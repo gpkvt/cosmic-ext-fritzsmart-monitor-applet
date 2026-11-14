@@ -7,13 +7,13 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 ## Features
 
 - Displays current power in watts and temperature in the COSMIC panel, with a configurable text size.
-- Popup displays separate power and temperature readings for every selected device, plus combined 15-minute high/low power values and a rolling power sparkline.
+- Popup displays each selected device in an alternating row, with separate 15-minute wattage and temperature sparklines, plus combined power history.
 - The main menu and settings are vertically scrollable when their content exceeds the popup height.
-- The panel displays combined power from all selected devices and the temperature of the first selected device.
+- The first selected device supplies both power and temperature values shown in the panel. Selected devices can be reordered in Settings.
 - In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy.
 - Optional per-router PEM CA certificate trust without disabling hostname verification.
 - Discovers compatible power-meter devices and lets the user select any combination with checkboxes.
-- Refreshes every 60 seconds and keeps up to 16 readings covering a rolling 15-minute window.
+- Refreshes every 60 seconds and keeps up to 16 total and per-device samples covering a rolling 15-minute window.
 - Keeps the last successful reading visible when a later refresh fails.
 - Uses FRITZ!Box challenge-response login and HTTPS certificate validation by
   default.
@@ -68,9 +68,11 @@ list.
 Open the applet popup and choose **Settings**. Adjust **Panel text size** (10–24 pt) to change the power and temperature labels in the panel. The setting is saved with the rest of the applet configuration. Enter the FRITZ!Box URL,
 username and password, then choose **Load devices**. The applet discovers
 devices that expose both power and temperature measurements. Check every
-device you want to monitor, then choose **Save settings**. Each selected
-device appears separately in the popup; the panel wattage and history use the
-combined power of all selected devices.
+device you want to monitor, then use **Up** and **Down** to order the selected
+devices before choosing **Save settings**. The first selected device supplies
+the panel's power and temperature readings. The popup shows every selected
+device separately, with its own wattage and temperature graph; combined power
+history remains available below the device list.
 
 Credentials are stored in `~/.config/fritz_solar.cfg` with owner-only
 permissions. TLS certificate validation is enabled by default. For a FRITZ!Box
