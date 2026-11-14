@@ -1,4 +1,4 @@
-use crate::solar::{fetch_solar_data, SolarReading};
+use crate::solar::{discover_devices, fetch_solar_data, FritzSettings, SolarDevice, SolarReading};
 use cosmic::iced::{
     futures,
     platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
@@ -18,6 +18,12 @@ pub struct AppModel {
     reading: Option<SolarReading>,
     error: Option<String>,
     updated: Option<String>,
+    settings_open: bool,
+    settings: FritzSettings,
+    devices: Vec<SolarDevice>,
+    device_labels: Vec<String>,
+    selected_device: Option<usize>,
+    settings_status: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -26,6 +32,15 @@ pub enum Message {
     PopupClosed(Id),
     Refresh,
     Updated(Result<SolarReading, String>),
+    ToggleSettings,
+    UrlChanged(String),
+    UsernameChanged(String),
+    PasswordChanged(String),
+    AllowInvalidCertsChanged(bool),
+    DiscoverDevices,
+    DevicesLoaded(Result<Vec<SolarDevice>, String>),
+    SelectDevice(usize),
+    SaveSettings,
 }
 
 impl cosmic::Application for AppModel {
@@ -34,102 +49,136 @@ impl cosmic::Application for AppModel {
     type Message = Message;
     const APP_ID: &'static str = "com.gpkvt.CosmicSolarApplet";
 
-    fn core(&self) -> &cosmic::Core {
-        &self.core
-    }
+    fn core(&self) -> &cosmic::Core { &self.core }
 
-    fn core_mut(&mut self) -> &mut cosmic::Core {
-        &mut self.core
-    }
+    fn core_mut(&mut self) -> &mut cosmic::Core { &mut self.core }
 
-    fn init(
-        core: cosmic::Core,
-        _flags: Self::Flags,
-    ) -> (Self, Task<cosmic::Action<Self::Message>>) {
+    fn init(core: cosmic::Core, _flags: Self::Flags) -> (Self, Task<cosmic::Action<Self::Message>>) {
+        let settings = FritzSettings::load().unwrap_or_default();
         (
-            Self {
-                core,
-                ..Default::default()
-            },
-            Task::perform(fetch_solar_data(), |result| {
-                cosmic::Action::App(Message::Updated(result))
-            }),
+            Self { core, settings, ..Default::default() },
+            Task::perform(fetch_solar_data(), |result| cosmic::Action::App(Message::Updated(result))),
         )
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
         Subscription::run(|| {
-            cosmic::iced::stream::channel(
-                4,
-                |mut output: futures::channel::mpsc::Sender<Message>| async move {
-                    let mut interval = tokio::time::interval(Duration::from_secs(60));
+            cosmic::iced::stream::channel(4, |mut output: futures::channel::mpsc::Sender<Message>| async move {
+                let mut interval = tokio::time::interval(Duration::from_secs(60));
+                interval.tick().await;
+                loop {
                     interval.tick().await;
-                    loop {
-                        interval.tick().await;
-                        if output.send(Message::Refresh).await.is_err() {
-                            break;
-                        }
-                    }
-                },
-            )
+                    if output.send(Message::Refresh).await.is_err() { break; }
+                }
+            })
         })
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
-        let label = self
-            .reading
-            .as_ref()
+        let label = self.reading.as_ref()
             .map(|reading| format!("☀ {} W", reading.power_w))
             .unwrap_or_else(|| "☀ -- W".to_string());
-
-        self.core
-            .applet
-            .text_button(self.core.applet.text(label), Message::TogglePopup)
-            .into()
+        self.core.applet.text_button(self.core.applet.text(label), Message::TogglePopup).into()
     }
 
     fn view_window(&self, _id: Id) -> Element<'_, Self::Message> {
-        let mut content = widget::Column::new()
-            .spacing(8)
-            .push(widget::text::title3("Solar production"));
-
-        if let Some(reading) = &self.reading {
+        let mut content = widget::Column::new().spacing(8);
+        if self.settings_open {
             content = content
-                .push(widget::text::title2(format!("{} W", reading.power_w)))
-                .push(widget::text::body(format!("{:.1} °C", reading.temperature_c)));
+                .push(widget::text::title3("Solar settings"))
+                .push(widget::text::body("FRITZ!Box URL"))
+                .push(widget::text_input("https://fritz.box", &self.settings.url).on_input(Message::UrlChanged))
+                .push(widget::text::body("Username"))
+                .push(widget::text_input("Username", &self.settings.username).on_input(Message::UsernameChanged))
+                .push(widget::text::body("Password"))
+                .push(widget::secure_input("Password", &self.settings.password, None, true).on_input(Message::PasswordChanged))
+                .push(widget::toggler(self.settings.allow_invalid_certs).label("Allow invalid TLS certificates").on_toggle(Message::AllowInvalidCertsChanged))
+                .push(widget::button::text("Load devices").on_press(Message::DiscoverDevices));
+            if !self.device_labels.is_empty() {
+                content = content
+                    .push(widget::text::body("Power-meter device"))
+                    .push(widget::dropdown(&self.device_labels, self.selected_device, Message::SelectDevice));
+            }
+            if let Some(status) = &self.settings_status {
+                content = content.push(widget::text::caption(status));
+            }
+            content = content
+                .push(widget::button::text("Save settings").on_press(Message::SaveSettings))
+                .push(widget::button::text("Back").on_press(Message::ToggleSettings));
         } else {
-            content = content.push(widget::text::body("Waiting for FRITZ!Box data..."));
+            content = content.push(widget::text::title3("Solar production"));
+            if let Some(reading) = &self.reading {
+                content = content
+                    .push(widget::text::title2(format!("{} W", reading.power_w)))
+                    .push(widget::text::body(format!("{:.1} °C", reading.temperature_c)));
+            } else {
+                content = content.push(widget::text::body("Waiting for FRITZ!Box data..."));
+            }
+            if let Some(updated) = &self.updated {
+                content = content.push(widget::text::caption(format!("Updated: {updated}")));
+            }
+            if let Some(error) = &self.error {
+                content = content.push(widget::text::caption(format!("Connection: {error}")));
+            }
+            content = content
+                .push(widget::button::text("Settings").on_press(Message::ToggleSettings))
+                .push(widget::button::text("Refresh").on_press(Message::Refresh));
         }
-
-        if let Some(updated) = &self.updated {
-            content = content.push(widget::text::caption(format!("Updated: {updated}")));
-        }
-        if let Some(error) = &self.error {
-            content = content.push(widget::text::caption(format!("Connection: {error}")));
-        }
-
         self.core.applet.popup_container(content).into()
     }
 
-    fn update(
-        &mut self,
-        message: Self::Message,
-    ) -> Task<cosmic::Action<Self::Message>> {
+    fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
             Message::Refresh => {
-                return Task::perform(fetch_solar_data(), |result| {
-                    cosmic::Action::App(Message::Updated(result))
-                });
+                return Task::perform(fetch_solar_data(), |result| cosmic::Action::App(Message::Updated(result)));
             }
             Message::Updated(result) => match result {
                 Ok(reading) => {
                     self.reading = Some(reading);
                     self.error = None;
-                    self.updated =
-                        Some(chrono::Local::now().format("%H:%M:%S").to_string());
+                    self.updated = Some(chrono::Local::now().format("%H:%M:%S").to_string());
                 }
                 Err(error) => self.error = Some(error),
             },
+            Message::ToggleSettings => {
+                self.settings_open = !self.settings_open;
+                self.settings_status = None;
+            }
+            Message::UrlChanged(value) => self.settings.url = value,
+            Message::UsernameChanged(value) => self.settings.username = value,
+            Message::PasswordChanged(value) => self.settings.password = value,
+            Message::AllowInvalidCertsChanged(value) => self.settings.allow_invalid_certs = value,
+            Message::DiscoverDevices => {
+                let settings = self.settings.clone();
+                self.settings_status = Some("Connecting and loading devices…".into());
+                return Task::perform(discover_devices(settings), |result| cosmic::Action::App(Message::DevicesLoaded(result)));
+            }
+            Message::DevicesLoaded(result) => match result {
+                Ok(devices) => {
+                    self.device_labels = devices.iter().map(|device| device.name.clone()).collect();
+                    self.devices = devices;
+                    self.selected_device = self.devices.iter().position(|device| {
+                        crate::solar::normalize_ain_for_selection(&device.ain)
+                            == crate::solar::normalize_ain_for_selection(&self.settings.ain)
+                    }).or(Some(0));
+                    self.settings_status = Some(format!("Found {} suitable device(s)", self.devices.len()));
+                }
+                Err(error) => self.settings_status = Some(error),
+            },
+            Message::SelectDevice(index) => {
+                if let Some(device) = self.devices.get(index) {
+                    self.settings.ain = device.ain.clone();
+                    self.selected_device = Some(index);
+                }
+            }
+            Message::SaveSettings => {
+                if let Err(error) = self.settings.save() {
+                    self.settings_status = Some(error);
+                } else {
+                    self.settings_status = Some("Settings saved".into());
+                    return Task::perform(fetch_solar_data(), |result| cosmic::Action::App(Message::Updated(result)));
+                }
+            }
             Message::TogglePopup => {
                 return if let Some(id) = self.popup.take() {
                     destroy_popup(id)
@@ -140,32 +189,19 @@ impl cosmic::Application for AppModel {
                         self.popup = None;
                         return Task::none();
                     };
-                    let mut settings = self.core.applet.get_popup_settings(
-                        main_window_id,
-                        id,
-                        None,
-                        None,
-                        None,
-                    );
-                    settings.positioner.size_limits =
-                        Limits::NONE.max_width(320.0).min_width(240.0);
+                    let mut settings = self.core.applet.get_popup_settings(main_window_id, id, None, None, None);
+                    settings.positioner.size_limits = Limits::NONE.max_width(360.0).min_width(260.0);
                     get_popup(settings)
                 };
             }
             Message::PopupClosed(id) => {
-                if self.popup == Some(id) {
-                    self.popup = None;
-                }
+                if self.popup == Some(id) { self.popup = None; }
             }
         }
         Task::none()
     }
 
-    fn on_close_requested(&self, id: Id) -> Option<Message> {
-        Some(Message::PopupClosed(id))
-    }
+    fn on_close_requested(&self, id: Id) -> Option<Message> { Some(Message::PopupClosed(id)) }
 
-    fn style(&self) -> Option<cosmic::iced::theme::Style> {
-        Some(cosmic::applet::style())
-    }
+    fn style(&self) -> Option<cosmic::iced::theme::Style> { Some(cosmic::applet::style()) }
 }
