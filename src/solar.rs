@@ -205,16 +205,21 @@ async fn read_xml_response(
     decode_xml_response(&bytes, context)
 }
 
+fn load_ca_certificate(path: &str) -> Result<Option<reqwest::Certificate>, String> {
+    if path.trim().is_empty() {
+        return Ok(None);
+    }
+    let certificate_pem = fs::read(path)
+        .map_err(|error| format!("Cannot read FRITZ!Box CA certificate {path}: {error}"))?;
+    let certificate = reqwest::Certificate::from_pem(&certificate_pem)
+        .map_err(|error| format!("Invalid FRITZ!Box CA certificate {path}: {error}"))?;
+    Ok(Some(certificate))
+}
+
 async fn authenticated_client(settings: &FritzSettings) -> Result<(Client, String), String> {
     validate_settings(settings, false)?;
     let mut builder = Client::builder().timeout(Duration::from_secs(10));
-    if !settings.ca_cert_path.trim().is_empty() {
-        let certificate_pem = fs::read(&settings.ca_cert_path).map_err(|error| {
-            format!("Cannot read FRITZ!Box CA certificate {}: {error}", settings.ca_cert_path)
-        })?;
-        let certificate = reqwest::Certificate::from_pem(&certificate_pem).map_err(|error| {
-            format!("Invalid FRITZ!Box CA certificate {}: {error}", settings.ca_cert_path)
-        })?;
+    if let Some(certificate) = load_ca_certificate(&settings.ca_cert_path)? {
         builder = builder.add_root_certificate(certificate);
     }
     if settings.allow_invalid_certs {
@@ -314,6 +319,30 @@ pub async fn fetch_solar_data() -> Result<SolarReading, String> {
 mod tests {
     use super::*;
 
+
+    #[test]
+    fn empty_ca_certificate_path_uses_system_roots() {
+        assert!(load_ca_certificate("").unwrap().is_none());
+        assert!(load_ca_certificate("   ").unwrap().is_none());
+    }
+
+    #[test]
+    fn missing_ca_certificate_returns_contextual_error() {
+        let error = load_ca_certificate("/definitely/not/a/fritzbox-ca.pem").unwrap_err();
+        assert!(error.contains("Cannot read FRITZ!Box CA certificate"));
+    }
+
+    #[test]
+    fn malformed_ca_certificate_is_rejected() {
+        let path = env::temp_dir().join(format!(
+            "cosmic-solar-invalid-ca-{}.pem",
+            std::process::id()
+        ));
+        fs::write(&path, b"not a PEM certificate").unwrap();
+        let error = load_ca_certificate(path.to_str().unwrap()).unwrap_err();
+        let _ = fs::remove_file(&path);
+        assert!(error.contains("Invalid FRITZ!Box CA certificate"));
+    }
 
     #[test]
     fn decodes_utf8_xml_response() {
