@@ -10,7 +10,7 @@ ICON_FILE := $(DATADIR)/icons/hicolor/scalable/apps/$(APP_ID).svg
 .PHONY: build install uninstall
 
 build:
-	BUILD_TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ) cargo build --release
+	cargo build --release
 
 install: build
 	install -Dm0755 target/release/$(APP_NAME) "$(BINDIR)/$(APP_NAME)"
