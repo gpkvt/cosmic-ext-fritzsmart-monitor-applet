@@ -41,6 +41,9 @@ pub enum Message {
     DevicesLoaded(Result<Vec<SolarDevice>, String>),
     SelectDevice(usize),
     SaveSettings,
+    CopyError,
+    CopySettingsStatus,
+    ClipboardCopied,
     Surface(cosmic::surface::Action<Message>),
 }
 
@@ -109,11 +112,9 @@ impl cosmic::Application for AppModel {
             }
             if let Some(status) = &self.settings_status {
                 content = content
-                    .push(widget::text::caption("Status (select text and right-click to copy)"))
-                    .push(
-                        widget::selectable_text::caption(status)
-                            .width(cosmic::iced::Length::Fill),
-                    );
+                    .push(widget::text::caption("Status"))
+                    .push(widget::text::body(status))
+                    .push(widget::button::text("Copy status").on_press(Message::CopySettingsStatus));
             }
             content = content
                 .push(widget::button::text("Save settings").on_press(Message::SaveSettings))
@@ -132,11 +133,9 @@ impl cosmic::Application for AppModel {
             }
             if let Some(error) = &self.error {
                 content = content
-                    .push(widget::text::caption("Connection error (select text and right-click to copy)"))
-                    .push(
-                        widget::selectable_text::body(error)
-                            .width(cosmic::iced::Length::Fill),
-                    );
+                    .push(widget::text::caption("Connection error"))
+                    .push(widget::text::body(error))
+                    .push(widget::button::text("Copy error").on_press(Message::CopyError));
             }
             content = content
                 .push(widget::button::text("Settings").on_press(Message::ToggleSettings))
@@ -194,6 +193,19 @@ impl cosmic::Application for AppModel {
                     self.selected_device = Some(index);
                 }
             }
+            Message::CopyError => {
+                if let Some(error) = self.error.clone() {
+                    return cosmic::iced::clipboard::write(error)
+                        .map(|()| cosmic::Action::App(Message::ClipboardCopied));
+                }
+            }
+            Message::CopySettingsStatus => {
+                if let Some(status) = self.settings_status.clone() {
+                    return cosmic::iced::clipboard::write(status)
+                        .map(|()| cosmic::Action::App(Message::ClipboardCopied));
+                }
+            }
+            Message::ClipboardCopied => {}
             Message::Surface(action) => {
                 return cosmic::task::message(cosmic::Action::Surface(action));
             }
