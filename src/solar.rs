@@ -184,7 +184,7 @@ fn parse_device_xml(xml: &str, ain: &str) -> Result<SolarReading, String> {
     let wanted_ain = normalize_ain_for_selection(ain);
     let device = document.descendants().find(|node| {
         node.has_tag_name("device") && node.attribute("identifier")
-            .is_some_and(|identifier| normalize_ain(identifier) == wanted_ain)
+            .is_some_and(|identifier| normalize_ain_for_selection(identifier) == wanted_ain)
     }).ok_or_else(|| "Configured FRITZ!Box device was not found".to_string())?;
     let power_mw = child_text(device, "powermeter", "power")
         .ok_or_else(|| "Device does not expose power measurements".to_string())?
@@ -201,7 +201,7 @@ pub async fn fetch_solar_data() -> Result<SolarReading, String> {
     let (client, sid) = authenticated_client(&settings).await?;
     let base = settings.url.trim_end_matches('/');
     let devices_xml = client.get(format!("{base}/webservices/homeautoswitch.lua"))
-        .query(&[("sid", sid.as_str()), ("ain", normalize_ain(&settings.ain).as_str()),
+        .query(&[("sid", sid.as_str()), ("ain", normalize_ain_for_selection(&settings.ain).as_str()),
             ("switchcmd", "getdevicelistinfos")])
         .send().await.map_err(|error| error.to_string())?
         .error_for_status().map_err(|error| format!("FRITZ!Box device request failed: {error}"))?
@@ -230,8 +230,8 @@ mod tests {
 
     #[test]
     fn normalizes_ain_separators() {
-        assert_eq!(normalize_ain("12345 678901"), "12345678901");
-        assert_eq!(normalize_ain("12:34-56 78"), "12345678");
+        assert_eq!(normalize_ain_for_selection("12345 678901"), "12345678901");
+        assert_eq!(normalize_ain_for_selection("12:34-56 78"), "12345678");
     }
 
     #[test]
