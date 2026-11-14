@@ -7,13 +7,13 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 ## Features
 
 - Displays current power in watts and temperature in the COSMIC panel, with a configurable text size.
-- Settings and popup device rows use alternating backgrounds. Each selected device has separate 15-minute wattage and temperature sparklines in the popup, plus combined power history.
+- Settings and popup device rows use alternating backgrounds. Each selected device has separate configurable-timespan wattage and temperature sparklines in the popup, plus combined power history.
 - The main menu and settings are vertically scrollable when their content exceeds the popup height.
 - The first selected device supplies both power and temperature values shown in the panel. Selected devices can be reordered in Settings.
 - In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy.
 - Optional per-router PEM CA certificate trust without disabling hostname verification.
 - Discovers compatible power-meter devices and lets the user select any combination with checkboxes.
-- Refreshes every 60 seconds and keeps up to 16 total and per-device samples covering a rolling 15-minute window.
+- Refreshes every 60 seconds and keeps total and per-device samples for the configured graph history (5 minutes to 24 hours).
 - Keeps the last successful reading visible when a later refresh fails.
 - Uses FRITZ!Box challenge-response login and HTTPS certificate validation by
   default.
@@ -71,8 +71,9 @@ devices that expose both power and temperature measurements. Check every
 device you want to monitor, then use **Up** and **Down** to order the selected
 devices before choosing **Save settings**. The first selected device supplies
 the panel's power and temperature readings. The popup shows every selected
-device separately, with its own wattage and temperature graph; combined power
-history remains available below the device list.
+device separately, with its own wattage and temperature graph. Set the graph
+history from 5 minutes to 24 hours in 5-minute increments under Settings; the
+combined power history uses the same timespan.
 
 Credentials are stored in `~/.config/fritz_solar.cfg` with owner-only
 permissions. TLS certificate validation is enabled by default. For a FRITZ!Box
@@ -91,9 +92,10 @@ readable; the applet manages the configuration file.
 
 ## Current scope and limitations
 
-The popup keeps rolling, in-memory 15-minute total-power and per-device histories
-(one sample per minute, up to 16 samples). It displays total-power low/high
-values and separate wattage and temperature sparklines for each selected device.
+The popup keeps rolling, in-memory total-power and per-device histories using
+the configured 5-minute to 24-hour graph timespan (one sample per minute). It
+displays total-power low/high values and separate wattage and temperature
+sparklines for each selected device.
 History is collected only while the applet is running and is not persisted across
 restarts. It does not provide historical production from before startup, daily
 yield, forecasts, or inverter-specific statistics. The FRITZ!Box device must
