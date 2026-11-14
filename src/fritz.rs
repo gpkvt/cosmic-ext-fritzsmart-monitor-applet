@@ -27,6 +27,7 @@ pub struct FritzSettings {
     pub allow_invalid_certs: bool,
     pub ca_cert_path: String,
     pub panel_text_size: u8,
+    pub graph_timespan_minutes: u16,
 }
 
 impl Default for FritzSettings {
@@ -40,12 +41,17 @@ impl Default for FritzSettings {
             allow_invalid_certs: false,
             ca_cert_path: String::new(),
             panel_text_size: 14,
+            graph_timespan_minutes: 15,
         }
     }
 }
 
 fn parse_panel_text_size(value: &str) -> u8 {
     value.parse::<u8>().unwrap_or(14).clamp(10, 24)
+}
+
+fn parse_graph_timespan_minutes(value: &str) -> u16 {
+    value.parse::<u16>().unwrap_or(15).clamp(5, 1440)
 }
 
 impl FritzSettings {
@@ -76,6 +82,7 @@ impl FritzSettings {
             allow_invalid_certs: get("ALLOW_INVALID_CERTS").eq_ignore_ascii_case("true"),
             ca_cert_path: get("CA_CERT_PATH"),
             panel_text_size: parse_panel_text_size(&get("PANEL_TEXT_SIZE")),
+            graph_timespan_minutes: parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")),
         };
         validate_settings(&settings, false)?;
         Ok(settings)
@@ -95,10 +102,10 @@ impl FritzSettings {
         let selected_ains = if self.ains.is_empty() { self.ain.clone() } else { self.ains.join(",") };
         let first_ain = self.ains.first().map(String::as_str).unwrap_or(&self.ain);
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\n",
             self.url, self.username, self.password, first_ain, selected_ains,
             if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path,
-            self.panel_text_size.clamp(10, 24)
+            self.panel_text_size.clamp(10, 24), self.graph_timespan_minutes.clamp(5, 1440)
         );
         #[cfg(unix)]
         let mut file = {
