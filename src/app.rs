@@ -47,6 +47,20 @@ pub enum Message {
     Surface(cosmic::surface::Action<Message>),
 }
 
+fn action_button<'a>(
+    icon_name: &'static str,
+    label: &'static str,
+    message: Message,
+) -> widget::Button<'a, Message> {
+    widget::button::custom(
+        widget::Row::new()
+            .spacing(8)
+            .push(widget::icon::from_name(icon_name).size(16))
+            .push(widget::text::body(label)),
+    )
+    .on_press(message)
+}
+
 impl cosmic::Application for AppModel {
     type Executor = cosmic::executor::Default;
     type Flags = ();
@@ -82,7 +96,15 @@ impl cosmic::Application for AppModel {
         let label = self.reading.as_ref()
             .map(|reading| format!("☀ {} W", reading.power_w))
             .unwrap_or_else(|| "☀ -- W".to_string());
-        self.core.applet.text_button(self.core.applet.text(label), Message::TogglePopup).into()
+        self.core.applet.button_from_element(
+            widget::Row::new()
+                .spacing(4)
+                .push(widget::icon::from_name("weather-clear-symbolic").size(16))
+                .push(widget::text::body(label)),
+            true,
+        )
+        .on_press_down(Message::TogglePopup)
+        .into()
     }
 
     fn view_window(&self, id: Id) -> Element<'_, Self::Message> {
@@ -115,7 +137,7 @@ impl cosmic::Application for AppModel {
                         .on_toggle(Message::AllowInvalidCertsChanged),
                 )
                 .push(widget::text::caption("DEVICE"))
-                .push(widget::button::text("Load devices").on_press(Message::DiscoverDevices));
+                .push(action_button("view-refresh-symbolic", "Load devices", Message::DiscoverDevices));
 
             if !self.device_labels.is_empty() {
                 content = content
@@ -134,7 +156,7 @@ impl cosmic::Application for AppModel {
             if let Some(status) = &self.settings_status {
                 content = content
                     .push(widget::text::body(status))
-                    .push(widget::button::text("Copy status").on_press(Message::CopySettingsStatus));
+                    .push(action_button("edit-copy-symbolic", "Copy status", Message::CopySettingsStatus));
             } else {
                 content = content.push(widget::text::caption("No status messages yet"));
             }
@@ -142,8 +164,8 @@ impl cosmic::Application for AppModel {
             content = content.push(
                 widget::Row::new()
                     .spacing(8)
-                    .push(widget::button::text("Save settings").on_press(Message::SaveSettings))
-                    .push(widget::button::text("Back").on_press(Message::ToggleSettings)),
+                    .push(action_button("document-save-symbolic", "Save settings", Message::SaveSettings))
+                    .push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings)),
             );
         } else {
             content = content.push(widget::text::title3("Solar production"));
@@ -168,7 +190,7 @@ impl cosmic::Application for AppModel {
                         widget::selectable_text::new(error.as_str())
                             .width(cosmic::iced::Length::Fill),
                     )
-                    .push(widget::button::text("Copy error").on_press(Message::CopyError));
+                    .push(action_button("edit-copy-symbolic", "Copy error", Message::CopyError));
                 if self.error_copied {
                     content = content.push(widget::text::caption("Error copied to clipboard"));
                 }
@@ -177,8 +199,8 @@ impl cosmic::Application for AppModel {
             content = content.push(
                 widget::Row::new()
                     .spacing(8)
-                    .push(widget::button::text("Refresh").on_press(Message::Refresh))
-                    .push(widget::button::text("Settings").on_press(Message::ToggleSettings)),
+                    .push(action_button("view-refresh-symbolic", "Refresh", Message::Refresh))
+                    .push(action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
             );
         }
 
