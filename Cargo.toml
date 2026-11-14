@@ -1,0 +1,22 @@
+[package]
+name = "cosmic-solar-applet"
+version = "0.1.0"
+edition = "2024"
+description = "Solar production monitor for the COSMIC desktop panel"
+license = "MIT"
+
+[dependencies]
+libcosmic = { git = "https://github.com/pop-os/libcosmic.git", features = [
+    "applet",
+    "applet-token",
+    "tokio",
+    "wayland",
+    "winit",
+] }
+tokio = { version = "1", features = ["time"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+roxmltree = "0.20"
+md-5 = "0.10"
+hex = "0.4"
+chrono = "0.4"
+futures = "0.3"
