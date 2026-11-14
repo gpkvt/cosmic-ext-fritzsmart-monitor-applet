@@ -48,7 +48,6 @@ pub enum Message {
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
     ToggleDevice(String, bool),
     SaveSettings,
-    Surface(cosmic::surface::Action<Message>),
 }
 
 
@@ -400,9 +399,6 @@ impl cosmic::Application for AppModel {
                 if selected { self.selected_ains.push(ain); }
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
-            }
-            Message::Surface(action) => {
-                return cosmic::task::message(cosmic::Action::Surface(action));
             }
             Message::SaveSettings => {
                 if let Err(error) = self.settings.save() {
