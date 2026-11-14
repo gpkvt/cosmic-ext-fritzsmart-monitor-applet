@@ -14,6 +14,12 @@ jobs:
         with:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
+      - name: Install desktop entry validator
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes desktop-file-utils
+      - name: Validate COSMIC applet desktop entry
+        run: desktop-file-validate data/com.gpkvt.CosmicSolarApplet.desktop
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Run tests
