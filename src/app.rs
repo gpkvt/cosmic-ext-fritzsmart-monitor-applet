@@ -164,7 +164,11 @@ impl cosmic::Application for AppModel {
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
-        let primary_reading = self.readings.first();
+        let primary_reading = self.selected_ains.first()
+            .and_then(|selected| self.readings.iter().find(|reading|
+                crate::fritz::normalize_ain_for_selection(&reading.ain)
+                    == crate::fritz::normalize_ain_for_selection(selected)))
+            .or_else(|| self.readings.first());
         let power = primary_reading.map(|reading| format!("{} W", reading.power_w))
             .unwrap_or_else(|| "-- W".to_string());
         let temperature = primary_reading.map(|reading| format!("{:.1} °C", reading.temperature_c))
