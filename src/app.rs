@@ -9,7 +9,7 @@ use cosmic::iced::{
 use cosmic::prelude::*;
 use cosmic::widget;
 use futures::SinkExt;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
@@ -29,6 +29,7 @@ pub struct AppModel {
     selected_ains: Vec<String>,
     settings_status: Option<String>,
     history: VecDeque<(Instant, i64)>,
+    device_history: HashMap<String, VecDeque<(Instant, i64, f64)>>,
 }
 
 #[derive(Debug, Clone)]
@@ -47,6 +48,7 @@ pub enum Message {
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
     ToggleDevice(String, bool),
+    MoveDevice(String, bool),
     SaveSettings,
 }
 
@@ -66,18 +68,54 @@ fn record_power_sample(history: &mut VecDeque<(Instant, i64)>, power_w: i64, now
 }
 
 fn power_sparkline(history: &VecDeque<(Instant, i64)>) -> String {
+    numeric_sparkline(history.iter().map(|(_, value)| *value as f64))
+}
+
+fn numeric_sparkline(values: impl Iterator<Item = f64>) -> String {
     const LEVELS: [&str; 8] = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
-    let Some(minimum) = history.iter().map(|(_, value)| *value).min() else {
+    let values: Vec<f64> = values.collect();
+    let Some(minimum) = values.iter().copied().reduce(f64::min) else {
         return "Waiting for samples…".into();
     };
-    let maximum = history.iter().map(|(_, value)| *value).max().unwrap_or(minimum);
-    if minimum == maximum {
-        return LEVELS[3].repeat(history.len());
+    let maximum = values.iter().copied().reduce(f64::max).unwrap_or(minimum);
+    if (maximum - minimum).abs() < f64::EPSILON {
+        return LEVELS[3].repeat(values.len());
     }
-    history.iter().map(|(_, value)| {
-        let position = ((*value - minimum) as f64 / (maximum - minimum) as f64 * 7.0).round() as usize;
+    values.iter().map(|value| {
+        let position = ((*value - minimum) / (maximum - minimum) * 7.0).round() as usize;
         LEVELS[position.min(7)]
     }).collect::<Vec<_>>().concat()
+}
+
+fn record_device_sample(
+    history: &mut HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    reading: &FritzReading,
+    now: Instant,
+) {
+    let samples = history
+        .entry(crate::fritz::normalize_ain_for_selection(&reading.ain))
+        .or_default();
+    samples.push_back((now, reading.power_w, reading.temperature_c));
+    while samples.front().is_some_and(|(timestamp, _, _)|
+        now.duration_since(*timestamp) > HISTORY_WINDOW) {
+        samples.pop_front();
+    }
+    while samples.len() > MAX_HISTORY_SAMPLES {
+        samples.pop_front();
+    }
+}
+
+fn move_selected_device(ains: &mut [String], ain: &str, move_up: bool) {
+    let normalized = crate::fritz::normalize_ain_for_selection(ain);
+    let Some(index) = ains.iter().position(|selected|
+        crate::fritz::normalize_ain_for_selection(selected) == normalized) else {
+        return;
+    };
+    if move_up && index > 0 {
+        ains.swap(index, index - 1);
+    } else if !move_up && index + 1 < ains.len() {
+        ains.swap(index, index + 1);
+    }
 }
 
 fn action_button<'a>(
@@ -126,9 +164,10 @@ impl cosmic::Application for AppModel {
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
-        let total_power = self.readings.iter().map(|reading| reading.power_w).sum::<i64>();
-        let power = if self.readings.is_empty() { "-- W".to_string() } else { format!("{total_power} W") };
-        let temperature = self.readings.first().map(|reading| format!("{:.1} °C", reading.temperature_c))
+        let primary_reading = self.readings.first();
+        let power = primary_reading.map(|reading| format!("{} W", reading.power_w))
+            .unwrap_or_else(|| "-- W".to_string());
+        let temperature = primary_reading.map(|reading| format!("{:.1} °C", reading.temperature_c))
             .unwrap_or_else(|| "-- °C".to_string());
 
         let suggested = self.core.applet.suggested_size(true);
@@ -234,19 +273,57 @@ impl cosmic::Application for AppModel {
                 .push(action_button("view-refresh-symbolic", "Load devices", Message::DiscoverDevices));
 
             if !self.devices.is_empty() {
-                content = content.push(widget::text::body("Select power-meter devices"));
-                for device in &self.devices {
-                    let selected = self.selected_ains.iter().any(|ain|
+                content = content.push(widget::text::body("Select and order power-meter devices"));
+                let mut ordered_devices: Vec<&FritzDevice> = self.selected_ains.iter()
+                    .filter_map(|ain| self.devices.iter().find(|device|
+                        crate::fritz::normalize_ain_for_selection(&device.ain)
+                            == crate::fritz::normalize_ain_for_selection(ain)))
+                    .collect();
+                ordered_devices.extend(self.devices.iter().filter(|device|
+                    !self.selected_ains.iter().any(|ain|
+                        crate::fritz::normalize_ain_for_selection(ain)
+                            == crate::fritz::normalize_ain_for_selection(&device.ain))));
+                for (row_index, device) in ordered_devices.iter().enumerate() {
+                    let selected_index = self.selected_ains.iter().position(|ain|
                         crate::fritz::normalize_ain_for_selection(ain)
                             == crate::fritz::normalize_ain_for_selection(&device.ain));
-                    content = content.push(widget::checkbox(selected)
-                        .label(device.name.clone())
-                        .on_toggle({
-                            let ain = device.ain.clone();
-                            move |checked| Message::ToggleDevice(ain.clone(), checked)
+                    let selected = selected_index.is_some();
+                    let ain = device.ain.clone();
+                    let mut row = widget::Row::new()
+                        .spacing(6)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::checkbox(selected)
+                            .label(device.name.clone())
+                            .on_toggle({
+                                let ain = ain.clone();
+                                move |checked| Message::ToggleDevice(ain.clone(), checked)
+                            }));
+                    if let Some(index) = selected_index {
+                        row = row.push(widget::text::caption(format!("#{}", index + 1)));
+                        if index > 0 {
+                            row = row.push(action_button("go-up-symbolic", "Up", Message::MoveDevice(ain.clone(), true)));
+                        }
+                        if index + 1 < self.selected_ains.len() {
+                            row = row.push(action_button("go-down-symbolic", "Down", Message::MoveDevice(ain.clone(), false)));
+                        }
+                    }
+                    let alternate = row_index % 2 == 1;
+                    content = content.push(widget::container(row)
+                        .padding(8)
+                        .style(move |theme| {
+                            let cosmic = theme.cosmic();
+                            let background = if alternate {
+                                cosmic.background(false).small_widget
+                            } else {
+                                cosmic.background(false).base
+                            };
+                            cosmic::iced::widget::container::Style {
+                                background: Some(cosmic::iced::Color::from(background).into()),
+                                ..Default::default()
+                            }
                         }));
                 }
-                content = content.push(widget::text::caption("All checked devices appear separately in the popup"));
+                content = content.push(widget::text::caption("Use Up and Down to set the order. The first selected device supplies the panel readings."));
             }
 
             content = content
@@ -278,11 +355,41 @@ impl cosmic::Application for AppModel {
 
             if !self.readings.is_empty() {
                 content = content.push(widget::text::caption("SELECTED DEVICES"));
-                for reading in &self.readings {
-                    content = content.push(widget::text::body(reading.name.clone()))
+                for (index, reading) in self.readings.iter().enumerate() {
+                    let device_history = self.device_history.get(
+                        &crate::fritz::normalize_ain_for_selection(&reading.ain),
+                    );
+                    let power_graph = device_history.map(|samples|
+                        numeric_sparkline(samples.iter().map(|(_, power, _)| *power as f64)))
+                        .unwrap_or_else(|| "Waiting for samples…".into());
+                    let temperature_graph = device_history.map(|samples|
+                        numeric_sparkline(samples.iter().map(|(_, _, temperature)| *temperature)))
+                        .unwrap_or_else(|| "Waiting for samples…".into());
+                    let device_content = widget::Column::new()
+                        .spacing(6)
+                        .push(widget::text::body(reading.name.clone()))
                         .push(widget::Row::new().spacing(12).align_y(cosmic::iced::Alignment::Center)
                             .push(widget::text::title2(format!("{} W", reading.power_w)))
-                            .push(widget::text::body(format!("{:.1} °C", reading.temperature_c))));
+                            .push(widget::text::body(format!("{:.1} °C", reading.temperature_c))))
+                        .push(widget::text::caption("POWER · LAST 15 MINUTES"))
+                        .push(widget::text::body(power_graph))
+                        .push(widget::text::caption("TEMPERATURE · LAST 15 MINUTES"))
+                        .push(widget::text::body(temperature_graph));
+                    let alternate = index % 2 == 1;
+                    content = content.push(widget::container(device_content)
+                        .padding(10)
+                        .style(move |theme| {
+                            let cosmic = theme.cosmic();
+                            let background = if alternate {
+                                cosmic.background(false).small_widget
+                            } else {
+                                cosmic.background(false).base
+                            };
+                            cosmic::iced::widget::container::Style {
+                                background: Some(cosmic::iced::Color::from(background).into()),
+                                ..Default::default()
+                            }
+                        }));
                 }
                 content = content.push(widget::divider::horizontal::default());
                 if let (Some(low), Some(high)) = (
@@ -355,7 +462,11 @@ impl cosmic::Application for AppModel {
             Message::Updated(result) => match result {
                 Ok(readings) => {
                     let total_power = readings.iter().map(|reading| reading.power_w).sum();
-                    record_power_sample(&mut self.history, total_power, Instant::now());
+                    let now = Instant::now();
+                    record_power_sample(&mut self.history, total_power, now);
+                    for reading in &readings {
+                        record_device_sample(&mut self.device_history, reading, now);
+                    }
                     self.readings = readings;
                     self.error = None;
                     self.updated = Some(chrono::Local::now().format("%H:%M:%S").to_string());
@@ -400,6 +511,11 @@ impl cosmic::Application for AppModel {
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
             }
+            Message::MoveDevice(ain, move_up) => {
+                move_selected_device(&mut self.selected_ains, &ain, move_up);
+                self.settings.ains = self.selected_ains.clone();
+                self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
+            }
             Message::SaveSettings => {
                 if let Err(error) = self.settings.save() {
                     self.settings_status = Some(error);
@@ -441,6 +557,39 @@ impl cosmic::Application for AppModel {
 #[cfg(test)]
 mod history_tests {
     use super::*;
+
+
+    #[test]
+    fn moving_selected_devices_preserves_order_and_boundaries() {
+        let mut ains = vec!["111111111111".into(), "222222222222".into(), "333333333333".into()];
+        move_selected_device(&mut ains, "2222 2222 2222", true);
+        assert_eq!(ains, vec!["222222222222", "111111111111", "333333333333"]);
+        move_selected_device(&mut ains, "222222222222", true);
+        assert_eq!(ains, vec!["222222222222", "111111111111", "333333333333"]);
+        move_selected_device(&mut ains, "222222222222", false);
+        assert_eq!(ains, vec!["111111111111", "222222222222", "333333333333"]);
+        move_selected_device(&mut ains, "missing", false);
+        assert_eq!(ains, vec!["111111111111", "222222222222", "333333333333"]);
+    }
+
+    #[test]
+    fn device_history_keeps_only_recent_samples() {
+        let start = Instant::now();
+        let mut history = HashMap::new();
+        let reading = FritzReading {
+            ain: "11:11 11".into(),
+            name: "Test device".into(),
+            power_w: 120,
+            temperature_c: 21.5,
+        };
+        for minute in 0_u64..18 {
+            record_device_sample(&mut history, &reading, start + Duration::from_secs(minute * 60));
+        }
+        let samples = history.get("1111").unwrap();
+        assert_eq!(samples.len(), 16);
+        assert_eq!(samples.front().unwrap().1, 120);
+        assert_eq!(samples.back().unwrap().2, 21.5);
+    }
 
     #[test]
     fn history_keeps_only_the_last_fifteen_minutes_and_sixteen_samples() {
