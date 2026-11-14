@@ -616,4 +616,10 @@ mod history_tests {
         let changing = VecDeque::from([(now, 10), (now, 20)]);
         assert_eq!(power_sparkline(&changing), "▁█");
     }
+
+    #[test]
+    fn numeric_sparkline_handles_temperature_values() {
+        assert_eq!(numeric_sparkline([20.0, 21.0, 22.0].into_iter()), "▁▄█");
+        assert_eq!(numeric_sparkline([21.5, 21.5].into_iter()), "▄▄");
+    }
 }
