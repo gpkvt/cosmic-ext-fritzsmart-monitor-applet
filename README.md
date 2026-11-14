@@ -33,9 +33,9 @@ make install
 ```
 
 The install target builds the release binary, installs it to
-`~/.local/bin/cosmic-solar-applet`, and installs the COSMIC desktop entry to
-`~/.local/share/applications/com.gpkvt.CosmicSolarApplet.desktop`. The
-desktop entry uses the absolute path to the installed binary and includes the
+`~/.local/bin/cosmic-solar-applet`, installs the COSMIC desktop entry to
+`~/.local/share/applications/com.gpkvt.CosmicSolarApplet.desktop`, and installs
+the app icon to `~/.local/share/icons/hicolor/scalable/apps/`. The desktop entry uses the absolute path to the installed binary and includes the
 COSMIC applet discovery keys, so the applet can be found in COSMIC Settings.
 No root privileges are required.
 
