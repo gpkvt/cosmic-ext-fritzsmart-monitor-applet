@@ -15,7 +15,7 @@ pub struct SolarDevice {
     pub ain: String,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct FritzSettings {
     pub url: String,
     pub username: String,
@@ -24,6 +24,24 @@ pub struct FritzSettings {
     pub allow_invalid_certs: bool,
     pub ca_cert_path: String,
     pub panel_text_size: u8,
+}
+
+impl Default for FritzSettings {
+    fn default() -> Self {
+        Self {
+            url: String::new(),
+            username: String::new(),
+            password: String::new(),
+            ain: String::new(),
+            allow_invalid_certs: false,
+            ca_cert_path: String::new(),
+            panel_text_size: 14,
+        }
+    }
+}
+
+fn parse_panel_text_size(value: &str) -> u8 {
+    value.parse::<u8>().unwrap_or(14).clamp(10, 24)
 }
 
 impl FritzSettings {
@@ -47,7 +65,7 @@ impl FritzSettings {
             ain: get("AIN"),
             allow_invalid_certs: get("ALLOW_INVALID_CERTS").eq_ignore_ascii_case("true"),
             ca_cert_path: get("CA_CERT_PATH"),
-            panel_text_size: get("PANEL_TEXT_SIZE").parse::<u8>().unwrap_or(14).clamp(10, 24),
+            panel_text_size: parse_panel_text_size(&get("PANEL_TEXT_SIZE")),
         };
         validate_settings(&settings, false)?;
         Ok(settings)
@@ -322,6 +340,15 @@ pub async fn fetch_solar_data() -> Result<SolarReading, String> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn panel_text_size_defaults_and_is_clamped() {
+        assert_eq!(FritzSettings::default().panel_text_size, 14);
+        assert_eq!(parse_panel_text_size(""), 14);
+        assert_eq!(parse_panel_text_size("invalid"), 14);
+        assert_eq!(parse_panel_text_size("8"), 10);
+        assert_eq!(parse_panel_text_size("18"), 18);
+        assert_eq!(parse_panel_text_size("30"), 24);
+    }
 
     #[test]
     fn empty_ca_certificate_path_uses_system_roots() {
