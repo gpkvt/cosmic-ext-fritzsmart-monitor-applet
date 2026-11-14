@@ -273,6 +273,7 @@ impl cosmic::Application for AppModel {
                     widget::Row::new()
                         .spacing(8)
                         .push(action_button("document-save-symbolic", "Save settings", Message::SaveSettings))
+                        .push(widget::horizontal_space())
                         .push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings)),
                 );
         } else {
@@ -321,6 +322,7 @@ impl cosmic::Application for AppModel {
                     widget::Row::new()
                         .spacing(8)
                         .push(action_button("view-refresh-symbolic", "Refresh", Message::Refresh))
+                        .push(widget::horizontal_space())
                         .push(action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
                 );
         }
