@@ -42,6 +42,7 @@ pub enum Message {
     UsernameChanged(String),
     PasswordChanged(String),
     AllowInvalidCertsChanged(bool),
+    CaCertPathChanged(String),
     DiscoverDevices,
     DevicesLoaded(Result<Vec<SolarDevice>, String>),
     SelectDevice(usize),
@@ -167,6 +168,12 @@ impl cosmic::Application for AppModel {
                     widget::secure_input("Password", &self.settings.password, None, true)
                         .on_input(Message::PasswordChanged),
                 )
+                .push(widget::text::body("Trusted CA certificate (PEM file, optional)"))
+                .push(
+                    widget::text_input("/home/user/.config/fritzbox-ca.pem", &self.settings.ca_cert_path)
+                        .on_input(Message::CaCertPathChanged),
+                )
+                .push(widget::text::caption("Leave empty to use the system certificate store"))
                 .push(
                     widget::toggler(self.settings.allow_invalid_certs)
                         .label(Some("Allow invalid TLS certificates".to_string()))
@@ -284,6 +291,7 @@ impl cosmic::Application for AppModel {
             Message::UsernameChanged(value) => self.settings.username = value,
             Message::PasswordChanged(value) => self.settings.password = value,
             Message::AllowInvalidCertsChanged(value) => self.settings.allow_invalid_certs = value,
+            Message::CaCertPathChanged(value) => self.settings.ca_cert_path = value,
             Message::DiscoverDevices => {
                 let settings = self.settings.clone();
                 self.settings_status = Some("Connecting and loading devices…".into());
