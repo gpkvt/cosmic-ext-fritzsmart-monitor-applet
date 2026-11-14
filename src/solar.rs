@@ -23,6 +23,7 @@ pub struct FritzSettings {
     pub ain: String,
     pub allow_invalid_certs: bool,
     pub ca_cert_path: String,
+    pub panel_text_size: u8,
 }
 
 impl FritzSettings {
@@ -46,6 +47,7 @@ impl FritzSettings {
             ain: get("AIN"),
             allow_invalid_certs: get("ALLOW_INVALID_CERTS").eq_ignore_ascii_case("true"),
             ca_cert_path: get("CA_CERT_PATH"),
+            panel_text_size: get("PANEL_TEXT_SIZE").parse::<u8>().unwrap_or(14).clamp(10, 24),
         };
         validate_settings(&settings, false)?;
         Ok(settings)
@@ -63,9 +65,10 @@ impl FritzSettings {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         let temporary = parent.join(format!(".fritz_solar.cfg.{}.tmp", std::process::id()));
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\n",
             self.url, self.username, self.password, self.ain,
-            if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path
+            if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path,
+            self.panel_text_size.clamp(10, 24)
         );
         #[cfg(unix)]
         let mut file = {
