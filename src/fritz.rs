@@ -325,7 +325,7 @@ fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<
     let mut readings = Vec::new();
     for device in document.descendants().filter(|node| node.has_tag_name("device")) {
         let Some(ain) = device.attribute("identifier") else { continue };
-        if !wanted.iter().any(|selected| *selected == normalize_ain_for_selection(ain)) { continue; }
+        if !wanted.iter().any(|selected| selected == &normalize_ain_for_selection(ain)) { continue; }
         let power_mw = child_text(device, "powermeter", "power")
             .ok_or_else(|| format!("Device {} does not expose power measurements", ain))?
             .parse::<i64>().map_err(|_| format!("Device {} returned an invalid power measurement", ain))?;
@@ -338,7 +338,7 @@ fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<
         readings.push(FritzReading { ain: ain.to_string(), name, power_w: power_mw / 1000, temperature_c });
     }
     readings.sort_by_key(|reading| wanted.iter().position(|selected|
-        *selected == normalize_ain_for_selection(&reading.ain)).unwrap_or(usize::MAX));
+        selected == &normalize_ain_for_selection(&reading.ain)).unwrap_or(usize::MAX));
     if readings.is_empty() { return Err("None of the selected FRITZ!Box devices were found".into()); }
     Ok(readings)
 }
