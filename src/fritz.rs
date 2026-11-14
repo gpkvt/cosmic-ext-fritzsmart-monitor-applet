@@ -337,6 +337,8 @@ fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<
             .unwrap_or("FRITZ!Box device").trim().to_string();
         readings.push(FritzReading { ain: ain.to_string(), name, power_w: power_mw / 1000, temperature_c });
     }
+    readings.sort_by_key(|reading| wanted.iter().position(|selected|
+        *selected == normalize_ain_for_selection(&reading.ain)).unwrap_or(usize::MAX));
     if readings.is_empty() { return Err("None of the selected FRITZ!Box devices were found".into()); }
     Ok(readings)
 }
@@ -520,15 +522,15 @@ mod tests {
         "#;
         let readings = parse_device_readings_xml(
             xml,
-            &["111111111111".into(), "2222 2222 2222".into()],
+            &["2222 2222 2222".into(), "111111111111".into()],
         ).unwrap();
         assert_eq!(readings.len(), 2);
-        assert_eq!(readings[0].name, "Solar inverter");
-        assert_eq!(readings[0].power_w, 123);
-        assert_eq!(readings[0].temperature_c, 21.5);
-        assert_eq!(readings[1].name, "Battery inverter");
-        assert_eq!(readings[1].power_w, 456);
-        assert_eq!(readings[1].temperature_c, 19.8);
+        assert_eq!(readings[0].name, "Battery inverter");
+        assert_eq!(readings[0].power_w, 456);
+        assert_eq!(readings[0].temperature_c, 19.8);
+        assert_eq!(readings[1].name, "Solar inverter");
+        assert_eq!(readings[1].power_w, 123);
+        assert_eq!(readings[1].temperature_c, 21.5);
     }
 
     #[test]
