@@ -122,26 +122,49 @@ fn challenge_response(challenge: &str, password: &str) -> String {
     hex::encode(Md5::digest(utf16le))
 }
 
+fn decode_xml_response(bytes: &[u8], context: &str) -> Result<String, String> {
+    String::from_utf8(bytes.to_vec())
+        .map_err(|error| format!("{context}: response is not valid UTF-8: {error}"))
+}
+
+async fn read_xml_response(
+    response: reqwest::Response,
+    context: &str,
+) -> Result<String, String> {
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("{context}: HTTP {status}"));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|error| format!("{context}: failed to read response: {error}"))?;
+
+    decode_xml_response(&bytes, context)
+}
+
 async fn authenticated_client(settings: &FritzSettings) -> Result<(Client, String), String> {
     validate_settings(settings, false)?;
     let mut builder = Client::builder().timeout(Duration::from_secs(10));
     if settings.allow_invalid_certs { builder = builder.danger_accept_invalid_certs(true); }
     let client = builder.build().map_err(|error| error.to_string())?;
     let base = settings.url.trim_end_matches('/');
-    let challenge_xml = client.get(format!("{base}/login_sid.lua")).send().await
-        .map_err(|error| format!("FRITZ!Box connection failed: {error}"))?
-        .error_for_status().map_err(|error| format!("FRITZ!Box challenge request failed: {error}"))?
-        .text().await.map_err(|error| error.to_string())?;
+    let challenge_response = client.get(format!("{base}/login_sid.lua")).send().await
+        .map_err(|error| format!("FRITZ!Box connection failed: {error}"))?;
+    let challenge_xml = read_xml_response(
+        challenge_response,
+        "FRITZ!Box challenge request failed",
+    ).await?;
     let challenge_document = Document::parse(&challenge_xml)
         .map_err(|error| format!("Invalid login XML: {error}"))?;
     let challenge = find_text(&challenge_document, "Challenge")
         .ok_or_else(|| "FRITZ!Box did not return a login challenge".to_string())?.to_string();
     let response = format!("{challenge}-{}", challenge_response(&challenge, &settings.password));
-    let sid_xml = client.get(format!("{base}/login_sid.lua"))
+    let sid_response = client.get(format!("{base}/login_sid.lua"))
         .query(&[("username", settings.username.as_str()), ("response", response.as_str())])
-        .send().await.map_err(|error| error.to_string())?
-        .error_for_status().map_err(|error| format!("FRITZ!Box login request failed: {error}"))?
-        .text().await.map_err(|error| error.to_string())?;
+        .send().await.map_err(|error| format!("FRITZ!Box login request failed: {error}"))?;
+    let sid_xml = read_xml_response(sid_response, "FRITZ!Box login request failed").await?;
     let sid_document = Document::parse(&sid_xml).map_err(|error| format!("Invalid session XML: {error}"))?;
     let sid = find_text(&sid_document, "SID").ok_or_else(|| "FRITZ!Box did not return a session ID".to_string())?;
     if sid == "0000000000000000" {
@@ -153,11 +176,10 @@ async fn authenticated_client(settings: &FritzSettings) -> Result<(Client, Strin
 pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<SolarDevice>, String> {
     let (client, sid) = authenticated_client(&settings).await?;
     let base = settings.url.trim_end_matches('/');
-    let xml = client.get(format!("{base}/webservices/homeautoswitch.lua"))
+    let device_response = client.get(format!("{base}/webservices/homeautoswitch.lua"))
         .query(&[("sid", sid.as_str()), ("switchcmd", "getdevicelistinfos")])
-        .send().await.map_err(|error| error.to_string())?
-        .error_for_status().map_err(|error| format!("FRITZ!Box device request failed: {error}"))?
-        .text().await.map_err(|error| error.to_string())?;
+        .send().await.map_err(|error| format!("FRITZ!Box device request failed: {error}"))?;
+    let xml = read_xml_response(device_response, "FRITZ!Box device request failed").await?;
     parse_devices_xml(&xml)
 }
 
@@ -205,18 +227,37 @@ pub async fn fetch_solar_data() -> Result<SolarReading, String> {
     validate_settings(&settings, true)?;
     let (client, sid) = authenticated_client(&settings).await?;
     let base = settings.url.trim_end_matches('/');
-    let devices_xml = client.get(format!("{base}/webservices/homeautoswitch.lua"))
+    let device_response = client.get(format!("{base}/webservices/homeautoswitch.lua"))
         .query(&[("sid", sid.as_str()), ("ain", normalize_ain_for_selection(&settings.ain).as_str()),
             ("switchcmd", "getdevicelistinfos")])
-        .send().await.map_err(|error| error.to_string())?
-        .error_for_status().map_err(|error| format!("FRITZ!Box device request failed: {error}"))?
-        .text().await.map_err(|error| error.to_string())?;
+        .send().await.map_err(|error| format!("FRITZ!Box device request failed: {error}"))?;
+    let devices_xml = read_xml_response(
+        device_response,
+        "FRITZ!Box device request failed",
+    ).await?;
     parse_device_xml(&devices_xml, &settings.ain)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    #[test]
+    fn decodes_utf8_xml_response() {
+        let xml = b"<devicelist><device /></devicelist>";
+        assert_eq!(
+            decode_xml_response(xml, "device request").unwrap(),
+            "<devicelist><device /></devicelist>"
+        );
+    }
+
+    #[test]
+    fn rejects_non_utf8_xml_response_with_context() {
+        let error = decode_xml_response(b"<device>\\xff</device>", "device request")
+            .unwrap_err();
+        assert!(error.starts_with("device request: response is not valid UTF-8:"));
+    }
 
     #[test]
     fn challenge_response_uses_utf16le_md5() {
