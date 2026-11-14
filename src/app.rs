@@ -85,18 +85,37 @@ impl cosmic::Application for AppModel {
     }
 
     fn view_window(&self, id: Id) -> Element<'_, Self::Message> {
-        let mut content = widget::Column::new().spacing(8);
+        // popup_container fixes the popup width at 360px. Keep the content
+        // padded so controls and text do not touch the popup border.
+        let mut content = widget::Column::new().spacing(12).padding(16);
+
         if self.settings_open {
             content = content
                 .push(widget::text::title3("Solar settings"))
+                .push(widget::text::caption("CONNECTION"))
                 .push(widget::text::body("FRITZ!Box URL"))
-                .push(widget::text_input("https://fritz.box", &self.settings.url).on_input(Message::UrlChanged))
+                .push(
+                    widget::text_input("https://fritz.box", &self.settings.url)
+                        .on_input(Message::UrlChanged),
+                )
                 .push(widget::text::body("Username"))
-                .push(widget::text_input("Username", &self.settings.username).on_input(Message::UsernameChanged))
+                .push(
+                    widget::text_input("Username", &self.settings.username)
+                        .on_input(Message::UsernameChanged),
+                )
                 .push(widget::text::body("Password"))
-                .push(widget::secure_input("Password", &self.settings.password, None, true).on_input(Message::PasswordChanged))
-                .push(widget::toggler(self.settings.allow_invalid_certs).label(Some("Allow invalid TLS certificates".to_string())).on_toggle(Message::AllowInvalidCertsChanged))
+                .push(
+                    widget::secure_input("Password", &self.settings.password, None, true)
+                        .on_input(Message::PasswordChanged),
+                )
+                .push(
+                    widget::toggler(self.settings.allow_invalid_certs)
+                        .label(Some("Allow invalid TLS certificates".to_string()))
+                        .on_toggle(Message::AllowInvalidCertsChanged),
+                )
+                .push(widget::text::caption("DEVICE"))
                 .push(widget::button::text("Load devices").on_press(Message::DiscoverDevices));
+
             if !self.device_labels.is_empty() {
                 content = content
                     .push(widget::text::body("Power-meter device"))
@@ -109,39 +128,53 @@ impl cosmic::Application for AppModel {
                         |message| message,
                     ));
             }
-            content = content.push(
-                widget::button::text("Copy status").on_press(Message::CopySettingsStatus)
-            );
+
+            content = content.push(widget::text::caption("DIAGNOSTICS"));
             if let Some(status) = &self.settings_status {
                 content = content
-                    .push(widget::text::caption("Status"))
-                    .push(widget::text::body(status));
+                    .push(widget::text::body(status))
+                    .push(widget::button::text("Copy status").on_press(Message::CopySettingsStatus));
+            } else {
+                content = content.push(widget::text::caption("No status messages yet"));
             }
-            content = content
-                .push(widget::button::text("Save settings").on_press(Message::SaveSettings))
-                .push(widget::button::text("Back").on_press(Message::ToggleSettings));
+
+            content = content.push(
+                widget::Row::new()
+                    .spacing(8)
+                    .push(widget::button::text("Save settings").on_press(Message::SaveSettings))
+                    .push(widget::button::text("Back").on_press(Message::ToggleSettings)),
+            );
         } else {
             content = content.push(widget::text::title3("Solar production"));
+
             if let Some(reading) = &self.reading {
                 content = content
+                    .push(widget::text::caption("CURRENT PRODUCTION"))
                     .push(widget::text::title2(format!("{} W", reading.power_w)))
                     .push(widget::text::body(format!("{:.1} °C", reading.temperature_c)));
             } else {
-                content = content.push(widget::text::body("Waiting for FRITZ!Box data..."));
+                content = content.push(widget::text::body("Waiting for FRITZ!Box data…"));
             }
+
             if let Some(updated) = &self.updated {
-                content = content.push(widget::text::caption(format!("Updated: {updated}")));
+                content = content.push(widget::text::caption(format!("Updated at {updated}")));
             }
+
             if let Some(error) = &self.error {
                 content = content
-                    .push(widget::text::caption("Connection error"))
-                    .push(widget::button::text("Copy error").on_press(Message::CopyError))
-                    .push(widget::text::body(error));
+                    .push(widget::text::caption("CONNECTION ERROR"))
+                    .push(widget::text::body(error))
+                    .push(widget::button::text("Copy error").on_press(Message::CopyError));
             }
-            content = content
-                .push(widget::button::text("Settings").on_press(Message::ToggleSettings))
-                .push(widget::button::text("Refresh").on_press(Message::Refresh));
+
+            content = content.push(
+                widget::Row::new()
+                    .spacing(8)
+                    .push(widget::button::text("Refresh").on_press(Message::Refresh))
+                    .push(widget::button::text("Settings").on_press(Message::ToggleSettings)),
+            );
         }
+
         self.core.applet.popup_container(content).into()
     }
 
@@ -226,7 +259,7 @@ impl cosmic::Application for AppModel {
                         return Task::none();
                     };
                     let mut settings = self.core.applet.get_popup_settings(main_window_id, id, None, None, None);
-                    settings.positioner.size_limits = Limits::NONE.max_width(360.0).min_width(260.0);
+                    settings.positioner.size_limits = Limits::NONE.max_width(360.0).min_width(360.0);
                     get_popup(settings)
                 };
             }
