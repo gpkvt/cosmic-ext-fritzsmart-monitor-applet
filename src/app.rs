@@ -9,7 +9,11 @@ use cosmic::iced::{
 use cosmic::prelude::*;
 use cosmic::widget;
 use futures::SinkExt;
+use std::sync::LazyLock;
 use std::time::Duration;
+
+static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
+    LazyLock::new(|| widget::Id::new("cosmic-solar-applet-autosize-main"));
 
 #[derive(Default)]
 pub struct AppModel {
@@ -132,8 +136,11 @@ impl cosmic::Application for AppModel {
             .height(cosmic::iced::Length::Fixed(
                 f32::from(suggested.1 + 2 * vertical_padding),
             ))
-            .class(cosmic::theme::Button::AppletIcon)
-            .into()
+            .class(cosmic::theme::Button::AppletIcon);
+
+        // The default applet window is icon-sized. Autosize it to the full
+        // row so the icon and both live readings remain visible.
+        widget::autosize::autosize(button, AUTOSIZE_MAIN_ID.clone()).into()
     }
 
     fn view_window(&self, id: Id) -> Element<'_, Self::Message> {
