@@ -52,7 +52,7 @@ impl FritzSettings {
     pub fn save(&self) -> Result<(), String> {
         validate_settings(self, true)?;
         for value in [&self.url, &self.username, &self.password, &self.ain] {
-            if value.contains(['\n', '\r']) {
+            if value.contains('\n') || value.contains('\r') {
                 return Err("Configuration values must not contain newlines".into());
             }
         }
