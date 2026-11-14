@@ -1,5 +1,5 @@
 mod app;
-mod solar;
+mod fritz;
 
 fn main() -> cosmic::iced::Result {
     cosmic::applet::run::<app::AppModel>(())
