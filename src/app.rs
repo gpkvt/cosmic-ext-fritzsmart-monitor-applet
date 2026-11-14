@@ -1,4 +1,4 @@
-use crate::fritz::{discover_devices, fetch_fritz_data, FritzSettings, FRITZ!BoxDevice, FRITZ!BoxReading};
+use crate::fritz::{discover_devices, fetch_fritz_data, FritzDevice, FritzReading, FritzSettings};
 use cosmic::iced::{
     futures,
     platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
@@ -9,8 +9,9 @@ use cosmic::iced::{
 use cosmic::prelude::*;
 use cosmic::widget;
 use futures::SinkExt;
+use std::collections::VecDeque;
 use std::sync::LazyLock;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
     LazyLock::new(|| widget::Id::new("fritz-power-monitor-autosize-main"));
@@ -19,15 +20,16 @@ static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
 pub struct AppModel {
     core: cosmic::Core,
     popup: Option<Id>,
-    reading: Option<FRITZ!BoxReading>,
+    reading: Option<FritzReading>,
     error: Option<String>,
     updated: Option<String>,
     settings_open: bool,
     settings: FritzSettings,
-    devices: Vec<FRITZ!BoxDevice>,
+    devices: Vec<FritzDevice>,
     device_labels: Vec<String>,
     selected_device: Option<usize>,
     settings_status: Option<String>,
+    history: VecDeque<(Instant, i64)>,
 }
 
 #[derive(Debug, Clone)]
@@ -35,7 +37,7 @@ pub enum Message {
     TogglePopup,
     PopupClosed(Id),
     Refresh,
-    Updated(Result<FRITZ!BoxReading, String>),
+    Updated(Result<FritzReading, String>),
     ToggleSettings,
     UrlChanged(String),
     UsernameChanged(String),
@@ -44,12 +46,41 @@ pub enum Message {
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
     DiscoverDevices,
-    DevicesLoaded(Result<Vec<FRITZ!BoxDevice>, String>),
+    DevicesLoaded(Result<Vec<FritzDevice>, String>),
     SelectDevice(usize),
     SaveSettings,
     Surface(cosmic::surface::Action<Message>),
 }
 
+
+
+const HISTORY_WINDOW: Duration = Duration::from_secs(15 * 60);
+const MAX_HISTORY_SAMPLES: usize = 16;
+
+fn record_power_sample(history: &mut VecDeque<(Instant, i64)>, power_w: i64, now: Instant) {
+    history.push_back((now, power_w));
+    while history.front().is_some_and(|(timestamp, _)| now.duration_since(*timestamp) > HISTORY_WINDOW) {
+        history.pop_front();
+    }
+    while history.len() > MAX_HISTORY_SAMPLES {
+        history.pop_front();
+    }
+}
+
+fn power_sparkline(history: &VecDeque<(Instant, i64)>) -> String {
+    const LEVELS: [&str; 8] = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
+    let Some(minimum) = history.iter().map(|(_, value)| *value).min() else {
+        return "Waiting for samples…".into();
+    };
+    let maximum = history.iter().map(|(_, value)| *value).max().unwrap_or(minimum);
+    if minimum == maximum {
+        return LEVELS[3].repeat(history.len());
+    }
+    history.iter().map(|(_, value)| {
+        let position = ((*value - minimum) as f64 / (maximum - minimum) as f64 * 7.0).round() as usize;
+        LEVELS[position.min(7)]
+    }).collect()
+}
 
 fn action_button<'a>(
     icon_name: &'static str,
@@ -245,6 +276,17 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption("CURRENT PRODUCTION"))
                     .push(widget::text::title2(format!("{} W", reading.power_w)))
                     .push(widget::text::body(format!("{:.1} °C", reading.temperature_c)));
+
+                if let (Some(low), Some(high)) = (
+                    self.history.iter().map(|(_, value)| *value).min(),
+                    self.history.iter().map(|(_, value)| *value).max(),
+                ) {
+                    content = content
+                        .push(widget::text::caption("LAST 15 MINUTES"))
+                        .push(widget::text::body(format!("Low  {low} W     High  {high} W")))
+                        .push(widget::text::title2(power_sparkline(&self.history)))
+                        .push(widget::text::caption("Power history · one sample per minute"));
+                }
             } else {
                 content = content.push(widget::text::body("Waiting for FRITZ!Box data…"));
             }
@@ -297,6 +339,7 @@ impl cosmic::Application for AppModel {
             }
             Message::Updated(result) => match result {
                 Ok(reading) => {
+                    record_power_sample(&mut self.history, reading.power_w, Instant::now());
                     self.reading = Some(reading);
                     self.error = None;
                     self.updated = Some(chrono::Local::now().format("%H:%M:%S").to_string());
@@ -379,4 +422,35 @@ impl cosmic::Application for AppModel {
     fn on_close_requested(&self, id: Id) -> Option<Message> { Some(Message::PopupClosed(id)) }
 
     fn style(&self) -> Option<cosmic::iced::theme::Style> { Some(cosmic::applet::style()) }
+}
+
+#[cfg(test)]
+mod history_tests {
+    use super::*;
+
+    #[test]
+    fn history_keeps_only_the_last_fifteen_minutes_and_sixteen_samples() {
+        let start = Instant::now();
+        let mut history = VecDeque::new();
+        for minute in 0..18 {
+            record_power_sample(&mut history, minute, start + Duration::from_secs(minute * 60));
+        }
+        assert_eq!(history.len(), 16);
+        assert_eq!(history.front().unwrap().1, 2);
+        assert_eq!(history.back().unwrap().1, 17);
+    }
+
+    #[test]
+    fn sparkline_is_empty_until_a_sample_arrives() {
+        assert_eq!(power_sparkline(&VecDeque::new()), "Waiting for samples…");
+    }
+
+    #[test]
+    fn sparkline_handles_constant_and_changing_values() {
+        let now = Instant::now();
+        let constant = VecDeque::from([(now, 42), (now, 42)]);
+        assert_eq!(power_sparkline(&constant), "▄▄");
+        let changing = VecDeque::from([(now, 10), (now, 20)]);
+        assert_eq!(power_sparkline(&changing), "▁█");
+    }
 }
