@@ -96,14 +96,11 @@ impl cosmic::Application for AppModel {
         let label = self.reading.as_ref()
             .map(|reading| format!("☀ {} W", reading.power_w))
             .unwrap_or_else(|| "☀ -- W".to_string());
-        self.core.applet.button_from_element(
-            widget::Row::new()
-                .spacing(4)
-                .push(widget::icon::from_name("weather-clear-symbolic").size(16))
-                .push(widget::text::body(label)),
-            true,
+
+        self.core.applet.text_button(
+            widget::text::body(label),
+            Message::TogglePopup,
         )
-        .on_press_down(Message::TogglePopup)
         .into()
     }
 
@@ -203,6 +200,18 @@ impl cosmic::Application for AppModel {
                     .push(action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
             );
         }
+
+        // Give the popup content an opaque base so it remains readable even
+        // when the panel theme uses a translucent applet background.
+        let content = widget::container(content).style(|theme| {
+            let cosmic = theme.cosmic();
+            cosmic::iced::widget::container::Style {
+                background: Some(
+                    cosmic::iced::Color::from(cosmic.background(false).base).into(),
+                ),
+                ..Default::default()
+            }
+        });
 
         self.core.applet.popup_container(content).into()
     }
