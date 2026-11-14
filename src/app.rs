@@ -79,7 +79,7 @@ fn power_sparkline(history: &VecDeque<(Instant, i64)>) -> String {
     history.iter().map(|(_, value)| {
         let position = ((*value - minimum) as f64 / (maximum - minimum) as f64 * 7.0).round() as usize;
         LEVELS[position.min(7)]
-    }).collect()
+    }).collect::<Vec<_>>().concat()
 }
 
 fn action_button<'a>(
@@ -432,8 +432,8 @@ mod history_tests {
     fn history_keeps_only_the_last_fifteen_minutes_and_sixteen_samples() {
         let start = Instant::now();
         let mut history = VecDeque::new();
-        for minute in 0..18 {
-            record_power_sample(&mut history, minute, start + Duration::from_secs(minute * 60));
+        for minute in 0_u64..18 {
+            record_power_sample(&mut history, minute as i64, start + Duration::from_secs(minute * 60));
         }
         assert_eq!(history.len(), 16);
         assert_eq!(history.front().unwrap().1, 2);
