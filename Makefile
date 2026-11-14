@@ -14,7 +14,7 @@ build:
 
 install: build
 	install -Dm0755 target/release/$(APP_NAME) "$(BINDIR)/$(APP_NAME)"
-	sed 's|^Exec=$(APP_NAME)$|Exec=$(abspath $(BINDIR)/$(APP_NAME))|' data/$(APP_ID).desktop | install -D -m0644 /dev/stdin "$(DESKTOP_FILE)"
+	sed 's|^Exec=$(APP_NAME)$$|Exec=$(abspath $(BINDIR)/$(APP_NAME))|' data/$(APP_ID).desktop | install -D -m0644 /dev/stdin "$(DESKTOP_FILE)"
 	install -Dm0644 data/$(APP_ID).svg "$(ICON_FILE)"
 
 uninstall:
