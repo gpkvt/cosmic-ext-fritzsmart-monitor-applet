@@ -20,14 +20,13 @@ static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
 pub struct AppModel {
     core: cosmic::Core,
     popup: Option<Id>,
-    reading: Option<FritzReading>,
+    readings: Vec<FritzReading>,
     error: Option<String>,
     updated: Option<String>,
     settings_open: bool,
     settings: FritzSettings,
     devices: Vec<FritzDevice>,
-    device_labels: Vec<String>,
-    selected_device: Option<usize>,
+    selected_ains: Vec<String>,
     settings_status: Option<String>,
     history: VecDeque<(Instant, i64)>,
 }
@@ -37,7 +36,7 @@ pub enum Message {
     TogglePopup,
     PopupClosed(Id),
     Refresh,
-    Updated(Result<FritzReading, String>),
+    Updated(Result<Vec<FritzReading>, String>),
     ToggleSettings,
     UrlChanged(String),
     UsernameChanged(String),
@@ -47,7 +46,7 @@ pub enum Message {
     PanelTextSizeChanged(u8),
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
-    SelectDevice(usize),
+    ToggleDevice(String, bool),
     SaveSettings,
     Surface(cosmic::surface::Action<Message>),
 }
@@ -128,15 +127,9 @@ impl cosmic::Application for AppModel {
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
-        let power = self
-            .reading
-            .as_ref()
-            .map(|reading| format!("{} W", reading.power_w))
-            .unwrap_or_else(|| "-- W".to_string());
-        let temperature = self
-            .reading
-            .as_ref()
-            .map(|reading| format!("{:.1} °C", reading.temperature_c))
+        let total_power = self.readings.iter().map(|reading| reading.power_w).sum::<i64>();
+        let power = if self.readings.is_empty() { "-- W".to_string() } else { format!("{total_power} W") };
+        let temperature = self.readings.first().map(|reading| format!("{:.1} °C", reading.temperature_c))
             .unwrap_or_else(|| "-- °C".to_string());
 
         let suggested = self.core.applet.suggested_size(true);
@@ -241,17 +234,19 @@ impl cosmic::Application for AppModel {
                 .push(widget::text::caption("DEVICE"))
                 .push(action_button("view-refresh-symbolic", "Load devices", Message::DiscoverDevices));
 
-            if !self.device_labels.is_empty() {
-                content = content
-                    .push(widget::text::body("Power-meter device"))
-                    .push(widget::dropdown::popup_dropdown(
-                        &self.device_labels,
-                        self.selected_device,
-                        Message::SelectDevice,
-                        id,
-                        Message::Surface,
-                        |message| message,
-                    ));
+            if !self.devices.is_empty() {
+                content = content.push(widget::text::body("Select power-meter devices"));
+                for device in &self.devices {
+                    let selected = self.selected_ains.iter().any(|ain|
+                        crate::fritz::normalize_ain_for_selection(ain)
+                            == crate::fritz::normalize_ain_for_selection(&device.ain));
+                    content = content.push(widget::checkbox(device.name.clone(), selected)
+                        .on_toggle({
+                            let ain = device.ain.clone();
+                            move |checked| Message::ToggleDevice(ain.clone(), checked)
+                        }));
+                }
+                content = content.push(widget::text::caption("All checked devices appear separately in the popup"));
             }
 
             content = content
@@ -281,25 +276,25 @@ impl cosmic::Application for AppModel {
                 .push(widget::text::title3("FRITZ!Power Monitor"))
                 .push(widget::divider::horizontal::default());
 
-            if let Some(reading) = &self.reading {
-                content = content
-                    .push(widget::text::caption("CURRENT PRODUCTION"))
-                    .push(widget::text::title2(format!("{} W", reading.power_w)))
-                    .push(widget::text::body(format!("{:.1} °C", reading.temperature_c)))
-                    .push(widget::divider::horizontal::default());
-
+            if !self.readings.is_empty() {
+                content = content.push(widget::text::caption("SELECTED DEVICES"));
+                for reading in &self.readings {
+                    content = content.push(widget::text::body(reading.name.clone()))
+                        .push(widget::Row::new().spacing(12).align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::text::title2(format!("{} W", reading.power_w)))
+                            .push(widget::text::body(format!("{:.1} °C", reading.temperature_c))));
+                }
+                content = content.push(widget::divider::horizontal::default());
                 if let (Some(low), Some(high)) = (
                     self.history.iter().map(|(_, value)| *value).min(),
                     self.history.iter().map(|(_, value)| *value).max(),
                 ) {
-                    content = content
-                        .push(widget::text::caption("LAST 15 MINUTES"))
+                    content = content.push(widget::text::caption("TOTAL POWER · LAST 15 MINUTES"))
                         .push(widget::text::body(format!("Low  {low} W     High  {high} W")))
-                        .push(widget::text::title2(power_sparkline(&self.history)))
-                        .push(widget::text::caption("Power history · one sample per minute"));
+                        .push(widget::text::title2(power_sparkline(&self.history)));
                 }
             } else {
-                content = content.push(widget::text::body("Waiting for FRITZ!Box data…"));
+                content = content.push(widget::text::body("Select one or more devices in Settings"));
             }
 
             if let Some(updated) = &self.updated {
@@ -352,9 +347,10 @@ impl cosmic::Application for AppModel {
                 return Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result)));
             }
             Message::Updated(result) => match result {
-                Ok(reading) => {
-                    record_power_sample(&mut self.history, reading.power_w, Instant::now());
-                    self.reading = Some(reading);
+                Ok(readings) => {
+                    let total_power = readings.iter().map(|reading| reading.power_w).sum();
+                    record_power_sample(&mut self.history, total_power, Instant::now());
+                    self.readings = readings;
                     self.error = None;
                     self.updated = Some(chrono::Local::now().format("%H:%M:%S").to_string());
                 }
@@ -379,26 +375,24 @@ impl cosmic::Application for AppModel {
             }
             Message::DevicesLoaded(result) => match result {
                 Ok(devices) => {
-                    self.device_labels = devices.iter().map(|device| device.name.clone()).collect();
                     self.devices = devices;
-                    self.selected_device = self.devices.iter().position(|device| {
-                        crate::fritz::normalize_ain_for_selection(&device.ain)
-                            == crate::fritz::normalize_ain_for_selection(&self.settings.ain)
-                    }).or(Some(0));
-                    if let Some(index) = self.selected_device {
-                        if let Some(device) = self.devices.get(index) {
-                            self.settings.ain = device.ain.clone();
-                        }
-                    }
+                    self.selected_ains = if self.settings.ains.is_empty() {
+                        if self.settings.ain.trim().is_empty() { Vec::new() } else { vec![self.settings.ain.clone()] }
+                    } else { self.settings.ains.clone() };
+                    self.selected_ains.retain(|selected| self.devices.iter().any(|device|
+                        crate::fritz::normalize_ain_for_selection(selected)
+                            == crate::fritz::normalize_ain_for_selection(&device.ain)));
                     self.settings_status = Some(format!("Found {} compatible power-meter device(s)", self.devices.len()));
                 }
                 Err(error) => self.settings_status = Some(error),
             },
-            Message::SelectDevice(index) => {
-                if let Some(device) = self.devices.get(index) {
-                    self.settings.ain = device.ain.clone();
-                    self.selected_device = Some(index);
-                }
+            Message::ToggleDevice(ain, selected) => {
+                let normalized = crate::fritz::normalize_ain_for_selection(&ain);
+                self.selected_ains.retain(|existing|
+                    crate::fritz::normalize_ain_for_selection(existing) != normalized);
+                if selected { self.selected_ains.push(ain); }
+                self.settings.ains = self.selected_ains.clone();
+                self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
             }
             Message::Surface(action) => {
                 return cosmic::task::message(cosmic::Action::Surface(action));
