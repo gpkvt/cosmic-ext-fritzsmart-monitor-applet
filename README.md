@@ -7,7 +7,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 ## Features
 
 - Displays current power in watts and temperature in the COSMIC panel, with a configurable text size.
-- Popup displays each selected device in an alternating row, with separate 15-minute wattage and temperature sparklines, plus combined power history.
+- Settings and popup device rows use alternating backgrounds. Each selected device has separate 15-minute wattage and temperature sparklines in the popup, plus combined power history.
 - The main menu and settings are vertically scrollable when their content exceeds the popup height.
 - The first selected device supplies both power and temperature values shown in the panel. Selected devices can be reordered in Settings.
 - In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy.
@@ -91,8 +91,13 @@ readable; the applet manages the configuration file.
 
 ## Current scope and limitations
 
-The popup keeps a rolling, in-memory 15-minute power history (one sample per minute) and displays its low/high values and a compact sparkline. History is collected only while the applet is running and is not persisted across restarts. It does not provide historical production from before startup, daily yield, forecasts, or inverter-specific statistics. The FRITZ!Box device must expose both `powermeter/power` and
-`temperature/celsius` in its device XML.
+The popup keeps rolling, in-memory 15-minute total-power and per-device histories
+(one sample per minute, up to 16 samples). It displays total-power low/high
+values and separate wattage and temperature sparklines for each selected device.
+History is collected only while the applet is running and is not persisted across
+restarts. It does not provide historical production from before startup, daily
+yield, forecasts, or inverter-specific statistics. The FRITZ!Box device must
+expose both `powermeter/power` and `temperature/celsius` in its device XML.
 
 This initial PR is an implementation baseline. It still needs a successful
 build and runtime validation on a COSMIC desktop and against the target
