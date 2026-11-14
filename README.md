@@ -7,7 +7,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 ## Features
 
 - Displays current power in watts in the COSMIC panel.
-- Popup displays power, device temperature and last successful update time.
+- Popup displays power, device temperature and last successful update time.\n- In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy.\n- Discovers compatible power-meter devices and lets the user select one by its friendly name.
 - Refreshes every 60 seconds.
 - Keeps the last successful reading visible when a later refresh fails.
 - Uses FRITZ!Box challenge-response login and HTTPS certificate validation by
@@ -23,28 +23,17 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 
 ## Configuration
 
-Create `~/.config/fritz_solar.cfg`:
+Open the applet popup and choose **Settings**. Enter the FRITZ!Box URL,
+username and password, then choose **Load devices**. The applet discovers
+devices that expose both power and temperature measurements. Select the
+desired device from the dropdown and choose **Save settings**.
 
-```ini
-FRITZ_URL=https://fritz.box
-USERNAME=solar
-PASSWORD=replace-me
-AIN=replace-with-device-ain
-ALLOW_INVALID_CERTS=false
-```
+Credentials are stored in `~/.config/fritz_solar.cfg` with owner-only
+permissions. TLS certificate validation is enabled by default. Allow invalid
+certificates only when you understand the security impact.
 
-Protect credentials:
-
-```sh
-chmod 600 ~/.config/fritz_solar.cfg
-```
-
-The parser accepts simple `KEY=VALUE` lines and optional single- or
-double-quoted values. It does not execute the file as a shell script.
-`ALLOW_INVALID_CERTS` should remain `false`; enable it only when you
-understand the security impact of disabling TLS certificate validation.
-
-The AIN is normalized by removing punctuation and whitespace before matching.
+The configuration file is managed by the applet; manual editing is not
+required. Existing simple `KEY=VALUE` configuration files remain readable.
 
 ## Build
 
