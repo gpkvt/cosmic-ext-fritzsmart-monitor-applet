@@ -240,7 +240,8 @@ impl cosmic::Application for AppModel {
                     let selected = self.selected_ains.iter().any(|ain|
                         crate::fritz::normalize_ain_for_selection(ain)
                             == crate::fritz::normalize_ain_for_selection(&device.ain));
-                    content = content.push(widget::checkbox(device.name.clone(), selected)
+                    content = content.push(widget::checkbox(selected)
+                        .label(device.name.clone())
                         .on_toggle({
                             let ain = device.ain.clone();
                             move |checked| Message::ToggleDevice(ain.clone(), checked)
