@@ -108,7 +108,12 @@ impl cosmic::Application for AppModel {
                     ));
             }
             if let Some(status) = &self.settings_status {
-                content = content.push(widget::text::caption(status));
+                content = content
+                    .push(widget::text::caption("Status (select text and right-click to copy)"))
+                    .push(
+                        widget::selectable_text::caption(status)
+                            .width(cosmic::iced::Length::Fill),
+                    );
             }
             content = content
                 .push(widget::button::text("Save settings").on_press(Message::SaveSettings))
@@ -126,7 +131,12 @@ impl cosmic::Application for AppModel {
                 content = content.push(widget::text::caption(format!("Updated: {updated}")));
             }
             if let Some(error) = &self.error {
-                content = content.push(widget::text::caption(format!("Connection: {error}")));
+                content = content
+                    .push(widget::text::caption("Connection error (select text and right-click to copy)"))
+                    .push(
+                        widget::selectable_text::body(error)
+                            .width(cosmic::iced::Length::Fill),
+                    );
             }
             content = content
                 .push(widget::button::text("Settings").on_press(Message::ToggleSettings))
