@@ -29,7 +29,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 
 ## Build and install
 
-Build and install the applet into your user account. Development builds display the package version with a trailing `+` (for example, `0.1.4-dev+`):
+Build and install the applet into your user account. `make install` first runs `git pull --ff-only` to update the checked-out branch without creating a merge commit, then builds and installs it. Run it from a Git checkout with a configured upstream. Development builds display the package version with a trailing `+` (for example, `0.1.4-dev+`):
 
 ```sh
 make install
