@@ -93,22 +93,46 @@ impl cosmic::Application for AppModel {
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
-        let label = self
+        let power = self
             .reading
             .as_ref()
-            .map(|reading| {
-                format!(
-                    "☀ {} W  ·  {:.1} °C",
-                    reading.power_w, reading.temperature_c
-                )
-            })
-            .unwrap_or_else(|| "☀ -- W  ·  -- °C".to_string());
+            .map(|reading| format!("{} W", reading.power_w))
+            .unwrap_or_else(|| "-- W".to_string());
+        let temperature = self
+            .reading
+            .as_ref()
+            .map(|reading| format!("{:.1} °C", reading.temperature_c))
+            .unwrap_or_else(|| "-- °C".to_string());
 
-        // text_button accepts a text widget, not a Row. Keeping both readings
-        // in one text label also guarantees they stay on the same line.
-        self.core
-            .applet
-            .text_button(widget::text::body(label), Message::TogglePopup)
+        let suggested = self.core.applet.suggested_size(true);
+        let (major_padding, minor_padding) = self.core.applet.suggested_padding(true);
+        let vertical_padding = if self.core.applet.is_horizontal() {
+            minor_padding
+        } else {
+            major_padding
+        };
+        let horizontal_padding = if self.core.applet.is_horizontal() {
+            major_padding
+        } else {
+            minor_padding
+        };
+
+        let content = widget::Row::new()
+            .spacing(6)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::icon::from_name("weather-clear-symbolic").size(suggested.1))
+            .push(self.core.applet.text(power))
+            .push(self.core.applet.text(temperature));
+
+        // Use a content-sized applet button: button_from_element() deliberately
+        // fixes the width to an icon, while text_button() only accepts Text.
+        widget::button::custom(content)
+            .on_press_down(Message::TogglePopup)
+            .padding([0, horizontal_padding])
+            .height(cosmic::iced::Length::Fixed(
+                f32::from(suggested.1 + 2 * vertical_padding),
+            ))
+            .class(cosmic::theme::Button::AppletIcon)
             .into()
     }
 
