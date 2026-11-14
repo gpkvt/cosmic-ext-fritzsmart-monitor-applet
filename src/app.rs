@@ -43,7 +43,6 @@ pub enum Message {
     SaveSettings,
     CopyError,
     CopySettingsStatus,
-    ClipboardCopied,
     Surface(cosmic::surface::Action<Message>),
 }
 
@@ -195,17 +194,14 @@ impl cosmic::Application for AppModel {
             }
             Message::CopyError => {
                 if let Some(error) = self.error.clone() {
-                    return cosmic::iced::clipboard::write(error)
-                        .map(|()| cosmic::Action::App(Message::ClipboardCopied));
+                    return cosmic::iced::clipboard::write(error);
                 }
             }
             Message::CopySettingsStatus => {
                 if let Some(status) = self.settings_status.clone() {
-                    return cosmic::iced::clipboard::write(status)
-                        .map(|()| cosmic::Action::App(Message::ClipboardCopied));
+                    return cosmic::iced::clipboard::write(status);
                 }
             }
-            Message::ClipboardCopied => {}
             Message::Surface(action) => {
                 return cosmic::task::message(cosmic::Action::Surface(action));
             }
