@@ -498,6 +498,40 @@ mod tests {
     }
 
     #[test]
+    fn parses_multiple_selected_power_meter_devices() {
+        let xml = r#"
+            <devicelist>
+              <device identifier="111111111111">
+                <name>Solar inverter</name>
+                <powermeter><power>123000</power></powermeter>
+                <temperature><celsius>215</celsius></temperature>
+              </device>
+              <device identifier="222222222222">
+                <name>Battery inverter</name>
+                <powermeter><power>456000</power></powermeter>
+                <temperature><celsius>198</celsius></temperature>
+              </device>
+              <device identifier="333333333333">
+                <name>Unselected device</name>
+                <powermeter><power>999000</power></powermeter>
+                <temperature><celsius>250</celsius></temperature>
+              </device>
+            </devicelist>
+        "#;
+        let readings = parse_device_readings_xml(
+            xml,
+            &["111111111111".into(), "2222 2222 2222".into()],
+        ).unwrap();
+        assert_eq!(readings.len(), 2);
+        assert_eq!(readings[0].name, "Solar inverter");
+        assert_eq!(readings[0].power_w, 123);
+        assert_eq!(readings[0].temperature_c, 21.5);
+        assert_eq!(readings[1].name, "Battery inverter");
+        assert_eq!(readings[1].power_w, 456);
+        assert_eq!(readings[1].temperature_c, 19.8);
+    }
+
+    #[test]
     fn rejects_unknown_device() {
         let xml = r#"<devicelist><device identifier="000000000000"/></devicelist>"#;
         assert!(parse_device_xml(xml, "123456789012").is_err());
