@@ -9,6 +9,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 - Displays current power in watts in the COSMIC panel.
 - Popup displays power, device temperature and last successful update time.
 - In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy.
+- Optional per-router PEM CA certificate trust without disabling hostname verification.
 - Discovers compatible power-meter devices and lets the user select one by its friendly name.
 - Refreshes every 60 seconds.
 - Keeps the last successful reading visible when a later refresh fails.
@@ -68,11 +69,19 @@ devices that expose both power and temperature measurements. Select the
 desired device from the dropdown and choose **Save settings**.
 
 Credentials are stored in `~/.config/fritz_solar.cfg` with owner-only
-permissions. TLS certificate validation is enabled by default. Allow invalid
-certificates only when you understand the security impact.
+permissions. TLS certificate validation is enabled by default. For a FRITZ!Box
+using a self-signed certificate, provide its PEM certificate in the optional
+**Trusted CA certificate** field. The certificate is added as an additional
+trust anchor; normal certificate-chain and hostname validation remain enabled.
+For example, extract the local router certificate with `openssl s_client` and
+store it in a user-readable file such as `~/.config/fritzbox-ca.pem`, then set
+that path in the applet. Use a URL hostname included in the certificate's SAN
+(e.g. `https://fritz.box/`) and ensure it resolves to the local router.
 
-The configuration file is managed by the applet; manual editing is not
-required. Existing simple `KEY=VALUE` configuration files remain readable.
+The **Allow invalid TLS certificates** option remains available only for
+compatibility and disables certificate verification; leave it off when using a
+trusted certificate. Existing simple `KEY=VALUE` configuration files remain
+readable; the applet manages the configuration file.
 
 ## Current scope and limitations
 
