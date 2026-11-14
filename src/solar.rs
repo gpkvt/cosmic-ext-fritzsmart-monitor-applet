@@ -181,7 +181,7 @@ pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<SolarDevice
 
 fn parse_device_xml(xml: &str, ain: &str) -> Result<SolarReading, String> {
     let document = Document::parse(xml).map_err(|error| format!("Invalid device XML: {error}"))?;
-    let wanted_ain = normalize_ain(ain);
+    let wanted_ain = normalize_ain_for_selection(ain);
     let device = document.descendants().find(|node| {
         node.has_tag_name("device") && node.attribute("identifier")
             .is_some_and(|identifier| normalize_ain(identifier) == wanted_ain)
