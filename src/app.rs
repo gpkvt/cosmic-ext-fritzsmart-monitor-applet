@@ -1,4 +1,4 @@
-use crate::solar::{discover_devices, fetch_solar_data, FritzSettings, SolarDevice, SolarReading};
+use crate::solar::{discover_devices, fetch_solar_data, FritzSettings, FRITZ!BoxDevice, FRITZ!BoxReading};
 use cosmic::iced::{
     futures,
     platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
@@ -13,18 +13,18 @@ use std::sync::LazyLock;
 use std::time::Duration;
 
 static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
-    LazyLock::new(|| widget::Id::new("cosmic-solar-applet-autosize-main"));
+    LazyLock::new(|| widget::Id::new("fritz-power-monitor-autosize-main"));
 
 #[derive(Default)]
 pub struct AppModel {
     core: cosmic::Core,
     popup: Option<Id>,
-    reading: Option<SolarReading>,
+    reading: Option<FRITZ!BoxReading>,
     error: Option<String>,
     updated: Option<String>,
     settings_open: bool,
     settings: FritzSettings,
-    devices: Vec<SolarDevice>,
+    devices: Vec<FRITZ!BoxDevice>,
     device_labels: Vec<String>,
     selected_device: Option<usize>,
     settings_status: Option<String>,
@@ -35,7 +35,7 @@ pub enum Message {
     TogglePopup,
     PopupClosed(Id),
     Refresh,
-    Updated(Result<SolarReading, String>),
+    Updated(Result<FRITZ!BoxReading, String>),
     ToggleSettings,
     UrlChanged(String),
     UsernameChanged(String),
@@ -44,7 +44,7 @@ pub enum Message {
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
     DiscoverDevices,
-    DevicesLoaded(Result<Vec<SolarDevice>, String>),
+    DevicesLoaded(Result<Vec<FRITZ!BoxDevice>, String>),
     SelectDevice(usize),
     SaveSettings,
     Surface(cosmic::surface::Action<Message>),
@@ -69,7 +69,7 @@ impl cosmic::Application for AppModel {
     type Executor = cosmic::executor::Default;
     type Flags = ();
     type Message = Message;
-    const APP_ID: &'static str = "com.gpkvt.CosmicSolarApplet";
+    const APP_ID: &'static str = "com.gpkvt.FritzPowerMonitor";
 
     fn core(&self) -> &cosmic::Core { &self.core }
 
@@ -157,7 +157,7 @@ impl cosmic::Application for AppModel {
 
         if self.settings_open {
             content = content
-                .push(widget::text::title3("Solar settings"))
+                .push(widget::text::title3("FRITZ!Power Monitor settings"))
                 .push(widget::text::caption("PANEL"))
                 .push(widget::text::body(format!("Panel text size: {} pt", self.settings.panel_text_size)))
                 .push(
@@ -225,7 +225,7 @@ impl cosmic::Application for AppModel {
                 content = content.push(
                     widget::selectable_text::selectable_text(status.as_str())
                         .width(cosmic::iced::Length::Fill)
-                        .context_menu(true),
+                        ,
                 );
             } else {
                 content = content.push(widget::text::caption("No status messages yet"));
@@ -238,7 +238,7 @@ impl cosmic::Application for AppModel {
                     .push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings)),
             );
         } else {
-            content = content.push(widget::text::title3("Solar production"));
+            content = content.push(widget::text::title3("FRITZ!Power Monitor"));
 
             if let Some(reading) = &self.reading {
                 content = content
@@ -259,7 +259,7 @@ impl cosmic::Application for AppModel {
                     .push(
                         widget::selectable_text::selectable_text(error.as_str())
                             .width(cosmic::iced::Length::Fill)
-                            .context_menu(true),
+                            ,
                     );
             }
 
