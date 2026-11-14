@@ -384,6 +384,16 @@ mod tests {
     }
 
     #[test]
+    fn graph_timespan_defaults_and_is_clamped() {
+        assert_eq!(FritzSettings::default().graph_timespan_minutes, 15);
+        assert_eq!(parse_graph_timespan_minutes(""), 15);
+        assert_eq!(parse_graph_timespan_minutes("invalid"), 15);
+        assert_eq!(parse_graph_timespan_minutes("1"), 5);
+        assert_eq!(parse_graph_timespan_minutes("60"), 60);
+        assert_eq!(parse_graph_timespan_minutes("2000"), 1440);
+    }
+
+    #[test]
     fn empty_ca_certificate_path_uses_system_roots() {
         assert!(load_ca_certificate("").unwrap().is_none());
         assert!(load_ca_certificate("   ").unwrap().is_none());
