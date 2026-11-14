@@ -8,6 +8,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 
 - Displays current power in watts and temperature in the COSMIC panel, with a configurable text size.
 - Popup displays separate power and temperature readings for every selected device, plus combined 15-minute high/low power values and a rolling power sparkline.
+- The main menu and settings are vertically scrollable when their content exceeds the popup height.
 - The panel displays combined power from all selected devices and the temperature of the first selected device.
 - In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy.
 - Optional per-router PEM CA certificate trust without disabling hostname verification.
