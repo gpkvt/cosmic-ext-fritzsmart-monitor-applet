@@ -41,6 +41,7 @@ pub enum Message {
     DevicesLoaded(Result<Vec<SolarDevice>, String>),
     SelectDevice(usize),
     SaveSettings,
+    Surface(cosmic::surface::Action<Message>),
 }
 
 impl cosmic::Application for AppModel {
@@ -81,7 +82,7 @@ impl cosmic::Application for AppModel {
         self.core.applet.text_button(self.core.applet.text(label), Message::TogglePopup).into()
     }
 
-    fn view_window(&self, _id: Id) -> Element<'_, Self::Message> {
+    fn view_window(&self, id: Id) -> Element<'_, Self::Message> {
         let mut content = widget::Column::new().spacing(8);
         if self.settings_open {
             content = content
@@ -97,7 +98,7 @@ impl cosmic::Application for AppModel {
             if !self.device_labels.is_empty() {
                 content = content
                     .push(widget::text::body("Power-meter device"))
-                    .push(widget::dropdown(&self.device_labels, self.selected_device, Message::SelectDevice));
+                    .push(widget::dropdown::popup_dropdown(\n                        &self.device_labels,\n                        self.selected_device,\n                        Message::SelectDevice,\n                        id,\n                        Message::Surface,\n                        |message| message,\n                    ));
             }
             if let Some(status) = &self.settings_status {
                 content = content.push(widget::text::caption(status));
@@ -176,7 +177,7 @@ impl cosmic::Application for AppModel {
                     self.selected_device = Some(index);
                 }
             }
-            Message::SaveSettings => {
+            Message::Surface(action) => {\n                return cosmic::task::message(cosmic::Action::Surface(action));\n            }\n            Message::SaveSettings => {
                 if let Err(error) = self.settings.save() {
                     self.settings_status = Some(error);
                 } else {
