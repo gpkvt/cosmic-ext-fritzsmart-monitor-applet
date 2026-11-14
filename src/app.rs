@@ -280,7 +280,6 @@ impl cosmic::Application for AppModel {
                 Ok(reading) => {
                     self.reading = Some(reading);
                     self.error = None;
-                    self.clipboard_status = None;
                     self.updated = Some(chrono::Local::now().format("%H:%M:%S").to_string());
                 }
                 Err(error) => {
