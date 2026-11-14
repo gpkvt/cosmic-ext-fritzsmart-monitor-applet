@@ -18,11 +18,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes desktop-file-utils
-      - name: Validate COSMIC applet desktop entry
-        run: desktop-file-validate data/com.gpkvt.CosmicSolarApplet.desktop
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Run tests
         run: cargo test
       - name: Check build
         run: cargo check
+      - name: Test user-local installation
+        run: |
+          prefix="$RUNNER_TEMP/cosmic-solar-install"
+          make install PREFIX="$prefix"
+          desktop_file="$prefix/share/applications/com.gpkvt.CosmicSolarApplet.desktop"
+          desktop-file-validate "$desktop_file"
+          test -x "$prefix/bin/cosmic-solar-applet"
+          grep -Fx "Exec=$prefix/bin/cosmic-solar-applet" "$desktop_file"
+          make uninstall PREFIX="$prefix"
+          test ! -e "$prefix/bin/cosmic-solar-applet"
+          test ! -e "$desktop_file"
