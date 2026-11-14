@@ -9,8 +9,6 @@ use cosmic::iced::{
 use cosmic::prelude::*;
 use cosmic::widget;
 use futures::SinkExt;
-use std::io::Write;
-use std::process::{Command, Stdio};
 use std::sync::LazyLock;
 use std::time::Duration;
 
@@ -30,7 +28,6 @@ pub struct AppModel {
     device_labels: Vec<String>,
     selected_device: Option<usize>,
     settings_status: Option<String>,
-    clipboard_status: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -49,66 +46,9 @@ pub enum Message {
     DevicesLoaded(Result<Vec<SolarDevice>, String>),
     SelectDevice(usize),
     SaveSettings,
-    CopyError,
-    CopySettingsStatus,
-    ClipboardResult(Result<(), String>),
     Surface(cosmic::surface::Action<Message>),
 }
 
-fn copy_to_clipboard(text: String) -> Result<(), String> {
-    let wayland = std::env::var_os("WAYLAND_DISPLAY").is_some();
-    let candidates: &[(&str, &[&str])] = if wayland {
-        &[("wl-copy", &[]), ("xclip", &["-selection", "clipboard", "-in"])]
-    } else {
-        &[("xclip", &["-selection", "clipboard", "-in"]), ("wl-copy", &[])]
-    };
-
-    let mut errors = Vec::new();
-    for (program, args) in candidates {
-        let mut child = match Command::new(program)
-            .args(*args)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped())
-            .spawn()
-        {
-            Ok(child) => child,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                errors.push(format!("{program} is not installed"));
-                continue;
-            }
-            Err(error) => {
-                errors.push(format!("Could not start {program}: {error}"));
-                continue;
-            }
-        };
-
-        let write_result = child.stdin.take()
-            .ok_or_else(|| format!("{program} stdin is unavailable"))
-            .and_then(|mut stdin| stdin.write_all(text.as_bytes())
-                .map_err(|error| format!("Could not send text to {program}: {error}")));
-        let output = child.wait_with_output()
-            .map_err(|error| format!("Could not wait for {program}: {error}"))?;
-
-        if let Err(error) = write_result {
-            errors.push(error);
-            continue;
-        }
-        if output.status.success() {
-            return Ok(());
-        }
-        errors.push(format!(
-            "{program} exited with {}: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-
-    Err(format!(
-        "Could not copy to the clipboard. Install wl-clipboard (Wayland) or xclip (X11). {}",
-        errors.join("; ")
-    ))
-}
 
 fn action_button<'a>(
     icon_name: &'static str,
@@ -263,12 +203,11 @@ impl cosmic::Application for AppModel {
 
             content = content.push(widget::text::caption("DIAGNOSTICS"));
             if let Some(status) = &self.settings_status {
-                content = content
-                    .push(widget::text::body(status))
-                    .push(action_button("edit-copy-symbolic", "Copy status", Message::CopySettingsStatus));
-                if let Some(clipboard_status) = &self.clipboard_status {
-                    content = content.push(widget::text::caption(clipboard_status));
-                }
+                content = content.push(
+                    widget::selectable_text::selectable_text(status.as_str())
+                        .width(cosmic::iced::Length::Fill)
+                        .context_menu(true),
+                );
             } else {
                 content = content.push(widget::text::caption("No status messages yet"));
             }
@@ -300,12 +239,9 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption("CONNECTION ERROR"))
                     .push(
                         widget::selectable_text::selectable_text(error.as_str())
-                            .width(cosmic::iced::Length::Fill),
-                    )
-                    .push(action_button("edit-copy-symbolic", "Copy error", Message::CopyError));
-                if let Some(status) = &self.clipboard_status {
-                    content = content.push(widget::text::caption(status));
-                }
+                            .width(cosmic::iced::Length::Fill)
+                            .context_menu(true),
+                    );
             }
 
             content = content.push(
@@ -388,30 +324,6 @@ impl cosmic::Application for AppModel {
                     self.settings.ain = device.ain.clone();
                     self.selected_device = Some(index);
                 }
-            }
-            Message::CopyError => {
-                if let Some(error) = self.error.clone() {
-                    self.clipboard_status = Some("Copying error…".into());
-                    return Task::perform(
-                        async move { copy_to_clipboard(error) },
-                        |result| cosmic::Action::App(Message::ClipboardResult(result)),
-                    );
-                }
-            }
-            Message::CopySettingsStatus => {
-                if let Some(status) = self.settings_status.clone() {
-                    self.clipboard_status = Some("Copying status…".into());
-                    return Task::perform(
-                        async move { copy_to_clipboard(status) },
-                        |result| cosmic::Action::App(Message::ClipboardResult(result)),
-                    );
-                }
-            }
-            Message::ClipboardResult(result) => {
-                self.clipboard_status = Some(match result {
-                    Ok(()) => "Copied to clipboard".into(),
-                    Err(error) => format!("Clipboard error: {error}"),
-                });
             }
             Message::Surface(action) => {
                 return cosmic::task::message(cosmic::Action::Surface(action));
