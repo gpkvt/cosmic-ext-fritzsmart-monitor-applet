@@ -153,7 +153,14 @@ impl cosmic::Application for AppModel {
                 .push(widget::text::title3("Solar settings"))
                 .push(widget::text::caption("PANEL"))
                 .push(widget::text::body(format!("Panel text size: {} pt", self.settings.panel_text_size)))
-                .push(widget::slider(10..=24, self.settings.panel_text_size, Message::PanelTextSizeChanged))
+                .push(
+                    widget::slider(
+                        10.0..=24.0,
+                        f32::from(self.settings.panel_text_size),
+                        |value| Message::PanelTextSizeChanged(value.round() as u8),
+                    )
+                    .step(1.0),
+                )
                 .push(widget::text::caption("Adjusts the power and temperature text in the panel"))
                 .push(widget::text::caption("CONNECTION"))
                 .push(widget::text::body("FRITZ!Box URL"))
