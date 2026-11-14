@@ -158,7 +158,11 @@ pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<SolarDevice
         .send().await.map_err(|error| error.to_string())?
         .error_for_status().map_err(|error| format!("FRITZ!Box device request failed: {error}"))?
         .text().await.map_err(|error| error.to_string())?;
-    let document = Document::parse(&xml).map_err(|error| format!("Invalid device XML: {error}"))?;
+    parse_devices_xml(&xml)
+}
+
+fn parse_devices_xml(xml: &str) -> Result<Vec<SolarDevice>, String> {
+    let document = Document::parse(xml).map_err(|error| format!("Invalid device XML: {error}"))?;
     let mut devices = Vec::new();
     for node in document.descendants().filter(|node| node.has_tag_name("device")) {
         let Some(ain) = node.attribute("identifier") else { continue };
@@ -167,8 +171,9 @@ pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<SolarDevice
         let has_temperature = child_text(node, "temperature", "celsius")
             .and_then(|value| value.parse::<i64>().ok()).is_some();
         if !has_power_meter || !has_temperature { continue; }
-        let name = node.children().find(|child| child.has_tag_name("name"))
-            .and_then(|child| child.text()).filter(|name| !name.trim().is_empty())
+        let child_name = node.children().find(|child| child.has_tag_name("name"))
+            .and_then(|child| child.text()).filter(|name| !name.trim().is_empty());
+        let name = child_name.or_else(|| node.attribute("name"))
             .map(str::trim).unwrap_or("Unnamed device").to_string();
         devices.push(SolarDevice { name, ain: ain.to_string() });
     }
@@ -247,6 +252,28 @@ mod tests {
         let reading = parse_device_xml(xml, "1234 5678 9012").unwrap();
         assert_eq!(reading.power_w, 123);
         assert_eq!(reading.temperature_c, 21.5);
+    }
+
+    #[test]
+    fn discovers_only_devices_with_power_and_temperature() {
+        let xml = r#"
+            <devicelist>
+              <device identifier="111111111111">
+                <name>Solar inverter</name>
+                <powermeter><power>123000</power></powermeter>
+                <temperature><celsius>215</celsius></temperature>
+              </device>
+              <device identifier="222222222222">
+                <name>Simple switch</name>
+                <switch><state>1</state></switch>
+              </device>
+            </devicelist>
+        "#;
+        let devices = parse_devices_xml(xml).unwrap();
+        assert_eq!(devices, vec![SolarDevice {
+            name: "Solar inverter".into(),
+            ain: "111111111111".into(),
+        }]);
     }
 
     #[test]
