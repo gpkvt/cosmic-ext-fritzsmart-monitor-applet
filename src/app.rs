@@ -161,7 +161,12 @@ impl cosmic::Application for AppModel {
                         crate::solar::normalize_ain_for_selection(&device.ain)
                             == crate::solar::normalize_ain_for_selection(&self.settings.ain)
                     }).or(Some(0));
-                    self.settings_status = Some(format!("Found {} suitable device(s)", self.devices.len()));
+                    if let Some(index) = self.selected_device {
+                        if let Some(device) = self.devices.get(index) {
+                            self.settings.ain = device.ain.clone();
+                        }
+                    }
+                    self.settings_status = Some(format!("Found {} compatible power-meter device(s)", self.devices.len()));
                 }
                 Err(error) => self.settings_status = Some(error),
             },
