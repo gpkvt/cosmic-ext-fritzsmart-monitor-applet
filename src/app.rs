@@ -233,9 +233,17 @@ impl cosmic::Application for AppModel {
                 )
                 .push(widget::text::caption("Leave empty to use the system certificate store"))
                 .push(
-                    widget::toggler(self.settings.allow_invalid_certs)
-                        .label(Some("Allow invalid TLS certificates".to_string()))
-                        .on_toggle(Message::AllowInvalidCertsChanged),
+                    widget::Row::new()
+                        .width(cosmic::iced::Length::Fill)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(
+                            widget::text::body("Allow invalid TLS certificates")
+                                .width(cosmic::iced::Length::Fill),
+                        )
+                        .push(
+                            widget::toggler(self.settings.allow_invalid_certs)
+                                .on_toggle(Message::AllowInvalidCertsChanged),
+                        ),
                 )
                 .push(widget::text::caption("DEVICE"))
                 .push(action_button("view-refresh-symbolic", "Load devices", Message::DiscoverDevices));
