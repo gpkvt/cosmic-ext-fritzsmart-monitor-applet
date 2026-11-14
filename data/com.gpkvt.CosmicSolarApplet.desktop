@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=COSMIC Solar
+Comment=Solar production monitor for FRITZ!Box smart-home devices
+Type=Application
+Exec=cosmic-solar-applet
+Terminal=false
+Categories=COSMIC;
+Keywords=COSMIC;Applet;Solar;Power;Energy;
+StartupNotify=true
+NoDisplay=true
+X-CosmicApplet=true
+X-CosmicHoverPopup=Auto
