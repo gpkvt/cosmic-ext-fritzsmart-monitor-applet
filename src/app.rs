@@ -326,7 +326,7 @@ impl cosmic::Application for AppModel {
         }
 
         content = content.push(
-            widget::text::caption(format!("v{}", env!("CARGO_PKG_VERSION"))),
+            widget::text::caption(format!("v{}", env!("APP_VERSION"))),
         );
 
         // Give the popup content an opaque base so it remains readable even
