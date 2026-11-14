@@ -173,7 +173,10 @@ impl cosmic::Application for AppModel {
                     .push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings)),
             );
         } else {
-            content = content.push(widget::text::title3("Solar production"));
+            content = content.push(widget::text::title3(format!(
+                "Solar production · v{}",
+                env!("CARGO_PKG_VERSION")
+            )));
 
             if let Some(reading) = &self.reading {
                 content = content
