@@ -98,7 +98,14 @@ impl cosmic::Application for AppModel {
             if !self.device_labels.is_empty() {
                 content = content
                     .push(widget::text::body("Power-meter device"))
-                    .push(widget::dropdown::popup_dropdown(\n                        &self.device_labels,\n                        self.selected_device,\n                        Message::SelectDevice,\n                        id,\n                        Message::Surface,\n                        |message| message,\n                    ));
+                    .push(widget::dropdown::popup_dropdown(
+                        &self.device_labels,
+                        self.selected_device,
+                        Message::SelectDevice,
+                        id,
+                        Message::Surface,
+                        |message| message,
+                    ));
             }
             if let Some(status) = &self.settings_status {
                 content = content.push(widget::text::caption(status));
@@ -177,7 +184,10 @@ impl cosmic::Application for AppModel {
                     self.selected_device = Some(index);
                 }
             }
-            Message::Surface(action) => {\n                return cosmic::task::message(cosmic::Action::Surface(action));\n            }\n            Message::SaveSettings => {
+            Message::Surface(action) => {
+                return cosmic::task::message(cosmic::Action::Surface(action));
+            }
+            Message::SaveSettings => {
                 if let Err(error) = self.settings.save() {
                     self.settings_status = Some(error);
                 } else {
