@@ -14,6 +14,7 @@ build:
 
 install: build
 	install -Dm0755 target/release/$(APP_NAME) "$(BINDIR)/$(APP_NAME)"
+	install -d "$(DATADIR)/applications"
 	sed 's|^Exec=.*|Exec=$(abspath $(BINDIR)/$(APP_NAME))|' data/$(APP_ID).desktop > "$(DESKTOP_FILE).tmp"
 	install -D -m0644 "$(DESKTOP_FILE).tmp" "$(DESKTOP_FILE)"
 	rm -f "$(DESKTOP_FILE).tmp"
