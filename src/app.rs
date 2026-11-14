@@ -531,7 +531,15 @@ impl cosmic::Application for AppModel {
             Message::AllowInvalidCertsChanged(value) => self.settings.allow_invalid_certs = value,
             Message::CaCertPathChanged(value) => self.settings.ca_cert_path = value,
             Message::PanelTextSizeChanged(value) => self.settings.panel_text_size = value.clamp(10, 24),
-            Message::GraphTimespanChanged(value) => self.settings.graph_timespan_minutes = value.clamp(5, 1440),
+            Message::GraphTimespanChanged(value) => {
+                self.settings.graph_timespan_minutes = value.clamp(5, 1440);
+                let now = Instant::now();
+                let window = graph_history_window(self.settings.graph_timespan_minutes);
+                self.history.retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
+                for samples in self.device_history.values_mut() {
+                    samples.retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
+                }
+            }
             Message::DiscoverDevices => {
                 let settings = self.settings.clone();
                 self.settings_status = Some("Connecting and loading devices…".into());
@@ -641,6 +649,24 @@ mod history_tests {
         assert_eq!(samples.len(), 16);
         assert_eq!(samples.front().unwrap().1, 120);
         assert_eq!(samples.back().unwrap().2, 21.5);
+    }
+
+    #[test]
+    fn longer_graph_window_retains_more_minute_samples() {
+        let start = Instant::now();
+        let mut history = VecDeque::new();
+        let window = graph_history_window(60);
+        for minute in 0_u64..75 {
+            record_power_sample(
+                &mut history,
+                minute as i64,
+                start + Duration::from_secs(minute * 60),
+                window,
+            );
+        }
+        assert_eq!(history.len(), 61);
+        assert_eq!(history.front().unwrap().1, 14);
+        assert_eq!(history.back().unwrap().1, 74);
     }
 
     #[test]
