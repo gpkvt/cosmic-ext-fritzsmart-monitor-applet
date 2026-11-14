@@ -258,6 +258,9 @@ impl cosmic::Application for AppModel {
                 content = content
                     .push(widget::text::body(status))
                     .push(action_button("edit-copy-symbolic", "Copy status", Message::CopySettingsStatus));
+                if let Some(clipboard_status) = &self.clipboard_status {
+                    content = content.push(widget::text::caption(clipboard_status));
+                }
             } else {
                 content = content.push(widget::text::caption("No status messages yet"));
             }
