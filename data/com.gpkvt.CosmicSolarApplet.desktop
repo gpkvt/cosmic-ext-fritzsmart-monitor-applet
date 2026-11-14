@@ -2,6 +2,7 @@
 Name=COSMIC Solar
 Comment=Solar production monitor for FRITZ!Box smart-home devices
 Type=Application
+Icon=com.gpkvt.CosmicSolarApplet
 Exec=cosmic-solar-applet
 Terminal=false
 Categories=COSMIC;
