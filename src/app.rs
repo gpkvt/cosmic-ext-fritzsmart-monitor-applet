@@ -412,7 +412,7 @@ impl cosmic::Application for AppModel {
                         .unwrap_or_else(|| "Waiting for samples…".into());
                     let device_content = widget::Column::new()
                         .spacing(6)
-                        .push(widget::text::body(reading.name.clone()))
+                        .push(widget::text::body(format!("{} · LAST {}", reading.name, format_graph_timespan(self.settings.graph_timespan_minutes))))
                         .push(widget::Row::new().spacing(12).align_y(cosmic::iced::Alignment::Center)
                             .push(widget::text::title2(format!("{} W", reading.power_w)))
                             .push(widget::text::body(format!("{:.1} °C", reading.temperature_c))))
@@ -424,14 +424,14 @@ impl cosmic::Application for AppModel {
                                     widget::Column::new()
                                         .spacing(4)
                                         .width(cosmic::iced::Length::Fill)
-                                        .push(widget::text::caption(format!("POWER · LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
+                                        .push(widget::text::caption("POWER"))
                                         .push(widget::text::body(power_graph)),
                                 )
                                 .push(
                                     widget::Column::new()
                                         .spacing(4)
                                         .width(cosmic::iced::Length::Fill)
-                                        .push(widget::text::caption(format!("TEMPERATURE · LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
+                                        .push(widget::text::caption("TEMPERATURE"))
                                         .push(widget::text::body(temperature_graph)),
                                 ),
                         );
