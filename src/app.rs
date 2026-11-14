@@ -187,7 +187,7 @@ impl cosmic::Application for AppModel {
                 content = content
                     .push(widget::text::caption("CONNECTION ERROR"))
                     .push(
-                        widget::selectable_text::new(error.as_str())
+                        widget::selectable_text::selectable_text(error.as_str())
                             .width(cosmic::iced::Length::Fill),
                     )
                     .push(action_button("edit-copy-symbolic", "Copy error", Message::CopyError));
