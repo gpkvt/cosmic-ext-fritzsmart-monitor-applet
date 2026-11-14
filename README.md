@@ -7,11 +7,11 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 ## Features
 
 - Displays current power in watts and temperature in the COSMIC panel, with a configurable text size.
-- Popup displays power, device temperature and last successful update time.
+- Popup displays current power, device temperature, 15-minute high/low power values, and a rolling 15-minute power sparkline.
 - In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy.
 - Optional per-router PEM CA certificate trust without disabling hostname verification.
 - Discovers compatible power-meter devices and lets the user select one by its friendly name.
-- Refreshes every 60 seconds.
+- Refreshes every 60 seconds and keeps up to 16 readings covering a rolling 15-minute window.
 - Keeps the last successful reading visible when a later refresh fails.
 - Uses FRITZ!Box challenge-response login and HTTPS certificate validation by
   default.
@@ -85,9 +85,7 @@ readable; the applet manages the configuration file.
 
 ## Current scope and limitations
 
-This first implementation reads instantaneous measurements only. It does not
-provide historical production, daily yield, forecasts, or inverter-specific
-statistics. The FRITZ!Box device must expose both `powermeter/power` and
+The popup keeps a rolling, in-memory 15-minute power history (one sample per minute) and displays its low/high values and a compact sparkline. History is collected only while the applet is running and is not persisted across restarts. It does not provide historical production from before startup, daily yield, forecasts, or inverter-specific statistics. The FRITZ!Box device must expose both `powermeter/power` and
 `temperature/celsius` in its device XML.
 
 This initial PR is an implementation baseline. It still needs a successful
