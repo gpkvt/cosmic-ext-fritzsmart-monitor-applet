@@ -1,6 +1,6 @@
 [package]
 name = "cosmic-solar-applet"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Solar production monitor for the COSMIC desktop panel"
 license = "MIT"
