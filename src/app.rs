@@ -189,6 +189,7 @@ impl cosmic::Application for AppModel {
         if self.settings_open {
             content = content
                 .push(widget::text::title3("FRITZ!Power Monitor settings"))
+                .push(widget::divider::horizontal::default())
                 .push(widget::text::caption("PANEL"))
                 .push(widget::text::body(format!("Panel text size: {} pt", self.settings.panel_text_size)))
                 .push(
@@ -200,6 +201,7 @@ impl cosmic::Application for AppModel {
                     .step(1.0),
                 )
                 .push(widget::text::caption("Adjusts the power and temperature text in the panel"))
+                .push(widget::divider::horizontal::default())
                 .push(widget::text::caption("CONNECTION"))
                 .push(widget::text::body("FRITZ!Box URL"))
                 .push(
@@ -251,7 +253,9 @@ impl cosmic::Application for AppModel {
                     ));
             }
 
-            content = content.push(widget::text::caption("DIAGNOSTICS"));
+            content = content
+                .push(widget::divider::horizontal::default())
+                .push(widget::text::caption("DIAGNOSTICS"));
             if let Some(status) = &self.settings_status {
                 content = content.push(
                     widget::selectable_text::selectable_text(status.as_str())
@@ -269,13 +273,16 @@ impl cosmic::Application for AppModel {
                     .push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings)),
             );
         } else {
-            content = content.push(widget::text::title3("FRITZ!Power Monitor"));
+            content = content
+                .push(widget::text::title3("FRITZ!Power Monitor"))
+                .push(widget::divider::horizontal::default());
 
             if let Some(reading) = &self.reading {
                 content = content
                     .push(widget::text::caption("CURRENT PRODUCTION"))
                     .push(widget::text::title2(format!("{} W", reading.power_w)))
-                    .push(widget::text::body(format!("{:.1} °C", reading.temperature_c)));
+                    .push(widget::text::body(format!("{:.1} °C", reading.temperature_c)))
+                    .push(widget::divider::horizontal::default());
 
                 if let (Some(low), Some(high)) = (
                     self.history.iter().map(|(_, value)| *value).min(),
@@ -305,7 +312,9 @@ impl cosmic::Application for AppModel {
                     );
             }
 
-            content = content.push(
+            content = content
+                .push(widget::divider::horizontal::default())
+                .push(
                 widget::Row::new()
                     .spacing(8)
                     .push(action_button("view-refresh-symbolic", "Refresh", Message::Refresh))
