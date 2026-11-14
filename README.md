@@ -6,7 +6,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 
 ## Features
 
-- Displays current power in watts in the COSMIC panel.
+- Displays current power in watts and temperature in the COSMIC panel, with a configurable text size.
 - Popup displays power, device temperature and last successful update time.
 - In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy.
 - Optional per-router PEM CA certificate trust without disabling hostname verification.
@@ -63,7 +63,7 @@ list.
 
 ## Configuration
 
-Open the applet popup and choose **Settings**. Enter the FRITZ!Box URL,
+Open the applet popup and choose **Settings**. Adjust **Panel text size** (10–24 pt) to change the power and temperature labels in the panel. The setting is saved with the rest of the applet configuration. Enter the FRITZ!Box URL,
 username and password, then choose **Load devices**. The applet discovers
 devices that expose both power and temperature measurements. Select the
 desired device from the dropdown and choose **Save settings**.
