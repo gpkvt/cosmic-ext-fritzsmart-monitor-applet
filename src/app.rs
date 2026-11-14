@@ -585,7 +585,7 @@ mod history_tests {
         for minute in 0_u64..18 {
             record_device_sample(&mut history, &reading, start + Duration::from_secs(minute * 60));
         }
-        let samples = history.get("1111").unwrap();
+        let samples = history.get("111111").unwrap();
         assert_eq!(samples.len(), 16);
         assert_eq!(samples.front().unwrap().1, 120);
         assert_eq!(samples.back().unwrap().2, 21.5);
