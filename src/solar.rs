@@ -127,6 +127,22 @@ fn decode_xml_response(bytes: &[u8], context: &str) -> Result<String, String> {
         .map_err(|error| format!("{context}: response is not valid UTF-8: {error}"))
 }
 
+fn format_response_read_error(context: &str, error: &reqwest::Error) -> String {
+    let error_kind = if error.is_timeout() {
+        "timeout"
+    } else if error.is_connect() {
+        "connection"
+    } else if error.is_body() {
+        "body"
+    } else if error.is_decode() {
+        "decode"
+    } else {
+        "other"
+    };
+
+    format!("{context}: failed to read response body ({error_kind} error): {error}")
+}
+
 async fn read_xml_response(
     response: reqwest::Response,
     context: &str,
@@ -139,7 +155,7 @@ async fn read_xml_response(
     let bytes = response
         .bytes()
         .await
-        .map_err(|error| format!("{context}: failed to read response: {error}"))?;
+        .map_err(|error| format_response_read_error(context, &error))?;
 
     decode_xml_response(&bytes, context)
 }
@@ -257,6 +273,18 @@ mod tests {
         let error = decode_xml_response(b"<device>\xff</device>", "device request")
             .unwrap_err();
         assert!(error.starts_with("device request: response is not valid UTF-8:"));
+    }
+
+    #[test]
+    fn response_read_error_includes_context_and_error_details() {
+        let error = reqwest::Client::new()
+            .get("http://[::1")
+            .build()
+            .unwrap_err();
+        let message = format_response_read_error("challenge request", &error);
+
+        assert!(message.starts_with("challenge request: failed to read response body ("));
+        assert!(message.contains(&error.to_string()));
     }
 
     #[test]
