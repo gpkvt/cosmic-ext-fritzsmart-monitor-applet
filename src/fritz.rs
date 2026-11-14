@@ -5,6 +5,8 @@ use std::{collections::HashMap, env, fs, io::Write, time::Duration};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FritzReading {
+    pub ain: String,
+    pub name: String,
     pub power_w: i64,
     pub temperature_c: f64,
 }
@@ -21,6 +23,7 @@ pub struct FritzSettings {
     pub username: String,
     pub password: String,
     pub ain: String,
+    pub ains: Vec<String>,
     pub allow_invalid_certs: bool,
     pub ca_cert_path: String,
     pub panel_text_size: u8,
@@ -33,6 +36,7 @@ impl Default for FritzSettings {
             username: String::new(),
             password: String::new(),
             ain: String::new(),
+            ains: Vec::new(),
             allow_invalid_certs: false,
             ca_cert_path: String::new(),
             panel_text_size: 14,
@@ -63,6 +67,12 @@ impl FritzSettings {
             username: get("USERNAME"),
             password: get("PASSWORD"),
             ain: get("AIN"),
+            ains: {
+                let legacy_ain = get("AIN");
+                let selected: Vec<String> = get("AINS").split(',')
+                    .map(str::trim).filter(|ain| !ain.is_empty()).map(str::to_string).collect();
+                if selected.is_empty() && !legacy_ain.trim().is_empty() { vec![legacy_ain] } else { selected }
+            },
             allow_invalid_certs: get("ALLOW_INVALID_CERTS").eq_ignore_ascii_case("true"),
             ca_cert_path: get("CA_CERT_PATH"),
             panel_text_size: parse_panel_text_size(&get("PANEL_TEXT_SIZE")),
@@ -82,9 +92,11 @@ impl FritzSettings {
         let parent = path.parent().ok_or("Invalid configuration path")?;
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         let temporary = parent.join(format!(".fritz_solar.cfg.{}.tmp", std::process::id()));
+        let selected_ains = if self.ains.is_empty() { self.ain.clone() } else { self.ains.join(",") };
+        let first_ain = self.ains.first().map(String::as_str).unwrap_or(&self.ain);
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\n",
-            self.url, self.username, self.password, self.ain,
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\n",
+            self.url, self.username, self.password, first_ain, selected_ains,
             if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path,
             self.panel_text_size.clamp(10, 24)
         );
@@ -120,8 +132,10 @@ fn validate_settings(settings: &FritzSettings, require_ain: bool) -> Result<(), 
     if settings.username.trim().is_empty() || settings.password.is_empty() {
         return Err("Enter the FRITZ!Box username and password".into());
     }
-    if require_ain && normalize_ain_for_selection(&settings.ain).is_empty() {
-        return Err("Select a FRITZ!Box device".into());
+    if require_ain && settings.ains.iter().all(|ain| normalize_ain_for_selection(ain).is_empty())
+        && normalize_ain_for_selection(&settings.ain).is_empty()
+    {
+        return Err("Select at least one FRITZ!Box device".into());
     }
     Ok(())
 }
@@ -304,36 +318,45 @@ fn parse_devices_xml(xml: &str) -> Result<Vec<FritzDevice>, String> {
     Ok(devices)
 }
 
-fn parse_device_xml(xml: &str, ain: &str) -> Result<FritzReading, String> {
+fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<FritzReading>, String> {
     let document = Document::parse(xml).map_err(|error| format!("Invalid device XML: {error}"))?;
-    let wanted_ain = normalize_ain_for_selection(ain);
-    let device = document.descendants().find(|node| {
-        node.has_tag_name("device") && node.attribute("identifier")
-            .is_some_and(|identifier| normalize_ain_for_selection(identifier) == wanted_ain)
-    }).ok_or_else(|| "Configured FRITZ!Box device was not found".to_string())?;
-    let power_mw = child_text(device, "powermeter", "power")
-        .ok_or_else(|| "Device does not expose power measurements".to_string())?
-        .parse::<i64>().map_err(|_| "Device returned an invalid power measurement".to_string())?;
-    let temperature_c = child_text(device, "temperature", "celsius")
-        .ok_or_else(|| "Device does not expose temperature measurements".to_string())?
-        .parse::<i64>().map_err(|_| "Device returned an invalid temperature measurement".to_string())? as f64 / 10.0;
-    Ok(FritzReading { power_w: power_mw / 1000, temperature_c })
+    let wanted: Vec<String> = selected_ains.iter().map(|ain| normalize_ain_for_selection(ain))
+        .filter(|ain| !ain.is_empty()).collect();
+    let mut readings = Vec::new();
+    for device in document.descendants().filter(|node| node.has_tag_name("device")) {
+        let Some(ain) = device.attribute("identifier") else { continue };
+        if !wanted.iter().any(|selected| *selected == normalize_ain_for_selection(ain)) { continue; }
+        let power_mw = child_text(device, "powermeter", "power")
+            .ok_or_else(|| format!("Device {} does not expose power measurements", ain))?
+            .parse::<i64>().map_err(|_| format!("Device {} returned an invalid power measurement", ain))?;
+        let temperature_c = child_text(device, "temperature", "celsius")
+            .ok_or_else(|| format!("Device {} does not expose temperature measurements", ain))?
+            .parse::<i64>().map_err(|_| format!("Device {} returned an invalid temperature measurement", ain))? as f64 / 10.0;
+        let name = device.children().find(|child| child.has_tag_name("name")).and_then(|child| child.text())
+            .filter(|name| !name.trim().is_empty()).or_else(|| device.attribute("name"))
+            .unwrap_or("FRITZ!Box device").trim().to_string();
+        readings.push(FritzReading { ain: ain.to_string(), name, power_w: power_mw / 1000, temperature_c });
+    }
+    if readings.is_empty() { return Err("None of the selected FRITZ!Box devices were found".into()); }
+    Ok(readings)
 }
 
-pub async fn fetch_fritz_data() -> Result<FritzReading, String> {
+fn parse_device_xml(xml: &str, ain: &str) -> Result<FritzReading, String> {
+    parse_device_readings_xml(xml, &[ain.to_string()])?.into_iter().next()
+        .ok_or_else(|| "Configured FRITZ!Box device was not found".to_string())
+}
+
+pub async fn fetch_fritz_data() -> Result<Vec<FritzReading>, String> {
     let settings = FritzSettings::load()?;
     validate_settings(&settings, true)?;
+    let selected_ains = if settings.ains.is_empty() { vec![settings.ain.clone()] } else { settings.ains.clone() };
     let (client, sid) = authenticated_client(&settings).await?;
     let base = settings.url.trim_end_matches('/');
     let device_response = client.get(format!("{base}/webservices/homeautoswitch.lua"))
-        .query(&[("sid", sid.as_str()), ("ain", normalize_ain_for_selection(&settings.ain).as_str()),
-            ("switchcmd", "getdevicelistinfos")])
+        .query(&[("sid", sid.as_str()), ("switchcmd", "getdevicelistinfos")])
         .send().await.map_err(|error| format!("FRITZ!Box device request failed: {error}"))?;
-    let devices_xml = read_xml_response(
-        device_response,
-        "FRITZ!Box device request failed",
-    ).await?;
-    parse_device_xml(&devices_xml, &settings.ain)
+    let devices_xml = read_xml_response(device_response, "FRITZ!Box device request failed").await?;
+    parse_device_readings_xml(&devices_xml, &selected_ains)
 }
 
 #[cfg(test)]
