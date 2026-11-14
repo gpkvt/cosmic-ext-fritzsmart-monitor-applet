@@ -66,11 +66,13 @@ fn max_history_samples(window: Duration) -> usize {
 fn format_graph_timespan(minutes: u16) -> String {
     let minutes = u32::from(minutes);
     if minutes % 1440 == 0 {
-        format!("{} day(s)", minutes / 1440)
+        let days = minutes / 1440;
+        format!("{days} {}", if days == 1 { "day" } else { "days" })
     } else if minutes % 60 == 0 {
-        format!("{} hour(s)", minutes / 60)
+        let hours = minutes / 60;
+        format!("{hours} {}", if hours == 1 { "hour" } else { "hours" })
     } else if minutes > 60 {
-        format!("{} hour(s) {} min", minutes / 60, minutes % 60)
+        format!("{}h {}m", minutes / 60, minutes % 60)
     } else {
         format!("{minutes} minutes")
     }
@@ -653,9 +655,9 @@ mod history_tests {
     #[test]
     fn graph_timespan_label_is_readable() {
         assert_eq!(format_graph_timespan(15), "15 minutes");
-        assert_eq!(format_graph_timespan(60), "1 hour(s)");
-        assert_eq!(format_graph_timespan(90), "1 hour(s) 30 min");
-        assert_eq!(format_graph_timespan(1440), "1 day(s)");
+        assert_eq!(format_graph_timespan(60), "1 hour");
+        assert_eq!(format_graph_timespan(90), "1h 30m");
+        assert_eq!(format_graph_timespan(1440), "1 day");
     }
 
     #[test]
