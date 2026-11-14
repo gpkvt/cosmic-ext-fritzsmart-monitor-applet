@@ -22,6 +22,7 @@ pub struct FritzSettings {
     pub password: String,
     pub ain: String,
     pub allow_invalid_certs: bool,
+    pub ca_cert_path: String,
 }
 
 impl FritzSettings {
@@ -44,6 +45,7 @@ impl FritzSettings {
             password: get("PASSWORD"),
             ain: get("AIN"),
             allow_invalid_certs: get("ALLOW_INVALID_CERTS").eq_ignore_ascii_case("true"),
+            ca_cert_path: get("CA_CERT_PATH"),
         };
         validate_settings(&settings, false)?;
         Ok(settings)
@@ -51,7 +53,7 @@ impl FritzSettings {
 
     pub fn save(&self) -> Result<(), String> {
         validate_settings(self, true)?;
-        for value in [&self.url, &self.username, &self.password, &self.ain] {
+        for value in [&self.url, &self.username, &self.password, &self.ain, &self.ca_cert_path] {
             if value.contains('\n') || value.contains('\r') {
                 return Err("Configuration values must not contain newlines".into());
             }
@@ -61,9 +63,9 @@ impl FritzSettings {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         let temporary = parent.join(format!(".fritz_solar.cfg.{}.tmp", std::process::id()));
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nALLOW_INVALID_CERTS={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\n",
             self.url, self.username, self.password, self.ain,
-            if self.allow_invalid_certs { "true" } else { "false" }
+            if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path
         );
         #[cfg(unix)]
         let mut file = {
@@ -206,7 +208,18 @@ async fn read_xml_response(
 async fn authenticated_client(settings: &FritzSettings) -> Result<(Client, String), String> {
     validate_settings(settings, false)?;
     let mut builder = Client::builder().timeout(Duration::from_secs(10));
-    if settings.allow_invalid_certs { builder = builder.danger_accept_invalid_certs(true); }
+    if !settings.ca_cert_path.trim().is_empty() {
+        let certificate_pem = fs::read(&settings.ca_cert_path).map_err(|error| {
+            format!("Cannot read FRITZ!Box CA certificate {}: {error}", settings.ca_cert_path)
+        })?;
+        let certificate = reqwest::Certificate::from_pem(&certificate_pem).map_err(|error| {
+            format!("Invalid FRITZ!Box CA certificate {}: {error}", settings.ca_cert_path)
+        })?;
+        builder = builder.add_root_certificate(certificate);
+    }
+    if settings.allow_invalid_certs {
+        builder = builder.danger_accept_invalid_certs(true);
+    }
     let client = builder.build().map_err(|error| error.to_string())?;
     let base = settings.url.trim_end_matches('/');
     let challenge_http_response = client.get(format!("{base}/login_sid.lua")).send().await
