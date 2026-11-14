@@ -24,6 +24,7 @@ pub struct AppModel {
     device_labels: Vec<String>,
     selected_device: Option<usize>,
     settings_status: Option<String>,
+    error_copied: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -163,8 +164,14 @@ impl cosmic::Application for AppModel {
             if let Some(error) = &self.error {
                 content = content
                     .push(widget::text::caption("CONNECTION ERROR"))
-                    .push(widget::text::body(error))
+                    .push(
+                        widget::selectable_text::new(error.as_str())
+                            .width(cosmic::iced::Length::Fill),
+                    )
                     .push(widget::button::text("Copy error").on_press(Message::CopyError));
+                if self.error_copied {
+                    content = content.push(widget::text::caption("Error copied to clipboard"));
+                }
             }
 
             content = content.push(
@@ -187,9 +194,13 @@ impl cosmic::Application for AppModel {
                 Ok(reading) => {
                     self.reading = Some(reading);
                     self.error = None;
+                    self.error_copied = false;
                     self.updated = Some(chrono::Local::now().format("%H:%M:%S").to_string());
                 }
-                Err(error) => self.error = Some(error),
+                Err(error) => {
+                    self.error = Some(error);
+                    self.error_copied = false;
+                },
             },
             Message::ToggleSettings => {
                 self.settings_open = !self.settings_open;
@@ -229,6 +240,7 @@ impl cosmic::Application for AppModel {
             }
             Message::CopyError => {
                 if let Some(error) = self.error.clone() {
+                    self.error_copied = true;
                     return cosmic::iced::clipboard::write(error);
                 }
             }
