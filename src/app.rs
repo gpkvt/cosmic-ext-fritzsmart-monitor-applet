@@ -416,10 +416,25 @@ impl cosmic::Application for AppModel {
                         .push(widget::Row::new().spacing(12).align_y(cosmic::iced::Alignment::Center)
                             .push(widget::text::title2(format!("{} W", reading.power_w)))
                             .push(widget::text::body(format!("{:.1} °C", reading.temperature_c))))
-                        .push(widget::text::caption(format!("POWER · LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
-                        .push(widget::text::body(power_graph))
-                        .push(widget::text::caption(format!("TEMPERATURE · LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
-                        .push(widget::text::body(temperature_graph));
+                        .push(
+                            widget::Row::new()
+                                .spacing(12)
+                                .width(cosmic::iced::Length::Fill)
+                                .push(
+                                    widget::Column::new()
+                                        .spacing(4)
+                                        .width(cosmic::iced::Length::Fill)
+                                        .push(widget::text::caption(format!("POWER · LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
+                                        .push(widget::text::body(power_graph)),
+                                )
+                                .push(
+                                    widget::Column::new()
+                                        .spacing(4)
+                                        .width(cosmic::iced::Length::Fill)
+                                        .push(widget::text::caption(format!("TEMPERATURE · LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
+                                        .push(widget::text::body(temperature_graph)),
+                                ),
+                        );
                     let alternate = index % 2 == 1;
                     content = content.push(widget::container(device_content)
                         .padding(10)
