@@ -339,7 +339,13 @@ impl cosmic::Application for AppModel {
             }
         });
 
-        self.core.applet.popup_container(content).into()
+        // Keep the popup within a practical height and make the full menu
+        // scrollable. The same wrapper is used for the main view and settings,
+        // so long device lists and diagnostics remain reachable on short screens.
+        self.core.applet
+            .popup_container(widget::scrollable(content).height(cosmic::iced::Length::Fill))
+            .max_height(600.0)
+            .into()
     }
 
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
@@ -417,7 +423,10 @@ impl cosmic::Application for AppModel {
                         return Task::none();
                     };
                     let mut settings = self.core.applet.get_popup_settings(main_window_id, id, None, None, None);
-                    settings.positioner.size_limits = Limits::NONE.max_width(360.0).min_width(360.0);
+                    settings.positioner.size_limits = Limits::NONE
+                        .max_width(360.0)
+                        .min_width(360.0)
+                        .max_height(600.0);
                     get_popup(settings)
                 };
             }
