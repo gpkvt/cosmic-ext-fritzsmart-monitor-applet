@@ -1,5 +1,5 @@
-APP_NAME := cosmic-solar-applet
-APP_ID := com.gpkvt.CosmicSolarApplet
+APP_NAME := fritz-power-monitor
+APP_ID := com.gpkvt.FritzPowerMonitor
 
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
