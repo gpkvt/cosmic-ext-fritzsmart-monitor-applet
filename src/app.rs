@@ -244,7 +244,7 @@ impl cosmic::Application for AppModel {
             return widget::text("").into();
         }
 
-        // popup_container fixes the popup width at 360px. Keep the content
+        // popup_container fixes the popup width at 320px. Keep the content
         // padded so controls and text do not touch the popup border.
         let mut content = widget::Column::new().spacing(12).padding(16);
 
@@ -591,8 +591,8 @@ impl cosmic::Application for AppModel {
                     };
                     let mut settings = self.core.applet.get_popup_settings(main_window_id, id, None, None, None);
                     settings.positioner.size_limits = Limits::NONE
-                        .max_width(360.0)
-                        .min_width(360.0)
+                        .max_width(320.0)
+                        .min_width(320.0)
                         .max_height(600.0);
                     get_popup(settings)
                 };
