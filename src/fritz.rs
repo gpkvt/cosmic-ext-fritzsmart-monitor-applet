@@ -343,6 +343,7 @@ fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<
     Ok(readings)
 }
 
+#[cfg(test)]
 fn parse_device_xml(xml: &str, ain: &str) -> Result<FritzReading, String> {
     parse_device_readings_xml(xml, &[ain.to_string()])?.into_iter().next()
         .ok_or_else(|| "Configured FRITZ!Box device was not found".to_string())
