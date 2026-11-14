@@ -132,7 +132,7 @@ impl cosmic::Application for AppModel {
         // fixes the width to an icon, while text_button() only accepts Text.
         let button = widget::button::custom(content)
             .on_press_down(Message::TogglePopup)
-            .padding([0, horizontal_padding])
+            .padding([vertical_padding, horizontal_padding])
             .height(cosmic::iced::Length::Fixed(
                 f32::from(suggested.1 + 2 * vertical_padding),
             ))
