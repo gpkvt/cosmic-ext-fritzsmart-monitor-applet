@@ -45,6 +45,7 @@ pub enum Message {
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
+    GraphTimespanChanged(u16),
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
     ToggleDevice(String, bool),
@@ -54,15 +55,38 @@ pub enum Message {
 
 
 
-const HISTORY_WINDOW: Duration = Duration::from_secs(15 * 60);
-const MAX_HISTORY_SAMPLES: usize = 16;
+fn graph_history_window(minutes: u16) -> Duration {
+    Duration::from_secs(u64::from(minutes.clamp(5, 1440)) * 60)
+}
 
-fn record_power_sample(history: &mut VecDeque<(Instant, i64)>, power_w: i64, now: Instant) {
+fn max_history_samples(window: Duration) -> usize {
+    (window.as_secs() / 60) as usize + 1
+}
+
+fn format_graph_timespan(minutes: u16) -> String {
+    let minutes = u32::from(minutes);
+    if minutes % 1440 == 0 {
+        format!("{} day(s)", minutes / 1440)
+    } else if minutes % 60 == 0 {
+        format!("{} hour(s)", minutes / 60)
+    } else if minutes > 60 {
+        format!("{} hour(s) {} min", minutes / 60, minutes % 60)
+    } else {
+        format!("{minutes} minutes")
+    }
+}
+
+fn record_power_sample(
+    history: &mut VecDeque<(Instant, i64)>,
+    power_w: i64,
+    now: Instant,
+    window: Duration,
+) {
     history.push_back((now, power_w));
-    while history.front().is_some_and(|(timestamp, _)| now.duration_since(*timestamp) > HISTORY_WINDOW) {
+    while history.front().is_some_and(|(timestamp, _)| now.duration_since(*timestamp) > window) {
         history.pop_front();
     }
-    while history.len() > MAX_HISTORY_SAMPLES {
+    while history.len() > max_history_samples(window) {
         history.pop_front();
     }
 }
@@ -91,16 +115,17 @@ fn record_device_sample(
     history: &mut HashMap<String, VecDeque<(Instant, i64, f64)>>,
     reading: &FritzReading,
     now: Instant,
+    window: Duration,
 ) {
     let samples = history
         .entry(crate::fritz::normalize_ain_for_selection(&reading.ain))
         .or_default();
     samples.push_back((now, reading.power_w, reading.temperature_c));
     while samples.front().is_some_and(|(timestamp, _, _)|
-        now.duration_since(*timestamp) > HISTORY_WINDOW) {
+        now.duration_since(*timestamp) > window) {
         samples.pop_front();
     }
-    while samples.len() > MAX_HISTORY_SAMPLES {
+    while samples.len() > max_history_samples(window) {
         samples.pop_front();
     }
 }
@@ -236,6 +261,20 @@ impl cosmic::Application for AppModel {
                     .step(1.0),
                 )
                 .push(widget::text::caption("Adjusts the power and temperature text in the panel"))
+                .push(widget::divider::horizontal::default())
+                .push(widget::text::caption(format!(
+                    "GRAPH HISTORY: {}",
+                    format_graph_timespan(self.settings.graph_timespan_minutes)
+                )))
+                .push(
+                    widget::slider(
+                        5.0..=1440.0,
+                        f32::from(self.settings.graph_timespan_minutes),
+                        |value| Message::GraphTimespanChanged(value.round() as u16),
+                    )
+                    .step(5.0),
+                )
+                .push(widget::text::caption("5 minutes to 24 hours; samples are collected once per minute"))
                 .push(widget::divider::horizontal::default())
                 .push(widget::text::caption("CONNECTION"))
                 .push(widget::text::body("FRITZ!Box URL"))
@@ -375,9 +414,9 @@ impl cosmic::Application for AppModel {
                         .push(widget::Row::new().spacing(12).align_y(cosmic::iced::Alignment::Center)
                             .push(widget::text::title2(format!("{} W", reading.power_w)))
                             .push(widget::text::body(format!("{:.1} °C", reading.temperature_c))))
-                        .push(widget::text::caption("POWER · LAST 15 MINUTES"))
+                        .push(widget::text::caption(format!("POWER · LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
                         .push(widget::text::body(power_graph))
-                        .push(widget::text::caption("TEMPERATURE · LAST 15 MINUTES"))
+                        .push(widget::text::caption(format!("TEMPERATURE · LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
                         .push(widget::text::body(temperature_graph));
                     let alternate = index % 2 == 1;
                     content = content.push(widget::container(device_content)
@@ -400,7 +439,7 @@ impl cosmic::Application for AppModel {
                     self.history.iter().map(|(_, value)| *value).min(),
                     self.history.iter().map(|(_, value)| *value).max(),
                 ) {
-                    content = content.push(widget::text::caption("TOTAL POWER · LAST 15 MINUTES"))
+                    content = content.push(widget::text::caption(format!("TOTAL POWER · LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
                         .push(widget::text::body(format!("Low  {low} W     High  {high} W")))
                         .push(widget::text::title2(power_sparkline(&self.history)));
                 }
@@ -467,9 +506,10 @@ impl cosmic::Application for AppModel {
                 Ok(readings) => {
                     let total_power = readings.iter().map(|reading| reading.power_w).sum();
                     let now = Instant::now();
-                    record_power_sample(&mut self.history, total_power, now);
+                    let history_window = graph_history_window(self.settings.graph_timespan_minutes);
+                    record_power_sample(&mut self.history, total_power, now, history_window);
                     for reading in &readings {
-                        record_device_sample(&mut self.device_history, reading, now);
+                        record_device_sample(&mut self.device_history, reading, now, history_window);
                     }
                     self.readings = readings;
                     self.error = None;
@@ -489,6 +529,7 @@ impl cosmic::Application for AppModel {
             Message::AllowInvalidCertsChanged(value) => self.settings.allow_invalid_certs = value,
             Message::CaCertPathChanged(value) => self.settings.ca_cert_path = value,
             Message::PanelTextSizeChanged(value) => self.settings.panel_text_size = value.clamp(10, 24),
+            Message::GraphTimespanChanged(value) => self.settings.graph_timespan_minutes = value.clamp(5, 1440),
             Message::DiscoverDevices => {
                 let settings = self.settings.clone();
                 self.settings_status = Some("Connecting and loading devices…".into());
@@ -587,7 +628,12 @@ mod history_tests {
             temperature_c: 21.5,
         };
         for minute in 0_u64..18 {
-            record_device_sample(&mut history, &reading, start + Duration::from_secs(minute * 60));
+            record_device_sample(
+                &mut history,
+                &reading,
+                start + Duration::from_secs(minute * 60),
+                Duration::from_secs(15 * 60),
+            );
         }
         let samples = history.get("111111").unwrap();
         assert_eq!(samples.len(), 16);
@@ -596,11 +642,33 @@ mod history_tests {
     }
 
     #[test]
+    fn graph_history_window_supports_configured_ranges() {
+        assert_eq!(graph_history_window(15), Duration::from_secs(900));
+        assert_eq!(graph_history_window(60), Duration::from_secs(3600));
+        assert_eq!(graph_history_window(0), Duration::from_secs(300));
+        assert_eq!(graph_history_window(2000), Duration::from_secs(86400));
+        assert_eq!(max_history_samples(graph_history_window(60)), 61);
+    }
+
+    #[test]
+    fn graph_timespan_label_is_readable() {
+        assert_eq!(format_graph_timespan(15), "15 minutes");
+        assert_eq!(format_graph_timespan(60), "1 hour(s)");
+        assert_eq!(format_graph_timespan(90), "1 hour(s) 30 min");
+        assert_eq!(format_graph_timespan(1440), "1 day(s)");
+    }
+
+    #[test]
     fn history_keeps_only_the_last_fifteen_minutes_and_sixteen_samples() {
         let start = Instant::now();
         let mut history = VecDeque::new();
         for minute in 0_u64..18 {
-            record_power_sample(&mut history, minute as i64, start + Duration::from_secs(minute * 60));
+            record_power_sample(
+                &mut history,
+                minute as i64,
+                start + Duration::from_secs(minute * 60),
+                Duration::from_secs(15 * 60),
+            );
         }
         assert_eq!(history.len(), 16);
         assert_eq!(history.front().unwrap().1, 2);
