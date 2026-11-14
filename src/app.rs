@@ -1,4 +1,4 @@
-use crate::solar::{discover_devices, fetch_solar_data, FritzSettings, FRITZ!BoxDevice, FRITZ!BoxReading};
+use crate::fritz::{discover_devices, fetch_fritz_data, FritzSettings, FRITZ!BoxDevice, FRITZ!BoxReading};
 use cosmic::iced::{
     futures,
     platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
@@ -79,7 +79,7 @@ impl cosmic::Application for AppModel {
         let settings = FritzSettings::load().unwrap_or_default();
         (
             Self { core, settings, ..Default::default() },
-            Task::perform(fetch_solar_data(), |result| cosmic::Action::App(Message::Updated(result))),
+            Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result))),
         )
     }
 
@@ -293,7 +293,7 @@ impl cosmic::Application for AppModel {
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
             Message::Refresh => {
-                return Task::perform(fetch_solar_data(), |result| cosmic::Action::App(Message::Updated(result)));
+                return Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result)));
             }
             Message::Updated(result) => match result {
                 Ok(reading) => {
@@ -325,8 +325,8 @@ impl cosmic::Application for AppModel {
                     self.device_labels = devices.iter().map(|device| device.name.clone()).collect();
                     self.devices = devices;
                     self.selected_device = self.devices.iter().position(|device| {
-                        crate::solar::normalize_ain_for_selection(&device.ain)
-                            == crate::solar::normalize_ain_for_selection(&self.settings.ain)
+                        crate::fritz::normalize_ain_for_selection(&device.ain)
+                            == crate::fritz::normalize_ain_for_selection(&self.settings.ain)
                     }).or(Some(0));
                     if let Some(index) = self.selected_device {
                         if let Some(device) = self.devices.get(index) {
@@ -351,7 +351,7 @@ impl cosmic::Application for AppModel {
                     self.settings_status = Some(error);
                 } else {
                     self.settings_status = Some("Settings saved".into());
-                    return Task::perform(fetch_solar_data(), |result| cosmic::Action::App(Message::Updated(result)));
+                    return Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result)));
                 }
             }
             Message::TogglePopup => {
