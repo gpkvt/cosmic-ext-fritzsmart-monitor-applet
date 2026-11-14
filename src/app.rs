@@ -173,10 +173,7 @@ impl cosmic::Application for AppModel {
                     .push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings)),
             );
         } else {
-            content = content.push(widget::text::title3(format!(
-                "Solar production · v{}",
-                env!("CARGO_PKG_VERSION")
-            )));
+            content = content.push(widget::text::title3("Solar production"));
 
             if let Some(reading) = &self.reading {
                 content = content
@@ -211,6 +208,10 @@ impl cosmic::Application for AppModel {
                     .push(action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
             );
         }
+
+        content = content.push(
+            widget::text::caption(format!("v{}", env!("CARGO_PKG_VERSION"))),
+        );
 
         // Give the popup content an opaque base so it remains readable even
         // when the panel theme uses a translucent applet background.
