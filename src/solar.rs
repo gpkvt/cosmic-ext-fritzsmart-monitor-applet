@@ -50,7 +50,7 @@ impl FritzSettings {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        validate_settings(self, false)?;
+        validate_settings(self, true)?;
         for value in [&self.url, &self.username, &self.password, &self.ain] {
             if value.contains(['\n', '\r']) {
                 return Err("Configuration values must not contain newlines".into());
@@ -97,13 +97,13 @@ fn validate_settings(settings: &FritzSettings, require_ain: bool) -> Result<(), 
     if settings.username.trim().is_empty() || settings.password.is_empty() {
         return Err("Enter the FRITZ!Box username and password".into());
     }
-    if require_ain && normalize_ain(&settings.ain).is_empty() {
+    if require_ain && normalize_ain_for_selection(&settings.ain).is_empty() {
         return Err("Select a FRITZ!Box device".into());
     }
     Ok(())
 }
 
-fn normalize_ain(value: &str) -> String {
+pub fn normalize_ain_for_selection(value: &str) -> String {
     value.chars().filter(|character| character.is_ascii_alphanumeric()).collect()
 }
 
@@ -164,7 +164,9 @@ pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<SolarDevice
         let Some(ain) = node.attribute("identifier") else { continue };
         let has_power_meter = child_text(node, "powermeter", "power")
             .and_then(|value| value.parse::<i64>().ok()).is_some();
-        if !has_power_meter { continue; }
+        let has_temperature = child_text(node, "temperature", "celsius")
+            .and_then(|value| value.parse::<i64>().ok()).is_some();
+        if !has_power_meter || !has_temperature { continue; }
         let name = node.children().find(|child| child.has_tag_name("name"))
             .and_then(|child| child.text()).filter(|name| !name.trim().is_empty())
             .map(str::trim).unwrap_or("Unnamed device").to_string();
@@ -188,8 +190,8 @@ fn parse_device_xml(xml: &str, ain: &str) -> Result<SolarReading, String> {
         .ok_or_else(|| "Device does not expose power measurements".to_string())?
         .parse::<i64>().map_err(|_| "Device returned an invalid power measurement".to_string())?;
     let temperature_c = child_text(device, "temperature", "celsius")
-        .and_then(|value| value.parse::<i64>().ok())
-        .map(|value| value as f64 / 10.0).unwrap_or(0.0);
+        .ok_or_else(|| "Device does not expose temperature measurements".to_string())?
+        .parse::<i64>().map_err(|_| "Device returned an invalid temperature measurement".to_string())? as f64 / 10.0;
     Ok(SolarReading { power_w: power_mw / 1000, temperature_c })
 }
 
