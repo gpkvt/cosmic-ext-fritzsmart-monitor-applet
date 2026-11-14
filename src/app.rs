@@ -109,11 +109,13 @@ impl cosmic::Application for AppModel {
                         |message| message,
                     ));
             }
+            content = content.push(
+                widget::button::text("Copy status").on_press(Message::CopySettingsStatus)
+            );
             if let Some(status) = &self.settings_status {
                 content = content
                     .push(widget::text::caption("Status"))
-                    .push(widget::text::body(status))
-                    .push(widget::button::text("Copy status").on_press(Message::CopySettingsStatus));
+                    .push(widget::text::body(status));
             }
             content = content
                 .push(widget::button::text("Save settings").on_press(Message::SaveSettings))
@@ -133,8 +135,8 @@ impl cosmic::Application for AppModel {
             if let Some(error) = &self.error {
                 content = content
                     .push(widget::text::caption("Connection error"))
-                    .push(widget::text::body(error))
-                    .push(widget::button::text("Copy error").on_press(Message::CopyError));
+                    .push(widget::button::text("Copy error").on_press(Message::CopyError))
+                    .push(widget::text::body(error));
             }
             content = content
                 .push(widget::button::text("Settings").on_press(Message::ToggleSettings))
