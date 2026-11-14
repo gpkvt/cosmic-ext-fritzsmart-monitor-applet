@@ -1,4 +1,4 @@
-# COSMIC Solar Applet
+# FRITZ!Power Monitor
 
 A COSMIC panel applet that reads instantaneous power and temperature data
 directly from a FRITZ!Box smart-home device. It does not execute or depend on
@@ -34,15 +34,15 @@ make install
 ```
 
 The install target builds the release binary, installs it to
-`~/.local/bin/cosmic-solar-applet`, installs the COSMIC desktop entry to
-`~/.local/share/applications/com.gpkvt.CosmicSolarApplet.desktop`, and installs
+`~/.local/bin/fritz-power-monitor`, installs the COSMIC desktop entry to
+`~/.local/share/applications/com.gpkvt.FritzPowerMonitor.desktop`, and installs
 the app icon to `~/.local/share/icons/hicolor/scalable/apps/`. The desktop
 entry uses the absolute path to the installed binary and includes the COSMIC
 applet discovery keys, so the applet can be found in COSMIC Settings.
 No root privileges are required.
 
 To install under a different prefix, set `PREFIX`, for example
-`make install PREFIX=/opt/cosmic-solar`. The corresponding bin and share
+`make install PREFIX=/opt/fritz-power-monitor`. The corresponding bin and share
 directories are created automatically.
 
 Remove the user-local installation with:
@@ -58,7 +58,7 @@ cargo test
 ```
 
 After installing, reopen COSMIC Settings (or log out and back in if the
-applet list is not refreshed) and add **COSMIC Solar** from the panel applet
+applet list is not refreshed) and add **FRITZ!Power Monitor** from the panel applet
 list.
 
 ## Configuration
