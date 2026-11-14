@@ -237,6 +237,7 @@ impl cosmic::Application for AppModel {
                                 .on_toggle(Message::AllowInvalidCertsChanged),
                         ),
                 )
+                .push(widget::divider::horizontal::default())
                 .push(widget::text::caption("DEVICE"))
                 .push(action_button("view-refresh-symbolic", "Load devices", Message::DiscoverDevices));
 
@@ -266,12 +267,14 @@ impl cosmic::Application for AppModel {
                 content = content.push(widget::text::caption("No status messages yet"));
             }
 
-            content = content.push(
-                widget::Row::new()
-                    .spacing(8)
-                    .push(action_button("document-save-symbolic", "Save settings", Message::SaveSettings))
-                    .push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings)),
-            );
+            content = content
+                .push(widget::divider::horizontal::default())
+                .push(
+                    widget::Row::new()
+                        .spacing(8)
+                        .push(action_button("document-save-symbolic", "Save settings", Message::SaveSettings))
+                        .push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings)),
+                );
         } else {
             content = content
                 .push(widget::text::title3("FRITZ!Power Monitor"))
@@ -315,11 +318,11 @@ impl cosmic::Application for AppModel {
             content = content
                 .push(widget::divider::horizontal::default())
                 .push(
-                widget::Row::new()
-                    .spacing(8)
-                    .push(action_button("view-refresh-symbolic", "Refresh", Message::Refresh))
-                    .push(action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
-            );
+                    widget::Row::new()
+                        .spacing(8)
+                        .push(action_button("view-refresh-symbolic", "Refresh", Message::Refresh))
+                        .push(action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
+                );
         }
 
         content = content.push(
