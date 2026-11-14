@@ -93,7 +93,7 @@ impl cosmic::Application for AppModel {
                 .push(widget::text_input("Username", &self.settings.username).on_input(Message::UsernameChanged))
                 .push(widget::text::body("Password"))
                 .push(widget::secure_input("Password", &self.settings.password, None, true).on_input(Message::PasswordChanged))
-                .push(widget::toggler(self.settings.allow_invalid_certs).label("Allow invalid TLS certificates").on_toggle(Message::AllowInvalidCertsChanged))
+                .push(widget::toggler(self.settings.allow_invalid_certs).label(Some("Allow invalid TLS certificates".to_string())).on_toggle(Message::AllowInvalidCertsChanged))
                 .push(widget::button::text("Load devices").on_press(Message::DiscoverDevices));
             if !self.device_labels.is_empty() {
                 content = content
