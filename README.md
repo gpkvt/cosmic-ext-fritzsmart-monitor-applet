@@ -27,7 +27,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 
 ## Build and install
 
-Build and install the applet into your user account:
+Build and install the applet into your user account. Each compiled binary displays its UTC build time in the development version string (for example, `0.1.3-dev+20261114T231900Z`):
 
 ```sh
 make install
