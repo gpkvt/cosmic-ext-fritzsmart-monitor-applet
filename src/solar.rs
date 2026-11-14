@@ -127,7 +127,16 @@ fn decode_xml_response(bytes: &[u8], context: &str) -> Result<String, String> {
         .map_err(|error| format!("{context}: response is not valid UTF-8: {error}"))
 }
 
-fn format_response_read_error(context: &str, error: &reqwest::Error) -> String {
+fn format_response_read_error(
+    context: &str,
+    url_path: &str,
+    status: reqwest::StatusCode,
+    version: reqwest::Version,
+    content_type: Option<&str>,
+    content_length: Option<&str>,
+    connection: Option<&str>,
+    error: &reqwest::Error,
+) -> String {
     let error_kind = if error.is_timeout() {
         "timeout"
     } else if error.is_connect() {
@@ -140,7 +149,12 @@ fn format_response_read_error(context: &str, error: &reqwest::Error) -> String {
         "other"
     };
 
-    format!("{context}: failed to read response body ({error_kind} error): {error}")
+    format!(
+        "{context}: failed to read response body\\n         Request path: {url_path}\\n         HTTP status: {status}\\n         HTTP version: {version:?}\\n         Content-Type: {}\\n         Content-Length: {}\\n         Connection: {}\\n         Error category: {error_kind}\\n         Error: {error}\\n         Error details: {error:?}",
+        content_type.unwrap_or("<missing>"),
+        content_length.unwrap_or("<missing>"),
+        connection.unwrap_or("<missing>"),
+    )
 }
 
 async fn read_xml_response(
@@ -152,10 +166,39 @@ async fn read_xml_response(
         return Err(format!("{context}: HTTP {status}"));
     }
 
+    let url_path = response.url().path().to_string();
+    let version = response.version();
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let content_length = response
+        .headers()
+        .get(reqwest::header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let connection = response
+        .headers()
+        .get(reqwest::header::CONNECTION)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+
     let bytes = response
         .bytes()
         .await
-        .map_err(|error| format_response_read_error(context, &error))?;
+        .map_err(|error| {
+            format_response_read_error(
+                context,
+                &url_path,
+                status,
+                version,
+                content_type.as_deref(),
+                content_length.as_deref(),
+                connection.as_deref(),
+                &error,
+            )
+        })?;
 
     decode_xml_response(&bytes, context)
 }
@@ -276,14 +319,28 @@ mod tests {
     }
 
     #[test]
-    fn response_read_error_includes_context_and_error_details() {
+    fn response_read_error_includes_request_and_response_diagnostics() {
         let error = reqwest::Client::new()
             .get("http://[::1")
             .build()
             .unwrap_err();
-        let message = format_response_read_error("challenge request", &error);
+        let message = format_response_read_error(
+            "challenge request",
+            "/login_sid.lua",
+            reqwest::StatusCode::OK,
+            reqwest::Version::HTTP_11,
+            Some("text/xml"),
+            Some("123"),
+            Some("close"),
+            &error,
+        );
 
-        assert!(message.starts_with("challenge request: failed to read response body ("));
+        assert!(message.contains("challenge request: failed to read response body"));
+        assert!(message.contains("Request path: /login_sid.lua"));
+        assert!(message.contains("HTTP status: 200 OK"));
+        assert!(message.contains("Content-Type: text/xml"));
+        assert!(message.contains("Content-Length: 123"));
+        assert!(message.contains("Error details:"));
         assert!(message.contains(&error.to_string()));
     }
 
