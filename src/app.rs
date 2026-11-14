@@ -93,20 +93,23 @@ impl cosmic::Application for AppModel {
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
-        let power = self.reading.as_ref()
-            .map(|reading| format!("{} W", reading.power_w))
-            .unwrap_or_else(|| "-- W".to_string());
-        let temperature = self.reading.as_ref()
-            .map(|reading| format!("{:.1} °C", reading.temperature_c))
-            .unwrap_or_else(|| "-- °C".to_string());
+        let label = self
+            .reading
+            .as_ref()
+            .map(|reading| {
+                format!(
+                    "☀ {} W  ·  {:.1} °C",
+                    reading.power_w, reading.temperature_c
+                )
+            })
+            .unwrap_or_else(|| "☀ -- W  ·  -- °C".to_string());
 
-        let content = widget::Row::new()
-            .spacing(6)
-            .push(widget::icon::from_name("weather-clear-symbolic").size(16))
-            .push(widget::text::body(power))
-            .push(widget::text::body(temperature));
-
-        self.core.applet.text_button(content, Message::TogglePopup).into()
+        // text_button accepts a text widget, not a Row. Keeping both readings
+        // in one text label also guarantees they stay on the same line.
+        self.core
+            .applet
+            .text_button(widget::text::body(label), Message::TogglePopup)
+            .into()
     }
 
     fn view_window(&self, id: Id) -> Element<'_, Self::Message> {
