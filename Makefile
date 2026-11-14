@@ -7,12 +7,16 @@ DATADIR ?= $(PREFIX)/share
 DESKTOP_FILE := $(DATADIR)/applications/$(APP_ID).desktop
 ICON_FILE := $(DATADIR)/icons/hicolor/scalable/apps/$(APP_ID).svg
 
-.PHONY: build install uninstall
+.PHONY: build update install uninstall
 
 build:
 	cargo build --release
 
-install: build
+update:
+	git pull --ff-only
+
+install: update
+	$(MAKE) build
 	install -Dm0755 target/release/$(APP_NAME) "$(BINDIR)/$(APP_NAME)"
 	install -d "$(DATADIR)/applications"
 	sed 's|^Exec=.*|Exec=$(abspath $(BINDIR)/$(APP_NAME))|' data/$(APP_ID).desktop > "$(DESKTOP_FILE).tmp"
