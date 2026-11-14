@@ -42,6 +42,7 @@ pub enum Message {
     PasswordChanged(String),
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
+    PanelTextSizeChanged(u8),
     DiscoverDevices,
     DevicesLoaded(Result<Vec<SolarDevice>, String>),
     SelectDevice(usize),
@@ -124,8 +125,8 @@ impl cosmic::Application for AppModel {
             .spacing(6)
             .align_y(cosmic::iced::Alignment::Center)
             .push(widget::icon::from_name("weather-clear-symbolic").size(suggested.1))
-            .push(self.core.applet.text(power))
-            .push(self.core.applet.text(temperature));
+            .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)))
+            .push(self.core.applet.text(temperature).size(f32::from(self.settings.panel_text_size)));
 
         // Use a content-sized applet button: button_from_element() deliberately
         // fixes the width to an icon, while text_button() only accepts Text.
@@ -150,6 +151,10 @@ impl cosmic::Application for AppModel {
         if self.settings_open {
             content = content
                 .push(widget::text::title3("Solar settings"))
+                .push(widget::text::caption("PANEL"))
+                .push(widget::text::body(format!("Panel text size: {} pt", self.settings.panel_text_size)))
+                .push(widget::slider(10..=24, self.settings.panel_text_size, Message::PanelTextSizeChanged))
+                .push(widget::text::caption("Adjusts the power and temperature text in the panel"))
                 .push(widget::text::caption("CONNECTION"))
                 .push(widget::text::body("FRITZ!Box URL"))
                 .push(
@@ -284,7 +289,6 @@ impl cosmic::Application for AppModel {
                 }
                 Err(error) => {
                     self.error = Some(error);
-                    self.clipboard_status = None;
                 },
             },
             Message::ToggleSettings => {
@@ -296,6 +300,7 @@ impl cosmic::Application for AppModel {
             Message::PasswordChanged(value) => self.settings.password = value,
             Message::AllowInvalidCertsChanged(value) => self.settings.allow_invalid_certs = value,
             Message::CaCertPathChanged(value) => self.settings.ca_cert_path = value,
+            Message::PanelTextSizeChanged(value) => self.settings.panel_text_size = value.clamp(10, 24),
             Message::DiscoverDevices => {
                 let settings = self.settings.clone();
                 self.settings_status = Some("Connecting and loading devices…".into());
