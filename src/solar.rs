@@ -150,10 +150,10 @@ async fn authenticated_client(settings: &FritzSettings) -> Result<(Client, Strin
     if settings.allow_invalid_certs { builder = builder.danger_accept_invalid_certs(true); }
     let client = builder.build().map_err(|error| error.to_string())?;
     let base = settings.url.trim_end_matches('/');
-    let challenge_response = client.get(format!("{base}/login_sid.lua")).send().await
+    let challenge_http_response = client.get(format!("{base}/login_sid.lua")).send().await
         .map_err(|error| format!("FRITZ!Box connection failed: {error}"))?;
     let challenge_xml = read_xml_response(
-        challenge_response,
+        challenge_http_response,
         "FRITZ!Box challenge request failed",
     ).await?;
     let challenge_document = Document::parse(&challenge_xml)
@@ -254,7 +254,7 @@ mod tests {
 
     #[test]
     fn rejects_non_utf8_xml_response_with_context() {
-        let error = decode_xml_response(b"<device>\\xff</device>", "device request")
+        let error = decode_xml_response(b"<device>\xff</device>", "device request")
             .unwrap_err();
         assert!(error.starts_with("device request: response is not valid UTF-8:"));
     }
