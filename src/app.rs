@@ -144,6 +144,13 @@ impl cosmic::Application for AppModel {
     }
 
     fn view_window(&self, id: Id) -> Element<'_, Self::Message> {
+        // Only render applet content for the popup we created. Other
+        // secondary surfaces (including native text context menus) must not
+        // accidentally receive the applet's interactive view.
+        if self.popup != Some(id) {
+            return widget::text("").into();
+        }
+
         // popup_container fixes the popup width at 360px. Keep the content
         // padded so controls and text do not touch the popup border.
         let mut content = widget::Column::new().spacing(12).padding(16);
