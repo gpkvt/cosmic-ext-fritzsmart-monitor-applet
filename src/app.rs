@@ -1513,6 +1513,20 @@ impl cosmic::Application for AppModel {
                         ))
                         .unwrap_or_else(|| "Waiting for next request".to_string())
                 };
+                let refresh_indicator = if self.refresh_started_at.is_some() {
+                    icon_action_button(
+                        refresh_spinner_frame(Instant::now()),
+                        "Request in progress",
+                        Message::Refresh,
+                    )
+                } else if let Some(remaining) = self.next_refresh_at.map(|deadline|
+                    deadline.saturating_duration_since(Instant::now())
+                ).filter(|remaining| remaining.as_secs() < 10) {
+                    widget::text::caption(format!("{}s", remaining.as_secs()))
+                        .into()
+                } else {
+                    icon_action_button("↻", "Reload now", Message::Refresh)
+                };
                 content = content.push(
                     widget::Row::new()
                         .spacing(8)
@@ -1520,11 +1534,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::title3(format!("HTTP requests ({})", requests.len()))
                             .width(cosmic::iced::Length::Fill))
                         .push(widget::text::caption(request_countdown))
-                        .push(icon_action_button(
-                            self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("↻"),
-                            if self.refresh_started_at.is_some() { "Request in progress" } else { "Reload now" },
-                            Message::Refresh,
-                        ))
+                        .push(refresh_indicator)
                 ).push(widget::text::caption(
                     "Most recent responses · query parameters and session IDs are omitted"
                 ));
