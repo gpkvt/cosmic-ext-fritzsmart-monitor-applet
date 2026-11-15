@@ -29,6 +29,7 @@
   </screenshots>
   <provides>
     <binary>fritz-power-monitor</binary>
+    <id>com.system76.CosmicApplet</id>
   </provides>
   <categories>
     <category>Utility</category>
