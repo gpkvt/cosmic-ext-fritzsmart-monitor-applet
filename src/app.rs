@@ -538,15 +538,22 @@ fn metric_tile<'a>(
     surface_card(content.into(), 10)
 }
 
-fn device_corner_radius(device_count: usize) -> f32 {
-    if device_count > 1 { 0.0 } else { 8.0 }
+fn device_corner_radius(index: usize, device_count: usize) -> cosmic::iced::border::Radius {
+    let top = index == 0;
+    let bottom = index + 1 == device_count;
+    cosmic::iced::border::Radius {
+        top_left: if top { 8.0 } else { 0.0 },
+        top_right: if top { 8.0 } else { 0.0 },
+        bottom_right: if bottom { 8.0 } else { 0.0 },
+        bottom_left: if bottom { 8.0 } else { 0.0 },
+    }
 }
 
 fn device_metric_tile<'a>(
     label: impl Into<String>,
     value: impl Into<String>,
     icon: &'static str,
-    radius: f32,
+    radius: cosmic::iced::border::Radius,
 ) -> cosmic::Element<'a, Message> {
     let label = label.into();
     let mut heading = widget::Row::new()
@@ -569,7 +576,7 @@ fn device_metric_tile<'a>(
             let cosmic = theme.cosmic();
             cosmic::iced::widget::container::Style {
                 background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
-                border: cosmic::iced::Border { radius: radius.into(), ..Default::default() },
+                border: cosmic::iced::Border { radius, ..Default::default() },
                 ..Default::default()
             }
         })
@@ -1636,7 +1643,7 @@ impl cosmic::Application for AppModel {
                     }
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                     let is_expanded = self.expanded_devices.contains(&device_key);
-                    let device_corner_radius = device_corner_radius(self.readings.len());
+                    let device_corner_radius = device_corner_radius(index, self.readings.len());
                     let device_history = self.device_history.get(&device_key);
                     let power_graph = device_history.map(|samples|
                         numeric_sparkline(samples.iter().map(|(_, power, _)| *power as f64)))
@@ -1723,7 +1730,7 @@ impl cosmic::Application for AppModel {
                                             cosmic::iced::widget::container::Style {
                                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
                                                 border: cosmic::iced::Border {
-                                                    radius: device_corner_radius.into(),
+                                                    radius: device_corner_radius,
                                                     ..Default::default()
                                                 },
                                                 ..Default::default()
@@ -2461,11 +2468,15 @@ mod history_tests {
     use super::*;
 
     #[test]
-    fn adjacent_device_rows_have_square_corners_but_single_device_keeps_rounding() {
-        assert_eq!(device_corner_radius(0), 8.0);
-        assert_eq!(device_corner_radius(1), 8.0);
-        assert_eq!(device_corner_radius(2), 0.0);
-        assert_eq!(device_corner_radius(5), 0.0);
+    fn device_rows_only_round_the_outer_list_corners() {
+        let first = device_corner_radius(0, 3);
+        assert_eq!((first.top_left, first.top_right, first.bottom_right, first.bottom_left), (8.0, 8.0, 0.0, 0.0));
+        let middle = device_corner_radius(1, 3);
+        assert_eq!((middle.top_left, middle.top_right, middle.bottom_right, middle.bottom_left), (0.0, 0.0, 0.0, 0.0));
+        let last = device_corner_radius(2, 3);
+        assert_eq!((last.top_left, last.top_right, last.bottom_right, last.bottom_left), (0.0, 0.0, 8.0, 8.0));
+        let single = device_corner_radius(0, 1);
+        assert_eq!((single.top_left, single.top_right, single.bottom_right, single.bottom_left), (8.0, 8.0, 8.0, 8.0));
     }
 
     #[test]
