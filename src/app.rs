@@ -93,16 +93,20 @@ fn should_notify_temperature_alert(previously_outside: Option<bool>, currently_o
 fn newly_missing_devices(
     previously_missing: &mut HashSet<String>,
     missing_devices: &[(String, String)],
+    suppressed_ains: &HashSet<String>,
 ) -> Vec<String> {
     let current: HashSet<String> = missing_devices.iter()
         .map(|(ain, _)| crate::fritz::normalize_ain_for_selection(ain))
         .collect();
     let newly_missing = missing_devices.iter()
-        .filter(|(ain, _)| !previously_missing.contains(
-            &crate::fritz::normalize_ain_for_selection(ain)
-        ))
+        .filter(|(ain, _)| {
+            let key = crate::fritz::normalize_ain_for_selection(ain);
+            !previously_missing.contains(&key) && !suppressed_ains.contains(&key)
+        })
         .map(|(_, name)| name.clone())
         .collect();
+    // Track all missing devices, including intentionally switching ones, so
+    // a transient transition does not trigger a delayed duplicate notification.
     *previously_missing = current;
     newly_missing
 }
@@ -1140,11 +1144,17 @@ impl cosmic::Application for AppModel {
                 );
             }
             Message::PowerCommandFinished(ain, on, result) => {
-                self.pending_power_changes.remove(
-                    &crate::fritz::normalize_ain_for_selection(&ain),
-                );
+                let key = crate::fritz::normalize_ain_for_selection(&ain);
                 match result {
                     Ok(()) => {
+                        // The FRITZ!Box has now reported the requested state;
+                        // update the UI only after that confirmation.
+                        for reading in &mut self.readings {
+                            if crate::fritz::normalize_ain_for_selection(&reading.ain) == key {
+                                reading.power_state = Some(on);
+                            }
+                        }
+                        self.pending_power_changes.remove(&key);
                         self.error = None;
                         self.refresh_started_at = Some(Instant::now());
                         self.next_refresh_at = None;
@@ -1152,6 +1162,7 @@ impl cosmic::Application for AppModel {
                             cosmic::Action::App(Message::Updated(result)));
                     }
                     Err(error) => {
+                        self.pending_power_changes.remove(&key);
                         let device_name = self.readings.iter().find(|reading|
                             crate::fritz::normalize_ain_for_selection(&reading.ain)
                                 == crate::fritz::normalize_ain_for_selection(&ain))
@@ -1171,6 +1182,7 @@ impl cosmic::Application for AppModel {
                     let newly_missing = newly_missing_devices(
                         &mut self.missing_device_ains,
                         &result.missing_devices,
+                        &self.pending_power_changes,
                     );
                     notify_missing_devices(&newly_missing);
                     let readings = result.readings;
@@ -1418,13 +1430,24 @@ mod history_tests {
         let missing = vec![
             ("12:34-56".to_string(), "Solar inverter".to_string()),
         ];
-        assert_eq!(newly_missing_devices(&mut previous, &missing), vec!["Solar inverter"]);
-        assert!(newly_missing_devices(&mut previous, &missing).is_empty());
-        assert!(newly_missing_devices(&mut previous, &[]).is_empty());
-        assert_eq!(newly_missing_devices(&mut previous, &missing), vec!["Solar inverter"]);
+        assert_eq!(newly_missing_devices(&mut previous, &missing, &HashSet::new()), vec!["Solar inverter"]);
+        assert!(newly_missing_devices(&mut previous, &missing, &HashSet::new()).is_empty());
+        assert!(newly_missing_devices(&mut previous, &[], &HashSet::new()).is_empty());
+        assert_eq!(newly_missing_devices(&mut previous, &missing, &HashSet::new()), vec!["Solar inverter"]);
     }
 
 
+
+    #[test]
+    fn missing_notifications_are_suppressed_during_intentional_power_changes() {
+        let mut previous = HashSet::new();
+        let missing = vec![("12:34-56".to_string(), "Smart plug".to_string())];
+        let pending = HashSet::from(["123456".to_string()]);
+
+        assert!(newly_missing_devices(&mut previous, &missing, &pending).is_empty());
+        assert!(newly_missing_devices(&mut previous, &missing, &HashSet::new()).is_empty());
+        assert!(newly_missing_devices(&mut previous, &[], &HashSet::new()).is_empty());
+    }
 
     #[test]
     fn temperature_alert_limits_include_exact_boundary_values() {
