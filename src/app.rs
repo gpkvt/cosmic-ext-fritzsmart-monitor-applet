@@ -2075,9 +2075,7 @@ impl cosmic::Application for AppModel {
                             .to_string()
                     })
                     .unwrap_or_else(|| "—".into());
-                let current_date = chrono::Local::now()
-                    .format("%A, %d %B %Y")
-                    .to_string();
+                let current_date = chrono::Local::now().format("%A, %d %B %Y").to_string();
                 let weather_details = widget::Column::new()
                     .spacing(6)
                     .push(widget::text::caption(current_date))
