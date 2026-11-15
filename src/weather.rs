@@ -226,6 +226,19 @@ mod tests {
     }
 
     #[test]
+    fn blurs_background_photos_without_changing_their_dimensions() {
+        let source = image::DynamicImage::ImageRgb8(
+            image::RgbImage::from_pixel(16, 12, image::Rgb([120, 80, 40])),
+        );
+        let mut encoded = std::io::Cursor::new(Vec::new());
+        source.write_to(&mut encoded, image::ImageFormat::Png).unwrap();
+
+        let blurred = blur_background_image(encoded.into_inner()).unwrap();
+        let decoded = image::load_from_memory(&blurred).unwrap();
+        assert_eq!(decoded.dimensions(), (16, 12));
+    }
+
+    #[test]
     fn parses_valid_coordinates_and_rejects_out_of_range_values() {
         assert_eq!(parse_coordinates("52.37, 4.90"), Some((52.37, 4.90)));
         assert_eq!(parse_coordinates("91,4"), None);
