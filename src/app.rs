@@ -396,6 +396,21 @@ fn average_temperature_c(readings: &[FritzReading], exclude_solar: bool) -> Opti
     (count > 0).then(|| sum / count as f64)
 }
 
+fn rebuild_input_power_history(
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    input_ains: &HashSet<String>,
+) -> VecDeque<(Instant, i64)> {
+    let mut samples = BTreeMap::<Instant, i64>::new();
+    for (ain, history) in device_history {
+        if input_ains.contains(ain) {
+            for (timestamp, power_w, _) in history {
+                *samples.entry(*timestamp).or_default() += signed_device_power(*power_w, true);
+            }
+        }
+    }
+    samples.into_iter().collect()
+}
+
 fn rebuild_net_power_history(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     input_ains: &HashSet<String>,
@@ -674,8 +689,11 @@ fn total_power_overview(
     history: &VecDeque<(Instant, i64)>,
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
 ) -> Option<cosmic::Element<'static, Message>> {
-    let low = history.iter().map(|(_, value)| *value).min()?;
-    let high = history.iter().map(|(_, value)| *value).max()?;
+    let output_low = history.iter().map(|(_, value)| *value).min()?;
+    let output_high = history.iter().map(|(_, value)| *value).max()?;
+    let input_history = rebuild_input_power_history(device_history, &settings.input_ains);
+    let input_low = input_history.iter().map(|(_, value)| *value).min();
+    let input_high = input_history.iter().map(|(_, value)| *value).max();
     let total_power = net_power_w(readings, &settings.input_ains);
     let axis_start = format_graph_axis_start(settings.graph_timespan_minutes);
     let total_graph: cosmic::Element<'static, Message> = widget::Column::new()
@@ -737,12 +755,12 @@ fn total_power_overview(
                 .width(cosmic::iced::Length::Fill)
                 .push(widget::container(range_metric_tile(
                     "LOW",
-                    format!("{low} W"),
+                    format!("{output_low} W"),
                     "go-down-symbolic",
                 )).width(cosmic::iced::Length::Fill))
                 .push(widget::container(range_metric_tile(
                     "HIGH",
-                    format!("{high} W"),
+                    format!("{output_high} W"),
                     "go-up-symbolic",
                 )).width(cosmic::iced::Length::Fill)),
         )
@@ -753,15 +771,32 @@ fn total_power_overview(
         .align_y(cosmic::iced::Alignment::Start)
         .push(output_column);
     if has_input_readings {
-        let input_column = widget::Column::new()
+        let mut input_column = widget::Column::new()
             .spacing(8)
             .width(cosmic::iced::Length::Fill)
             .push(metric_tile(
                 "TOTAL POWER INPUT",
                 format!("{} W", input_power_w(readings, &settings.input_ains)),
                 "go-down-symbolic",
-            ))
-            .push(graph_panel(input_graphs.into()));
+            ));
+        if let (Some(low), Some(high)) = (input_low, input_high) {
+            input_column = input_column.push(
+                widget::Row::new()
+                    .spacing(8)
+                    .width(cosmic::iced::Length::Fill)
+                    .push(widget::container(range_metric_tile(
+                        "LOW",
+                        format!("{low} W"),
+                        "go-down-symbolic",
+                    )).width(cosmic::iced::Length::Fill))
+                    .push(widget::container(range_metric_tile(
+                        "HIGH",
+                        format!("{high} W"),
+                        "go-up-symbolic",
+                    )).width(cosmic::iced::Length::Fill)),
+            );
+        }
+        input_column = input_column.push(graph_panel(input_graphs.into()));
         power_columns = power_columns.push(input_column);
     }
     let content = widget::Column::new()
