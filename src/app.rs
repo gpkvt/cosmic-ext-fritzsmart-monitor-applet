@@ -724,19 +724,29 @@ fn total_power_overview(
             &crate::fritz::normalize_ain_for_selection(&reading.ain),
         )
     });
-    let mut content = widget::Column::new()
+    let output_tile = widget::container(metric_tile(
+        "TOTAL POWER OUTPUT",
+        format!("{total_power} W"),
+        "go-up-symbolic",
+    ))
+    .width(cosmic::iced::Length::Fill);
+    let mut power_tiles = widget::Row::new()
+        .spacing(8)
+        .width(cosmic::iced::Length::Fill)
+        .push(output_tile);
+    if has_input_readings {
+        power_tiles = power_tiles.push(
+            widget::container(metric_tile(
+                "TOTAL POWER INPUT",
+                format!("{} W", input_power_w(readings, &settings.input_ains)),
+                "go-down-symbolic",
+            ))
+            .width(cosmic::iced::Length::Fill),
+        );
+    }
+    let content = widget::Column::new()
         .spacing(10)
-        .push(widget::Row::new()
-            .spacing(12)
-            .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::container(widget::icon::from_name("utilities-system-monitor-symbolic").size(20))
-                .center_x(32).center_y(36))
-            .push(widget::Column::new()
-                .spacing(3)
-                .width(cosmic::iced::Length::Fill)
-                .push(widget::text::body("Total power output"))
-                .push(widget::text::caption(format!("Net · Last {timespan}"))))
-            .push(widget::text::title3(format!("{} W", total_power))))
+        .push(power_tiles)
         .push(
             widget::Row::new()
                 .spacing(8)
@@ -752,13 +762,6 @@ fn total_power_overview(
                     "go-up-symbolic",
                 )).width(cosmic::iced::Length::Fill)),
         );
-    if has_input_readings {
-        content = content.push(metric_tile(
-            "TOTAL INPUT",
-            format!("{} W", input_power_w(readings, &settings.input_ains)),
-            "go-down-symbolic",
-        ));
-    }
     content = content
         .push(graph_panel(total_graph))
         .push(graph_panel(input_graphs.into()));
