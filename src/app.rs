@@ -316,6 +316,30 @@ impl AppModel {
     }
 }
 
+fn clock_ticks(interval_duration: Duration) -> impl futures::Stream<Item = Message> {
+    cosmic::iced::stream::channel(
+        4,
+        move |mut output: futures::channel::mpsc::Sender<Message>| async move {
+            let mut interval = tokio::time::interval(interval_duration);
+            interval.tick().await;
+            loop {
+                interval.tick().await;
+                if output.send(Message::ClockTick).await.is_err() {
+                    break;
+                }
+            }
+        },
+    )
+}
+
+fn regular_clock_ticks() -> impl futures::Stream<Item = Message> {
+    clock_ticks(Duration::from_secs(1))
+}
+
+fn drag_animation_ticks() -> impl futures::Stream<Item = Message> {
+    clock_ticks(Duration::from_millis(16))
+}
+
 impl cosmic::Application for AppModel {
     type Executor = cosmic::executor::Default;
     type Flags = ();
@@ -335,23 +359,15 @@ impl cosmic::Application for AppModel {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        // A lightweight one-second tick updates the visible countdown and
-        // checks the deadline. Refresh timing itself remains configurable.
-        let tick_interval = if self.dragging_device_ain.is_some() {
-            Duration::from_millis(16)
+        // Use non-capturing function pointers: this libcosmic iced version's
+        // Subscription::run accepts a fn pointer rather than a closure.
+        // Dragging gets frame-rate ticks for the animated insertion preview;
+        // otherwise a one-second tick updates countdowns and deadlines.
+        if self.dragging_device_ain.is_some() {
+            Subscription::run(drag_animation_ticks)
         } else {
-            Duration::from_secs(1)
-        };
-        Subscription::run(move || {
-            cosmic::iced::stream::channel(4, move |mut output: futures::channel::mpsc::Sender<Message>| async move {
-                let mut interval = tokio::time::interval(tick_interval);
-                interval.tick().await;
-                loop {
-                    interval.tick().await;
-                    if output.send(Message::ClockTick).await.is_err() { break; }
-                }
-            })
-        })
+            Subscription::run(regular_clock_ticks)
+        }
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
