@@ -400,9 +400,29 @@ fn graph_visual(
             "<polyline points=\"{points}\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
         )
     };
+    // Draw a restrained grid first so it stays behind both graph styles.
+    const GRID_ROWS: usize = 4;
+    const GRID_COLUMNS: usize = 6;
+    let horizontal_grid = (1..GRID_ROWS)
+        .map(|row| {
+            let y = row as f64 * HEIGHT / GRID_ROWS as f64;
+            format!("M0 {y:.2}H{WIDTH}")
+        })
+        .collect::<Vec<_>>();
+    let vertical_grid = (1..GRID_COLUMNS)
+        .map(|column| {
+            let x = column as f64 * WIDTH / GRID_COLUMNS as f64;
+            format!("M{x:.2} 0V{HEIGHT}")
+        })
+        .collect::<Vec<_>>();
+    let grid = horizontal_grid
+        .into_iter()
+        .chain(vertical_grid)
+        .collect::<Vec<_>>()
+        .join(" ");
     let baseline = HEIGHT - 2.0;
     let svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {HEIGHT}\" preserveAspectRatio=\"none\"><title>{current_value:.1} {unit}</title><path d=\"M0 {baseline}H{WIDTH}\" stroke=\"#808080\" stroke-opacity=\"0.35\"/>{drawing}</svg>"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {HEIGHT}\" preserveAspectRatio=\"none\"><title>{current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.18\" stroke-width=\"0.6\"/><path d=\"M0 {baseline}H{WIDTH}\" stroke=\"#808080\" stroke-opacity=\"0.35\"/>{drawing}</svg>"
     );
     let graph = widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
         svg.into_bytes(),
