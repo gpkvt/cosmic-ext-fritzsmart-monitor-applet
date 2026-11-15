@@ -1515,7 +1515,7 @@ impl cosmic::Application for AppModel {
                 };
                 let refresh_indicator = if self.refresh_started_at.is_some() {
                     icon_action_button(
-                        refresh_spinner_frame(Instant::now()),
+                        self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("◴"),
                         "Request in progress",
                         Message::Refresh,
                     )
