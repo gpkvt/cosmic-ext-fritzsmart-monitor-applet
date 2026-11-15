@@ -6,6 +6,16 @@ pub struct WeatherData {
     pub icon_code: String,
     pub description: String,
     pub temperature_c: f64,
+    pub feels_like_c: f64,
+    pub humidity_percent: u8,
+    pub pressure_hpa: u32,
+    pub wind_speed_mps: f64,
+    pub wind_direction_degrees: Option<u16>,
+    pub cloudiness_percent: u8,
+    pub visibility_m: u32,
+    pub sunrise_unix: i64,
+    pub sunset_unix: i64,
+    pub location_name: String,
 }
 
 impl WeatherData {
@@ -57,9 +67,34 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
         .ok_or_else(|| "OpenWeatherMap response has no weather icon".to_string())?;
     let description = payload["weather"][0]["description"].as_str()
         .unwrap_or("Current conditions").to_string();
-    let temperature_c = payload["main"]["temp"].as_f64()
+    let main = &payload["main"];
+    let temperature_c = main["temp"].as_f64()
         .ok_or_else(|| "OpenWeatherMap response has no temperature".to_string())?;
-    Ok(WeatherData { icon_code: icon_code.to_string(), description, temperature_c })
+    let feels_like_c = main["feels_like"].as_f64().unwrap_or(temperature_c);
+    let humidity_percent = main["humidity"].as_u64().unwrap_or(0).min(100) as u8;
+    let pressure_hpa = main["pressure"].as_u64().unwrap_or(0) as u32;
+    let wind_speed_mps = payload["wind"]["speed"].as_f64().unwrap_or(0.0);
+    let wind_direction_degrees = payload["wind"]["deg"].as_u64().map(|value| (value % 360) as u16);
+    let cloudiness_percent = payload["clouds"]["all"].as_u64().unwrap_or(0).min(100) as u8;
+    let visibility_m = payload["visibility"].as_u64().unwrap_or(0) as u32;
+    let sunrise_unix = payload["sys"]["sunrise"].as_i64().unwrap_or(0);
+    let sunset_unix = payload["sys"]["sunset"].as_i64().unwrap_or(0);
+    let location_name = payload["name"].as_str().unwrap_or(location).to_string();
+    Ok(WeatherData {
+        icon_code: icon_code.to_string(),
+        description,
+        temperature_c,
+        feels_like_c,
+        humidity_percent,
+        pressure_hpa,
+        wind_speed_mps,
+        wind_direction_degrees,
+        cloudiness_percent,
+        visibility_m,
+        sunrise_unix,
+        sunset_unix,
+        location_name,
+    })
 }
 
 fn parse_coordinates(location: &str) -> Option<(f64, f64)> {
@@ -92,7 +127,13 @@ mod tests {
             ("13n", "weather-snow-symbolic"),
             ("50d", "weather-fog-symbolic"),
         ] {
-            let weather = WeatherData { icon_code: code.into(), description: String::new(), temperature_c: 0.0 };
+            let weather = WeatherData {
+                icon_code: code.into(), description: String::new(), temperature_c: 0.0,
+                feels_like_c: 0.0, humidity_percent: 0, pressure_hpa: 0,
+                wind_speed_mps: 0.0, wind_direction_degrees: None,
+                cloudiness_percent: 0, visibility_m: 0, sunrise_unix: 0,
+                sunset_unix: 0, location_name: String::new(),
+            };
             assert_eq!(weather.icon_name(), expected);
         }
     }
