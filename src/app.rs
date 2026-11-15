@@ -43,6 +43,7 @@ pub struct AppModel {
     weather_attribution_expanded: bool,
     next_weather_refresh_at: Option<Instant>,
     pending_power_changes: HashSet<String>,
+    expanded_device_options: HashSet<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +67,7 @@ pub enum Message {
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
     ToggleDevice(String, bool),
+    ToggleDeviceOptions(String),
     StartDeviceDrag(String),
     DragOverDevice(String),
     EndDeviceDrag,
@@ -647,10 +649,17 @@ impl cosmic::Application for AppModel {
                     }
                     let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
                     let alert_thresholds = self.settings.temperature_alerts.get(&normalized_ain).copied();
+                    let expanded = self.expanded_device_options.contains(&normalized_ain);
+                    row = row.push(
+                        widget::button::custom(widget::text::caption(if expanded { "Options ▾" } else { "Options ▸" }))
+                            .on_press(Message::ToggleDeviceOptions(ain.clone()))
+                            .padding([2, 4]),
+                    );
                     let mut device_row = widget::Column::new()
                         .spacing(6)
-                        .push(row)
-                        .push(widget::Row::new()
+                        .push(row);
+                    if expanded {
+                        device_row = device_row.push(widget::Row::new()
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::text::caption("Temperature alerts"))
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
@@ -659,27 +668,29 @@ impl cosmic::Application for AppModel {
                                     let ain = ain.clone();
                                     move |enabled| Message::ToggleTemperatureAlert(ain.clone(), enabled)
                                 })));
-                    if let Some(thresholds) = alert_thresholds {
-                        device_row = device_row
-                            .push(widget::text::caption(format!("Upper limit: {} °C", thresholds.high_c)))
-                            .push(widget::slider(
-                                0.0..=40.0,
-                                f32::from(thresholds.high_c),
-                                {
-                                    let ain = ain.clone();
-                                    move |value| Message::TemperatureAlertHighChanged(ain.clone(), value.round() as i16)
-                                },
-                            ).step(1.0))
-                            .push(widget::text::caption(format!("Lower limit: {} °C", thresholds.low_c)))
-                            .push(widget::slider(
-                                -10.0..=0.0,
-                                f32::from(thresholds.low_c),
-                                {
-                                    let ain = ain.clone();
-                                    move |value| Message::TemperatureAlertLowChanged(ain.clone(), value.round() as i16)
-                                },
-                            ).step(1.0))
-                            .push(widget::text::caption("Notify above the upper limit or below the lower limit"));
+                        if let Some(thresholds) = alert_thresholds {
+                            device_row = device_row
+                                .push(widget::text::caption(format!("Upper limit: {} °C", thresholds.high_c)))
+                                .push(widget::slider(
+                                    0.0..=40.0,
+                                    f32::from(thresholds.high_c),
+                                    {
+                                        let ain = ain.clone();
+                                        move |value| Message::TemperatureAlertHighChanged(ain.clone(), value.round() as i16)
+                                    },
+                                ).step(1.0))
+                                .push(widget::text::caption(format!("Lower limit: {} °C", thresholds.low_c)))
+                                .push(widget::slider(
+                                    -10.0..=0.0,
+                                    f32::from(thresholds.low_c),
+                                    {
+                                        let ain = ain.clone();
+                                        move |value| Message::TemperatureAlertLowChanged(ain.clone(), value.round() as i16)
+                                    },
+                                ).step(1.0))
+                                .push(widget::text::caption("Notify above the upper limit or below the lower limit"));
+                        }
+                    }
                     }
                     content = content.push(widget::mouse_area(
                         widget::container(device_row)
@@ -1261,6 +1272,12 @@ impl cosmic::Application for AppModel {
             Message::ToggleSettings => {
                 self.settings_open = !self.settings_open;
                 self.settings_status = None;
+                if self.settings_open {
+                    self.settings_status = Some("Connecting and loading devices…".into());
+                    return Task::perform(discover_devices(self.settings.clone()), |result| {
+                        cosmic::Action::App(Message::DevicesLoaded(result))
+                    });
+                }
             }
             Message::UrlChanged(value) => {
                 self.settings.url = value;
@@ -1323,6 +1340,12 @@ impl cosmic::Application for AppModel {
                 }
                 Err(error) => self.settings_status = Some(format!("Connection failed: {error}")),
             },
+            Message::ToggleDeviceOptions(ain) => {
+                let key = crate::fritz::normalize_ain_for_selection(&ain);
+                if !self.expanded_device_options.remove(&key) {
+                    self.expanded_device_options.insert(key);
+                }
+            }
             Message::ToggleDevice(ain, selected) => {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
                 self.selected_ains.retain(|existing|
