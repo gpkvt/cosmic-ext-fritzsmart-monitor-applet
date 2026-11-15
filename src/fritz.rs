@@ -488,6 +488,10 @@ fn parse_switch_state_response(body: &str) -> Option<bool> {
     }
 }
 
+fn switch_command_response_matches(body: &str, on: bool) -> bool {
+    body.trim() == if on { "1" } else { "0" }
+}
+
 async fn fetch_switch_state(
     client: &Client,
     base: &str,
@@ -565,7 +569,7 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
         .query(&[("sid", sid.as_str()), ("switchcmd", command), ("ain", ain.as_str())])
         .send().await.map_err(|error| format!("FRITZ!Box power command failed: {error}"))?;
     let body = read_xml_response(response, "FRITZ!Box power command failed").await?;
-    if body.trim() != "1" {
+    if !switch_command_response_matches(&body, on) {
         return Err(format!("FRITZ!Box rejected the power command: {}", body.trim()));
     }
 
@@ -805,6 +809,15 @@ mod tests {
         let xml = r#"<devicelist><device identifier="000000000000"/></devicelist>"#;
         assert!(parse_device_xml(xml, "123456789012").is_err());
     }
+    #[test]
+    fn validates_on_and_off_command_responses() {
+        assert!(switch_command_response_matches("1", true));
+        assert!(!switch_command_response_matches("0", true));
+        assert!(switch_command_response_matches("0", false));
+        assert!(!switch_command_response_matches("1", false));
+        assert!(!switch_command_response_matches("inval", false));
+    }
+
     #[test]
     fn parses_dedicated_switch_state_responses() {
         assert_eq!(parse_switch_state_response("1"), Some(true));
