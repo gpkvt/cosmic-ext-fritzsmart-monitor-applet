@@ -694,12 +694,12 @@ fn total_power_overview(
                     "LOW",
                     format!("{low} W"),
                     "go-down-symbolic",
-                )).width(cosmic::iced::Length::Fill)
+                )).width(cosmic::iced::Length::Fill))
                 .push(widget::container(range_metric_tile(
                     "HIGH",
                     format!("{high} W"),
                     "go-up-symbolic",
-                )).width(cosmic::iced::Length::Fill)).width(cosmic::iced::Length::Fill)),
+                )).width(cosmic::iced::Length::Fill)),
         )
         .push(graph_panel(total_graph))
         .push(graph_panel(input_graphs.into()));
