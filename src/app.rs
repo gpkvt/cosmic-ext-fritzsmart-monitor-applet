@@ -34,6 +34,8 @@ pub struct AppModel {
     dragging_device_ain: Option<String>,
     drag_target_ain: Option<String>,
     drag_target_since: Option<Instant>,
+    drag_original_ains: Option<Vec<String>>,
+    drag_original_total_power_first: Option<bool>,
     settings_status: Option<String>,
     settings_saved_until: Option<Instant>,
     history: VecDeque<(Instant, i64)>,
@@ -400,7 +402,8 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
         .spacing(6)
         .align_y(cosmic::iced::Alignment::Center)
         .push(widget::mouse_area(widget::text("⠿").size(20))
-            .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string())))
+            .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string()))
+            .on_release(Message::EndDeviceDrag))
         .push(widget::text::body("Total power (net)").width(cosmic::iced::Length::Fill))
         .push(widget::text::caption(format!("#{position}")));
     widget::mouse_area(
@@ -834,7 +837,8 @@ impl cosmic::Application for AppModel {
                         if selected {
                             row = row.push(
                                 widget::mouse_area(widget::text("⠿").size(20))
-                                    .on_press(Message::StartDeviceDrag(ain.clone())),
+                                    .on_press(Message::StartDeviceDrag(ain.clone()))
+                                    .on_release(Message::EndDeviceDrag),
                             );
                         }
                         row = row.push(widget::checkbox(selected)
@@ -1701,6 +1705,8 @@ impl cosmic::Application for AppModel {
                     self.dragging_device_ain = Some(ain);
                     self.drag_target_ain = None;
                     self.drag_target_since = None;
+                    self.drag_original_ains = Some(self.selected_ains.clone());
+                    self.drag_original_total_power_first = Some(self.settings.total_power_first);
                 }
             }
             Message::DragOverDevice(target_ain) => {
@@ -1714,23 +1720,25 @@ impl cosmic::Application for AppModel {
                             || crate::fritz::normalize_ain_for_selection(current)
                                 == crate::fritz::normalize_ain_for_selection(&target_ain));
                     if target_is_valid && dragged_ain != target_ain && !same_target {
+                        // Move the dragged entry as soon as a new row is entered.
+                        // The insertion preview then animates at the live position.
+                        move_sortable_entry(
+                            &mut self.selected_ains,
+                            &mut self.settings.total_power_first,
+                            dragged_ain,
+                            &target_ain,
+                        );
                         self.drag_target_ain = Some(target_ain);
                         self.drag_target_since = Some(Instant::now());
                     }
                 }
             }
             Message::EndDeviceDrag => {
-                if let Some(dragged_ain) = self.dragging_device_ain.take() {
-                    let previous_ains = self.selected_ains.clone();
-                    let previous_total_power_first = self.settings.total_power_first;
-                    if let Some(target_ain) = self.drag_target_ain.take() {
-                        move_sortable_entry(
-                            &mut self.selected_ains,
-                            &mut self.settings.total_power_first,
-                            &dragged_ain,
-                            &target_ain,
-                        );
-                    }
+                if self.dragging_device_ain.take().is_some() {
+                    let previous_ains = self.drag_original_ains.take().unwrap_or_default();
+                    let previous_total_power_first =
+                        self.drag_original_total_power_first.take().unwrap_or(self.settings.total_power_first);
+                    self.drag_target_ain = None;
                     self.drag_target_since = None;
                     if self.selected_ains != previous_ains
                         || self.settings.total_power_first != previous_total_power_first
