@@ -1145,7 +1145,13 @@ impl cosmic::Application for AppModel {
                 let settings_heading = widget::Row::new()
                     .spacing(12)
                     .align_y(cosmic::iced::Alignment::Center)
-                    .push(widget::button::custom(widget::text("< Back"))
+                    .push(widget::button::custom(
+                        widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
+                            br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 18 9 12l6-6" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"#.to_vec(),
+                        ))
+                        .width(16)
+                        .height(16),
+                    )
                         .on_press(Message::ToggleSettings)
                         .padding([8, 4])
                         .class(cosmic::theme::Button::Text))
