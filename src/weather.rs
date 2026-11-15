@@ -47,6 +47,7 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
     }
 
     let client = Client::builder()
+        .user_agent("FRITZ-Power-Monitor/0.2.1 (https://github.com/gpkvt/cosmic-solar-applet)")
         .timeout(Duration::from_secs(10))
         .build()
         .map_err(|error| format!("Weather client error: {error}"))?;
