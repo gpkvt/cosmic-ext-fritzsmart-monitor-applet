@@ -197,6 +197,7 @@ mod tests {
                 wind_speed_mps: 0.0, wind_direction_degrees: None,
                 cloudiness_percent: 0, visibility_m: 0, sunrise_unix: 0,
                 sunset_unix: 0, location_name: String::new(),
+                background_image: None, image_attribution: None,
             };
             assert_eq!(weather.icon_name(), expected);
         }
