@@ -1569,9 +1569,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::body("Select and order power-meter devices"))
                         .push(widget::text_input("Search devices by name or AIN", &self.device_search)
                             .on_input(Message::DeviceSearchChanged));
-                    if self.settings.total_power_first {
-                        content = content.push(total_power_sort_row(1));
-                    }
+                    let mut inserted_specials = HashSet::new();
                     let mut ordered_devices: Vec<&FritzDevice> = self.selected_ains.iter()
                         .filter_map(|ain| self.devices.iter().find(|device|
                             crate::fritz::normalize_ain_for_selection(&device.ain)
@@ -1589,6 +1587,21 @@ impl cosmic::Application for AppModel {
                         let selected_index = self.selected_ains.iter().position(|ain|
                             crate::fritz::normalize_ain_for_selection(ain)
                                 == crate::fritz::normalize_ain_for_selection(&device.ain));
+                        if let Some(_) = selected_index {
+                            let device_key = crate::fritz::normalize_ain_for_selection(&device.ain);
+                            let device_position = self.settings.menu_order.iter()
+                                .position(|entry| entry == &device_key).unwrap_or(usize::MAX);
+                            let total_position = self.settings.menu_order.iter()
+                                .position(|entry| entry == TOTAL_POWER_DRAG_ID).unwrap_or(usize::MAX);
+                            let difference_position = self.settings.menu_order.iter()
+                                .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID).unwrap_or(usize::MAX);
+                            if total_position <= device_position && inserted_specials.insert(TOTAL_POWER_DRAG_ID) {
+                                content = content.push(total_power_sort_row(total_position + 1));
+                            }
+                            if difference_position <= device_position && inserted_specials.insert(POWER_DIFFERENCE_DRAG_ID) {
+                                content = content.push(power_difference_sort_row(difference_position + 1));
+                            }
+                        }
                         let selected = selected_index.is_some();
                         let ain = device.ain.clone();
                         let mut row = widget::Row::new()
@@ -1691,10 +1704,16 @@ impl cosmic::Application for AppModel {
                             );
                         }
                     }
-                    if !self.settings.total_power_first {
-                        content = content.push(total_power_sort_row(self.selected_ains.len() + 1));
+                    if inserted_specials.insert(TOTAL_POWER_DRAG_ID) {
+                        let position = self.settings.menu_order.iter()
+                            .position(|entry| entry == TOTAL_POWER_DRAG_ID).unwrap_or(self.selected_ains.len());
+                        content = content.push(total_power_sort_row(position + 1));
                     }
-                    content = content.push(power_difference_sort_row(self.selected_ains.len() + 2));
+                    if inserted_specials.insert(POWER_DIFFERENCE_DRAG_ID) {
+                        let position = self.settings.menu_order.iter()
+                            .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID).unwrap_or(self.selected_ains.len() + 1);
+                        content = content.push(power_difference_sort_row(position + 1));
+                    }
                     content = content.push(widget::text::caption("Drag the ⠿ handles to reorder devices, Total power output (including input), and Power difference. The order is saved automatically."));
                 }
             }
