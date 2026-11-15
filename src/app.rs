@@ -29,6 +29,7 @@ pub struct AppModel {
     error: Option<String>,
     updated: Option<String>,
     settings_open: bool,
+    active_settings_section: Option<&'static str>,
     expanded_settings_sections: HashSet<&'static str>,
     settings: FritzSettings,
     devices: Vec<FritzDevice>,
@@ -71,6 +72,7 @@ pub enum Message {
     PowerCommandFinished(String, bool, Result<(), String>),
     ToggleSettings,
     ToggleSettingsSection(&'static str),
+    BackToSettingsCategories,
     UrlChanged(String),
     UsernameChanged(String),
     PasswordChanged(String),
@@ -668,7 +670,20 @@ fn total_power_overview(
     )
 }
 
-fn settings_section_header<'a>(title: &'a str, expanded: bool, section: &'static str) -> cosmic::Element<'a, Message> {
+fn settings_section_details(section: &'static str) -> (&'static str, &'static str) {
+    match section {
+        "panel" => ("Panel", "Appearance and live readings in the panel"),
+        "graph" => ("Graph history", "Choose how much power history is displayed"),
+        "refresh" => ("Automatic refresh", "Control how often device readings update"),
+        "weather" => ("Weather", "Show local weather alongside power readings"),
+        "connection" => ("Connection", "FRITZ!Box address and security settings"),
+        "device" => ("Devices", "Select, order and configure monitored devices"),
+        "diagnostics" => ("Diagnostics", "Connection and settings status"),
+        _ => ("Settings", "Configure your power monitor"),
+    }
+}
+
+fn settings_section_header<'a>(title: &'a str, section: &'static str) -> cosmic::Element<'a, Message> {
     let (section_icon, description) = match section {
         "panel" => ("preferences-desktop-display-symbolic", "Panel appearance and readings"),
         "graph" => ("utilities-system-monitor-symbolic", "History shown in power graphs"),
@@ -679,26 +694,25 @@ fn settings_section_header<'a>(title: &'a str, expanded: bool, section: &'static
         "diagnostics" => ("dialog-information-symbolic", "Connection and save status"),
         _ => ("preferences-system-symbolic", "Applet preferences"),
     };
-    let disclosure_icon = if expanded { "go-down-symbolic" } else { "go-next-symbolic" };
-    let section_button: cosmic::Element<'a, Message> = widget::button::custom(
+    let section_row: cosmic::Element<'a, Message> = widget::button::custom(
         widget::Row::new()
             .spacing(12)
             .align_y(cosmic::iced::Alignment::Center)
             .push(widget::container(widget::icon::from_name(section_icon).size(20))
-                .center_x(40).center_y(40))
+                .center_x(32).center_y(36))
             .push(widget::Column::new()
-                .spacing(2)
+                .spacing(3)
                 .width(cosmic::iced::Length::Fill)
                 .push(widget::text::body(title))
                 .push(widget::text::caption(description)))
-            .push(widget::icon::from_name(disclosure_icon).size(16)),
+            .push(widget::icon::from_name("go-next-symbolic").size(16)),
     )
     .on_press(Message::ToggleSettingsSection(section))
-    .padding([8, 12])
+    .padding([8, 4])
     .width(cosmic::iced::Length::Fill)
-    .class(cosmic::theme::Button::Standard)
+    .class(cosmic::theme::Button::Text)
     .into();
-    surface_card(section_button, 2)
+    section_row
 }
 
 fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
@@ -1008,20 +1022,36 @@ impl cosmic::Application for AppModel {
             .width(cosmic::iced::Length::Fill);
 
         if self.settings_open {
-            let settings_heading = widget::Row::new()
-                .spacing(12)
-                .align_y(cosmic::iced::Alignment::Center)
-                .push(widget::container(widget::icon::from_name("preferences-system-symbolic").size(24))
-                    .center_x(44).center_y(44))
-                .push(widget::Column::new()
-                    .spacing(2)
-                    .push(widget::text::title2("Settings"))
-                    .push(widget::text::caption("Personalize your power monitor")));
-            content = content
-                .push(surface_card(settings_heading.into(), 12))
-                .push(widget::text::caption("Choose a section to expand its controls."));
-            content = content.push(settings_section_header("Panel", self.expanded_settings_sections.contains("panel"), "panel"));
-            if self.expanded_settings_sections.contains("panel") {
+            if let Some(section) = self.active_settings_section {
+                let (title, description) = settings_section_details(section);
+                content = content
+                    .push(widget::Row::new()
+                        .spacing(10)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(icon_action_button("‹", "Back to settings", Message::BackToSettingsCategories))
+                        .push(widget::Column::new()
+                            .spacing(2)
+                            .push(widget::text::title2(title))
+                            .push(widget::text::caption(description))));
+            } else {
+                let settings_heading = widget::Row::new()
+                    .spacing(12)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::icon::from_name("preferences-system-symbolic").size(24))
+                    .push(widget::Column::new()
+                        .spacing(2)
+                        .push(widget::text::title2("Settings"))
+                        .push(widget::text::caption("Configure your power monitor")));
+                content = content
+                    .push(settings_heading)
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::caption("GENERAL"));
+                for (title, section) in [("Panel", "panel"), ("Graph history", "graph"), ("Automatic refresh", "refresh"), ("Weather", "weather"), ("Connection", "connection"), ("Devices", "device"), ("Diagnostics", "diagnostics")] {
+                    content = content.push(settings_section_header(title, section));
+                }
+            }
+
+            if self.active_settings_section == Some("panel") {
                 content = content
                     .push(widget::text::body(format!("Panel text size: {} pt", self.settings.panel_text_size)))
                     .push(
@@ -1058,8 +1088,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
             }
 
-            content = content.push(settings_section_header("Graph history", self.expanded_settings_sections.contains("graph"), "graph"));
-            if self.expanded_settings_sections.contains("graph") {
+            if self.active_settings_section == Some("graph") {
     content = content
         .push(widget::text::caption(format!(
                         "GRAPH HISTORY: {}",
@@ -1077,8 +1106,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
             }
 
-            content = content.push(settings_section_header("Automatic refresh", self.expanded_settings_sections.contains("refresh"), "refresh"));
-            if self.expanded_settings_sections.contains("refresh") {
+            if self.active_settings_section == Some("refresh") {
     content = content
         .push(widget::text::caption(format!(
                         "AUTOMATIC REFRESH: {}",
@@ -1096,8 +1124,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
             }
 
-            content = content.push(settings_section_header("Weather", self.expanded_settings_sections.contains("weather"), "weather"));
-            if self.expanded_settings_sections.contains("weather") {
+            if self.active_settings_section == Some("weather") {
                 content = content
                     .push(widget::Row::new()
                         .align_y(cosmic::iced::Alignment::Center)
@@ -1117,8 +1144,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
             }
 
-            content = content.push(settings_section_header("Connection", self.expanded_settings_sections.contains("connection"), "connection"));
-            if self.expanded_settings_sections.contains("connection") {
+            if self.active_settings_section == Some("connection") {
                 content = content
                     .push(widget::text::body("FRITZ!Box URL"))
                     .push(
@@ -1157,8 +1183,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
             }
 
-            content = content.push(settings_section_header("Devices", self.expanded_settings_sections.contains("device"), "device"));
-            if self.expanded_settings_sections.contains("device") {
+            if self.active_settings_section == Some("device") {
                 content = content
                     .push(action_button("view-refresh-symbolic", "Load devices", Message::DiscoverDevices));
     
@@ -1296,8 +1321,7 @@ impl cosmic::Application for AppModel {
                 }
             }
 
-            content = content.push(settings_section_header("Diagnostics", self.expanded_settings_sections.contains("diagnostics"), "diagnostics"));
-            if self.expanded_settings_sections.contains("diagnostics") {
+            if self.active_settings_section == Some("diagnostics") {
     content = content
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::caption("DIAGNOSTICS"));
@@ -1328,7 +1352,9 @@ impl cosmic::Application for AppModel {
             if self.settings_saved_until.is_some_and(|deadline| Instant::now() < deadline) {
                 content = content.push(widget::text::caption("✓ Saved"));
             }
-            content = content.push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings));
+            if self.active_settings_section.is_none() {
+                content = content.push(action_button("go-previous-symbolic", "Close settings", Message::ToggleSettings));
+            }
         } else {
             if let Some(weather) = &self.weather {
                 let wind_direction = weather.wind_direction_degrees
@@ -2074,19 +2100,17 @@ impl cosmic::Application for AppModel {
                 self.settings_status = None;
             }
             Message::ToggleSettingsSection(section) => {
-                let expanded = if self.expanded_settings_sections.remove(section) {
-                    false
-                } else {
-                    self.expanded_settings_sections.insert(section);
-                    true
-                };
-                if section == "device" && expanded && !self.devices_loaded && !self.devices_loading {
+                self.active_settings_section = Some(section);
+                if section == "device" && !self.devices_loaded && !self.devices_loading {
                     self.devices_loading = true;
                     let settings = self.settings.clone();
                     self.settings_status = Some("Connecting and loading devices…".into());
                     return Task::perform(discover_devices(settings), |result|
                         cosmic::Action::App(Message::DevicesLoaded(result)));
                 }
+            }
+            Message::BackToSettingsCategories => {
+                self.active_settings_section = None;
             }
             Message::UrlChanged(value) => {
                 self.settings.url = value;
