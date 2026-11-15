@@ -37,6 +37,7 @@ pub struct AppModel {
     device_history: HashMap<String, VecDeque<(Instant, i64, f64)>>,
     temperature_alert_state: HashMap<String, bool>,
     next_refresh_at: Option<Instant>,
+    refresh_started_at: Option<Instant>,
     weather: Option<WeatherData>,
     next_weather_refresh_at: Option<Instant>,
 }
@@ -316,6 +317,12 @@ impl AppModel {
     }
 }
 
+fn refresh_spinner_frame(started_at: Instant) -> &'static str {
+    const FRAMES: [&str; 4] = ["◴", "◷", "◶", "◵"];
+    let frame = (started_at.elapsed().as_millis() / 100) as usize % FRAMES.len();
+    FRAMES[frame]
+}
+
 fn clock_ticks(interval_duration: Duration) -> impl futures::Stream<Item = Message> {
     cosmic::iced::stream::channel(
         4,
@@ -353,7 +360,7 @@ impl cosmic::Application for AppModel {
     fn init(core: cosmic::Core, _flags: Self::Flags) -> (Self, Task<cosmic::Action<Self::Message>>) {
         let settings = FritzSettings::load().unwrap_or_default();
         (
-            Self { core, settings, ..Default::default() },
+            Self { core, settings, refresh_started_at: Some(Instant::now()), ..Default::default() },
             Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result))),
         )
     }
@@ -363,7 +370,7 @@ impl cosmic::Application for AppModel {
         // Subscription::run accepts a fn pointer rather than a closure.
         // Dragging gets frame-rate ticks for the animated insertion preview;
         // otherwise a one-second tick updates countdowns and deadlines.
-        if self.dragging_device_ain.is_some() {
+        if self.dragging_device_ain.is_some() || self.refresh_started_at.is_some() {
             Subscription::run(drag_animation_ticks)
         } else {
             Subscription::run(regular_clock_ticks)
@@ -904,7 +911,11 @@ impl cosmic::Application for AppModel {
                     .align_y(cosmic::iced::Alignment::Center)
                     .push(widget::text::title3("FRITZ!Power Monitor"))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                    .push(icon_action_button("↻", "Refresh readings", Message::Refresh)),
+                    .push(icon_action_button(
+                        self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("↻"),
+                        if self.refresh_started_at.is_some() { "Refreshing readings" } else { "Refresh readings" },
+                        Message::Refresh,
+                    )), 
             )
             .padding([12, 16])
             .width(cosmic::iced::Length::Fill);
@@ -942,6 +953,11 @@ impl cosmic::Application for AppModel {
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
             Message::Refresh => {
+                // Ignore repeated clicks while a request is already running.
+                if self.refresh_started_at.is_some() {
+                    return Task::none();
+                }
+                self.refresh_started_at = Some(Instant::now());
                 self.next_refresh_at = None;
                 return Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result)));
             }
@@ -966,11 +982,13 @@ impl cosmic::Application for AppModel {
                         cosmic::Action::App(Message::WeatherUpdated(result)));
                 }
                 if self.next_refresh_at.is_some_and(|deadline| Instant::now() >= deadline) {
+                    self.refresh_started_at = Some(Instant::now());
                     self.next_refresh_at = None;
                     return Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result)));
                 }
             }
             Message::Updated(result) => {
+                self.refresh_started_at = None;
                 match result {
                 Ok(readings) => {
                     let total_power = readings.iter().map(|reading| reading.power_w).sum();
