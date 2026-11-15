@@ -1145,6 +1145,10 @@ impl cosmic::Application for AppModel {
                 let settings_heading = widget::Row::new()
                     .spacing(12)
                     .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::button::custom(widget::text("< Back"))
+                        .on_press(Message::ToggleSettings)
+                        .padding([8, 4])
+                        .class(cosmic::theme::Button::Text))
                     .push(widget::icon::from_name("preferences-system-symbolic").size(24))
                     .push(widget::Column::new()
                         .spacing(2)
@@ -1464,9 +1468,6 @@ impl cosmic::Application for AppModel {
             }
             if self.settings_saved_until.is_some_and(|deadline| Instant::now() < deadline) {
                 content = content.push(widget::text::caption("✓ Saved"));
-            }
-            if self.active_settings_section.is_none() {
-                content = content.push(action_button("go-previous-symbolic", "Close settings", Message::ToggleSettings));
             }
         } else {
             if let Some(weather) = &self.weather {
