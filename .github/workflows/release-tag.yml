@@ -95,90 +95,25 @@ jobs:
           git push origin HEAD:main
 
       - name: Create or repair version tag
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.RELEASE_TOKEN }}
-          script: |
-            if (context.eventName === 'push' && context.payload.head_commit?.message?.startsWith('chore(release): bump version to ')) {
-              core.info('The manual release run already created this version tag; skipping duplicate push run.');
-              return;
-            }
+        shell: bash
+        run: |
+          set -euo pipefail
 
-            const { execFileSync } = require('node:child_process');
-            const fs = require('node:fs');
-            const cargo = fs.readFileSync('Cargo.toml', 'utf8');
-            const version = cargo.match(/^version = "([^"]+)"/m)?.[1];
-            if (!version) throw new Error('Could not read Cargo.toml package version');
+          version="$(sed -n '/^\[package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n1)"
+          if [[ -z "$version" ]]; then
+            echo "Could not read Cargo.toml package version" >&2
+            exit 1
+          fi
 
-            const tag = `v${version}`;
-            const history = execFileSync('git', [
-              'log', '--first-parent', '-G', `^version = "${version}"`,
-              '--format=%H', '--', 'Cargo.toml'
-            ], { encoding: 'utf8' }).trim();
-            const releaseCommit = history.split('\n')[0];
-            if (!releaseCommit) throw new Error(`Could not find the commit that introduced ${version}`);
+          tag="v${version}"
+          release_commit="$(git log --first-parent -G "^version = \"${version}\"" --format=%H -- Cargo.toml | head -n1)"
+          if [[ -z "$release_commit" ]]; then
+            echo "Could not find the commit that introduced $version" >&2
+            exit 1
+          fi
 
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            let existing;
-            try {
-              existing = await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
-            } catch (error) {
-              if (error.status !== 404) throw error;
-            }
-
-            if (existing) {
-              let target = existing.data.object.sha;
-              if (existing.data.object.type === 'tag') {
-                const annotated = await github.rest.git.getTag({ owner, repo, tag_sha: target });
-                target = annotated.data.object.sha;
-              }
-              if (target === releaseCommit) {
-                core.info(`${tag} already points to the version bump commit.`);
-                return;
-              }
-              core.warning(`${tag} points to ${target}; repairing it to ${releaseCommit}.`);
-              const annotated = await github.rest.git.createTag({
-                owner,
-                repo,
-                tag,
-                message: `Release ${tag}`,
-                object: releaseCommit,
-                type: 'commit',
-                tagger: {
-                  name: 'gpkvt',
-                  email: 'git@21x9.org',
-                  date: new Date().toISOString()
-                }
-              });
-              await github.rest.git.updateRef({
-                owner,
-                repo,
-                ref: `tags/${tag}`,
-                sha: annotated.data.sha,
-                force: true
-              });
-              core.info(`Repaired ${tag} at ${releaseCommit}`);
-              return;
-            }
-
-            const annotated = await github.rest.git.createTag({
-              owner,
-              repo,
-              tag,
-              message: `Release ${tag}`,
-              object: releaseCommit,
-              type: 'commit',
-              tagger: {
-                name: 'gpkvt',
-                email: 'git@21x9.org',
-                date: new Date().toISOString()
-              }
-            });
-            await github.rest.git.createRef({
-              owner,
-              repo,
-              ref: `refs/tags/${tag}`,
-              sha: annotated.data.sha
-            });
-            core.info(`Created ${tag} at ${releaseCommit}`);
+          git config user.name "gpkvt"
+          git config user.email "git@21x9.org"
+          git tag --force --annotate "$tag" "$release_commit" --message "Release $tag"
+          git push --force origin "refs/tags/$tag"
+          echo "Created or repaired $tag at $release_commit"
