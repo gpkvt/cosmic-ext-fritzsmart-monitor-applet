@@ -18,22 +18,10 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - name: Check release token
-        id: token
-        env:
-          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          if [ -n "$RELEASE_TOKEN" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Add the RELEASE_TOKEN repository secret (Contents: write and Workflows: write), then run this workflow manually to create or repair the release tag."
-          fi
       - name: Create or repair version tag
-        if: steps.token.outputs.available == 'true'
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.RELEASE_TOKEN }}
+          github-token: ${{ github.token }}
           script: |
             const { execFileSync } = require('node:child_process');
             const fs = require('node:fs');
