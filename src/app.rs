@@ -404,12 +404,22 @@ fn graph_visual(
     let svg = format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {HEIGHT}\" preserveAspectRatio=\"none\"><title>{current_value:.1} {unit}</title><path d=\"M0 {baseline}H{WIDTH}\" stroke=\"#808080\" stroke-opacity=\"0.35\"/>{drawing}</svg>"
     );
-    widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
+    let graph = widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
         svg.into_bytes(),
     ))
     .width(cosmic::iced::Length::Fill)
-    .height(56)
-    .into()
+    .height(56);
+
+    widget::Column::new()
+        .spacing(2)
+        .push(
+            widget::Row::new()
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
+        )
+        .push(graph)
+        .into()
 }
 
 fn input_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
