@@ -1620,11 +1620,11 @@ impl cosmic::Application for AppModel {
                                     let ain = ain.clone();
                                     move |checked| Message::ToggleDevice(ain.clone(), checked)
                                 }));
-                        if let Some(index) = selected_index {
-                            row = row.push(widget::text::caption(format!(
-                                "#{}",
-                                index + 1 + if self.settings.total_power_first { 1 } else { 0 },
-                            )));
+                        if selected_index.is_some() {
+                            let position = self.settings.menu_order.iter()
+                                .position(|entry| entry == &crate::fritz::normalize_ain_for_selection(&ain))
+                                .unwrap_or_else(|| selected_index.unwrap_or_default());
+                            row = row.push(widget::text::caption(format!("#{}", position + 1)));
                         }
                         let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
                         let alert_thresholds = self.settings.temperature_alerts.get(&normalized_ain).copied();
