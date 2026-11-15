@@ -1535,7 +1535,22 @@ impl cosmic::Application for AppModel {
                             widget::Row::new()
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::text::caption(request.timestamp.clone()))
+                                .push(
+                                    widget::Column::new()
+                                        .spacing(0)
+                                        .push(widget::text::caption(
+                                            request.timestamp
+                                                .split_once(' ')
+                                                .map(|(date, _)| date.to_string())
+                                                .unwrap_or_default(),
+                                        ))
+                                        .push(widget::text::caption(
+                                            request.timestamp
+                                                .split_once(' ')
+                                                .map(|(_, time)| time.to_string())
+                                                .unwrap_or_default(),
+                                        ))
+                                )
                                 .push(widget::text::body(format!("{} {}", request.method, request.path))
                                     .width(cosmic::iced::Length::Fill))
                                 .push(widget::text::caption(format!(
