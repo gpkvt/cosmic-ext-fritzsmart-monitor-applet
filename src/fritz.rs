@@ -169,11 +169,12 @@ fn parse_menu_order(value: &str, selected_ains: &str, total_power_first: bool) -
     let mut order = Vec::new();
     if !value.trim().is_empty() {
         for entry in value.split(',') {
-            let normalized = if entry == TOTAL || entry == DIFFERENCE || entry == SUMMARY || entry == WEATHER {
-                entry.to_string()
-            } else {
-                normalize_ain_for_selection(entry)
-            };
+            let normalized =
+                if entry == TOTAL || entry == DIFFERENCE || entry == SUMMARY || entry == WEATHER {
+                    entry.to_string()
+                } else {
+                    normalize_ain_for_selection(entry)
+                };
             if !normalized.is_empty() && !order.contains(&normalized) {
                 order.push(normalized);
             }
