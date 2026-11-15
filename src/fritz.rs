@@ -9,7 +9,6 @@ pub struct FritzReading {
     pub name: String,
     pub power_w: i64,
     pub temperature_c: f64,
-    pub power_state: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -43,10 +42,6 @@ pub struct FritzSettings {
     pub graph_timespan_minutes: u16,
     pub refresh_interval_seconds: u32,
     pub temperature_alerts: HashMap<String, TemperatureAlertThresholds>,
-    pub weather_enabled: bool,
-    pub openweathermap_api_key: String,
-    pub weather_location: String,
-    pub weather_refresh_interval_minutes: u16,
 }
 
 impl Default for FritzSettings {
@@ -63,10 +58,6 @@ impl Default for FritzSettings {
             graph_timespan_minutes: 15,
             refresh_interval_seconds: 60,
             temperature_alerts: HashMap::new(),
-            weather_enabled: false,
-            openweathermap_api_key: String::new(),
-            weather_location: String::new(),
-            weather_refresh_interval_minutes: 10,
         }
     }
 }
@@ -133,16 +124,12 @@ impl FritzSettings {
             graph_timespan_minutes: parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")),
             refresh_interval_seconds: parse_refresh_interval_seconds(&get("REFRESH_INTERVAL_SECONDS")),
             temperature_alerts: parse_temperature_alerts(&get("TEMPERATURE_ALERTS")),
-            weather_enabled: get("WEATHER_ENABLED").eq_ignore_ascii_case("true"),
-            openweathermap_api_key: get("OPENWEATHERMAP_API_KEY"),
-            weather_location: get("WEATHER_LOCATION"),
-            weather_refresh_interval_minutes: get("WEATHER_REFRESH_INTERVAL_MINUTES").parse::<u16>().unwrap_or(10).clamp(5, 60),
         };
         Ok(settings)
     }
 
     pub fn save(&self) -> Result<(), String> {
-        for value in [&self.url, &self.username, &self.password, &self.ain, &self.ca_cert_path, &self.openweathermap_api_key, &self.weather_location] {
+        for value in [&self.url, &self.username, &self.password, &self.ain, &self.ca_cert_path] {
             if value.contains('\n') || value.contains('\r') {
                 return Err("Configuration values must not contain newlines".into());
             }
@@ -164,13 +151,11 @@ impl FritzSettings {
         temperature_alerts.sort_unstable();
         let temperature_alerts = temperature_alerts.join(";");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\n",
             self.url, self.username, self.password, first_ain, selected_ains,
             if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path,
             self.panel_text_size.clamp(10, 24), self.graph_timespan_minutes.clamp(5, 1440),
-            self.refresh_interval_seconds.clamp(30, 3600), temperature_alerts,
-            if self.weather_enabled { "true" } else { "false" }, self.openweathermap_api_key,
-            self.weather_location, self.weather_refresh_interval_minutes.clamp(5, 60),
+            self.refresh_interval_seconds.clamp(30, 3600), temperature_alerts
         );
         #[cfg(unix)]
         let mut file = {
@@ -390,102 +375,29 @@ fn parse_devices_xml(xml: &str) -> Result<Vec<FritzDevice>, String> {
     Ok(devices)
 }
 
-fn parse_switch_state(value: Option<&str>) -> Option<bool> {
-    match value?.trim() {
-        "0" => Some(false),
-        "1" => Some(true),
-        _ => None,
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct FritzFetchResult {
-    pub readings: Vec<FritzReading>,
-    pub missing_devices: Vec<(String, String)>,
-}
-
-fn parse_device_readings_detailed_xml(
-    xml: &str,
-    selected_ains: &[String],
-) -> Result<FritzFetchResult, String> {
+fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<FritzReading>, String> {
     let document = Document::parse(xml).map_err(|error| format!("Invalid device XML: {error}"))?;
-    let wanted: Vec<String> = selected_ains.iter()
-        .map(|ain| normalize_ain_for_selection(ain))
-        .filter(|ain| !ain.is_empty())
-        .collect();
+    let wanted: Vec<String> = selected_ains.iter().map(|ain| normalize_ain_for_selection(ain))
+        .filter(|ain| !ain.is_empty()).collect();
     let mut readings = Vec::new();
-    let mut missing_devices = Vec::new();
-    let mut seen = std::collections::HashSet::new();
-
     for device in document.descendants().filter(|node| node.has_tag_name("device")) {
         let Some(ain) = device.attribute("identifier") else { continue };
-        let normalized_ain = normalize_ain_for_selection(ain);
-        if !wanted.iter().any(|selected| selected == &normalized_ain) {
-            continue;
-        }
-        seen.insert(normalized_ain.clone());
-
-        let name = device.children().find(|child| child.has_tag_name("name"))
-            .and_then(|child| child.text())
-            .filter(|name| !name.trim().is_empty())
-            .or_else(|| device.attribute("name"))
-            .unwrap_or("FRITZ!Box device")
-            .trim()
-            .to_string();
-
-        let reading = (|| {
-            let power_mw = child_text(device, "powermeter", "power")
-                .ok_or_else(|| "does not expose power measurements".to_string())?
-                .parse::<i64>()
-                .map_err(|_| "returned an invalid power measurement".to_string())?;
-            let temperature_c = child_text(device, "temperature", "celsius")
-                .ok_or_else(|| "does not expose temperature measurements".to_string())?
-                .parse::<i64>()
-                .map_err(|_| "returned an invalid temperature measurement".to_string())?
-                as f64 / 10.0;
-
-            Ok::<FritzReading, String>(FritzReading {
-                ain: ain.to_string(),
-                name: name.clone(),
-                power_w: power_mw / 1000,
-                temperature_c,
-                power_state: parse_switch_state(child_text(device, "switch", "state")),
-            })
-        })();
-
-        match reading {
-            Ok(reading) => readings.push(reading),
-            Err(_error) => missing_devices.push((normalized_ain, name)),
-        }
+        if !wanted.iter().any(|selected| selected == &normalize_ain_for_selection(ain)) { continue; }
+        let power_mw = child_text(device, "powermeter", "power")
+            .ok_or_else(|| format!("Device {} does not expose power measurements", ain))?
+            .parse::<i64>().map_err(|_| format!("Device {} returned an invalid power measurement", ain))?;
+        let temperature_c = child_text(device, "temperature", "celsius")
+            .ok_or_else(|| format!("Device {} does not expose temperature measurements", ain))?
+            .parse::<i64>().map_err(|_| format!("Device {} returned an invalid temperature measurement", ain))? as f64 / 10.0;
+        let name = device.children().find(|child| child.has_tag_name("name")).and_then(|child| child.text())
+            .filter(|name| !name.trim().is_empty()).or_else(|| device.attribute("name"))
+            .unwrap_or("FRITZ!Box device").trim().to_string();
+        readings.push(FritzReading { ain: ain.to_string(), name, power_w: power_mw / 1000, temperature_c });
     }
-
-    for selected in &wanted {
-        if !seen.contains(selected) {
-            let original_ain = selected_ains.iter()
-                .find(|ain| normalize_ain_for_selection(ain) == *selected)
-                .map(String::as_str)
-                .unwrap_or(selected);
-            missing_devices.push((selected.clone(), format!("Device {original_ain}")));
-        }
-    }
-
     readings.sort_by_key(|reading| wanted.iter().position(|selected|
         selected == &normalize_ain_for_selection(&reading.ain)).unwrap_or(usize::MAX));
-    Ok(FritzFetchResult { readings, missing_devices })
-}
-
-fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<FritzReading>, String> {
-    let result = parse_device_readings_detailed_xml(xml, selected_ains)?;
-    if result.readings.is_empty() {
-        if result.missing_devices.is_empty() {
-            return Err("None of the selected FRITZ!Box devices were found".into());
-        }
-        return Err(format!(
-            "No selected devices returned usable readings: {}",
-            result.missing_devices.iter().map(|(ain, name)| format!("{name} ({ain})")).collect::<Vec<_>>().join("; ")
-        ));
-    }
-    Ok(result.readings)
+    if readings.is_empty() { return Err("None of the selected FRITZ!Box devices were found".into()); }
+    Ok(readings)
 }
 
 #[cfg(test)]
@@ -494,117 +406,7 @@ fn parse_device_xml(xml: &str, ain: &str) -> Result<FritzReading, String> {
         .ok_or_else(|| "Configured FRITZ!Box device was not found".to_string())
 }
 
-pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
-    let settings = FritzSettings::load()?;
-    validate_settings(&settings, true)?;
-    let selected_ains = if settings.ains.is_empty() {
-        vec![settings.ain.clone()]
-    } else {
-        settings.ains.clone()
-    };
-    let normalized_ain = normalize_ain_for_selection(&ain);
-    if normalized_ain.is_empty()
-        || !selected_ains.iter().any(|selected|
-            normalize_ain_for_selection(selected) == normalized_ain)
-    {
-        return Err("Refusing to control a device that is not selected".into());
-    }
-
-    let (client, sid) = authenticated_client(&settings).await?;
-    let base = settings.url.trim_end_matches('/');
-    let command = if on { "setswitchon" } else { "setswitchoff" };
-    let response = client
-        .get(format!("{base}/webservices/homeautoswitch.lua"))
-        .query(&[
-            ("sid", sid.as_str()),
-            ("switchcmd", command),
-            ("ain", ain.as_str()),
-        ])
-        .send()
-        .await
-        .map_err(|error| format!("FRITZ!Box power command failed: {error}"))?;
-    if !response.status().is_success() {
-        return Err(format!("FRITZ!Box power command failed: HTTP {}", response.status()));
-    }
-    let body = response.text().await
-        .map_err(|error| format!("Could not read FRITZ!Box power command response: {error}"))?;
-    if body.trim() != "1" {
-        return Err(format!("FRITZ!Box did not confirm the power command: {}", body.trim()));
-    }
-
-    wait_for_device_power_state(
-        &client,
-        base,
-        &sid,
-        &selected_ains,
-        &ain,
-        on,
-    ).await
-}
-
-const POWER_CONFIRM_TIMEOUT: Duration = Duration::from_secs(30);
-const POWER_CONFIRM_INTERVAL: Duration = Duration::from_secs(2);
-
-fn power_state_matches(
-    readings: &[FritzReading],
-    ain: &str,
-    requested_state: bool,
-) -> bool {
-    let key = normalize_ain_for_selection(ain);
-    readings.iter().any(|reading| {
-        normalize_ain_for_selection(&reading.ain) == key
-            && reading.power_state == Some(requested_state)
-    })
-}
-
-async fn wait_for_device_power_state(
-    client: &Client,
-    base: &str,
-    sid: &str,
-    selected_ains: &[String],
-    ain: &str,
-    requested_state: bool,
-) -> Result<(), String> {
-    let deadline = tokio::time::Instant::now() + POWER_CONFIRM_TIMEOUT;
-    let mut last_error: Option<String> = None;
-
-    loop {
-        let verification = async {
-            let response = client
-                .get(format!("{base}/webservices/homeautoswitch.lua"))
-                .query(&[("sid", sid), ("switchcmd", "getdevicelistinfos")])
-                .send()
-                .await
-                .map_err(|error| format!("Could not verify device state: {error}"))?;
-            let xml = read_xml_response(response, "Could not verify device state").await?;
-            let result = parse_device_readings_detailed_xml(&xml, selected_ains)?;
-            Ok::<bool, String>(power_state_matches(&result.readings, ain, requested_state))
-        }
-        .await;
-
-        match verification {
-            Ok(true) => return Ok(()),
-            Ok(false) => last_error = None,
-            Err(error) => last_error = Some(error),
-        }
-
-        let now = tokio::time::Instant::now();
-        if now >= deadline {
-            let detail = last_error
-                .map(|error| format!(" Last verification error: {error}"))
-                .unwrap_or_default();
-            return Err(format!(
-                "Device did not report {} within {} seconds.{detail}",
-                if requested_state { "on" } else { "off" },
-                POWER_CONFIRM_TIMEOUT.as_secs(),
-            ));
-        }
-
-        tokio::time::sleep(POWER_CONFIRM_INTERVAL.min(deadline - now)).await;
-    }
-}
-
-pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
+pub async fn fetch_fritz_data() -> Result<Vec<FritzReading>, String> {
     let settings = FritzSettings::load()?;
     validate_settings(&settings, true)?;
     let selected_ains = if settings.ains.is_empty() { vec![settings.ain.clone()] } else { settings.ains.clone() };
@@ -614,7 +416,7 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
         .query(&[("sid", sid.as_str()), ("switchcmd", "getdevicelistinfos")])
         .send().await.map_err(|error| format!("FRITZ!Box device request failed: {error}"))?;
     let devices_xml = read_xml_response(device_response, "FRITZ!Box device request failed").await?;
-    parse_device_readings_detailed_xml(&devices_xml, &selected_ains)
+    parse_device_readings_xml(&devices_xml, &selected_ains)
 }
 
 #[cfg(test)]
@@ -816,126 +618,9 @@ mod tests {
         assert_eq!(readings[0].name, "Battery inverter");
         assert_eq!(readings[0].power_w, 456);
         assert_eq!(readings[0].temperature_c, 19.8);
-        assert_eq!(readings[0].power_state, None);
         assert_eq!(readings[1].name, "Solar inverter");
         assert_eq!(readings[1].power_w, 123);
         assert_eq!(readings[1].temperature_c, 21.5);
-    }
-
-    #[test]
-    fn reports_missing_selected_devices_alongside_healthy_readings() {
-        let xml = r#"
-            <devicelist>
-              <device identifier="111111111111">
-                <name>Offline inverter</name>
-                <present>0</present>
-              </device>
-              <device identifier="222222222222">
-                <name>Working inverter</name>
-                <powermeter><power>456000</power></powermeter>
-                <temperature><celsius>198</celsius></temperature>
-              </device>
-            </devicelist>
-        "#;
-        let result = parse_device_readings_detailed_xml(
-            xml,
-            &["111111111111".into(), "222222222222".into(), "333333333333".into()],
-        ).unwrap();
-        assert_eq!(result.readings.len(), 1);
-        assert_eq!(result.missing_devices, vec![
-            ("111111111111".into(), "Offline inverter".into()),
-            ("333333333333".into(), "Device 333333333333".into()),
-        ]);
-    }
-
-    #[test]
-    fn skips_unavailable_selected_device_and_keeps_healthy_readings() {
-        let xml = r#"
-            <devicelist>
-              <device identifier="111111111111">
-                <name>Offline inverter</name>
-                <present>0</present>
-              </device>
-              <device identifier="222222222222">
-                <name>Working inverter</name>
-                <powermeter><power>456000</power></powermeter>
-                <temperature><celsius>198</celsius></temperature>
-              </device>
-            </devicelist>
-        "#;
-        let readings = parse_device_readings_xml(
-            xml,
-            &["111111111111".into(), "222222222222".into()],
-        ).unwrap();
-        assert_eq!(readings.len(), 1);
-        assert_eq!(readings[0].name, "Working inverter");
-        assert_eq!(readings[0].power_w, 456);
-        assert_eq!(readings[0].temperature_c, 19.8);
-    }
-
-    #[test]
-    fn switch_state_parser_handles_on_off_and_unknown_values() {
-        assert_eq!(parse_switch_state(Some("0")), Some(false));
-        assert_eq!(parse_switch_state(Some("1")), Some(true));
-        assert_eq!(parse_switch_state(Some("2")), None);
-        assert_eq!(parse_switch_state(None), None);
-    }
-
-    #[test]
-    fn parses_switch_state_only_when_switchable() {
-        let xml = r#"<devicelist>
-            <device identifier="111111111111">
-                <name>Smart plug</name>
-                <powermeter><power>1000</power></powermeter>
-                <temperature><celsius>200</celsius></temperature>
-                <switch><state>1</state></switch>
-            </device>
-            <device identifier="222222222222">
-                <name>Unknown state</name>
-                <powermeter><power>0</power></powermeter>
-                <temperature><celsius>200</celsius></temperature>
-                <switch><state>2</state></switch>
-            </device>
-        </devicelist>"#;
-        let readings = parse_device_readings_xml(
-            xml,
-            &["111111111111".into(), "222222222222".into()],
-        ).unwrap();
-        assert_eq!(readings[0].power_state, Some(true));
-        assert_eq!(readings[1].power_state, None);
-    }
-
-    #[test]
-    fn power_state_confirmation_matches_normalized_ain_and_requested_state() {
-        let readings = vec![
-            FritzReading {
-                ain: "12:34 56".into(),
-                name: "Smart plug".into(),
-                power_w: 0,
-                temperature_c: 20.0,
-                power_state: Some(true),
-            },
-        ];
-
-        assert!(power_state_matches(&readings, "123456", true));
-        assert!(!power_state_matches(&readings, "123456", false));
-        assert!(!power_state_matches(&readings, "999999", true));
-    }
-
-    #[test]
-    fn unknown_power_state_never_confirms_a_transition() {
-        let readings = vec![
-            FritzReading {
-                ain: "123456".into(),
-                name: "Smart plug".into(),
-                power_w: 0,
-                temperature_c: 20.0,
-                power_state: None,
-            },
-        ];
-
-        assert!(!power_state_matches(&readings, "123456", true));
-        assert!(!power_state_matches(&readings, "123456", false));
     }
 
     #[test]
