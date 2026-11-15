@@ -343,7 +343,12 @@ impl cosmic::Application for AppModel {
         let content = widget::Row::new()
             .spacing(6)
             .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::icon::from_name("weather-clear-symbolic").size(suggested.1))
+            .push(
+                widget::container(widget::icon::from_name("weather-clear-symbolic").size(suggested.1))
+                    // Symbolic icons sit optically high beside text glyphs;
+                    // a small top inset aligns their visual centers.
+                    .padding([2, 0]),
+            )
             .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)))
             .push(self.core.applet.text(temperature).size(f32::from(self.settings.panel_text_size)));
 
