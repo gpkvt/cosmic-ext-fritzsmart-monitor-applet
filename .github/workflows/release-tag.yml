@@ -67,7 +67,7 @@ jobs:
 
           path = Path("Cargo.toml")
           text = path.read_text()
-          match = re.search(r'(?ms)^\\[package\\]\\s+.*?^version\\s*=\\s*"([0-9]+)\\.([0-9]+)\\.([0-9]+)"\\s*$', text)
+          match = re.search(r'(?ms)^\[package\]\s+.*?^version\s*=\s*"([0-9]+)\.([0-9]+)\.([0-9]+)"\s*$', text)
           if not match:
               raise SystemExit("Could not find a stable [package].version in Cargo.toml")
 
@@ -84,8 +84,8 @@ jobs:
 
           new_version = f"{major}.{minor}.{patch}"
           updated, count = re.subn(
-              r'(?ms)(^\\[package\\]\\s+.*?^version\\s*=\\s*")[0-9]+\\.[0-9]+\\.[0-9]+("\\s*$)',
-              rf'\\g<1>{new_version}\\g<2>',
+              r'(?ms)(^\[package\]\s+.*?^version\s*=\s*")[0-9]+\.[0-9]+\.[0-9]+("\s*$)',
+              rf'\g<1>{new_version}\g<2>',
               text,
               count=1,
           )
