@@ -1,7 +1,7 @@
 use md5::{Digest, Md5};
 use reqwest::Client;
 use roxmltree::{Document, Node};
-use std::{collections::HashMap, env, fs, io::Write, time::Duration};
+use std::{collections::HashMap, env, fs, io::Write, time::{Duration, Instant}};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FritzReading {
@@ -9,6 +9,13 @@ pub struct FritzReading {
     pub name: String,
     pub power_w: i64,
     pub temperature_c: f64,
+    pub power_state: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FritzFetchResult {
+    pub readings: Vec<FritzReading>,
+    pub missing_devices: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -42,6 +49,10 @@ pub struct FritzSettings {
     pub graph_timespan_minutes: u16,
     pub refresh_interval_seconds: u32,
     pub temperature_alerts: HashMap<String, TemperatureAlertThresholds>,
+    pub weather_enabled: bool,
+    pub openweathermap_api_key: String,
+    pub weather_location: String,
+    pub weather_refresh_interval_minutes: u16,
 }
 
 impl Default for FritzSettings {
@@ -58,6 +69,10 @@ impl Default for FritzSettings {
             graph_timespan_minutes: 15,
             refresh_interval_seconds: 60,
             temperature_alerts: HashMap::new(),
+            weather_enabled: false,
+            openweathermap_api_key: String::new(),
+            weather_location: String::new(),
+            weather_refresh_interval_minutes: 10,
         }
     }
 }
@@ -124,12 +139,16 @@ impl FritzSettings {
             graph_timespan_minutes: parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")),
             refresh_interval_seconds: parse_refresh_interval_seconds(&get("REFRESH_INTERVAL_SECONDS")),
             temperature_alerts: parse_temperature_alerts(&get("TEMPERATURE_ALERTS")),
+            weather_enabled: get("WEATHER_ENABLED").eq_ignore_ascii_case("true"),
+            openweathermap_api_key: get("OPENWEATHERMAP_API_KEY"),
+            weather_location: get("WEATHER_LOCATION"),
+            weather_refresh_interval_minutes: get("WEATHER_REFRESH_INTERVAL_MINUTES").parse::<u16>().unwrap_or(10).clamp(5, 60),
         };
         Ok(settings)
     }
 
     pub fn save(&self) -> Result<(), String> {
-        for value in [&self.url, &self.username, &self.password, &self.ain, &self.ca_cert_path] {
+        for value in [&self.url, &self.username, &self.password, &self.ain, &self.ca_cert_path, &self.openweathermap_api_key, &self.weather_location] {
             if value.contains('\n') || value.contains('\r') {
                 return Err("Configuration values must not contain newlines".into());
             }
@@ -151,11 +170,13 @@ impl FritzSettings {
         temperature_alerts.sort_unstable();
         let temperature_alerts = temperature_alerts.join(";");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\n",
             self.url, self.username, self.password, first_ain, selected_ains,
             if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path,
             self.panel_text_size.clamp(10, 24), self.graph_timespan_minutes.clamp(5, 1440),
-            self.refresh_interval_seconds.clamp(30, 3600), temperature_alerts
+            self.refresh_interval_seconds.clamp(30, 3600), temperature_alerts,
+            if self.weather_enabled { "true" } else { "false" }, self.openweathermap_api_key,
+            self.weather_location, self.weather_refresh_interval_minutes.clamp(5, 60)
         );
         #[cfg(unix)]
         let mut file = {
@@ -392,7 +413,12 @@ fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<
         let name = device.children().find(|child| child.has_tag_name("name")).and_then(|child| child.text())
             .filter(|name| !name.trim().is_empty()).or_else(|| device.attribute("name"))
             .unwrap_or("FRITZ!Box device").trim().to_string();
-        readings.push(FritzReading { ain: ain.to_string(), name, power_w: power_mw / 1000, temperature_c });
+        let power_state = child_text(device, "switch", "state").and_then(|state| match state.trim() {
+            "1" => Some(true),
+            "0" => Some(false),
+            _ => None,
+        });
+        readings.push(FritzReading { ain: ain.to_string(), name, power_w: power_mw / 1000, temperature_c, power_state });
     }
     readings.sort_by_key(|reading| wanted.iter().position(|selected|
         selected == &normalize_ain_for_selection(&reading.ain)).unwrap_or(usize::MAX));
@@ -406,17 +432,85 @@ fn parse_device_xml(xml: &str, ain: &str) -> Result<FritzReading, String> {
         .ok_or_else(|| "Configured FRITZ!Box device was not found".to_string())
 }
 
-pub async fn fetch_fritz_data() -> Result<Vec<FritzReading>, String> {
+async fn fetch_device_list_xml(client: &Client, base: &str, sid: &str) -> Result<String, String> {
+    let response = client.get(format!("{base}/webservices/homeautoswitch.lua"))
+        .query(&[("sid", sid), ("switchcmd", "getdevicelistinfos")])
+        .send().await.map_err(|error| format!("FRITZ!Box device request failed: {error}"))?;
+    read_xml_response(response, "FRITZ!Box device request failed").await
+}
+
+fn parse_fetch_result_xml(xml: &str, selected_ains: &[String]) -> Result<FritzFetchResult, String> {
+    let document = Document::parse(xml).map_err(|error| format!("Invalid device XML: {error}"))?;
+    let mut readings = Vec::new();
+    let mut missing_devices = Vec::new();
+    for ain in selected_ains {
+        match parse_device_readings_xml(xml, std::slice::from_ref(ain)) {
+            Ok(mut device_readings) => readings.append(&mut device_readings),
+            Err(_) => {
+                let key = normalize_ain_for_selection(ain);
+                let name = document.descendants().find(|node| node.has_tag_name("device")
+                    && node.attribute("identifier").is_some_and(|id| normalize_ain_for_selection(id) == key))
+                    .and_then(|node| node.children().find(|child| child.has_tag_name("name"))
+                        .and_then(|child| child.text()).or_else(|| node.attribute("name")))
+                    .map(str::trim).filter(|name| !name.is_empty()).unwrap_or(ain).to_string();
+                missing_devices.push((ain.clone(), name));
+            }
+        }
+    }
+    if readings.is_empty() {
+        return Err(if missing_devices.is_empty() {
+            "No selected devices returned usable readings".into()
+        } else {
+            format!("No selected devices returned usable readings: {}", missing_devices.iter()
+                .map(|(_, name)| name.as_str()).collect::<Vec<_>>().join(", "))
+        });
+    }
+    Ok(FritzFetchResult { readings, missing_devices })
+}
+
+pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     let settings = FritzSettings::load()?;
     validate_settings(&settings, true)?;
     let selected_ains = if settings.ains.is_empty() { vec![settings.ain.clone()] } else { settings.ains.clone() };
     let (client, sid) = authenticated_client(&settings).await?;
     let base = settings.url.trim_end_matches('/');
-    let device_response = client.get(format!("{base}/webservices/homeautoswitch.lua"))
-        .query(&[("sid", sid.as_str()), ("switchcmd", "getdevicelistinfos")])
-        .send().await.map_err(|error| format!("FRITZ!Box device request failed: {error}"))?;
-    let devices_xml = read_xml_response(device_response, "FRITZ!Box device request failed").await?;
-    parse_device_readings_xml(&devices_xml, &selected_ains)
+    let devices_xml = fetch_device_list_xml(&client, base, &sid).await?;
+    parse_fetch_result_xml(&devices_xml, &selected_ains)
+}
+
+pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
+    let settings = FritzSettings::load()?;
+    validate_settings(&settings, false)?;
+    let (client, sid) = authenticated_client(&settings).await?;
+    let base = settings.url.trim_end_matches('/');
+    let command = if on { "setswitchon" } else { "setswitchoff" };
+    let response = client.get(format!("{base}/webservices/homeautoswitch.lua"))
+        .query(&[("sid", sid.as_str()), ("switchcmd", command), ("ain", ain.as_str())])
+        .send().await.map_err(|error| format!("FRITZ!Box power command failed: {error}"))?;
+    let body = read_xml_response(response, "FRITZ!Box power command failed").await?;
+    if body.trim() != "1" && body.trim() != "0" {
+        return Err(format!("FRITZ!Box rejected the power command: {}", body.trim()));
+    }
+
+    let key = normalize_ain_for_selection(&ain);
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let mut last_error = None;
+    while Instant::now() < deadline {
+        match fetch_device_list_xml(&client, base, &sid).await {
+            Ok(xml) => match parse_device_readings_xml(&xml, std::slice::from_ref(&ain)) {
+                Ok(readings) if readings.iter().any(|reading|
+                    normalize_ain_for_selection(&reading.ain) == key && reading.power_state == Some(on)) => return Ok(()),
+                Ok(_) => {},
+                Err(error) => last_error = Some(error),
+            },
+            Err(error) => last_error = Some(error),
+        }
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
+    Err(match last_error {
+        Some(error) => format!("Timed out waiting for the device to turn {} (last check: {error})", if on { "on" } else { "off" }),
+        None => format!("Timed out waiting for the device to turn {}", if on { "on" } else { "off" }),
+    })
 }
 
 #[cfg(test)]
