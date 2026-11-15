@@ -7,7 +7,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 ## Features
 
 - Displays current power in watts and temperature in the COSMIC panel, with a configurable text size.
-- Settings and popup device rows use distinct muted background tints. Each selected device has separate configurable-timespan wattage and temperature sparklines in the popup, plus a combined total-power card that follows the same visual design. Device chart panels use subtly rounded corners.
+- Settings and popup device rows use distinct muted background tints. Each selected device has separate configurable-timespan wattage and temperature sparklines in the popup, plus a combined net-power card that follows the same visual design. Device chart panels use subtly rounded corners. Devices can be marked as inputs; their wattage is subtracted from the net total and each input gets its own graph in the total-power card.
 - The main menu has a sticky title bar with icon-only Refresh and Settings actions; both use accessible labels and tooltips. The menu content scrolls independently beneath the title bar. The main menu and settings are vertically scrollable when their content exceeds the popup height.
 - The first selected device supplies both power and temperature values shown in the panel. Selected devices can be reordered in Settings.
 - The main popup shows live on/off state and a native toggle switch for selected devices that expose FRITZ!Box switching support. The switch remains disabled while the command is verified against the FRITZ!Box and until refreshed power and temperature readings arrive; non-switchable devices have no power toggle.
@@ -82,8 +82,11 @@ username and password, then choose **Load devices**. The applet discovers
 devices that expose both power and temperature measurements. Check every
 device you want to monitor, then drag the grip (⠿) beside a selected device
 to change its position. An animated drop preview marks the target; the order is
-changed and saved only when you release the drag. For each device,
-enable **Temperature alerts** to receive notifications when its temperature
+changed and saved only when you release the drag. Enable **Input (subtract from total)**
+for devices that measure consumption rather than generation; their wattage is
+subtracted from the combined net-power reading and their individual signed
+history is shown in the total-power card. This role is saved per device.
+For each device, enable **Temperature alerts** to receive notifications when its temperature
 rises above the upper limit or falls below the lower limit. The defaults are
 40 °C and −10 °C; both limits can be adjusted within their safe ranges in
 Settings. Alerts are disabled by default. A notification is sent when a device
@@ -116,8 +119,9 @@ readable; the applet manages the configuration file.
 
 The popup keeps rolling, in-memory total-power and per-device histories using
 the configured 5-minute to 24-hour graph timespan (one sample per minute). It
-displays total-power low/high values and separate wattage and temperature
-sparklines for each selected device.
+displays net-power low/high values, separate wattage and temperature
+sparklines for each selected device, and an individual signed power graph for
+each device marked as an input.
 History is collected only while the applet is running and is not persisted across
 restarts. It does not provide historical production from before startup, daily
 yield, forecasts, or inverter-specific statistics. The FRITZ!Box device must
