@@ -41,8 +41,8 @@ jobs:
             dpkg-dev \
             patchelf \
             file
-      - name: Format Rust sources
-        run: cargo fmt --all
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
       - name: Generate locked Cargo dependencies
         run: cargo generate-lockfile
       - name: Prepare Flatpak Cargo sources
