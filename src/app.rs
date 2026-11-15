@@ -257,15 +257,21 @@ fn icon_action_button<'a>(
     icon_name: &'static str,
     accessible_name: &'static str,
     message: Message,
-) -> impl Into<Element<'a, Message>> {
-    // Use COSMIC's dedicated icon-button builder rather than wrapping an icon
-    // in a generic custom button. This gives the controls a proper hit target,
-    // standard button styling, and accessible names/tooltips.
-    widget::button::icon(widget::icon::from_name(icon_name).symbolic(true).size(18))
-        .on_press(message)
-        .padding(8)
-        .name(accessible_name)
-        .tooltip(accessible_name)
+) -> widget::Button<'a, Message> {
+    // Use a fixed-size custom icon button so both title-bar actions retain
+    // their hit targets inside the narrow 320px popup. The settings action
+    // uses a widely available symbolic icon name.
+    widget::button::custom(
+        widget::container(widget::icon::from_name(icon_name).symbolic(true).size(18))
+            .center_x(36)
+            .center_y(36),
+    )
+    .on_press(message)
+    .padding(0)
+    .width(cosmic::iced::Length::Fixed(36.0))
+    .height(cosmic::iced::Length::Fixed(36.0))
+    .name(accessible_name)
+    .tooltip(accessible_name)
 }
 
 fn action_button<'a>(
@@ -776,7 +782,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::title3("FRITZ!Power Monitor"))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                     .push(icon_action_button("view-refresh-symbolic", "Refresh readings", Message::Refresh))
-                    .push(icon_action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
+                    .push(icon_action_button("emblem-system-symbolic", "Settings", Message::ToggleSettings)),
             )
             .padding([12, 16])
             .width(cosmic::iced::Length::Fill);
