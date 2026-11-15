@@ -1658,7 +1658,7 @@ impl cosmic::Application for AppModel {
                         device_cards = device_cards.push(widget::divider::horizontal::default());
                     }
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                    let is_expanded = !self.collapsed_devices.contains(&device_key);
+                    let is_expanded = self.collapsed_devices.contains(&device_key);
                     let device_corner_radius = device_corner_radius(index, self.readings.len());
                     let device_history = self.device_history.get(&device_key);
                     let power_graph = device_history.map(|samples|
