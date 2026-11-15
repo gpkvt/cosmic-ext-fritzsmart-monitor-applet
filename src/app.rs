@@ -2606,8 +2606,7 @@ impl cosmic::Application for AppModel {
             }
 
             if self.error.is_none() && !self.readings.is_empty() {
-                if !self.readings.is_empty() {
-                    let primary = self
+                let primary = self
                         .selected_ains
                         .first()
                         .and_then(|selected| {
