@@ -1468,8 +1468,8 @@ impl cosmic::Application for AppModel {
         } else {
             if let Some(weather) = &self.weather {
                 let wind_direction = weather.wind_direction_degrees
-                    .map(|degrees| format!(" · {degrees}°"))
-                    .unwrap_or_default();
+                    .map(|degrees| format!("{degrees}°"))
+                    .unwrap_or_else(|| "—".into());
                 let sunrise = chrono::DateTime::from_timestamp(weather.sunrise_unix, 0)
                     .map(|time| time.with_timezone(&chrono::Local).format("%H:%M").to_string())
                     .unwrap_or_else(|| "—".into());
@@ -1491,7 +1491,11 @@ impl cosmic::Application for AppModel {
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                         .push(widget::text::body(format!("Clouds  {}%", weather.cloudiness_percent))))
                     .push(widget::Row::new().spacing(8)
-                        .push(widget::text::body(format!("Wind  {:.1} m/s{}", weather.wind_speed_mps, wind_direction)))
+                        .push(widget::Column::new().spacing(2)
+                            .push(widget::text::body("Wind speed"))
+                            .push(widget::text::body(format!("{:.1} m/s", weather.wind_speed_mps)))
+                            .push(widget::text::body("Direction"))
+                            .push(widget::text::body(wind_direction)))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                         .push(widget::Column::new().spacing(2)
                             .push(widget::text::body("Pressure"))
