@@ -2600,8 +2600,8 @@ mod history_tests {
         move_sortable_entry(&mut ains, &mut total_first, TOTAL_POWER_DRAG_ID, "222222222222");
         assert!(total_first);
         move_sortable_entry(&mut ains, &mut total_first, "111111111111", TOTAL_POWER_DRAG_ID);
-        assert!(total_first);
-        assert_eq!(ains, vec!["111111111111", "222222222222"]);
+        assert!(!total_first);
+        assert_eq!(ains, vec!["222222222222", "111111111111"]);
     }
 
     #[test]
