@@ -678,14 +678,8 @@ fn total_power_overview(
                     "go-up-symbolic",
                 )).width(cosmic::iced::Length::Fill)),
         )
-        .push(
-            widget::Row::new()
-                .spacing(8)
-                .width(cosmic::iced::Length::Fill)
-                .align_y(cosmic::iced::Alignment::Start)
-                .push(graph_panel(total_graph))
-                .push(graph_panel(input_graphs.into())),
-        );
+        .push(graph_panel(total_graph))
+        .push(graph_panel(input_graphs.into()));
     Some(surface_card(content.into(), 14))
 }
 
