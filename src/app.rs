@@ -644,7 +644,6 @@ fn live_power_summary(
         let temperature_metric = widget::Column::new()
             .spacing(8)
             .width(cosmic::iced::Length::Fill)
-            .push(widget::text::caption("TEMP"))
             .push(widget::text::title2(keep_value_unit_together(temp)));
         metrics = metrics.push(temperature_metric);
     }
@@ -1696,7 +1695,7 @@ impl cosmic::Application for AppModel {
                         .spacing(8)
                         .width(cosmic::iced::Length::Fill)
                         .push(device_metric_tile("POWER", format!("{} W", reading.power_w), "utilities-system-monitor-symbolic", device_corner_radius))
-                        .push(device_metric_tile("TEMP", format!("{:.1} °C", reading.temperature_c), "utilities-temperature-symbolic", device_corner_radius));
+                        .push(device_metric_tile("", format!("{:.1} °C", reading.temperature_c), "utilities-temperature-symbolic", device_corner_radius));
                     let device_content = widget::Column::new()
                         .spacing(10)
                         .push(metrics)
@@ -1757,10 +1756,6 @@ impl cosmic::Application for AppModel {
                                             widget::Column::new()
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
-                                                .push(widget::Row::new()
-                                                    .spacing(6)
-                                                    .align_y(cosmic::iced::Alignment::Center)
-                                                    .push(widget::text::caption("TEMP (°C)")) )
                                                 .push(widget::text::body(temperature_graph)
                                                     .width(cosmic::iced::Length::Fill)
                                                     .align_x(cosmic::iced::Alignment::End))
