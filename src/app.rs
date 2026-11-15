@@ -521,6 +521,24 @@ fn metric_tile<'a>(
     surface_card(content.into(), 10)
 }
 
+fn displayed_power_w(
+    readings: &[FritzReading],
+    selected_ains: &[String],
+    total_power_first: bool,
+    input_ains: &HashSet<String>,
+) -> Option<i64> {
+    if total_power_first {
+        (!readings.is_empty()).then(|| net_power_w(readings, input_ains))
+    } else {
+        selected_ains.first()
+            .and_then(|selected| readings.iter().find(|reading|
+                crate::fritz::normalize_ain_for_selection(&reading.ain)
+                    == crate::fritz::normalize_ain_for_selection(selected)))
+            .or_else(|| readings.first())
+            .map(|reading| reading.power_w)
+    }
+}
+
 fn live_power_summary(
     power: String,
     is_net: bool,
@@ -1441,12 +1459,13 @@ impl cosmic::Application for AppModel {
                         crate::fritz::normalize_ain_for_selection(&reading.ain)
                             == crate::fritz::normalize_ain_for_selection(selected)))
                     .or_else(|| self.readings.first());
-                let summary_power = if self.settings.total_power_first {
-                    format!("{} W", net_power_w(&self.readings, &self.settings.input_ains))
-                } else {
-                    primary.map(|reading| format!("{} W", reading.power_w))
-                        .unwrap_or_else(|| "-- W".into())
-                };
+                let summary_power = displayed_power_w(
+                    &self.readings,
+                    &self.selected_ains,
+                    self.settings.total_power_first,
+                    &self.settings.input_ains,
+                ).map(|power| format!("{power} W"))
+                    .unwrap_or_else(|| "-- W".into());
                 let summary_temperature = if self.settings.panel_average_temperature {
                     average_temperature_c(&self.readings).map(|value| format!("{value:.1} °C"))
                 } else if self.settings.total_power_first {
@@ -2296,6 +2315,21 @@ impl cosmic::Application for AppModel {
 #[cfg(test)]
 mod history_tests {
     use super::*;
+
+    #[test]
+    fn displayed_power_uses_selected_device_or_net_total_by_layout_mode() {
+        let readings = vec![
+            FritzReading { ain: "111111".into(), name: "First".into(), power_w: 800, temperature_c: 20.0, power_state: None },
+            FritzReading { ain: "222222".into(), name: "Solar input".into(), power_w: 250, temperature_c: 21.0, power_state: None },
+        ];
+        let selected = vec!["222222".to_string(), "111111".to_string()];
+        let inputs = HashSet::from(["222222".to_string()]);
+
+        assert_eq!(displayed_power_w(&readings, &selected, false, &inputs), Some(250));
+        assert_eq!(displayed_power_w(&readings, &selected, true, &inputs), Some(550));
+        assert_eq!(displayed_power_w(&[], &selected, true, &inputs), None);
+        assert_eq!(displayed_power_w(&[], &selected, false, &inputs), None);
+    }
 
     #[test]
     fn quick_setting_sliders_snap_to_anchor_points() {
