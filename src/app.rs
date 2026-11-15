@@ -158,36 +158,6 @@ fn move_selected_device(ains: &mut [String], ain: &str, move_up: bool) {
     }
 }
 
-fn graph_frame<'a>(content: impl Into<cosmic::iced::Element<'a, Message>>) -> widget::Container<'a, Message> {
-    // A one-pixel inset of the contrasting theme surface creates a clear,
-    // rounded-looking frame without relying on hard-coded light/dark colors.
-    let content = widget::container(content)
-        .padding(8)
-        .width(cosmic::iced::Length::Fill)
-        .style(|theme| {
-            let cosmic = theme.cosmic();
-            cosmic::iced::widget::container::Style {
-                background: Some(
-                    cosmic::iced::Color::from(cosmic.background(false).base).into(),
-                ),
-                ..Default::default()
-            }
-        });
-
-    widget::container(content)
-        .padding(1)
-        .width(cosmic::iced::Length::Fill)
-        .style(|theme| {
-            let cosmic = theme.cosmic();
-            cosmic::iced::widget::container::Style {
-                background: Some(
-                    cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
-                ),
-                ..Default::default()
-            }
-        })
-}
-
 fn action_button<'a>(
     icon_name: &'static str,
     label: &'static str,
@@ -467,36 +437,76 @@ impl cosmic::Application for AppModel {
                                 .spacing(12)
                                 .width(cosmic::iced::Length::Fill)
                                 .push(
-                                    graph_frame(
-                                        widget::Column::new()
-                                            .spacing(4)
-                                            .width(cosmic::iced::Length::Fill)
-                                            .push(widget::text::caption("POWER (W)"))
-                                            .push(widget::text::body(power_graph))
-                                            .push(
-                                                widget::Row::new()
-                                                    .width(cosmic::iced::Length::Fill)
-                                                    .push(widget::text::caption(format_graph_axis_start(self.settings.graph_timespan_minutes)))
-                                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                                    .push(widget::text::caption("Now")),
-                                            ),
-                                    ),
+                                    widget::container(
+                                        widget::container(
+                                            widget::Column::new()
+                                                .spacing(4)
+                                                .width(cosmic::iced::Length::Fill)
+                                                .push(widget::text::caption("POWER (W)"))
+                                                .push(widget::text::body(power_graph))
+                                                .push(
+                                                    widget::Row::new()
+                                                        .width(cosmic::iced::Length::Fill)
+                                                        .push(widget::text::caption(format_graph_axis_start(self.settings.graph_timespan_minutes)))
+                                                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                                        .push(widget::text::caption("Now")),
+                                                ),
+                                        )
+                                        .padding(8)
+                                        .width(cosmic::iced::Length::Fill)
+                                        .style(|theme| {
+                                            let cosmic = theme.cosmic();
+                                            cosmic::iced::widget::container::Style {
+                                                background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
+                                                ..Default::default()
+                                            }
+                                        }),
+                                    )
+                                    .padding(1)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .style(|theme| {
+                                        let cosmic = theme.cosmic();
+                                        cosmic::iced::widget::container::Style {
+                                            background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                                            ..Default::default()
+                                        }
+                                    }),
                                 )
                                 .push(
-                                    graph_frame(
-                                        widget::Column::new()
-                                            .spacing(4)
-                                            .width(cosmic::iced::Length::Fill)
-                                            .push(widget::text::caption("TEMPERATURE (°C)"))
-                                            .push(widget::text::body(temperature_graph))
-                                            .push(
-                                                widget::Row::new()
-                                                    .width(cosmic::iced::Length::Fill)
-                                                    .push(widget::text::caption(format_graph_axis_start(self.settings.graph_timespan_minutes)))
-                                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                                    .push(widget::text::caption("Now")),
-                                            ),
-                                    ),
+                                    widget::container(
+                                        widget::container(
+                                            widget::Column::new()
+                                                .spacing(4)
+                                                .width(cosmic::iced::Length::Fill)
+                                                .push(widget::text::caption("TEMPERATURE (°C)"))
+                                                .push(widget::text::body(temperature_graph))
+                                                .push(
+                                                    widget::Row::new()
+                                                        .width(cosmic::iced::Length::Fill)
+                                                        .push(widget::text::caption(format_graph_axis_start(self.settings.graph_timespan_minutes)))
+                                                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                                        .push(widget::text::caption("Now")),
+                                                ),
+                                        )
+                                        .padding(8)
+                                        .width(cosmic::iced::Length::Fill)
+                                        .style(|theme| {
+                                            let cosmic = theme.cosmic();
+                                            cosmic::iced::widget::container::Style {
+                                                background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
+                                                ..Default::default()
+                                            }
+                                        }),
+                                    )
+                                    .padding(1)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .style(|theme| {
+                                        let cosmic = theme.cosmic();
+                                        cosmic::iced::widget::container::Style {
+                                            background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                                            ..Default::default()
+                                        }
+                                    }),
                                 ),
                         );
                     let alternate = index % 2 == 1;
