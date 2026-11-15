@@ -1,5 +1,5 @@
 use crate::fritz::{discover_devices, fetch_fritz_data, FritzDevice, FritzFetchResult, FritzReading, FritzSettings, TemperatureAlertThresholds};
-use crate::weather::{fetch_weather, WeatherData};
+use crate::weather::{fetch_weather, fetch_weather_forecast, WeatherData, WeatherForecast};
 use cosmic::iced::{
     futures,
     platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
@@ -52,6 +52,10 @@ pub struct AppModel {
     next_refresh_at: Option<Instant>,
     refresh_started_at: Option<Instant>,
     weather: Option<WeatherData>,
+    weather_forecast: Option<WeatherForecast>,
+    weather_forecast_error: Option<String>,
+    weather_forecast_loading: bool,
+    weather_forecast_expanded: bool,
     weather_attribution_expanded: bool,
     quick_options_expanded: bool,
     collapsed_devices: HashSet<String>,
@@ -101,6 +105,8 @@ pub enum Message {
     TemperatureAlertHighChanged(String, i16),
     TemperatureAlertLowChanged(String, i16),
     WeatherUpdated(Result<WeatherData, String>),
+    ToggleWeatherForecast,
+    WeatherForecastUpdated(Result<WeatherForecast, String>),
     ToggleWeatherAttribution,
     OpenCommonsPage(String),
     ToggleQuickOptions,
@@ -1849,19 +1855,65 @@ impl cosmic::Application for AppModel {
                             }
                         }).into()
                 };
-                let weather_heading = widget::Row::new()
-                    .spacing(8)
-                    .align_y(cosmic::iced::Alignment::Center)
-                    .push(widget::icon::from_name(weather.icon_name()).size(20))
-                    .push(widget::Column::new()
-                        .spacing(1)
-                        .width(cosmic::iced::Length::Fill)
-                        .push(widget::text::title3("Weather"))
-                        .push(widget::text::caption(weather.location_name.clone())))
-                    .push(widget::text::title2(format!("{:.0}°", weather.temperature_c)));
+                let weather_heading = widget::button::custom(
+                    widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::icon::from_name(weather.icon_name()).size(20))
+                        .push(widget::Column::new()
+                            .spacing(1)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::title3("Weather"))
+                            .push(widget::text::caption(weather.location_name.clone())))
+                        .push(widget::text::title2(format!("{:.0}°", weather.temperature_c)))
+                        .push(widget::icon::from_name(if self.weather_forecast_expanded {
+                            "go-down-symbolic"
+                        } else {
+                            "go-next-symbolic"
+                        }).size(16)),
+                )
+                    .on_press(Message::ToggleWeatherForecast)
+                    .padding([4, 0])
+                    .width(cosmic::iced::Length::Fill)
+                    .class(cosmic::theme::Button::Text);
                 content = content
                     .push(weather_heading)
                     .push(weather_card);
+                if self.weather_forecast_expanded {
+                    content = content
+                        .push(widget::divider::horizontal::default())
+                        .push(widget::text::title3("7-day forecast"))
+                        .push(widget::text::caption("Forecast data by Open-Meteo"));
+                    if self.weather_forecast_loading {
+                        content = content.push(widget::text::caption("Loading forecast…"));
+                    }
+                    if let Some(error) = &self.weather_forecast_error {
+                        content = content.push(error_notice("FORECAST UNAVAILABLE", error));
+                    }
+                    if let Some(forecast) = &self.weather_forecast {
+                        for day in &forecast.days {
+                            let date_label = chrono::NaiveDate::parse_from_str(&day.date, "%Y-%m-%d")
+                                .map(|date| date.format("%a, %d %b").to_string())
+                                .unwrap_or_else(|_| day.date.clone());
+                            let day_row = widget::Row::new()
+                                .spacing(8)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::Column::new()
+                                    .spacing(2)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::body(date_label))
+                                    .push(widget::text::caption(day.description.clone())))
+                                .push(widget::icon::from_name(day.icon_name()).size(22))
+                                .push(widget::text::body(format!("{:.0}° / {:.0}°", day.max_temperature_c, day.min_temperature_c)))
+                                .push(widget::Column::new()
+                                    .spacing(2)
+                                    .align_x(cosmic::iced::Alignment::End)
+                                    .push(widget::text::caption(format!("{}% rain", day.precipitation_probability_percent)))
+                                    .push(widget::text::caption(format!("{:.0} km/h", day.wind_speed_kmh))));
+                            content = content.push(day_row);
+                        }
+                    }
+                }
                 if let Some(error) = &self.weather_error {
                     content = content.push(error_notice("WEATHER UNAVAILABLE", error));
                 }
@@ -2469,6 +2521,31 @@ impl cosmic::Application for AppModel {
                     Instant::now() + Duration::from_secs(u64::from(self.settings.refresh_interval_seconds.clamp(30, 3600))),
                 );
             }
+            Message::ToggleWeatherForecast => {
+                self.weather_forecast_expanded = !self.weather_forecast_expanded;
+                if self.weather_forecast_expanded
+                    && self.weather_forecast.is_none()
+                    && !self.weather_forecast_loading
+                {
+                    self.weather_forecast_loading = true;
+                    self.weather_forecast_error = None;
+                    let location = self.settings.weather_location.clone();
+                    return Task::perform(fetch_weather_forecast(location), |result|
+                        cosmic::Action::App(Message::WeatherForecastUpdated(result)));
+                }
+            }
+            Message::WeatherForecastUpdated(result) => {
+                self.weather_forecast_loading = false;
+                match result {
+                    Ok(forecast) => {
+                        self.weather_forecast = Some(forecast);
+                        self.weather_forecast_error = None;
+                    }
+                    Err(error) => {
+                        self.weather_forecast_error = Some(error);
+                    }
+                }
+            }
             Message::ToggleWeatherAttribution => {
                 self.weather_attribution_expanded = !self.weather_attribution_expanded;
             }
@@ -2540,6 +2617,10 @@ impl cosmic::Application for AppModel {
                 if !enabled {
                     self.weather = None;
                     self.weather_error = None;
+                    self.weather_forecast = None;
+                    self.weather_forecast_error = None;
+                    self.weather_forecast_loading = false;
+                    self.weather_forecast_expanded = false;
                 }
                 self.persist_settings();
             }
@@ -2551,6 +2632,9 @@ impl cosmic::Application for AppModel {
             }
             Message::WeatherLocationChanged(value) => {
                 self.settings.weather_location = value;
+                self.weather_forecast = None;
+                self.weather_forecast_error = None;
+                self.weather_forecast_loading = false;
                 self.weather_error = None;
                 self.next_weather_refresh_at = None;
                 self.persist_settings();

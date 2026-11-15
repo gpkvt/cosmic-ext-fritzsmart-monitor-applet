@@ -45,6 +45,162 @@ impl WeatherData {
     }
 }
 
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct WeatherForecast {
+    pub days: Vec<WeatherForecastDay>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct WeatherForecastDay {
+    pub date: String,
+    pub weather_code: u8,
+    pub description: String,
+    pub min_temperature_c: f64,
+    pub max_temperature_c: f64,
+    pub precipitation_probability_percent: u8,
+    pub wind_speed_kmh: f64,
+}
+
+impl WeatherForecastDay {
+    pub fn icon_name(&self) -> &'static str {
+        match self.weather_code {
+            0 => "weather-clear-symbolic",
+            1 | 2 => "weather-few-clouds-symbolic",
+            3 => "weather-overcast-symbolic",
+            45 | 48 => "weather-fog-symbolic",
+            51..=57 | 61..=67 | 80..=82 => "weather-showers-symbolic",
+            71..=77 | 85..=86 => "weather-snow-symbolic",
+            95 | 96 | 99 => "weather-storm-symbolic",
+            _ => "weather-overcast-symbolic",
+        }
+    }
+}
+
+fn weather_code_description(code: u8) -> &'static str {
+    match code {
+        0 => "Clear sky",
+        1 => "Mainly clear",
+        2 => "Partly cloudy",
+        3 => "Overcast",
+        45 | 48 => "Fog",
+        51 => "Light drizzle",
+        53 => "Drizzle",
+        55 | 56 | 57 => "Dense drizzle",
+        61 => "Light rain",
+        63 => "Rain",
+        65 | 66 | 67 => "Heavy rain",
+        71 => "Light snow",
+        73 => "Snow",
+        75 | 77 => "Heavy snow",
+        80 => "Rain showers",
+        81 | 82 => "Heavy showers",
+        85 | 86 => "Snow showers",
+        95 => "Thunderstorm",
+        96 | 99 => "Thunderstorm with hail",
+        _ => "Variable conditions",
+    }
+}
+
+pub async fn fetch_weather_forecast(location: String) -> Result<WeatherForecast, String> {
+    let location = location.trim();
+    if location.is_empty() {
+        return Err("Weather location is empty".into());
+    }
+    let client = Client::builder()
+        .user_agent("FRITZ-Power-Monitor/0.2.6")
+        .timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|error| format!("Forecast client error: {error}"))?;
+
+    let (latitude, longitude) = if let Some(coordinates) = parse_coordinates(location) {
+        coordinates
+    } else {
+        let response = client
+            .get("https://geocoding-api.open-meteo.com/v1/search")
+            .query(&[
+                ("name", location),
+                ("count", "1"),
+                ("language", "en"),
+                ("format", "json"),
+            ])
+            .send()
+            .await
+            .map_err(|error| format!("Location lookup failed: {error}"))?;
+        if !response.status().is_success() {
+            return Err(format!("Location lookup returned HTTP {}", response.status()));
+        }
+        let payload: serde_json::Value = response.json().await
+            .map_err(|error| format!("Invalid location response: {error}"))?;
+        let result = payload["results"]
+            .as_array()
+            .and_then(|results| results.first())
+            .ok_or_else(|| format!("Could not find weather location '{location}'"))?;
+        (
+            result["latitude"].as_f64().ok_or("Location has no latitude")?,
+            result["longitude"].as_f64().ok_or("Location has no longitude")?,
+        )
+    };
+
+    let response = client
+        .get("https://api.open-meteo.com/v1/forecast")
+        .query(&[
+            ("latitude", latitude.to_string()),
+            ("longitude", longitude.to_string()),
+            (
+                "daily",
+                "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max".to_string(),
+            ),
+            ("forecast_days", "7".to_string()),
+            ("timezone", "auto".to_string()),
+        ])
+        .send()
+        .await
+        .map_err(|error| format!("7-day forecast request failed: {error}"))?;
+    if !response.status().is_success() {
+        return Err(format!("Forecast provider returned HTTP {}", response.status()));
+    }
+    let payload: serde_json::Value = response.json().await
+        .map_err(|error| format!("Invalid forecast response: {error}"))?;
+    let daily = &payload["daily"];
+    let dates = daily["time"].as_array().ok_or("Forecast has no dates")?;
+    let codes = daily["weather_code"].as_array().ok_or("Forecast has no weather codes")?;
+    let minimums = daily["temperature_2m_min"].as_array()
+        .ok_or("Forecast has no minimum temperatures")?;
+    let maximums = daily["temperature_2m_max"].as_array()
+        .ok_or("Forecast has no maximum temperatures")?;
+    let precipitation = daily["precipitation_probability_max"].as_array();
+    let wind = daily["wind_speed_10m_max"].as_array();
+    let mut days = Vec::with_capacity(7);
+    for index in 0..dates.len().min(7) {
+        let date = dates[index].as_str().ok_or("Invalid forecast date")?;
+        let code = codes[index].as_u64().ok_or("Invalid forecast weather code")?
+            .min(255) as u8;
+        days.push(WeatherForecastDay {
+            date: date.to_string(),
+            weather_code: code,
+            description: weather_code_description(code).to_string(),
+            min_temperature_c: minimums[index].as_f64()
+                .ok_or("Invalid minimum temperature")?,
+            max_temperature_c: maximums[index].as_f64()
+                .ok_or("Invalid maximum temperature")?,
+            precipitation_probability_percent: precipitation
+                .and_then(|values| values.get(index))
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(0)
+                .min(100) as u8,
+            wind_speed_kmh: wind
+                .and_then(|values| values.get(index))
+                .and_then(serde_json::Value::as_f64)
+                .unwrap_or(0.0),
+        });
+    }
+    if days.is_empty() {
+        return Err("Forecast provider returned no forecast days".into());
+    }
+    Ok(WeatherForecast { days })
+}
+
 pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherData, String> {
     if api_key.trim().is_empty() {
         return Err("OpenWeatherMap API key is empty".into());
@@ -213,6 +369,30 @@ fn parse_coordinates(location: &str) -> Option<(f64, f64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn forecast_weather_codes_map_to_descriptive_conditions_and_icons() {
+        for (code, description, icon) in [
+            (0, "Clear sky", "weather-clear-symbolic"),
+            (2, "Partly cloudy", "weather-few-clouds-symbolic"),
+            (3, "Overcast", "weather-overcast-symbolic"),
+            (61, "Light rain", "weather-showers-symbolic"),
+            (73, "Snow", "weather-snow-symbolic"),
+            (95, "Thunderstorm", "weather-storm-symbolic"),
+        ] {
+            assert_eq!(weather_code_description(code), description);
+            let day = WeatherForecastDay {
+                date: "2026-11-15".into(),
+                weather_code: code,
+                description: description.into(),
+                min_temperature_c: 0.0,
+                max_temperature_c: 1.0,
+                precipitation_probability_percent: 0,
+                wind_speed_kmh: 0.0,
+            };
+            assert_eq!(day.icon_name(), icon);
+        }
+    }
 
     #[test]
     fn commons_attribution_links_only_to_commons_file_pages() {
