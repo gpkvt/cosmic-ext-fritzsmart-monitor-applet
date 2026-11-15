@@ -5,12 +5,24 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      bump_type:
+        description: Semantic version increment
+        type: choice
+        required: true
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
 
 jobs:
   tag-release:
+    # Manual runs and pushes to main are supported; feature branches are ignored.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out main history
@@ -18,11 +30,80 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Bump package version
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          BUMP_TYPE: ${{ inputs.bump_type }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "Run the release action from the main branch." >&2
+            exit 1
+          fi
+
+          new_version="$(python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          path = Path("Cargo.toml")
+          lines = path.read_text().splitlines()
+          in_package = False
+          version_line = None
+          for index, line in enumerate(lines):
+              if line.strip() == "[package]":
+                  in_package = True
+                  continue
+              if line.startswith("["):
+                  in_package = False
+              if in_package and line.startswith("version = "):
+                  version_line = index
+                  break
+
+          if version_line is None:
+              raise SystemExit("Could not find [package].version in Cargo.toml")
+
+          current = lines[version_line].split('"')[1]
+          parts = current.split(".")
+          if len(parts) != 3 or not all(part.isdigit() for part in parts):
+              raise SystemExit(f"Expected stable MAJOR.MINOR.PATCH version, got {current!r}")
+          major, minor, patch = map(int, parts)
+
+          bump = os.environ["BUMP_TYPE"]
+          if bump == "major":
+              major, minor, patch = major + 1, 0, 0
+          elif bump == "minor":
+              minor, patch = minor + 1, 0
+          elif bump == "patch":
+              patch += 1
+          else:
+              raise SystemExit(f"Unsupported bump type: {bump}")
+
+          new_version = f"{major}.{minor}.{patch}"
+          lines[version_line] = f'version = "{new_version}"'
+          path.write_text("\n".join(lines) + "\n")
+          print(new_version)
+          PY
+          )"
+          echo "Bumping package version to ${new_version}"
+          cargo update --workspace
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml Cargo.lock
+          git commit -m "chore(release): bump version to ${new_version}"
+          git push origin HEAD:main
+
       - name: Create or repair version tag
         uses: actions/github-script@v7
         with:
-          github-token: ${{ github.token }}
+          github-token: ${{ secrets.RELEASE_TOKEN }}
           script: |
+            if (context.eventName === 'push' && context.payload.head_commit?.message?.startsWith('chore(release): bump version to ')) {
+              core.info('The manual release run already created this version tag; skipping duplicate push run.');
+              return;
+            }
+
             const { execFileSync } = require('node:child_process');
             const fs = require('node:fs');
             const cargo = fs.readFileSync('Cargo.toml', 'utf8');
@@ -57,8 +138,6 @@ jobs:
                 return;
               }
               core.warning(`${tag} points to ${target}; repairing it to ${releaseCommit}.`);
-              // Update the existing ref directly; deleting it first is rejected
-              // by GitHub for some fine-grained PAT configurations.
               const annotated = await github.rest.git.createTag({
                 owner,
                 repo,
