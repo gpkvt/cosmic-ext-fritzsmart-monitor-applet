@@ -288,6 +288,34 @@ fn icon_action_button<'a>(
     .name(accessible_name)
 }
 
+
+fn error_notice<'a>(title: &'static str, message: &'a str) -> widget::Container<'a, Message> {
+    widget::container(
+        widget::Column::new()
+            .spacing(5)
+            .push(widget::Row::new()
+                .spacing(8)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(widget::icon::from_name("dialog-warning-symbolic").size(18))
+                .push(widget::text::body(title)))
+            .push(widget::selectable_text::selectable_text(message)
+                .width(cosmic::iced::Length::Fill))
+    )
+    .width(cosmic::iced::Length::Fill)
+    .padding(12)
+    .style(|_| cosmic::iced::widget::container::Style {
+        background: Some(cosmic::iced::Color::from_rgba(0.58, 0.08, 0.10, 0.96).into()),
+        text_color: Some(cosmic::iced::Color::WHITE),
+        ..Default::default()
+    })
+}
+
+fn is_error_status(status: &str) -> bool {
+    status.starts_with("Could not save settings:")
+        || status.starts_with("Weather unavailable:")
+        || status.starts_with("Connection failed:")
+}
+
 fn action_button<'a>(
     icon_name: &'static str,
     label: &'static str,
@@ -652,11 +680,22 @@ impl cosmic::Application for AppModel {
                 .push(widget::divider::horizontal::default())
                 .push(widget::text::caption("DIAGNOSTICS"));
             if let Some(status) = &self.settings_status {
-                content = content.push(
-                    widget::selectable_text::selectable_text(status.as_str())
-                        .width(cosmic::iced::Length::Fill)
-                        ,
-                );
+                if is_error_status(status) {
+                    let title = if status.starts_with("Weather unavailable:") {
+                        "WEATHER UNAVAILABLE"
+                    } else if status.starts_with("Could not save settings:") {
+                        "SETTINGS NOT SAVED"
+                    } else {
+                        "CONNECTION FAILED"
+                    };
+                    let message = status.split_once(':').map(|(_, message)| message.trim()).unwrap_or(status);
+                    content = content.push(error_notice(title, message));
+                } else {
+                    content = content.push(
+                        widget::selectable_text::selectable_text(status.as_str())
+                            .width(cosmic::iced::Length::Fill),
+                    );
+                }
             } else {
                 content = content.push(widget::text::caption("No status messages yet"));
             }
@@ -872,13 +911,7 @@ impl cosmic::Application for AppModel {
             }
 
             if let Some(error) = &self.error {
-                content = content
-                    .push(widget::text::caption("CONNECTION ERROR"))
-                    .push(
-                        widget::selectable_text::selectable_text(error.as_str())
-                            .width(cosmic::iced::Length::Fill)
-                            ,
-                    );
+                content = content.push(error_notice("CONNECTION ERROR", error));
             }
 
             content = content
@@ -1140,7 +1173,7 @@ impl cosmic::Application for AppModel {
                             == crate::fritz::normalize_ain_for_selection(&device.ain)));
                     self.settings_status = Some(format!("Found {} compatible power-meter device(s)", self.devices.len()));
                 }
-                Err(error) => self.settings_status = Some(error),
+                Err(error) => self.settings_status = Some(format!("Connection failed: {error}")),
             },
             Message::ToggleDevice(ain, selected) => {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
@@ -1322,6 +1355,15 @@ mod history_tests {
         assert_eq!(graph_history_window(0), Duration::from_secs(300));
         assert_eq!(graph_history_window(2000), Duration::from_secs(86400));
         assert_eq!(max_history_samples(graph_history_window(60)), 61);
+    }
+
+    #[test]
+    fn error_statuses_are_distinguished_from_progress_messages() {
+        assert!(is_error_status("Connection failed: timeout"));
+        assert!(is_error_status("Weather unavailable: offline"));
+        assert!(is_error_status("Could not save settings: permission denied"));
+        assert!(!is_error_status("Connecting and loading devices…"));
+        assert!(!is_error_status("Found 2 compatible power-meter device(s)"));
     }
 
     #[test]
