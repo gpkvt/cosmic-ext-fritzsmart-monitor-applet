@@ -7,7 +7,9 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 ## Features
 
 - Displays current power in watts and temperature in the COSMIC panel, with a configurable text size.
-- Settings and popup device rows use distinct muted background tints. Each selected device has separate configurable-timespan wattage and temperature sparklines in the popup, plus a combined net-power card that follows the same visual design. Device chart panels use subtly rounded corners. Devices can be marked as inputs; their wattage is subtracted from the net total and each input gets its own graph in the total-power card.
+- Settings and popup device rows use distinct muted background tints. Each selected device has separate configurable-timespan wattage and temperature sparklines in the popup, plus a combined net-power card that follows the same visual design. Device chart panels use subtly rounded corners. Devices can be marked as Devices with “solar” in their name are automatically marked as inputs on the first device discovery; the default is applied only once so manual changes are preserved.
+
+inputs; their wattage is subtracted from the net total and each input gets its own graph in the total-power card.
 - The main menu has a sticky title bar with icon-only Refresh and Settings actions; both use accessible labels and tooltips. The menu content scrolls independently beneath the title bar. The main menu and settings are vertically scrollable when their content exceeds the popup height.
 - The first selected device supplies both power and temperature values shown in the panel. Selected devices can be reordered in Settings.
 - The main popup shows live on/off state and a native toggle switch for selected devices that expose FRITZ!Box switching support. The switch remains disabled while the command is verified against the FRITZ!Box and until refreshed power and temperature readings arrive; non-switchable devices have no power toggle.
