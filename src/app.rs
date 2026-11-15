@@ -397,7 +397,7 @@ fn settings_section_header<'a>(title: &'a str, expanded: bool, section: &'static
         .spacing(10)
         .align_y(cosmic::iced::Alignment::Center)
         .push(widget::text::body(title).width(cosmic::iced::Length::Fill))
-        .push(widget::text(if expanded { "⌄" } else { "›" }).size(18));
+        .push(widget::text(if expanded { "⌄" } else { "›" }).font(cosmic::font::default()).size(18));
 
     widget::mouse_area(
         widget::container(row)
@@ -426,7 +426,7 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
         .width(cosmic::iced::Length::Fill)
         .spacing(6)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::mouse_area(widget::text("⠿").size(20))
+        .push(widget::mouse_area(widget::text("⠿").font(cosmic::font::default()).size(20))
             .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string()))
             .on_release(Message::EndDeviceDrag))
         .push(widget::text::body("Total power (net)").width(cosmic::iced::Length::Fill))
@@ -479,7 +479,7 @@ fn icon_action_button<'a>(
     // icon themes may not provide every symbolic name on every COSMIC setup.
     // Fixed dimensions keep both actions visible in the 320px popup.
     widget::button::custom(
-        widget::container(widget::text(glyph).size(20))
+        widget::container(widget::text(glyph).font(cosmic::font::default()).size(20))
             .center_x(36)
             .center_y(36),
     )
@@ -870,7 +870,7 @@ impl cosmic::Application for AppModel {
                             .align_y(cosmic::iced::Alignment::Center);
                         if selected {
                             row = row.push(
-                                widget::mouse_area(widget::text("⠿").size(20))
+                                widget::mouse_area(widget::text("⠿").font(cosmic::font::default()).size(20))
                                     .on_press(Message::StartDeviceDrag(ain.clone()))
                                     .on_release(Message::EndDeviceDrag),
                             );
@@ -957,7 +957,7 @@ impl cosmic::Application for AppModel {
                             let gap_height = 18.0 * progress;
                             content = content.push(
                                 widget::container(
-                                    widget::text("Drop here").size(11)
+                                    widget::text("Drop here").font(cosmic::font::default()).size(11)
                                 )
                                 .height(cosmic::iced::Length::Fixed(gap_height))
                                 .width(cosmic::iced::Length::Fill)
