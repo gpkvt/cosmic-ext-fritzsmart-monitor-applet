@@ -347,6 +347,15 @@ fn load_ca_certificate(path: &str) -> Result<Option<reqwest::Certificate>, Strin
     }
     let certificate_pem = fs::read(path)
         .map_err(|error| format!("Cannot read FRITZ!Box CA certificate {path}: {error}"))?;
+    const PEM_BEGIN: &[u8] = b"-----BEGIN CERTIFICATE-----";
+    const PEM_END: &[u8] = b"-----END CERTIFICATE-----";
+    if !certificate_pem.windows(PEM_BEGIN.len()).any(|window| window == PEM_BEGIN)
+        || !certificate_pem.windows(PEM_END.len()).any(|window| window == PEM_END)
+    {
+        return Err(format!(
+            "Invalid FRITZ!Box CA certificate {path}: expected a PEM-encoded certificate"
+        ));
+    }
     let certificate = reqwest::Certificate::from_pem(&certificate_pem)
         .map_err(|error| format!("Invalid FRITZ!Box CA certificate {path}: {error}"))?;
     Ok(Some(certificate))
