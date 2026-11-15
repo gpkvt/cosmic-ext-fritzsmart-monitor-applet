@@ -344,7 +344,7 @@ impl cosmic::Application for AppModel {
             .spacing(6)
             .align_y(cosmic::iced::Alignment::Center)
             .push(
-                widget::container(widget::icon::from_name("weather-clear-symbolic").size(suggested.1))
+                widget::container(widget::icon::from_name("weather-clear-symbolic").size(suggested.1.saturating_sub(2)))
                     // Symbolic icons sit optically high beside text glyphs;
                     // a small top inset aligns their visual centers.
                     .padding([2, 0]),
