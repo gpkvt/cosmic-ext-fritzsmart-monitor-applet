@@ -96,6 +96,7 @@ pub enum Message {
     TemperatureAlertLowChanged(String, i16),
     WeatherUpdated(Result<WeatherData, String>),
     ToggleWeatherAttribution,
+    OpenCommonsPage(String),
     ToggleQuickOptions,
     QuickRefreshIntervalPreview(u32),
     CommitQuickRefreshInterval,
@@ -204,7 +205,7 @@ fn device_background_color(base: cosmic::iced::Color, index: usize) -> cosmic::i
         (0.52, 0.32, 0.76), // purple
     ];
     let (red, green, blue) = TINTS[index % TINTS.len()];
-    let strength = 0.28;
+    let strength = 0.16;
     cosmic::iced::Color::from_rgba(
         base.r * (1.0 - strength) + red * strength,
         base.g * (1.0 - strength) + green * strength,
@@ -460,7 +461,7 @@ fn graph_panel(content: cosmic::Element<'static, Message>) -> cosmic::Element<'s
                 cosmic::iced::widget::container::Style {
                     background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
                     border: cosmic::iced::Border {
-                        radius: 3.0.into(),
+                        radius: 8.0.into(),
                         ..Default::default()
                     },
                     ..Default::default()
@@ -474,7 +475,7 @@ fn graph_panel(content: cosmic::Element<'static, Message>) -> cosmic::Element<'s
         cosmic::iced::widget::container::Style {
             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
             border: cosmic::iced::Border {
-                radius: 3.0.into(),
+                radius: 8.0.into(),
                 ..Default::default()
             },
             ..Default::default()
@@ -541,7 +542,7 @@ fn total_power_overview(
 
     let content = widget::Column::new()
         .spacing(6)
-        .push(widget::text::body(format!("TOTAL POWER · LAST {timespan}")))
+        .push(widget::text::caption(format!("TOTAL POWER · LAST {timespan}")))
         .push(widget::text::title2(format!("{total_power} W")))
         .push(widget::text::caption(format!("Low  {low} W     High  {high} W")))
         .push(
@@ -554,7 +555,7 @@ fn total_power_overview(
         );
     Some(
         widget::container(content)
-            .padding(10)
+            .padding(14)
             .style(move |theme| {
                 let cosmic = theme.cosmic();
                 let base = cosmic::iced::Color::from(cosmic.background(false).base);
@@ -898,13 +899,14 @@ impl cosmic::Application for AppModel {
         // popup_container fixes the popup width at 320px. Keep the content
         // padded so controls and text do not touch the popup border.
         let mut content = widget::Column::new()
-            .spacing(12)
+            .spacing(14)
             .padding(16)
             .width(cosmic::iced::Length::Fill);
 
         if self.settings_open {
             content = content
-                .push(widget::text::title3("FRITZ!Power Monitor settings"))
+                .push(widget::text::title2("Settings"))
+                .push(widget::text::caption("Configure your panel, devices and data sources"))
                 .push(widget::divider::horizontal::default());
             content = content.push(settings_section_header("Panel", self.expanded_settings_sections.contains("panel"), "panel"));
             if self.expanded_settings_sections.contains("panel") {
@@ -1284,36 +1286,59 @@ impl cosmic::Application for AppModel {
                         }).into()
                 };
                 content = content
-                    .push(widget::text::caption("WEATHER"))
+                    .push(widget::text::title3("Weather"))
                     .push(weather_card);
                 if let Some(credit) = weather.image_attribution.as_ref() {
                     let label = if self.weather_attribution_expanded {
-                        "▾ Wikimedia Commons image credit"
+                        "Hide image attribution"
                     } else {
-                        "▸ Wikimedia Commons image credit"
+                        "Image attribution"
                     };
                     content = content.push(
                         widget::button::custom(
                             widget::Row::new()
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::icon::from_name("image-x-generic-symbolic").size(14))
-                                .push(widget::text::caption(label)),
+                                .push(widget::icon::from_name("image-x-generic-symbolic").size(16))
+                                .push(widget::text::body(label).width(cosmic::iced::Length::Fill))
+                                .push(widget::icon::from_name(
+                                    if self.weather_attribution_expanded { "go-down-symbolic" } else { "go-next-symbolic" }
+                                ).size(14)),
                         )
                         .on_press(Message::ToggleWeatherAttribution)
-                        .padding([8, 10])
+                        .padding([10, 12])
+                        .width(cosmic::iced::Length::Fill)
                         .class(cosmic::theme::Button::Standard),
                     );
                     if self.weather_attribution_expanded {
-                        content = content.push(widget::container(
-                            widget::text::caption(credit.clone())
-                        ).padding([0, 8]));
+                        let attribution = widget::Column::new()
+                            .spacing(5)
+                            .push(widget::text::body(credit.title.clone()))
+                            .push(widget::text::caption(format!("By {} · {}", credit.artist, credit.license)))
+                            .push(action_button(
+                                "web-browser-symbolic",
+                                "View on Wikimedia Commons",
+                                Message::OpenCommonsPage(credit.page_url.clone()),
+                            ));
+                        content = content.push(
+                            widget::container(attribution)
+                                .padding(12)
+                                .width(cosmic::iced::Length::Fill)
+                                .style(|theme| {
+                                    let cosmic = theme.cosmic();
+                                    cosmic::iced::widget::container::Style {
+                                        background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                                        border: cosmic::iced::Border { radius: 8.0.into(), ..Default::default() },
+                                        ..Default::default()
+                                    }
+                                })
+                        );
                     }
                 }
                 content = content.push(widget::divider::horizontal::default());
             } else if self.settings.weather_enabled {
                 content = content
-                    .push(widget::text::caption("WEATHER"))
+                    .push(widget::text::title3("Weather"))
                     .push(widget::text::body("Weather data is loading…"))
                     .push(widget::divider::horizontal::default());
             }
@@ -1332,7 +1357,8 @@ impl cosmic::Application for AppModel {
                             .push(widget::divider::horizontal::default());
                     }
                 }
-                content = content.push(widget::text::caption("SELECTED DEVICES"));
+                content = content.push(widget::text::title3("Devices"))
+                    .push(widget::text::caption("LIVE POWER AND TEMPERATURE"));
                 for (index, reading) in self.readings.iter().enumerate() {
                     let device_history = self.device_history.get(
                         &crate::fritz::normalize_ain_for_selection(&reading.ain),
@@ -1366,7 +1392,8 @@ impl cosmic::Application for AppModel {
                     });
                     let device_content = widget::Column::new()
                         .spacing(6)
-                        .push(widget::text::body(format!("{} · LAST {}", reading.name, format_graph_timespan(self.settings.graph_timespan_minutes))))
+                        .push(widget::text::body(reading.name.clone()))
+                        .push(widget::text::caption(format!("LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
                         .push(widget::Row::new().spacing(12).align_y(cosmic::iced::Alignment::Center)
                             .push(widget::text::title2(format!("{} W", reading.power_w)))
                             .push(widget::text::body(format!("{:.1} °C", reading.temperature_c))))
@@ -1398,7 +1425,7 @@ impl cosmic::Application for AppModel {
                                             cosmic::iced::widget::container::Style {
                                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
                                                 border: cosmic::iced::Border {
-                                                    radius: 3.0.into(),
+                                                    radius: 8.0.into(),
                                                     ..Default::default()
                                                 },
                                                 ..Default::default()
@@ -1412,7 +1439,7 @@ impl cosmic::Application for AppModel {
                                         cosmic::iced::widget::container::Style {
                                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
                                             border: cosmic::iced::Border {
-                                                radius: 3.0.into(),
+                                                radius: 8.0.into(),
                                                 ..Default::default()
                                             },
                                             ..Default::default()
@@ -1442,7 +1469,7 @@ impl cosmic::Application for AppModel {
                                             cosmic::iced::widget::container::Style {
                                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
                                                 border: cosmic::iced::Border {
-                                                    radius: 3.0.into(),
+                                                    radius: 8.0.into(),
                                                     ..Default::default()
                                                 },
                                                 ..Default::default()
@@ -1456,7 +1483,7 @@ impl cosmic::Application for AppModel {
                                         cosmic::iced::widget::container::Style {
                                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
                                             border: cosmic::iced::Border {
-                                                radius: 3.0.into(),
+                                                radius: 8.0.into(),
                                                 ..Default::default()
                                             },
                                             ..Default::default()
@@ -1601,7 +1628,7 @@ impl cosmic::Application for AppModel {
                 widget::Row::new()
                     .spacing(8)
                     .align_y(cosmic::iced::Alignment::Center)
-                    .push(widget::text::title3("FRITZ!Power Monitor"))
+                    .push(widget::text::title2("FRITZ!Power Monitor"))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                     .push(icon_action_button(
                         self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("↻"),
@@ -1610,7 +1637,7 @@ impl cosmic::Application for AppModel {
                     ))
                     .push(action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
             )
-            .padding([12, 16])
+            .padding([14, 16])
             .width(cosmic::iced::Length::Fill);
 
             widget::Column::new()
@@ -1792,6 +1819,11 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleWeatherAttribution => {
                 self.weather_attribution_expanded = !self.weather_attribution_expanded;
+            }
+            Message::OpenCommonsPage(url) => {
+                if url.starts_with("https://commons.wikimedia.org/wiki/File:") {
+                    let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+                }
             }
             Message::ToggleQuickOptions => {
                 self.quick_options_expanded = !self.quick_options_expanded;
