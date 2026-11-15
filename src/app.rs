@@ -846,7 +846,7 @@ fn move_selected_device_to_drop_target(ains: &mut Vec<String>, dragged_ain: &str
 }
 
 fn icon_action_button<'a>(
-    glyph: &'static str,
+    glyph: impl Into<String>,
     accessible_name: &'static str,
     message: Message,
 ) -> widget::Button<'a, Message> {
@@ -854,7 +854,7 @@ fn icon_action_button<'a>(
     // icon themes may not provide every symbolic name on every COSMIC setup.
     // Fixed dimensions keep both actions visible in the 320px popup.
     widget::button::custom(
-        widget::container(widget::text(glyph).size(20))
+        widget::container(widget::text(glyph.into()).size(20))
             .center_x(36)
             .center_y(36),
     )
@@ -1522,8 +1522,11 @@ impl cosmic::Application for AppModel {
                 } else if let Some(remaining) = self.next_refresh_at.map(|deadline|
                     deadline.saturating_duration_since(Instant::now())
                 ).filter(|remaining| remaining.as_secs() < 10) {
-                    widget::text::caption(format!("{}s", remaining.as_secs()))
-                        .into()
+                    icon_action_button(
+                        format!("{}s", remaining.as_secs()),
+                        "Next automatic refresh",
+                        Message::Refresh,
+                    )
                 } else {
                     icon_action_button("↻", "Reload now", Message::Refresh)
                 };
