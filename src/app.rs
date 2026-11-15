@@ -1516,7 +1516,7 @@ impl cosmic::Application for AppModel {
                     widget::Row::new()
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::title3("HTTP requests")
+                        .push(widget::text::title3(format!("HTTP requests ({})", requests.len()))
                             .width(cosmic::iced::Length::Fill))
                         .push(widget::text::caption(request_countdown))
                         .push(icon_action_button(
@@ -1531,33 +1531,38 @@ impl cosmic::Application for AppModel {
                     content = content.push(widget::text::caption("No HTTP responses recorded yet"));
                 } else {
                     for request in requests.iter().rev() {
+                        let status_color = if (200..300).contains(&request.status) {
+                            cosmic::iced::Color::from_rgb(0.55, 0.82, 0.58)
+                        } else if request.status >= 400 {
+                            cosmic::iced::Color::from_rgb(0.95, 0.48, 0.45)
+                        } else {
+                            cosmic::iced::Color::from_rgb(0.88, 0.76, 0.48)
+                        };
+                        let log_line = format!(
+                            "{}  {} {}  {} {}",
+                            request.timestamp,
+                            if request.https { "HTTPS" } else { "HTTP " },
+                            request.status,
+                            request.method,
+                            request.path,
+                        );
                         content = content.push(
-                            widget::Row::new()
-                                .spacing(8)
-                                .align_y(cosmic::iced::Alignment::Center)
-                                .push(
-                                    widget::Column::new()
-                                        .spacing(0)
-                                        .push(widget::text::caption(
-                                            request.timestamp
-                                                .split_once(' ')
-                                                .map(|(date, _)| date.to_string())
-                                                .unwrap_or_default(),
-                                        ))
-                                        .push(widget::text::caption(
-                                            request.timestamp
-                                                .split_once(' ')
-                                                .map(|(_, time)| time.to_string())
-                                                .unwrap_or_default(),
-                                        ))
-                                )
-                                .push(widget::text::body(format!("{} {}", request.method, request.path))
-                                    .width(cosmic::iced::Length::Fill))
-                                .push(widget::text::caption(format!(
-                                    "{} {}",
-                                    if request.https { "HTTPS" } else { "HTTP" },
-                                    request.status
-                                )))
+                            widget::container(
+                                widget::text(log_line)
+                                    .font(cosmic::iced::Font::MONOSPACE)
+                                    .size(12)
+                                    .color(status_color)
+                            )
+                            .width(cosmic::iced::Length::Fill)
+                            .padding([5, 8])
+                            .style(|_| cosmic::iced::widget::container::Style {
+                                background: Some(cosmic::iced::Color::from_rgb(0.10, 0.11, 0.12).into()),
+                                border: cosmic::iced::Border {
+                                    radius: 3.0.into(),
+                                    ..Default::default()
+                                },
+                                ..Default::default()
+                            })
                         );
                     }
                 }
