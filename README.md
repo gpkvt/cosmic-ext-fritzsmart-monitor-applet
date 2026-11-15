@@ -8,7 +8,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 
 - Displays current power in watts and temperature in the COSMIC panel, with a configurable text size.
 - Settings and popup device rows use distinct muted background tints. Each selected device has separate configurable-timespan wattage and temperature sparklines in the popup, plus combined power history.
-- The main menu and settings are vertically scrollable when their content exceeds the popup height.
+- The main menu has icon-only Refresh and Settings actions at the top; both use accessible labels and tooltips. The main menu and settings are vertically scrollable when their content exceeds the popup height.
 - The first selected device supplies both power and temperature values shown in the panel. Selected devices can be reordered in Settings.
 - In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy; every setting is saved immediately when changed.
 - Optional per-device temperature alerts for readings above the upper limit or below the lower limit. Defaults are 40 °C and −10 °C; the upper limit is configurable from 0–40 °C and the lower limit from −10–0 °C. Desktop notifications fire when a device crosses out of the safe range and re-arm when it returns.
@@ -30,7 +30,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 
 ## Build and install
 
-Build and install the applet into your user account. `make install` first runs `git pull --ff-only` to update the checked-out branch without creating a merge commit, then builds and installs it. Run it from a Git checkout with a configured upstream. Development builds display the package version with a trailing `+` (for example, `0.1.8-dev+`):
+Build and install the applet into your user account. `make install` first runs `git pull --ff-only` to update the checked-out branch without creating a merge commit, then builds and installs it. Run it from a Git checkout with a configured upstream. Development builds display the package version with a trailing `+` (for example, `0.1.9-dev+`):
 
 ```sh
 make install
