@@ -50,6 +50,7 @@ pub struct FritzSettings {
     pub refresh_interval_seconds: u32,
     pub temperature_alerts: HashMap<String, TemperatureAlertThresholds>,
     pub input_ains: HashSet<String>,
+    pub input_defaults_initialized: bool,
     pub weather_enabled: bool,
     pub openweathermap_api_key: String,
     pub weather_location: String,
@@ -71,6 +72,7 @@ impl Default for FritzSettings {
             refresh_interval_seconds: 60,
             temperature_alerts: HashMap::new(),
             input_ains: HashSet::new(),
+            input_defaults_initialized: false,
             weather_enabled: false,
             openweathermap_api_key: String::new(),
             weather_location: String::new(),
@@ -149,6 +151,7 @@ impl FritzSettings {
             refresh_interval_seconds: parse_refresh_interval_seconds(&get("REFRESH_INTERVAL_SECONDS")),
             temperature_alerts: parse_temperature_alerts(&get("TEMPERATURE_ALERTS")),
             input_ains: parse_input_ains(&get("INPUT_AINS")),
+            input_defaults_initialized: get("INPUT_DEFAULTS_INITIALIZED").eq_ignore_ascii_case("true"),
             weather_enabled: get("WEATHER_ENABLED").eq_ignore_ascii_case("true"),
             openweathermap_api_key: get("OPENWEATHERMAP_API_KEY"),
             weather_location: get("WEATHER_LOCATION"),
@@ -185,13 +188,14 @@ impl FritzSettings {
         input_ains.sort_unstable();
         let input_ains = input_ains.join(",");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\n",
             self.url, self.username, self.password, first_ain, selected_ains,
             if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path,
             self.panel_text_size.clamp(10, 24), self.graph_timespan_minutes.clamp(5, 1440),
             self.refresh_interval_seconds.clamp(30, 3600), temperature_alerts,
             if self.weather_enabled { "true" } else { "false" }, self.openweathermap_api_key,
-            self.weather_location, self.weather_refresh_interval_minutes.clamp(5, 60), input_ains
+            self.weather_location, self.weather_refresh_interval_minutes.clamp(5, 60), input_ains,
+            if self.input_defaults_initialized { "true" } else { "false" }
         );
         #[cfg(unix)]
         let mut file = {
