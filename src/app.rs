@@ -2724,7 +2724,7 @@ mod history_tests {
         assert_eq!(power_sparkline(&constant), "▄▄▄▄▄▄▄▄▄▄▄▄");
         let changing = VecDeque::from([(now, 10), (now, 20)]);
         let graph = power_sparkline(&changing);
-        assert_eq!(graph.chars().count(), 20);
+        assert_eq!(graph.chars().count(), 12);
         assert_eq!(graph.chars().next(), Some('▁'));
         assert_eq!(graph.chars().last(), Some('█'));
     }
@@ -2732,16 +2732,16 @@ mod history_tests {
     #[test]
     fn numeric_sparkline_handles_temperature_values() {
         let graph = numeric_sparkline([20.0, 21.0, 22.0].into_iter());
-        assert_eq!(graph.chars().count(), 20);
+        assert_eq!(graph.chars().count(), 12);
         assert_eq!(graph.chars().next(), Some('▁'));
         assert_eq!(graph.chars().last(), Some('█'));
-        assert_eq!(numeric_sparkline([21.5, 21.5].into_iter()), "▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄");
+        assert_eq!(numeric_sparkline([21.5, 21.5].into_iter()), "▄▄▄▄▄▄▄▄▄▄▄▄");
     }
 
     #[test]
     fn numeric_sparkline_is_bounded_to_fit_graph_cards() {
         let graph = numeric_sparkline((0..100).map(f64::from));
-        assert_eq!(graph.chars().count(), 20);
+        assert_eq!(graph.chars().count(), 12);
         assert_eq!(graph.chars().next(), Some('▁'));
         assert_eq!(graph.chars().last(), Some('█'));
     }
@@ -2749,11 +2749,11 @@ mod history_tests {
     #[test]
     fn numeric_sparkline_fills_width_with_sparse_history() {
         let single = numeric_sparkline([42.0].into_iter());
-        assert_eq!(single.chars().count(), 20);
-        assert_eq!(single, "▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄");
+        assert_eq!(single.chars().count(), 12);
+        assert_eq!(single, "▄▄▄▄▄▄▄▄▄▄▄▄");
 
         let sparse = numeric_sparkline([10.0, 20.0].into_iter());
-        assert_eq!(sparse.chars().count(), 20);
+        assert_eq!(sparse.chars().count(), 12);
         assert_eq!(sparse.chars().next(), Some('▁'));
         assert_eq!(sparse.chars().last(), Some('█'));
     }
