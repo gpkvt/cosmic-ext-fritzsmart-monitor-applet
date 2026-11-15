@@ -1119,6 +1119,40 @@ fn sortable_menu_card<'a>(
         .into()
 }
 
+fn special_menu_sort_row(
+    id: &'static str,
+    label: &'static str,
+    position: usize,
+) -> cosmic::Element<'static, Message> {
+    let row = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
+        .spacing(6)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(
+            widget::mouse_area(widget::text("⠿").size(20))
+                .on_press(Message::StartDeviceDrag(id.to_string()))
+                .on_release(Message::EndDeviceDrag),
+        )
+        .push(widget::text::body(label).width(cosmic::iced::Length::Fill))
+        .push(widget::text::caption(format!("#{position}")));
+    widget::mouse_area(
+        widget::container(row)
+            .width(cosmic::iced::Length::Fill)
+            .padding(8)
+            .style(|theme| {
+                let cosmic = theme.cosmic();
+                let base = cosmic::iced::Color::from(cosmic.background(false).base);
+                cosmic::iced::widget::container::Style {
+                    background: Some(device_background_color(base, 0).into()),
+                    ..Default::default()
+                }
+            }),
+    )
+    .on_enter(Message::DragOverDevice(id.to_string()))
+    .on_release(Message::EndDeviceDrag)
+    .into()
+}
+
 fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
     let row = widget::Row::new()
         .width(cosmic::iced::Length::Fill)
@@ -1971,6 +2005,36 @@ impl cosmic::Application for AppModel {
                                 .iter()
                                 .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID)
                                 .unwrap_or(usize::MAX);
+                            let summary_position = self
+                                .settings
+                                .menu_order
+                                .iter()
+                                .position(|entry| entry == SUMMARY_DRAG_ID)
+                                .unwrap_or(usize::MAX);
+                            let weather_position = self
+                                .settings
+                                .menu_order
+                                .iter()
+                                .position(|entry| entry == WEATHER_DRAG_ID)
+                                .unwrap_or(usize::MAX);
+                            if weather_position <= device_position
+                                && inserted_specials.insert(WEATHER_DRAG_ID)
+                            {
+                                content = content.push(special_menu_sort_row(
+                                    WEATHER_DRAG_ID,
+                                    "Weather",
+                                    weather_position + 1,
+                                ));
+                            }
+                            if summary_position <= device_position
+                                && inserted_specials.insert(SUMMARY_DRAG_ID)
+                            {
+                                content = content.push(special_menu_sort_row(
+                                    SUMMARY_DRAG_ID,
+                                    "Live power summary",
+                                    summary_position + 1,
+                                ));
+                            }
                             if total_position <= device_position
                                 && inserted_specials.insert(TOTAL_POWER_DRAG_ID)
                             {
@@ -2142,7 +2206,33 @@ impl cosmic::Application for AppModel {
                             .unwrap_or(self.selected_ains.len() + 1);
                         content = content.push(power_difference_sort_row(position + 1));
                     }
-                    content = content.push(widget::text::caption("Drag the ⠿ handles to reorder devices, Total power output with Total power input grouped alongside it, and Power difference. The order is saved automatically."));
+                    if inserted_specials.insert(SUMMARY_DRAG_ID) {
+                        let position = self
+                            .settings
+                            .menu_order
+                            .iter()
+                            .position(|entry| entry == SUMMARY_DRAG_ID)
+                            .unwrap_or(self.selected_ains.len() + 2);
+                        content = content.push(special_menu_sort_row(
+                            SUMMARY_DRAG_ID,
+                            "Live power summary",
+                            position + 1,
+                        ));
+                    }
+                    if inserted_specials.insert(WEATHER_DRAG_ID) {
+                        let position = self
+                            .settings
+                            .menu_order
+                            .iter()
+                            .position(|entry| entry == WEATHER_DRAG_ID)
+                            .unwrap_or(self.selected_ains.len() + 3);
+                        content = content.push(special_menu_sort_row(
+                            WEATHER_DRAG_ID,
+                            "Weather",
+                            position + 1,
+                        ));
+                    }
+                    content = content.push(widget::text::caption("Drag the ⠿ handles to reorder the weather section, live power summary, power cards and selected devices. The order is saved automatically."));
                 }
             }
 
