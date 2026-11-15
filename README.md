@@ -71,7 +71,7 @@ cargo build --release
 ```
 
 GitHub Actions formats the Rust sources, runs the test suite, checks compilation, builds the optimized binary and validates installation on pull requests and pushes to `main`. Pushing
-a version tag such as `v0.2.4` builds Linux x86_64 release packages and
+a version tag such as `v0.2.5` builds Linux x86_64 release packages and
 publishes them on the GitHub Releases page:
 
 - A Debian `.deb` package with runtime dependencies detected from the built
