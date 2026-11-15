@@ -78,7 +78,8 @@ Open the applet popup and choose **Settings**. Adjust **Panel text size** (10–
 username and password, then choose **Load devices**. The applet discovers
 devices that expose both power and temperature measurements. Check every
 device you want to monitor, then drag the grip (⠿) beside a selected device
-to change its position. Changes are saved automatically when you release it. For each device,
+to change its position. An animated drop preview marks the target; the order is
+changed and saved only when you release the drag. For each device,
 enable **Temperature alerts** to receive notifications when its temperature
 rises above the upper limit or falls below the lower limit. The defaults are
 40 °C and −10 °C; both limits can be adjusted within their safe ranges in
