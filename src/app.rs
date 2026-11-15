@@ -3392,11 +3392,11 @@ mod history_tests {
     fn live_drag_reorders_devices_as_targets_are_entered() {
         let mut order = vec!["a".into(), "b".into(), "c".into()];
 
-        move_sortable_entry(&mut order, "a", "c");
+        move_menu_entry(&mut order, "a", "c");
 
         assert_eq!(order, vec!["b".to_string(), "c".to_string(), "a".to_string()]);
 
-        move_sortable_entry(&mut order, "a", "b");
+        move_menu_entry(&mut order, "a", "b");
 
         assert_eq!(order, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
     }
@@ -3410,7 +3410,7 @@ mod history_tests {
             POWER_DIFFERENCE_DRAG_ID.into(),
         ];
 
-        move_sortable_entry(&mut order, POWER_DIFFERENCE_DRAG_ID, "a");
+        move_menu_entry(&mut order, POWER_DIFFERENCE_DRAG_ID, "a");
         assert_eq!(order, vec![
             TOTAL_POWER_DRAG_ID.to_string(),
             POWER_DIFFERENCE_DRAG_ID.to_string(),
@@ -3418,7 +3418,7 @@ mod history_tests {
             "b".to_string(),
         ]);
 
-        move_sortable_entry(&mut order, "b", TOTAL_POWER_DRAG_ID);
+        move_menu_entry(&mut order, "b", TOTAL_POWER_DRAG_ID);
         assert_eq!(order, vec![
             "b".to_string(),
             TOTAL_POWER_DRAG_ID.to_string(),
