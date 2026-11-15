@@ -7,6 +7,8 @@ DATADIR ?= $(PREFIX)/share
 DESKTOP_FILE := $(DATADIR)/applications/$(APP_ID).desktop
 ICON_FILE := $(DATADIR)/icons/hicolor/scalable/apps/$(APP_ID).svg
 
+UPDATE ?= 1
+
 .PHONY: build update install uninstall
 
 build:
@@ -17,7 +19,7 @@ update:
 
 install:
 	clear || true
-	$(MAKE) update
+	@if [ "$(UPDATE)" = "1" ]; then $(MAKE) update; fi
 	$(MAKE) build
 	install -Dm0755 target/release/$(APP_NAME) "$(BINDIR)/$(APP_NAME)"
 	install -d "$(DATADIR)/applications"
