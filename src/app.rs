@@ -955,7 +955,7 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
         .push(widget::mouse_area(widget::text("⠿").size(20))
             .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string()))
             .on_release(Message::EndDeviceDrag))
-        .push(widget::text::body("Total power output (net)").width(cosmic::iced::Length::Fill))
+        .push(widget::text::body("Total power output").width(cosmic::iced::Length::Fill))
         .push(widget::text::caption(format!("#{position}")));
     widget::mouse_area(
         widget::container(row)
@@ -1662,7 +1662,7 @@ impl cosmic::Application for AppModel {
                             .push(row)
                             .push(widget::Row::new()
                                 .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::text::caption("Input (subtract from total)"))
+                                .push(widget::text::caption("Input device (separate total)"))
                                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                                 .push(widget::toggler(is_input)
                                     .on_toggle({
@@ -1742,7 +1742,7 @@ impl cosmic::Application for AppModel {
                             .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID).unwrap_or(self.selected_ains.len() + 1);
                         content = content.push(power_difference_sort_row(position + 1));
                     }
-                    content = content.push(widget::text::caption("Drag the ⠿ handles to reorder devices, Total power output (including input), and Power difference. The order is saved automatically."));
+                    content = content.push(widget::text::caption("Drag the ⠿ handles to reorder devices, Total power output with Total power input grouped alongside it, and Power difference. The order is saved automatically."));
                 }
             }
 
@@ -3394,11 +3394,11 @@ mod history_tests {
 
         move_sortable_entry(&mut order, "a", "c");
 
-        assert_eq!(order, vec!["b", "c", "a"]);
+        assert_eq!(order, vec!["b".to_string(), "c".to_string(), "a".to_string()]);
 
         move_sortable_entry(&mut order, "a", "b");
 
-        assert_eq!(order, vec!["a", "b", "c"]);
+        assert_eq!(order, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
     }
 
     #[test]
@@ -3412,18 +3412,18 @@ mod history_tests {
 
         move_sortable_entry(&mut order, POWER_DIFFERENCE_DRAG_ID, "a");
         assert_eq!(order, vec![
-            TOTAL_POWER_DRAG_ID,
-            POWER_DIFFERENCE_DRAG_ID,
-            "a",
-            "b",
+            TOTAL_POWER_DRAG_ID.to_string(),
+            POWER_DIFFERENCE_DRAG_ID.to_string(),
+            "a".to_string(),
+            "b".to_string(),
         ]);
 
         move_sortable_entry(&mut order, "b", TOTAL_POWER_DRAG_ID);
         assert_eq!(order, vec![
-            "b",
-            TOTAL_POWER_DRAG_ID,
-            POWER_DIFFERENCE_DRAG_ID,
-            "a",
+            "b".to_string(),
+            TOTAL_POWER_DRAG_ID.to_string(),
+            POWER_DIFFERENCE_DRAG_ID.to_string(),
+            "a".to_string(),
         ]);
     }
 
