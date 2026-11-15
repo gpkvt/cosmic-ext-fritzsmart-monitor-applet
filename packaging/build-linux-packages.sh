@@ -33,15 +33,13 @@ test -s "$ICON"
 test -s "$FLATPAK_MANIFEST"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
-CARGO_SOURCES="$WORKSPACE/cargo-sources.json"
-FLATPAK_SOURCE="$WORKSPACE/flatpak-source"
-if [[ -e "$CARGO_SOURCES" || -e "$FLATPAK_SOURCE" ]]; then
-    echo "Refusing to overwrite existing Flatpak source inputs" >&2
-    exit 1
-fi
 TEMP_DIR="$(mktemp -d)"
+FLATPAK_CONTEXT="$TEMP_DIR/flatpak-context"
+CARGO_SOURCES="$FLATPAK_CONTEXT/cargo-sources.json"
+FLATPAK_SOURCE="$FLATPAK_CONTEXT/flatpak-source"
+mkdir -p "$FLATPAK_CONTEXT"
 cleanup() {
-    rm -rf "$TEMP_DIR" "$CARGO_SOURCES" "$FLATPAK_SOURCE"
+    rm -rf "$TEMP_DIR"
 }
 trap cleanup EXIT
 
@@ -129,6 +127,7 @@ install -m0755 "$APPIMAGE_SOURCE" "$APPIMAGE_FILE"
 file "$APPIMAGE_FILE"
 
 # Generate offline Cargo sources and build a self-contained Flatpak bundle.
+cp "$FLATPAK_MANIFEST" "$FLATPAK_CONTEXT/$APP_ID.yml"
 python3 -m venv "$TEMP_DIR/venv"
 "$TEMP_DIR/venv/bin/pip" install --disable-pip-version-check tomlkit aiohttp
 git clone --depth 1 https://github.com/flatpak/flatpak-builder-tools.git \
@@ -148,7 +147,7 @@ flatpak install --user --noninteractive --or-update flathub \
     "org.freedesktop.Sdk.Extension.rust-stable//$FLATPAK_RUNTIME_VERSION"
 FLATPAK_REPO="$TEMP_DIR/flatpak-repo"
 flatpak-builder --user --force-clean --default-branch="$FLATPAK_BRANCH" \
-    --repo="$FLATPAK_REPO" "$TEMP_DIR/build-flatpak" "$FLATPAK_MANIFEST"
+    --repo="$FLATPAK_REPO" "$TEMP_DIR/build-flatpak" "$FLATPAK_CONTEXT/$APP_ID.yml"
 FLATPAK_FILE="$OUTPUT_DIR/fritz-power-monitor-$APP_VERSION.flatpak"
 flatpak build-bundle "$FLATPAK_REPO" "$FLATPAK_FILE" "$APP_ID" "$FLATPAK_BRANCH" \
     --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
