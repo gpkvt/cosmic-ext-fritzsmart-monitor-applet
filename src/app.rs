@@ -289,7 +289,7 @@ fn icon_action_button<'a>(
 }
 
 
-fn error_notice<'a>(title: &'static str, message: &'a str) -> widget::Container<'a, Message> {
+fn error_notice<'a>(title: &'static str, message: &'a str) -> cosmic::Element<'a, Message> {
     widget::container(
         widget::Column::new()
             .spacing(5)
@@ -308,6 +308,7 @@ fn error_notice<'a>(title: &'static str, message: &'a str) -> widget::Container<
         text_color: Some(cosmic::iced::Color::WHITE),
         ..Default::default()
     })
+    .into()
 }
 
 fn is_error_status(status: &str) -> bool {
@@ -742,23 +743,22 @@ impl cosmic::Application for AppModel {
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                         .push(widget::text::body(format!("Sunrise  {sunrise}"))))
                     .push(widget::text::body(format!("Sunset  {sunset}")));
-                let weather_card = if let Some(image_bytes) = &weather.background_image {
-                    let background = widget::image::Image::new(
+                let weather_card: cosmic::Element<'_, Message> = if let Some(image_bytes) = &weather.background_image {
+                    let photo = widget::image::Image::new(
                         widget::image::Handle::from_bytes(image_bytes.clone()),
                     )
                     .width(cosmic::iced::Length::Fill)
-                    .height(cosmic::iced::Length::Fixed(210.0))
+                    .height(cosmic::iced::Length::Fixed(104.0))
                     .content_fit(cosmic::iced::ContentFit::Cover);
-                    let foreground = widget::container(weather_details)
+                    let details = widget::container(weather_details)
                         .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fill)
                         .padding(10)
                         .style(|_| cosmic::iced::widget::container::Style {
-                            background: Some(cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.78).into()),
+                            background: Some(cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.94).into()),
                             text_color: Some(cosmic::iced::Color::WHITE),
                             ..Default::default()
                         });
-                    widget::Stack::new().push(background).push(foreground)
+                    widget::Column::new().push(photo).push(details).into()
                 } else {
                     widget::container(weather_details).padding(10)
                         .style(|theme| {
@@ -767,7 +767,7 @@ impl cosmic::Application for AppModel {
                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
                                 ..Default::default()
                             }
-                        })
+                        }).into()
                 };
                 content = content
                     .push(widget::text::caption("WEATHER"))
