@@ -30,6 +30,7 @@ jobs:
           sudo apt-get install --yes \
             appstream \
             desktop-file-utils \
+            flatpak \
             flatpak-builder \
             python3-venv \
             libdbus-1-dev \
@@ -52,65 +53,27 @@ jobs:
           appstreamcli validate --no-net data/com.gpkvt.FritzPowerMonitor.metainfo.xml
       - name: Check Rust formatting
         run: cargo fmt --all -- --check
-      - name: Prepare Flatpak Cargo sources
-        run: |
-          python3 -m venv .venv
-          .venv/bin/pip install --disable-pip-version-check tomlkit aiohttp
-          git clone --depth 1 https://github.com/flatpak/flatpak-builder-tools.git "$RUNNER_TEMP/flatpak-builder-tools"
-          .venv/bin/python "$RUNNER_TEMP/flatpak-builder-tools/cargo/flatpak-cargo-generator.py" Cargo.lock -o cargo-sources.json
-          mkdir -p flatpak-source
-          cp Cargo.toml Cargo.lock build.rs flatpak-source/
-          cp -r src data flatpak-source/
-      - name: Upload reproducible Flatpak source inputs
-        uses: actions/upload-artifact@v4
-        with:
-          name: flatpak-source-inputs
-          path: |
-            Cargo.lock
-            cargo-sources.json
-          if-no-files-found: error
-          retention-days: 14
       - name: Validate Flatpak manifest
         run: flatpak-builder --show-manifest com.gpkvt.FritzPowerMonitor.yml > /dev/null
-      - name: Install Flatpak build runtime
-        run: |
-          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user --noninteractive flathub \
-            org.freedesktop.Platform//26.08 \
-            org.freedesktop.Sdk//26.08 \
-            org.freedesktop.Sdk.Extension.rust-stable//26.08
-      - name: Build Flatpak application
-        run: |
-          flatpak-builder --user --force-clean --default-branch=stable \
-            --repo=flatpak-repo build-flatpak com.gpkvt.FritzPowerMonitor.yml
-      - name: Build and smoke-test distributable Flatpak bundle
-        run: |
-          set -euo pipefail
-          bundle="$RUNNER_TEMP/fritz-power-monitor-ci.flatpak"
-          flatpak build-bundle flatpak-repo "$bundle" \
-            com.gpkvt.FritzPowerMonitor stable \
-            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user --noninteractive --bundle "$bundle"
-          flatpak uninstall --user --noninteractive com.gpkvt.FritzPowerMonitor
       - name: Run tests
         run: cargo test --locked
       - name: Check build
         run: cargo check --locked
-      - name: Build optimized binary
-        run: cargo build --release --locked
-      - name: Build Debian and AppImage packages
+      - name: Build Debian, AppImage and Flatpak packages
         run: |
           APP_VERSION=0.0.0 OUTPUT_DIR="$RUNNER_TEMP/packages" bash packaging/build-linux-packages.sh
           test -s "$RUNNER_TEMP/packages/fritz-power-monitor_0.0.0_amd64.deb"
           test -x "$RUNNER_TEMP/packages/fritz-power-monitor-0.0.0-x86_64.AppImage"
+          test -s "$RUNNER_TEMP/packages/fritz-power-monitor-0.0.0.flatpak"
           dpkg-deb --info "$RUNNER_TEMP/packages/fritz-power-monitor_0.0.0_amd64.deb"
-      - name: Upload Debian and AppImage packages
+      - name: Upload Linux packages
         uses: actions/upload-artifact@v4
         with:
           name: linux-packages
           path: |
             ${{ runner.temp }}/packages/*.deb
             ${{ runner.temp }}/packages/*.AppImage
+            ${{ runner.temp }}/packages/*.flatpak
             ${{ runner.temp }}/packages/SHA256SUMS
           if-no-files-found: error
           retention-days: 14

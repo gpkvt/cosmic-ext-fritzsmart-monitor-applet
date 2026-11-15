@@ -49,40 +49,11 @@ jobs:
         run: |
           desktop-file-validate data/com.gpkvt.FritzPowerMonitor.desktop
           appstreamcli validate --no-net data/com.gpkvt.FritzPowerMonitor.metainfo.xml
-      - name: Build optimized binary
-        run: APP_RELEASE_VERSION="${GITHUB_REF_NAME#v}" cargo build --release --locked
-      - name: Build Debian and AppImage packages
-        run: APP_VERSION="${GITHUB_REF_NAME#v}" OUTPUT_DIR=dist bash packaging/build-linux-packages.sh
-      - name: Prepare Flatpak Cargo sources
+      - name: Build Debian, AppImage and Flatpak packages
         run: |
-          python3 -m venv .venv
-          .venv/bin/pip install --disable-pip-version-check tomlkit aiohttp
-          git clone --depth 1 https://github.com/flatpak/flatpak-builder-tools.git "$RUNNER_TEMP/flatpak-builder-tools"
-          .venv/bin/python "$RUNNER_TEMP/flatpak-builder-tools/cargo/flatpak-cargo-generator.py" Cargo.lock -o cargo-sources.json
-          mkdir -p flatpak-source
-          cp Cargo.toml Cargo.lock build.rs flatpak-source/
-          cp -r src data flatpak-source/
-      - name: Install Flatpak build runtime
-        run: |
-          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user --noninteractive flathub \
-            org.freedesktop.Platform//26.08 \
-            org.freedesktop.Sdk//26.08 \
-            org.freedesktop.Sdk.Extension.rust-stable//26.08
-      - name: Build Flatpak bundle
-        run: |
-          set -euo pipefail
-          flatpak-builder --user --force-clean --default-branch=stable \
-            --repo=flatpak-repo build-flatpak com.gpkvt.FritzPowerMonitor.yml
-          mkdir -p dist
-          flatpak build-bundle flatpak-repo \
-            "dist/fritz-power-monitor-${GITHUB_REF_NAME}.flatpak" \
-            com.gpkvt.FritzPowerMonitor stable \
-            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user --noninteractive --bundle \
-            "dist/fritz-power-monitor-${GITHUB_REF_NAME}.flatpak"
-          flatpak uninstall --user --noninteractive com.gpkvt.FritzPowerMonitor
-          sha256sum dist/*.flatpak > "dist/fritz-power-monitor-${GITHUB_REF_NAME}.flatpak.sha256"
+          APP_VERSION="${GITHUB_REF_NAME#v}" \
+          APP_RELEASE_VERSION="${GITHUB_REF_NAME#v}" \
+          OUTPUT_DIR=dist bash packaging/build-linux-packages.sh
       - name: Assemble release archive
         shell: bash
         run: |
