@@ -27,6 +27,7 @@ pub struct AppModel {
     popup: Option<Id>,
     readings: Vec<FritzReading>,
     error: Option<String>,
+    weather_error: Option<String>,
     updated: Option<String>,
     settings_open: bool,
     active_settings_section: Option<&'static str>,
@@ -1107,6 +1108,15 @@ impl cosmic::Application for AppModel {
         } else {
             content
         };
+        let content = if self.weather_error.is_some() {
+            content
+                .push(widget::icon::from_name("weather-severe-alert-symbolic")
+                    .size(self.settings.panel_text_size.into()))
+                .push(self.core.applet.text("Weather unavailable")
+                    .size(f32::from(self.settings.panel_text_size)))
+        } else {
+            content
+        };
 
         // Use a content-sized applet button: button_from_element() deliberately
         // fixes the width to an icon, while text_button() only accepts Text.
@@ -1463,6 +1473,9 @@ impl cosmic::Application for AppModel {
     content = content
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::caption("DIAGNOSTICS"));
+                if let Some(error) = &self.weather_error {
+                    content = content.push(error_notice("WEATHER UNAVAILABLE", error));
+                }
                 if let Some(status) = &self.settings_status {
                     if is_error_status(status) {
                         let title = if status.starts_with("Weather unavailable:") {
@@ -2213,8 +2226,13 @@ impl cosmic::Application for AppModel {
             }
             Message::WeatherUpdated(result) => {
                 match result {
-                    Ok(weather) => { self.weather = Some(weather); }
-                    Err(error) => { self.settings_status = Some(format!("Weather unavailable: {error}")); }
+                    Ok(weather) => {
+                        self.weather = Some(weather);
+                        self.weather_error = None;
+                    }
+                    Err(error) => {
+                        self.weather_error = Some(error);
+                    }
                 }
                 if self.settings.weather_enabled {
                     self.next_weather_refresh_at = Some(Instant::now() + Duration::from_secs(
@@ -2224,16 +2242,21 @@ impl cosmic::Application for AppModel {
             Message::WeatherEnabledChanged(enabled) => {
                 self.settings.weather_enabled = enabled;
                 self.next_weather_refresh_at = None;
-                if !enabled { self.weather = None; }
+                if !enabled {
+                    self.weather = None;
+                    self.weather_error = None;
+                }
                 self.persist_settings();
             }
             Message::OpenWeatherMapApiKeyChanged(value) => {
                 self.settings.openweathermap_api_key = value;
+                self.weather_error = None;
                 self.next_weather_refresh_at = None;
                 self.persist_settings();
             }
             Message::WeatherLocationChanged(value) => {
                 self.settings.weather_location = value;
+                self.weather_error = None;
                 self.next_weather_refresh_at = None;
                 self.persist_settings();
             }
