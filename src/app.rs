@@ -59,7 +59,6 @@ pub struct AppModel {
     weather_forecast_error: Option<String>,
     weather_forecast_loading: bool,
     weather_forecast_expanded: bool,
-    weather_attribution_expanded: bool,
     quick_options_expanded: bool,
     collapsed_devices: HashSet<String>,
     quick_refresh_interval: u32,
@@ -111,8 +110,6 @@ pub enum Message {
     ToggleWeatherForecast,
     SelectWeatherForecast(u8),
     WeatherForecastUpdated(u8, Result<WeatherForecast, String>),
-    ToggleWeatherAttribution,
-    OpenCommonsPage(String),
     ToggleQuickOptions,
     ToggleDeviceDetails(String),
     QuickRefreshIntervalPreview(u32),
@@ -1925,34 +1922,11 @@ impl cosmic::Application for AppModel {
                             text_color: Some(cosmic::iced::Color::WHITE),
                             ..Default::default()
                         });
-                    let image_credit_button = widget::Column::new()
-                        .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fill)
-                        .push(widget::Space::new().height(cosmic::iced::Length::Fill))
-                        .push(
-                            widget::Row::new()
-                                .width(cosmic::iced::Length::Fill)
-                                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                .push(
-                                    widget::button::custom(
-                                        widget::icon::from_name("image-x-generic-symbolic").size(16),
-                                    )
-                                    .on_press(Message::OpenCommonsPage(
-                                        weather.image_attribution.as_ref()
-                                            .map(|credit| credit.page_url.clone())
-                                            .unwrap_or_default(),
-                                    ))
-                                    .padding(7)
-                                    .class(cosmic::theme::Button::Standard),
-                                ),
-                        )
-                        .padding(8);
                     cosmic::iced::widget::Stack::new()
                         .width(cosmic::iced::Length::Fill)
                         .height(cosmic::iced::Length::Fixed(210.0))
                         .push(photo)
                         .push(details)
-                        .push(image_credit_button)
                         .into()
                 } else {
                     widget::container(weather_details).padding(10)
@@ -2073,49 +2047,6 @@ impl cosmic::Application for AppModel {
                 }
                 if let Some(error) = &self.weather_error {
                     content = content.push(error_notice("WEATHER UNAVAILABLE", error));
-                }
-                if let Some(credit) = weather.image_attribution.as_ref() {
-                    let label = if self.weather_attribution_expanded {
-                        "Hide image attribution"
-                    } else {
-                        "Image attribution"
-                    };
-                    content = content.push(
-                        widget::button::custom(
-                            widget::Row::new()
-                                .spacing(8)
-                                .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::icon::from_name("image-x-generic-symbolic").size(16))
-                                .push(widget::text::body(label).width(cosmic::iced::Length::Fill))
-                                .push(widget::icon::from_name(
-                                    if self.weather_attribution_expanded { "go-down-symbolic" } else { "go-next-symbolic" }
-                                ).size(14)),
-                        )
-                        .on_press(Message::ToggleWeatherAttribution)
-                        .padding([10, 12])
-                        .width(cosmic::iced::Length::Fill)
-                        .class(cosmic::theme::Button::Standard),
-                    );
-                    if self.weather_attribution_expanded {
-                        let attribution = widget::Column::new()
-                            .spacing(5)
-                            .push(widget::text::body(credit.title.clone()))
-                            .push(widget::text::caption(format!("By {} · {}", credit.artist, credit.license)))
-                            ;
-                        content = content.push(
-                            widget::container(attribution)
-                                .padding(12)
-                                .width(cosmic::iced::Length::Fill)
-                                .style(|theme| {
-                                    let cosmic = theme.cosmic();
-                                    cosmic::iced::widget::container::Style {
-                                        background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
-                                        border: cosmic::iced::Border { radius: 8.0.into(), ..Default::default() },
-                                        ..Default::default()
-                                    }
-                                })
-                        );
-                    }
                 }
                 content = content.push(widget::divider::horizontal::default());
             } else if self.settings.weather_enabled {
@@ -2707,14 +2638,6 @@ impl cosmic::Application for AppModel {
                     Err(error) => {
                         self.weather_forecast_error = Some(error);
                     }
-                }
-            }
-            Message::ToggleWeatherAttribution => {
-                self.weather_attribution_expanded = !self.weather_attribution_expanded;
-            }
-            Message::OpenCommonsPage(url) => {
-                if url.starts_with("https://commons.wikimedia.org/wiki/File:") {
-                    let _ = std::process::Command::new("xdg-open").arg(url).spawn();
                 }
             }
             Message::ToggleDeviceDetails(ain) => {
