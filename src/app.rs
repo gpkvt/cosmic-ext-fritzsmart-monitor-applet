@@ -2212,18 +2212,19 @@ impl cosmic::Application for AppModel {
                         .center_x(36).center_y(36))
                     .push(widget::text::body("FRITZ!Power Monitor")
                         .width(cosmic::iced::Length::Fill))
-                    .push(widget::text::caption(
-                        self.next_refresh_at
-                            .map(|deadline| format_countdown(
-                                deadline.saturating_duration_since(Instant::now()).as_secs()
-                            ))
-                            .unwrap_or_default()
-                    ))
-                    .push(icon_action_button(
-                        self.refresh_started_at.map(refresh_spinner_frame).unwrap_or_else(|| "view-refresh-symbolic".to_string()),
-                        if self.refresh_started_at.is_some() { "Refreshing readings" } else { "Reload now" },
-                        Message::Refresh,
-                    ))
+                    .push(if self.refresh_started_at.is_some() {
+                        icon_action_button(
+                            self.refresh_started_at.map(refresh_spinner_frame).unwrap_or_else(|| "view-refresh-symbolic".to_string()),
+                            "Refreshing readings",
+                            Message::Refresh,
+                        )
+                    } else if let Some(remaining) = self.next_refresh_at.map(|deadline|
+                        deadline.saturating_duration_since(Instant::now())
+                    ).filter(|remaining| *remaining < Duration::from_secs(10)) {
+                        countdown_action_button(remaining.as_secs())
+                    } else {
+                        icon_action_button("view-refresh-symbolic", "Reload now", Message::Refresh)
+                    })
                     .push(icon_action_button("⚙", "Settings", Message::ToggleSettings)),
             )
             .padding([8, 12])
