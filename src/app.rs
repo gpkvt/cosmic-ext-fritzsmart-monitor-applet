@@ -1095,10 +1095,10 @@ fn settings_section_header<'a>(
     section_row
 }
 
-fn sortable_menu_card(
+fn sortable_menu_card<'a>(
     id: String,
-    card: cosmic::Element<'static, Message>,
-) -> cosmic::Element<'static, Message> {
+    card: cosmic::Element<'a, Message>,
+) -> cosmic::Element<'a, Message> {
     let drag_handle = widget::mouse_area(widget::text("⠿").size(20))
         .on_press(Message::StartDeviceDrag(id.clone()))
         .on_release(Message::EndDeviceDrag);
@@ -3715,10 +3715,17 @@ impl cosmic::Application for AppModel {
                             crate::fritz::normalize_ain_for_selection(selected)
                                 == crate::fritz::normalize_ain_for_selection(&target_ain)
                         });
+                    let is_special = |id: &str| {
+                        id == TOTAL_POWER_DRAG_ID
+                            || id == POWER_DIFFERENCE_DRAG_ID
+                            || id == SUMMARY_DRAG_ID
+                    };
                     let same_target = self.drag_target_ain.as_deref().is_some_and(|current| {
                         current == target_ain
-                            || crate::fritz::normalize_ain_for_selection(current)
-                                == crate::fritz::normalize_ain_for_selection(&target_ain)
+                            || (!is_special(current)
+                                && !is_special(&target_ain)
+                                && crate::fritz::normalize_ain_for_selection(current)
+                                    == crate::fritz::normalize_ain_for_selection(&target_ain))
                     });
                     if target_is_valid && dragged_ain != target_ain && !same_target {
                         // Move the dragged entry as soon as a new row is entered.
@@ -4444,6 +4451,18 @@ mod history_tests {
         assert_eq!(
             order,
             vec![
+                "b".to_string(),
+                TOTAL_POWER_DRAG_ID.to_string(),
+                POWER_DIFFERENCE_DRAG_ID.to_string(),
+                "a".to_string(),
+            ]
+        );
+
+        move_menu_entry(&mut order, SUMMARY_DRAG_ID, "b");
+        assert_eq!(
+            order,
+            vec![
+                SUMMARY_DRAG_ID.to_string(),
                 "b".to_string(),
                 TOTAL_POWER_DRAG_ID.to_string(),
                 POWER_DIFFERENCE_DRAG_ID.to_string(),
