@@ -353,10 +353,12 @@ fn move_sortable_entry(
             *total_power_first = true;
         }
     } else if target == TOTAL_POWER_DRAG_ID {
-        if ains.iter().any(|ain|
+        if let Some(index) = ains.iter().position(|ain|
             crate::fritz::normalize_ain_for_selection(ain)
                 == crate::fritz::normalize_ain_for_selection(dragged))
         {
+            let device = ains.remove(index);
+            ains.push(device);
             *total_power_first = false;
         }
     } else {
@@ -364,14 +366,14 @@ fn move_sortable_entry(
     }
 }
 
-fn total_power_sort_row() -> cosmic::Element<'static, Message> {
+fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
     let row = widget::Row::new()
         .spacing(6)
         .align_y(cosmic::iced::Alignment::Center)
         .push(widget::mouse_area(widget::text("⠿").size(20))
             .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string())))
         .push(widget::text::body("Total power (net)"))
-        .push(widget::text::caption("combined"));
+        .push(widget::text::caption(format!("#{position}")));
     widget::mouse_area(
         widget::container(row)
             .padding(8)
@@ -732,7 +734,7 @@ impl cosmic::Application for AppModel {
             if !self.devices.is_empty() {
                 content = content.push(widget::text::body("Select and order power-meter devices"));
                 if self.settings.total_power_first {
-                    content = content.push(total_power_sort_row());
+                    content = content.push(total_power_sort_row(1));
                 }
                 let mut ordered_devices: Vec<&FritzDevice> = self.selected_ains.iter()
                     .filter_map(|ain| self.devices.iter().find(|device|
@@ -848,7 +850,7 @@ impl cosmic::Application for AppModel {
                     }
                 }
                 if !self.settings.total_power_first {
-                    content = content.push(total_power_sort_row());
+                    content = content.push(total_power_sort_row(self.selected_ains.len() + 1));
                 }
                 content = content.push(widget::text::caption("Drag the ⠿ handles to reorder devices and Total power. Move Total power to the top to show combined net watts in the panel; move it to the bottom to show the first device's power and temperature. Temperature alerts notify once when a device crosses its configured threshold."));
             }
@@ -1738,9 +1740,9 @@ mod history_tests {
         assert!(total_first);
         assert_eq!(ains, vec!["111111111111", "222222222222"]);
 
-        move_sortable_entry(&mut ains, &mut total_first, "222222222222", TOTAL_POWER_DRAG_ID);
+        move_sortable_entry(&mut ains, &mut total_first, "111111111111", TOTAL_POWER_DRAG_ID);
         assert!(!total_first);
-        assert_eq!(ains, vec!["111111111111", "222222222222"]);
+        assert_eq!(ains, vec!["222222222222", "111111111111"]);
     }
 
     #[test]
