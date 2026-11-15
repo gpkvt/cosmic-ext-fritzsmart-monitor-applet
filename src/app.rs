@@ -392,6 +392,126 @@ fn move_sortable_entry(
     }
 }
 
+
+fn graph_panel(content: cosmic::Element<'static, Message>) -> cosmic::Element<'static, Message> {
+    widget::container(
+        widget::container(content)
+            .padding(8)
+            .width(cosmic::iced::Length::Fill)
+            .style(|theme| {
+                let cosmic = theme.cosmic();
+                cosmic::iced::widget::container::Style {
+                    background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
+                    border: cosmic::iced::Border {
+                        radius: 3.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }
+            }),
+    )
+    .padding(1)
+    .width(cosmic::iced::Length::Fill)
+    .style(|theme| {
+        let cosmic = theme.cosmic();
+        cosmic::iced::widget::container::Style {
+            background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+            border: cosmic::iced::Border {
+                radius: 3.0.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    })
+    .into()
+}
+
+fn total_power_overview(
+    readings: &[FritzReading],
+    settings: &FritzSettings,
+    history: &VecDeque<(Instant, i64)>,
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    position: usize,
+) -> Option<cosmic::Element<'static, Message>> {
+    let low = history.iter().map(|(_, value)| *value).min()?;
+    let high = history.iter().map(|(_, value)| *value).max()?;
+    let total_power = net_power_w(readings, &settings.input_ains);
+    let timespan = format_graph_timespan(settings.graph_timespan_minutes);
+    let axis_start = format_graph_axis_start(settings.graph_timespan_minutes);
+    let total_graph: cosmic::Element<'static, Message> = widget::Column::new()
+        .spacing(4)
+        .push(widget::text::caption("TOTAL POWER (W)"))
+        .push(widget::text::body(power_sparkline(history)))
+        .push(widget::Row::new()
+            .width(cosmic::iced::Length::Fill)
+            .push(widget::text::caption(axis_start.clone()))
+            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+            .push(widget::text::caption("Now")))
+        .into();
+
+    let mut input_graphs = widget::Column::new().spacing(8);
+    let mut has_input_graph = false;
+    for reading in readings.iter().filter(|reading| {
+        settings.input_ains.contains(
+            &crate::fritz::normalize_ain_for_selection(&reading.ain),
+        )
+    }) {
+        has_input_graph = true;
+        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
+        let graph = device_history.get(&key)
+            .map(|samples| numeric_sparkline(samples.iter().map(|(_, power, _)|
+                signed_device_power(*power, true) as f64)))
+            .unwrap_or_else(|| "Waiting for samples…".into());
+        input_graphs = input_graphs.push(
+            widget::Column::new()
+                .spacing(4)
+                .push(widget::text::caption(format!(
+                    "{} · {} W",
+                    reading.name,
+                    signed_device_power(reading.power_w, true),
+                )))
+                .push(widget::text::body(graph))
+                .push(widget::Row::new()
+                    .width(cosmic::iced::Length::Fill)
+                    .push(widget::text::caption(axis_start.clone()))
+                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                    .push(widget::text::caption("Now"))),
+        );
+    }
+    if !has_input_graph {
+        input_graphs = input_graphs.push(widget::text::caption("No input devices"));
+    }
+
+    let content = widget::Column::new()
+        .spacing(6)
+        .push(widget::text::body(format!("TOTAL POWER · LAST {timespan}")))
+        .push(widget::text::title2(format!("{total_power} W")))
+        .push(widget::text::caption(format!("Low  {low} W     High  {high} W")))
+        .push(
+            widget::Row::new()
+                .spacing(8)
+                .width(cosmic::iced::Length::Fill)
+                .align_y(cosmic::iced::Alignment::Start)
+                .push(graph_panel(total_graph))
+                .push(graph_panel(input_graphs.into())),
+        );
+    let base = cosmic::iced::Color::from(cosmic::iced::Theme::Dark.palette().background);
+    let _ = base;
+    Some(
+        widget::container(content)
+            .padding(10)
+            .style(move |theme| {
+                let cosmic = theme.cosmic();
+                let base = cosmic::iced::Color::from(cosmic.background(false).base);
+                cosmic::iced::widget::container::Style {
+                    background: Some(device_background_color(base, position).into()),
+                    ..Default::default()
+                }
+            })
+            .into(),
+    )
+}
+
 fn settings_section_header<'a>(title: &'a str, expanded: bool, section: &'static str) -> cosmic::Element<'a, Message> {
     let row = widget::Row::new()
         .spacing(10)
@@ -1103,6 +1223,17 @@ impl cosmic::Application for AppModel {
 
             if !self.readings.is_empty() {
                 content = content.push(widget::text::caption("SELECTED DEVICES"));
+                if self.settings.total_power_first {
+                    if let Some(overview) = total_power_overview(
+                        &self.readings,
+                        &self.settings,
+                        &self.history,
+                        &self.device_history,
+                        0,
+                    ) {
+                        content = content.push(overview);
+                    }
+                }
                 for (index, reading) in self.readings.iter().enumerate() {
                     let device_history = self.device_history.get(
                         &crate::fritz::normalize_ain_for_selection(&reading.ain),
@@ -1246,110 +1377,16 @@ impl cosmic::Application for AppModel {
                         }));
                 }
                 content = content.push(widget::divider::horizontal::default());
-                if let (Some(low), Some(high)) = (
-                    self.history.iter().map(|(_, value)| *value).min(),
-                    self.history.iter().map(|(_, value)| *value).max(),
-                ) {
-                    let total_power = net_power_w(&self.readings, &self.settings.input_ains);
-                    let total_graph = widget::Column::new()
-                        .spacing(4)
-                        .push(widget::text::caption("TOTAL POWER (W)"))
-                        .push(widget::text::body(power_sparkline(&self.history)))
-                        .push(widget::Row::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::caption(format_graph_axis_start(self.settings.graph_timespan_minutes)))
-                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(widget::text::caption("Now")));
-                    let mut input_graphs = widget::Column::new().spacing(8);
-                    let mut has_input_graph = false;
-                    for reading in self.readings.iter().filter(|reading|
-                        self.settings.input_ains.contains(
-                            &crate::fritz::normalize_ain_for_selection(&reading.ain),
-                        ))
-                    {
-                        has_input_graph = true;
-                        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                        let input_history = self.device_history.get(&key);
-                        let graph = input_history.map(|samples|
-                            numeric_sparkline(samples.iter().map(|(_, power, _)|
-                                signed_device_power(*power, true) as f64)))
-                            .unwrap_or_else(|| "Waiting for samples…".into());
-                        input_graphs = input_graphs.push(
-                            widget::Column::new()
-                                .spacing(4)
-                                .push(widget::text::caption(format!(
-                                    "{} · {} W",
-                                    reading.name,
-                                    signed_device_power(reading.power_w, true),
-                                )))
-                                .push(widget::text::body(graph)),
-                        );
+                if !self.settings.total_power_first {
+                    if let Some(overview) = total_power_overview(
+                        &self.readings,
+                        &self.settings,
+                        &self.history,
+                        &self.device_history,
+                        self.selected_ains.len(),
+                    ) {
+                        content = content.push(overview);
                     }
-                    if !has_input_graph {
-                        input_graphs = input_graphs.push(widget::text::caption("No input devices"));
-                    }
-                    let total_power_content = widget::Column::new()
-                        .spacing(6)
-                        .push(widget::text::body(format!(
-                            "TOTAL POWER · LAST {}",
-                            format_graph_timespan(self.settings.graph_timespan_minutes),
-                        )))
-                        .push(widget::text::title2(format!("{total_power} W")))
-                        .push(widget::text::caption(format!("Low  {low} W     High  {high} W")))
-                        .push(
-                            widget::Row::new()
-                                .spacing(8)
-                                .width(cosmic::iced::Length::Fill)
-                                .align_y(cosmic::iced::Alignment::Start)
-                                .push(
-                                    widget::container(total_graph)
-                                        .padding(8)
-                                        .width(cosmic::iced::Length::Fill)
-                                        .style(|theme| {
-                                            let cosmic = theme.cosmic();
-                                            cosmic::iced::widget::container::Style {
-                                                background: Some(
-                                                    cosmic::iced::Color::from(cosmic.background(false).base).into(),
-                                                ),
-                                                border: cosmic::iced::Border {
-                                                    radius: 3.0.into(),
-                                                    ..Default::default()
-                                                },
-                                                ..Default::default()
-                                            }
-                                        }),
-                                )
-                                .push(
-                                    widget::container(input_graphs)
-                                        .padding(8)
-                                        .width(cosmic::iced::Length::Fill)
-                                        .style(|theme| {
-                                            let cosmic = theme.cosmic();
-                                            cosmic::iced::widget::container::Style {
-                                                background: Some(
-                                                    cosmic::iced::Color::from(cosmic.background(false).base).into(),
-                                                ),
-                                                border: cosmic::iced::Border {
-                                                    radius: 3.0.into(),
-                                                    ..Default::default()
-                                                },
-                                                ..Default::default()
-                                            }
-                                        }),
-                                ),
-                        );
-                    content = content.push(
-                        widget::container(total_power_content)
-                            .padding(10)
-                            .style(move |theme| {
-                                let cosmic = theme.cosmic();
-                                let base = cosmic::iced::Color::from(cosmic.background(false).base);
-                                cosmic::iced::widget::container::Style {
-                                    background: Some(device_background_color(base, 0).into()),
-                                    ..Default::default()
-                                }
-                            }),
-                    );
                 }
             } else {
                 content = content.push(widget::text::body("Select one or more devices in Settings"));
