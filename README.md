@@ -77,8 +77,8 @@ list.
 Open the applet popup and choose **Settings**. Adjust **Panel text size** (10–24 pt) to change the power and temperature labels in the panel. The setting is saved with the rest of the applet configuration. Set **Automatic refresh** from 30 seconds to 1 hour; the main popup shows a live countdown to the next refresh. The default is 60 seconds. Enter the FRITZ!Box URL,
 username and password, then choose **Load devices**. The applet discovers
 devices that expose both power and temperature measurements. Check every
-device you want to monitor, then use **Up** and **Down** to order the selected
-devices. Changes are saved automatically as you make them. For each device,
+device you want to monitor, then drag the grip (⠿) beside a selected device
+to change its position. Changes are saved automatically when you release it. For each device,
 enable **Temperature alerts** to receive notifications when its temperature
 rises above the upper limit or falls below the lower limit. The defaults are
 40 °C and −10 °C; both limits can be adjusted within their safe ranges in
