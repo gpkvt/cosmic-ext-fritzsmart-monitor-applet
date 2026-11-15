@@ -6,7 +6,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 
 ## Features
 
-- Displays current power in watts and temperature in the COSMIC panel, with a configurable text size, optional average temperature, and a separate input-power figure when Total power is shown.
+- Displays current power in watts and temperature in the COSMIC panel, with a configurable text size, optional average temperature, and a separate input-power figure accompanied by a dedicated solar-panel SVG icon when Total power is shown.
 - Settings are grouped into collapsible sections (Panel, Graph history, Automatic refresh, Weather, Connection, Devices and Diagnostics); all sections start collapsed to keep the settings view compact.
 - The popup uses a dedicated live-power summary with prominent net or selected-device wattage, optional input power and temperature metrics, and a device count. Weather, total-power and device content use consistent rounded, theme-aware cards.
 - Device cards separate the device identity and live state from prominent power/temperature metric tiles, the power switch and side-by-side history graphs. Total power keeps the net and input graphs side by side in a matching overview card.
