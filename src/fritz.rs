@@ -42,6 +42,10 @@ pub struct FritzSettings {
     pub graph_timespan_minutes: u16,
     pub refresh_interval_seconds: u32,
     pub temperature_alerts: HashMap<String, TemperatureAlertThresholds>,
+    pub weather_enabled: bool,
+    pub openweathermap_api_key: String,
+    pub weather_location: String,
+    pub weather_refresh_interval_minutes: u16,
 }
 
 impl Default for FritzSettings {
@@ -58,6 +62,10 @@ impl Default for FritzSettings {
             graph_timespan_minutes: 15,
             refresh_interval_seconds: 60,
             temperature_alerts: HashMap::new(),
+            weather_enabled: false,
+            openweathermap_api_key: String::new(),
+            weather_location: String::new(),
+            weather_refresh_interval_minutes: 10,
         }
     }
 }
@@ -124,12 +132,16 @@ impl FritzSettings {
             graph_timespan_minutes: parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")),
             refresh_interval_seconds: parse_refresh_interval_seconds(&get("REFRESH_INTERVAL_SECONDS")),
             temperature_alerts: parse_temperature_alerts(&get("TEMPERATURE_ALERTS")),
+            weather_enabled: get("WEATHER_ENABLED").eq_ignore_ascii_case("true"),
+            openweathermap_api_key: get("OPENWEATHERMAP_API_KEY"),
+            weather_location: get("WEATHER_LOCATION"),
+            weather_refresh_interval_minutes: get("WEATHER_REFRESH_INTERVAL_MINUTES").parse::<u16>().unwrap_or(10).clamp(5, 60),
         };
         Ok(settings)
     }
 
     pub fn save(&self) -> Result<(), String> {
-        for value in [&self.url, &self.username, &self.password, &self.ain, &self.ca_cert_path] {
+        for value in [&self.url, &self.username, &self.password, &self.ain, &self.ca_cert_path, &self.openweathermap_api_key, &self.weather_location] {
             if value.contains('\n') || value.contains('\r') {
                 return Err("Configuration values must not contain newlines".into());
             }
@@ -151,11 +163,13 @@ impl FritzSettings {
         temperature_alerts.sort_unstable();
         let temperature_alerts = temperature_alerts.join(";");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\n",
             self.url, self.username, self.password, first_ain, selected_ains,
             if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path,
             self.panel_text_size.clamp(10, 24), self.graph_timespan_minutes.clamp(5, 1440),
-            self.refresh_interval_seconds.clamp(30, 3600), temperature_alerts
+            self.refresh_interval_seconds.clamp(30, 3600), temperature_alerts,
+            if self.weather_enabled { "true" } else { "false" }, self.openweathermap_api_key,
+            self.weather_location, self.weather_refresh_interval_minutes.clamp(5, 60)
         );
         #[cfg(unix)]
         let mut file = {
