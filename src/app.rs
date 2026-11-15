@@ -772,6 +772,14 @@ mod history_tests {
     }
 
     #[test]
+    fn graph_x_axis_start_matches_configured_timespan() {
+        assert_eq!(format_graph_axis_start(15), "15m ago");
+        assert_eq!(format_graph_axis_start(60), "1h ago");
+        assert_eq!(format_graph_axis_start(90), "1h 30m ago");
+        assert_eq!(format_graph_axis_start(1440), "1d ago");
+    }
+
+    #[test]
     fn history_keeps_only_the_last_fifteen_minutes_and_sixteen_samples() {
         let start = Instant::now();
         let mut history = VecDeque::new();
