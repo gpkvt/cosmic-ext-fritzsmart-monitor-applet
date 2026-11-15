@@ -867,6 +867,20 @@ fn icon_action_button<'a>(
 }
 
 
+fn countdown_action_button(seconds: u64) -> widget::Button<'static, Message> {
+    widget::button::custom(
+        widget::container(widget::text(format!("{seconds}s")).size(14))
+            .center_x(36)
+            .center_y(36),
+    )
+    .on_press(Message::Refresh)
+    .padding(0)
+    .width(cosmic::iced::Length::Fixed(36.0))
+    .height(cosmic::iced::Length::Fixed(36.0))
+    .class(cosmic::theme::Button::Text)
+    .name("Next automatic refresh")
+}
+
 fn error_notice<'a>(title: &'static str, message: &'a str) -> cosmic::Element<'a, Message> {
     widget::container(
         widget::Column::new()
@@ -1521,20 +1535,10 @@ impl cosmic::Application for AppModel {
                     )
                 } else if let Some(remaining) = self.next_refresh_at.map(|deadline|
                     deadline.saturating_duration_since(Instant::now())
-                ).filter(|remaining| !remaining.is_zero() && remaining < Duration::from_secs(10)) {
-                    // Keep the countdown as plain text: the icon button style can
-                    // suppress or visually clip text labels in some COSMIC themes.
-                    widget::container(
-                        widget::text(format!("{}s", remaining.as_secs().saturating_add(1)))
-                            .size(14)
-                    )
-                    .width(cosmic::iced::Length::Fixed(36.0))
-                    .height(cosmic::iced::Length::Fixed(36.0))
-                    .center_x(36)
-                    .center_y(36)
-                    .into()
+                ).filter(|remaining| !remaining.is_zero() && *remaining < Duration::from_secs(10)) {
+                    countdown_action_button(remaining.as_secs().saturating_add(1))
                 } else {
-                    icon_action_button("↻", "Reload now", Message::Refresh).into()
+                    icon_action_button("↻", "Reload now", Message::Refresh)
                 };
                 content = content.push(
                     widget::Row::new()
