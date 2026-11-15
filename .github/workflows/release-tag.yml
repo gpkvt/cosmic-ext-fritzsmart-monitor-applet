@@ -13,24 +13,31 @@ jobs:
     if: github.event.head_commit != null
     runs-on: ubuntu-latest
     steps:
-      - name: Check out merged commit
+      - name: Check out main history
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - name: Create version tag when it does not exist
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create or repair version tag
         run: |
           set -euo pipefail
           version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n1)"
           test -n "$version"
           tag="v$version"
-          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-            echo "$tag already exists; nothing to do."
-            exit 0
-          fi
+          release_commit="$(git log --first-parent -G "^version = \"$version\"" --format=%H -- Cargo.toml | head -n1)"
+          test -n "$release_commit"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$tag" -m "Release $tag" "$GITHUB_SHA"
+          git fetch --tags origin
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            current_target="$(git rev-parse "$tag^{commit}")"
+            if [ "$current_target" = "$release_commit" ]; then
+              echo "$tag already points to the version bump commit."
+              exit 0
+            fi
+            echo "$tag points to $current_target; repairing it to $release_commit."
+            git tag -d "$tag"
+            git push origin ":refs/tags/$tag"
+          fi
+          git tag -a "$tag" -m "Release $tag" "$release_commit"
           git push origin "refs/tags/$tag"
