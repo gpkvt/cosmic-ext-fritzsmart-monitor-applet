@@ -24,6 +24,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes \
             desktop-file-utils \
+            flatpak-builder \
+            python3-venv \
             libdbus-1-dev \
             libdisplay-info-dev \
             libgbm-dev \
@@ -37,12 +39,22 @@ jobs:
             pkg-config
       - name: Format Rust sources
         run: cargo fmt --all
+      - name: Generate locked Cargo dependencies
+        run: cargo generate-lockfile
+      - name: Prepare Flatpak Cargo sources
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --disable-pip-version-check tomlkit aiohttp
+          git clone --depth 1 https://github.com/flatpak/flatpak-builder-tools.git "$RUNNER_TEMP/flatpak-builder-tools"
+          .venv/bin/python "$RUNNER_TEMP/flatpak-builder-tools/cargo/flatpak-cargo-generator.py" Cargo.lock -o cargo-sources.json
+      - name: Validate Flatpak manifest
+        run: flatpak-builder --show-manifest com.gpkvt.FritzPowerMonitor.yml > /dev/null
       - name: Run tests
-        run: cargo test
+        run: cargo test --locked
       - name: Check build
-        run: cargo check
+        run: cargo check --locked
       - name: Build optimized binary
-        run: cargo build --release
+        run: cargo build --release --locked
       - name: Test user-local installation
         run: |
           prefix="$RUNNER_TEMP/fritz-power-monitor-install"
