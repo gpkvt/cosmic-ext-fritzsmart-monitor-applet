@@ -53,7 +53,7 @@ pub struct AppModel {
     weather: Option<WeatherData>,
     weather_attribution_expanded: bool,
     quick_options_expanded: bool,
-    expanded_devices: HashSet<String>,
+    collapsed_devices: HashSet<String>,
     quick_refresh_interval: u32,
     quick_graph_timespan: u16,
     next_weather_refresh_at: Option<Instant>,
@@ -1642,7 +1642,7 @@ impl cosmic::Application for AppModel {
                         device_cards = device_cards.push(widget::divider::horizontal::default());
                     }
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                    let is_expanded = self.expanded_devices.contains(&device_key);
+                    let is_expanded = !self.collapsed_devices.contains(&device_key);
                     let device_corner_radius = device_corner_radius(index, self.readings.len());
                     let device_history = self.device_history.get(&device_key);
                     let power_graph = device_history.map(|samples|
@@ -2150,8 +2150,8 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleDeviceDetails(ain) => {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
-                if !self.expanded_devices.remove(&key) {
-                    self.expanded_devices.insert(key);
+                if !self.collapsed_devices.remove(&key) {
+                    self.collapsed_devices.insert(key);
                 }
             }
             Message::ToggleQuickOptions => {
