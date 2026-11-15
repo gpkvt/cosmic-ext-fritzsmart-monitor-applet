@@ -1968,7 +1968,6 @@ impl cosmic::Application for AppModel {
                     let forecast_range_selector = widget::Row::new()
                         .spacing(4)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                         .push(
                             widget::button::custom(
                                 widget::Row::new()
@@ -2007,6 +2006,7 @@ impl cosmic::Application for AppModel {
                             .spacing(8)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::text::title3(format!("{forecast_days}-day forecast")))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                             .push(forecast_range_selector))
                         .push(widget::text::caption("Forecast data by Open-Meteo"));
                     if self.weather_forecast_loading {
@@ -2654,7 +2654,9 @@ impl cosmic::Application for AppModel {
             }
             Message::SelectWeatherForecast(requested_days) => {
                 let days = if requested_days == 14 { 14 } else { 7 };
-                if self.weather_forecast_days != Some(days) {
+                if self.weather_forecast_days != Some(days)
+                    || (self.weather_forecast.is_none() && !self.weather_forecast_loading)
+                {
                     self.weather_forecast_days = Some(days);
                     self.weather_forecast = None;
                     self.weather_forecast_error = None;
