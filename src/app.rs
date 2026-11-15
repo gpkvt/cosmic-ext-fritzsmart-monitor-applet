@@ -1131,7 +1131,7 @@ impl cosmic::Application for AppModel {
         // Use a content-sized applet button: button_from_element() deliberately
         // fixes the width to an icon, while text_button() only accepts Text.
         let button = widget::button::custom(content)
-            .on_press_down(Message::TogglePopup)
+            .on_press(Message::TogglePopup)
             .padding([vertical_padding, horizontal_padding])
             .height(cosmic::iced::Length::Fixed(
                 f32::from((suggested.1 + 2 * vertical_padding).max(40)),
