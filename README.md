@@ -11,7 +11,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 - The main menu and settings are vertically scrollable when their content exceeds the popup height.
 - The first selected device supplies both power and temperature values shown in the panel. Selected devices can be reordered in Settings.
 - In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy; every setting is saved immediately when changed.
-- Optional per-device high-temperature alerts with configurable thresholds (30–100 °C); desktop notifications fire once when a reading crosses the threshold and re-arm after it cools below the limit.
+- Optional per-device temperature alerts for readings above the upper limit or below the lower limit. Defaults are 40 °C and −10 °C; the upper limit is configurable from 0–40 °C and the lower limit from −10–0 °C. Desktop notifications fire when a device crosses out of the safe range and re-arm when it returns.
 - Optional per-router PEM CA certificate trust without disabling hostname verification.
 - Discovers compatible power-meter devices and lets the user select any combination with checkboxes.
 - Refreshes every 60 seconds and keeps total and per-device samples for the configured graph history (5 minutes to 24 hours).
@@ -54,11 +54,18 @@ Remove the user-local installation with:
 make uninstall
 ```
 
-Run the test suite independently with:
+Run the formatting check, test suite and optimized build independently with:
 
 ```sh
+cargo fmt --all -- --check
 cargo test
+cargo build --release
 ```
+
+GitHub Actions runs these checks on pull requests and pushes to `main`. Pushing
+a version tag such as `v0.1.5` builds a Linux x86_64 release archive containing
+the applet binary, desktop entry, icon, README and license, and publishes the
+archive with a SHA-256 checksum on the GitHub Releases page.
 
 After installing, reopen COSMIC Settings (or log out and back in if the
 applet list is not refreshed) and add **FRITZ!Power Monitor** from the panel applet
@@ -71,14 +78,17 @@ username and password, then choose **Load devices**. The applet discovers
 devices that expose both power and temperature measurements. Check every
 device you want to monitor, then use **Up** and **Down** to order the selected
 devices. Changes are saved automatically as you make them. For each device,
-enable **High-temperature alert** and set the temperature threshold; the applet
-sends a desktop notification when a new reading crosses that threshold. Alerts
-are disabled by default and do not repeat while the temperature remains above
-the threshold. The first selected device supplies
+enable **Temperature alerts** to receive notifications when its temperature
+rises above the upper limit or falls below the lower limit. The defaults are
+40 °C and −10 °C; both limits can be adjusted within their safe ranges in
+Settings. Alerts are disabled by default. A notification is sent when a device
+leaves the configured range and is re-armed after it returns to that range. The first selected device supplies
 the panel's power and temperature readings. The popup shows every selected
 device separately, with its own wattage and temperature graph. Set the graph
 history from 5 minutes to 24 hours in 5-minute increments under Settings; the
-combined power history uses the same timespan.
+combined power history uses the same timespan. Graph sparklines are evenly
+downsampled to a fixed number of columns so long history windows remain within
+their cards.
 
 Credentials are stored in `~/.config/fritz_solar.cfg` with owner-only
 permissions. TLS certificate validation is enabled by default. For a FRITZ!Box
