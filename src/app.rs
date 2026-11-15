@@ -1476,14 +1476,14 @@ impl cosmic::Application for AppModel {
                 let uses_https = endpoint.to_ascii_lowercase().starts_with("https://");
                 let tls_status = if uses_https {
                     if self.settings.allow_invalid_certs {
-                        "HTTPS enabled · certificate validation disabled"
+                        "HTTPS configured · certificate validation disabled"
                     } else if !self.settings.ca_cert_path.trim().is_empty() {
-                        "HTTPS enabled · custom CA certificate configured"
+                        "HTTPS configured · custom CA certificate configured"
                     } else {
-                        "HTTPS enabled · system certificate roots"
+                        "HTTPS configured · system certificate roots"
                     }
                 } else if endpoint.to_ascii_lowercase().starts_with("http://") {
-                    "HTTPS disabled · using plain HTTP"
+                    "HTTPS not configured · using plain HTTP"
                 } else {
                     "HTTPS status unavailable · invalid or empty URL"
                 };
@@ -1516,9 +1516,7 @@ impl cosmic::Application for AppModel {
                     }
                 }
 
-    content = content
-                    .push(widget::divider::horizontal::default())
-                    .push(widget::text::caption("DIAGNOSTICS"));
+
                 if let Some(error) = &self.weather_error {
                     content = content.push(error_notice("WEATHER UNAVAILABLE", error));
                 }
