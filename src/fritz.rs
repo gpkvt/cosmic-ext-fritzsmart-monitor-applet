@@ -1373,8 +1373,8 @@ mod tests {
                 "power-difference"
             ]
             .into_iter()
-                .map(str::to_string)
-                .collect::<Vec<_>>()
+            .map(str::to_string)
+            .collect::<Vec<_>>()
         );
         assert_eq!(parse_menu_order(""), default_menu_order());
     }
