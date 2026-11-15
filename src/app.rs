@@ -34,6 +34,7 @@ pub struct AppModel {
     devices: Vec<FritzDevice>,
     devices_loaded: bool,
     devices_loading: bool,
+    device_search: String,
     selected_ains: Vec<String>,
     dragging_device_ain: Option<String>,
     drag_scroll_direction: i8,
@@ -82,6 +83,7 @@ pub enum Message {
     RefreshIntervalChanged(u32),
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
+    DeviceSearchChanged(String),
     ToggleDevice(String, bool),
     ToggleDeviceInput(String, bool),
     StartDeviceDrag(String),
@@ -106,6 +108,13 @@ pub enum Message {
 }
 
 
+
+fn device_matches_search(device: &FritzDevice, query: &str) -> bool {
+    let query = query.trim();
+    query.is_empty()
+        || device.name.to_lowercase().contains(&query.to_lowercase())
+        || device.ain.to_lowercase().contains(&query.to_lowercase())
+}
 
 fn temperature_outside_limits(temperature: f64, thresholds: TemperatureAlertThresholds) -> bool {
     temperature > f64::from(thresholds.high_c) || temperature < f64::from(thresholds.low_c)
@@ -1040,7 +1049,10 @@ impl cosmic::Application for AppModel {
                     .push(action_button("view-refresh-symbolic", "Load devices", Message::DiscoverDevices));
     
                 if !self.devices.is_empty() {
-                    content = content.push(widget::text::body("Select and order power-meter devices"));
+                    content = content
+                        .push(widget::text::body("Select and order power-meter devices"))
+                        .push(widget::text_input("Search devices by name or AIN", &self.device_search)
+                            .on_input(Message::DeviceSearchChanged));
                     if self.settings.total_power_first {
                         content = content.push(total_power_sort_row(1));
                     }
@@ -1053,6 +1065,10 @@ impl cosmic::Application for AppModel {
                         !self.selected_ains.iter().any(|ain|
                             crate::fritz::normalize_ain_for_selection(ain)
                                 == crate::fritz::normalize_ain_for_selection(&device.ain))));
+                    ordered_devices.retain(|device| device_matches_search(device, &self.device_search));
+                    if ordered_devices.is_empty() {
+                        content = content.push(widget::text::caption("No devices match your search"));
+                    }
                     for (row_index, device) in ordered_devices.iter().enumerate() {
                         let selected_index = self.selected_ains.iter().position(|ain|
                             crate::fritz::normalize_ain_for_selection(ain)
@@ -1923,6 +1939,9 @@ impl cosmic::Application for AppModel {
                 self.settings_status = Some("Connecting and loading devices…".into());
                 return Task::perform(discover_devices(settings), |result| cosmic::Action::App(Message::DevicesLoaded(result)));
             }
+            Message::DeviceSearchChanged(value) => {
+                self.device_search = value;
+            }
             Message::DevicesLoaded(result) => {
                 self.devices_loading = false;
                 self.devices_loaded = result.is_ok();
@@ -2134,6 +2153,19 @@ mod history_tests {
         assert!(newly_missing_devices(&mut previous, &missing, &pending).is_empty());
         assert!(newly_missing_devices(&mut previous, &missing, &HashSet::new()).is_empty());
         assert!(newly_missing_devices(&mut previous, &[], &HashSet::new()).is_empty());
+    }
+
+    #[test]
+    fn device_search_matches_name_and_ain_case_insensitively() {
+        let device = FritzDevice {
+            ain: "12:AB-34:CD".into(),
+            name: "Solar Inverter".into(),
+        };
+        assert!(device_matches_search(&device, "solar"));
+        assert!(device_matches_search(&device, "12:ab"));
+        assert!(device_matches_search(&device, "  INVERTER  "));
+        assert!(device_matches_search(&device, "  "));
+        assert!(!device_matches_search(&device, "smart plug"));
     }
 
     #[test]
