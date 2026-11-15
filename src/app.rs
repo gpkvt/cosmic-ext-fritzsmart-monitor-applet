@@ -1725,7 +1725,7 @@ impl cosmic::Application for AppModel {
                                         )
                                         .padding(8)
                                         .width(cosmic::iced::Length::Fill)
-                                        .style(|theme| {
+                                        .style(move |theme| {
                                             let cosmic = theme.cosmic();
                                             cosmic::iced::widget::container::Style {
                                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
@@ -1739,7 +1739,7 @@ impl cosmic::Application for AppModel {
                                     )
                                     .padding(1)
                                     .width(cosmic::iced::Length::Fill)
-                                    .style(|theme| {
+                                    .style(move |theme| {
                                         let cosmic = theme.cosmic();
                                         cosmic::iced::widget::container::Style {
                                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
@@ -1774,7 +1774,7 @@ impl cosmic::Application for AppModel {
                                         )
                                         .padding(8)
                                         .width(cosmic::iced::Length::Fill)
-                                        .style(|theme| {
+                                        .style(move |theme| {
                                             let cosmic = theme.cosmic();
                                             cosmic::iced::widget::container::Style {
                                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
@@ -1788,7 +1788,7 @@ impl cosmic::Application for AppModel {
                                     )
                                     .padding(1)
                                     .width(cosmic::iced::Length::Fill)
-                                    .style(|theme| {
+                                    .style(move |theme| {
                                         let cosmic = theme.cosmic();
                                         cosmic::iced::widget::container::Style {
                                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
