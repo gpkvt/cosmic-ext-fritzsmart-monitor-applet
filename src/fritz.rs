@@ -722,5 +722,50 @@ mod tests {
         let xml = r#"<devicelist><device identifier="000000000000"/></devicelist>"#;
         assert!(parse_device_xml(xml, "123456789012").is_err());
     }
+    #[test]
+    fn parses_switch_power_state_when_available() {
+        for (state, expected) in [("1", Some(true)), ("0", Some(false)), ("unknown", None)] {
+            let xml = format!(r#"
+                <devicelist><device identifier="123456789012">
+                  <powermeter><power>123000</power></powermeter>
+                  <temperature><celsius>215</celsius></temperature>
+                  <switch><state>{state}</state></switch>
+                </device></devicelist>
+            "#);
+            let reading = parse_device_xml(&xml, "123456789012").unwrap();
+            assert_eq!(reading.power_state, expected);
+        }
+    }
+
+    #[test]
+    fn fetch_result_keeps_healthy_devices_and_reports_missing_devices() {
+        let xml = r#"
+            <devicelist>
+              <device identifier="111111111111">
+                <name>Healthy plug</name>
+                <powermeter><power>123000</power></powermeter>
+                <temperature><celsius>215</celsius></temperature>
+                <switch><state>1</state></switch>
+              </device>
+            </devicelist>
+        "#;
+        let result = parse_fetch_result_xml(
+            xml,
+            &["111111111111".into(), "222222222222".into()],
+        ).unwrap();
+        assert_eq!(result.readings.len(), 1);
+        assert_eq!(result.readings[0].power_state, Some(true));
+        assert_eq!(result.missing_devices, vec![("222222222222".into(), "222222222222".into())]);
+    }
+
+    #[test]
+    fn weather_settings_have_safe_defaults_and_clamped_refresh_interval() {
+        let settings = FritzSettings::default();
+        assert!(!settings.weather_enabled);
+        assert!(settings.openweathermap_api_key.is_empty());
+        assert!(settings.weather_location.is_empty());
+        assert_eq!(settings.weather_refresh_interval_minutes, 10);
+    }
+
 }
 
