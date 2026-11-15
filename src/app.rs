@@ -245,6 +245,15 @@ fn move_selected_device(ains: &mut [String], ain: &str, move_up: bool) {
     }
 }
 
+fn icon_action_button<'a>(
+    icon_name: &'static str,
+    message: Message,
+) -> widget::Button<'a, Message> {
+    widget::button::custom(widget::icon::from_name(icon_name).size(18))
+        .on_press(message)
+        .padding(8)
+}
+
 fn action_button<'a>(
     icon_name: &'static str,
     label: &'static str,
@@ -549,7 +558,15 @@ impl cosmic::Application for AppModel {
                 .push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings));
         } else {
             content = content
-                .push(widget::text::title3("FRITZ!Power Monitor"))
+                .push(
+                    widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::title3("FRITZ!Power Monitor"))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(icon_action_button("view-refresh-symbolic", Message::Refresh))
+                        .push(icon_action_button("preferences-system-symbolic", Message::ToggleSettings)),
+                )
                 .push(widget::divider::horizontal::default());
 
             if !self.readings.is_empty() {
@@ -691,15 +708,7 @@ impl cosmic::Application for AppModel {
                     );
             }
 
-            content = content
-                .push(widget::divider::horizontal::default())
-                .push(
-                    widget::Row::new()
-                        .spacing(8)
-                        .push(action_button("view-refresh-symbolic", "Refresh", Message::Refresh))
-                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                        .push(action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
-                );
+            content = content.push(widget::divider::horizontal::default());
         }
 
         content = content.push(
