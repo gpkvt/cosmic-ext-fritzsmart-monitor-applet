@@ -640,7 +640,15 @@ impl cosmic::Application for AppModel {
             )
             .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)));
         let content = if let Some(input_power) = input_power {
-            content.push(self.core.applet.text(input_power).size(f32::from(self.settings.panel_text_size)))
+            content
+                .push(
+                    widget::container(
+                        widget::icon::from_name("weather-clear-symbolic")
+                            .size(suggested.1.saturating_sub(2)),
+                    )
+                    .padding([2, 0]),
+                )
+                .push(self.core.applet.text(input_power).size(f32::from(self.settings.panel_text_size)))
         } else {
             content
         };
