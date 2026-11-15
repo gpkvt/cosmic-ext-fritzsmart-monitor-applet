@@ -1499,7 +1499,7 @@ impl cosmic::Application for AppModel {
                 const GRAPH_ANCHORS: [f32; 5] = [5.0, 60.0, 360.0, 720.0, 1440.0];
                 content = content
                     .push(widget::text::caption(format!(
-                        "REFRESH INTERVAL · {}",
+                        "Refresh · {}",
                         format_countdown(u64::from(self.quick_refresh_interval))
                     )))
                     .push(widget::slider(
@@ -1511,7 +1511,7 @@ impl cosmic::Application for AppModel {
                     ).step(0.01).on_release(Message::CommitQuickRefreshInterval))
                     .push(quick_slider_anchor_labels(["30s", "5m", "15m", "30m", "60m"]))
                     .push(widget::text::caption(format!(
-                        "GRAPH DURATION · {}",
+                        "Graph · {}",
                         format_graph_timespan(self.quick_graph_timespan)
                     )))
                     .push(widget::slider(
