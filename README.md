@@ -1,5 +1,5 @@
-# FRITZ!Power Monitor
-
+# Cosmic FRITZ!Power Monitor Applet
+ 
 A COSMIC panel applet that reads instantaneous power and temperature data
 directly from a FRITZ!Box smart-home device. It does not execute or depend on
 `fritz_solar.sh`.
