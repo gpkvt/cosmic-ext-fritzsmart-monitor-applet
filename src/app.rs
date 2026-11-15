@@ -251,15 +251,17 @@ fn quick_slider_position(value: f32, anchors: [f32; 5]) -> f32 {
     segment as f32 + (value - anchors[segment]) / span
 }
 
-fn quick_slider_anchor_labels(labels: [&'static str; 5]) -> widget::Row<'static, Message> {
-    labels.into_iter().fold(
-        widget::Row::new().width(cosmic::iced::Length::Fill).spacing(0),
-        |row, label| row.push(
-            widget::container(widget::text(label))
-                .width(cosmic::iced::Length::Fill)
-                .align_x(cosmic::iced::alignment::Horizontal::Center),
-        ),
-    )
+fn quick_slider_anchor_labels(labels: [&'static str; 5]) -> cosmic::Element<'static, Message> {
+    let mut row = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
+        .spacing(0);
+    for label in labels {
+        let label: cosmic::Element<'static, Message> = widget::container(widget::text(label))
+            .width(cosmic::iced::Length::Fill)
+            .into();
+        row = row.push(label);
+    }
+    row.into()
 }
 
 fn format_countdown(seconds: u64) -> String {
@@ -822,25 +824,20 @@ impl cosmic::Application for AppModel {
                     let solar_icon = widget::icon::from_name(
                         self.weather.as_ref().map(|weather| weather.icon_name()).unwrap_or("weather-clear-symbolic"),
                     ).size(suggested.1.saturating_sub(2));
+                    let mut icon_row = widget::Row::new()
+                        .spacing(0)
+                        .align_y(cosmic::iced::Alignment::Start)
+                        .push(solar_icon);
                     if input_power.is_some() {
-                        widget::Stack::new()
-                            .push(solar_icon)
-                            .push(
-                                widget::container(
-                                    widget::text("↓")
-                                        .font(cosmic::font::default())
-                                        .size(f32::from(suggested.1 / 2)),
-                                )
-                                .align_x(cosmic::iced::alignment::Horizontal::Right)
-                                .align_y(cosmic::iced::alignment::Vertical::Top)
-                                .padding([0, 1]),
-                            )
-                    } else {
-                        widget::Stack::new().push(solar_icon)
+                        icon_row = icon_row.push(
+                            widget::text("↓")
+                                .font(cosmic::font::default())
+                                .size(f32::from(suggested.1 / 2)),
+                        );
                     }
+                    icon_row
                 })
-                // Symbolic icons sit optically high beside text glyphs;
-                // the input badge overlaps the icon's upper-right corner.
+                // Keep the input marker compact beside the solar/weather icon.
                 .padding([2, 0]),
             )
             .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)));
