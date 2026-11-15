@@ -20,6 +20,7 @@ static DRAG_SCROLL_ID: LazyLock<widget::Id> =
     LazyLock::new(|| widget::Id::new("fritz-power-monitor-drag-scroll"));
 
 const TOTAL_POWER_DRAG_ID: &str = "__TOTAL_POWER__";
+const POWER_DIFFERENCE_DRAG_ID: &str = "__POWER_DIFFERENCE__";
 
 #[derive(Default)]
 pub struct AppModel {
@@ -43,6 +44,7 @@ pub struct AppModel {
     drag_target_since: Option<Instant>,
     drag_original_ains: Option<Vec<String>>,
     drag_original_total_power_first: Option<bool>,
+    drag_original_menu_order: Option<Vec<String>>,
     settings_status: Option<String>,
     settings_saved_until: Option<Instant>,
     history: VecDeque<(Instant, i64)>,
@@ -465,6 +467,25 @@ fn record_device_sample(
     }
 }
 
+fn move_menu_entry(order: &mut Vec<String>, dragged: &str, target: &str) {
+    let normalize = |entry: &str| {
+        if entry == TOTAL_POWER_DRAG_ID || entry == POWER_DIFFERENCE_DRAG_ID {
+            entry.to_string()
+        } else {
+            crate::fritz::normalize_ain_for_selection(entry)
+        }
+    };
+    let dragged = normalize(dragged);
+    let target = normalize(target);
+    let Some(from) = order.iter().position(|entry| normalize(entry) == dragged) else { return; };
+    let Some(to) = order.iter().position(|entry| normalize(entry) == target) else { return; };
+    if from != to {
+        let entry = order.remove(from);
+        order.insert(to, entry);
+    }
+}
+
+// Retained for the legacy device-order unit tests.
 fn move_sortable_entry(
     ains: &mut Vec<String>,
     total_power_first: &mut bool,
@@ -818,55 +839,68 @@ fn total_power_overview(
         input_column = input_column.push(graph_panel(input_graphs.into()));
         power_columns = power_columns.push(input_column);
 
-        // Keep the output and input totals independent. The difference is a
-        // separate net metric, calculated by adding the signed input total.
-        let difference = total_power + input_power_w(readings, &settings.input_ains);
-        let difference_history = rebuild_power_difference_history(history, &input_history);
-        let mut difference_column = widget::Column::new()
-            .spacing(8)
-            .width(cosmic::iced::Length::Fill)
-            .push(metric_tile(
-                "POWER DIFFERENCE",
-                format!("{difference} W"),
-                if difference >= 0 { "go-up-symbolic" } else { "go-down-symbolic" },
-            ));
-        if let (Some(low), Some(high)) = (
-            difference_history.iter().map(|(_, value)| *value).min(),
-            difference_history.iter().map(|(_, value)| *value).max(),
-        ) {
-            difference_column = difference_column.push(
-                widget::Row::new()
-                    .spacing(8)
-                    .width(cosmic::iced::Length::Fill)
-                    .push(widget::container(range_metric_tile(
-                        "LOW", format!("{low} W"), "go-down-symbolic",
-                    )).width(cosmic::iced::Length::Fill))
-                    .push(widget::container(range_metric_tile(
-                        "HIGH", format!("{high} W"), "go-up-symbolic",
-                    )).width(cosmic::iced::Length::Fill)),
-            );
-        }
-        let difference_graph = widget::Column::new()
-            .spacing(4)
-            .push(widget::text::caption("POWER DIFFERENCE (W)"))
-            .push(graph_visual(
-                difference_history.iter().map(|(_, value)| *value as f64),
-                &settings.graph_style,
-                "W",
-            ))
-            .push(widget::Row::new()
-                .width(cosmic::iced::Length::Fill)
-                .push(widget::text::caption(axis_start.clone()))
-                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                .push(widget::text::caption("Now")));
-        difference_column = difference_column.push(graph_panel(difference_graph.into()));
-        power_columns = power_columns.push(difference_column);
+
     }
     let content = widget::Column::new()
         .spacing(10)
         .push(power_columns);
     Some(surface_card(content.into(), 14))
 }
+
+
+fn power_difference_overview(
+    readings: &[FritzReading],
+    settings: &FritzSettings,
+    history: &VecDeque<(Instant, i64)>,
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+) -> Option<cosmic::Element<'static, Message>> {
+    let input_history = rebuild_input_power_history(device_history, &settings.input_ains);
+    let has_input_readings = readings.iter().any(|reading| settings.input_ains.contains(
+        &crate::fritz::normalize_ain_for_selection(&reading.ain),
+    ));
+    if !has_input_readings { return None; }
+    let total_power = output_power_w(readings, &settings.input_ains);
+    let input_power = input_power_w(readings, &settings.input_ains);
+    // Input readings are signed negative values; adding them gives the net difference.
+    let difference = total_power + input_power;
+    let difference_history = rebuild_power_difference_history(history, &input_history);
+    let mut column = widget::Column::new()
+        .spacing(8)
+        .width(cosmic::iced::Length::Fill)
+        .push(metric_tile(
+            "POWER DIFFERENCE",
+            format!("{difference} W"),
+            if difference >= 0 { "go-up-symbolic" } else { "go-down-symbolic" },
+        ));
+    if let (Some(low), Some(high)) = (
+        difference_history.iter().map(|(_, value)| *value).min(),
+        difference_history.iter().map(|(_, value)| *value).max(),
+    ) {
+        column = column.push(widget::Row::new()
+            .spacing(8)
+            .width(cosmic::iced::Length::Fill)
+            .push(widget::container(range_metric_tile("LOW", format!("{low} W"), "go-down-symbolic"))
+                .width(cosmic::iced::Length::Fill))
+            .push(widget::container(range_metric_tile("HIGH", format!("{high} W"), "go-up-symbolic"))
+                .width(cosmic::iced::Length::Fill)));
+    }
+    let graph = widget::Column::new()
+        .spacing(4)
+        .push(widget::text::caption("POWER DIFFERENCE (W)"))
+        .push(graph_visual(
+            difference_history.iter().map(|(_, value)| *value as f64),
+            &settings.graph_style,
+            "W",
+        ))
+        .push(widget::Row::new()
+            .width(cosmic::iced::Length::Fill)
+            .push(widget::text::caption(format_graph_axis_start(settings.graph_timespan_minutes)))
+            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+            .push(widget::text::caption("Now")));
+    column = column.push(graph_panel(graph.into()));
+    Some(surface_card(column.into(), 14))
+}
+
 
 fn settings_section_details(section: &'static str) -> (&'static str, &'static str) {
     match section {
@@ -921,7 +955,7 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
         .push(widget::mouse_area(widget::text("⠿").size(20))
             .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string()))
             .on_release(Message::EndDeviceDrag))
-        .push(widget::text::body("Total power output (net)").width(cosmic::iced::Length::Fill))
+        .push(widget::text::body("Total power output").width(cosmic::iced::Length::Fill))
         .push(widget::text::caption(format!("#{position}")));
     widget::mouse_area(
         widget::container(row)
@@ -937,6 +971,34 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
             })
     )
     .on_enter(Message::DragOverDevice(TOTAL_POWER_DRAG_ID.to_string()))
+    .on_release(Message::EndDeviceDrag)
+    .into()
+}
+
+fn power_difference_sort_row(position: usize) -> cosmic::Element<'static, Message> {
+    let row = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
+        .spacing(6)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(widget::mouse_area(widget::text("⠿").size(20))
+            .on_press(Message::StartDeviceDrag(POWER_DIFFERENCE_DRAG_ID.to_string()))
+            .on_release(Message::EndDeviceDrag))
+        .push(widget::text::body("Power difference").width(cosmic::iced::Length::Fill))
+        .push(widget::text::caption(format!("#{position}")));
+    widget::mouse_area(
+        widget::container(row)
+            .width(cosmic::iced::Length::Fill)
+            .padding(8)
+            .style(|theme| {
+                let cosmic = theme.cosmic();
+                let base = cosmic::iced::Color::from(cosmic.background(false).base);
+                cosmic::iced::widget::container::Style {
+                    background: Some(device_background_color(base, 0).into()),
+                    ..Default::default()
+                }
+            })
+    )
+    .on_enter(Message::DragOverDevice(POWER_DIFFERENCE_DRAG_ID.to_string()))
     .on_release(Message::EndDeviceDrag)
     .into()
 }
@@ -1535,9 +1597,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::body("Select and order power-meter devices"))
                         .push(widget::text_input("Search devices by name or AIN", &self.device_search)
                             .on_input(Message::DeviceSearchChanged));
-                    if self.settings.total_power_first {
-                        content = content.push(total_power_sort_row(1));
-                    }
+                    let mut inserted_specials = HashSet::new();
                     let mut ordered_devices: Vec<&FritzDevice> = self.selected_ains.iter()
                         .filter_map(|ain| self.devices.iter().find(|device|
                             crate::fritz::normalize_ain_for_selection(&device.ain)
@@ -1555,6 +1615,21 @@ impl cosmic::Application for AppModel {
                         let selected_index = self.selected_ains.iter().position(|ain|
                             crate::fritz::normalize_ain_for_selection(ain)
                                 == crate::fritz::normalize_ain_for_selection(&device.ain));
+                        if let Some(_) = selected_index {
+                            let device_key = crate::fritz::normalize_ain_for_selection(&device.ain);
+                            let device_position = self.settings.menu_order.iter()
+                                .position(|entry| entry == &device_key).unwrap_or(usize::MAX);
+                            let total_position = self.settings.menu_order.iter()
+                                .position(|entry| entry == TOTAL_POWER_DRAG_ID).unwrap_or(usize::MAX);
+                            let difference_position = self.settings.menu_order.iter()
+                                .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID).unwrap_or(usize::MAX);
+                            if total_position <= device_position && inserted_specials.insert(TOTAL_POWER_DRAG_ID) {
+                                content = content.push(total_power_sort_row(total_position + 1));
+                            }
+                            if difference_position <= device_position && inserted_specials.insert(POWER_DIFFERENCE_DRAG_ID) {
+                                content = content.push(power_difference_sort_row(difference_position + 1));
+                            }
+                        }
                         let selected = selected_index.is_some();
                         let ain = device.ain.clone();
                         let mut row = widget::Row::new()
@@ -1573,11 +1648,11 @@ impl cosmic::Application for AppModel {
                                     let ain = ain.clone();
                                     move |checked| Message::ToggleDevice(ain.clone(), checked)
                                 }));
-                        if let Some(index) = selected_index {
-                            row = row.push(widget::text::caption(format!(
-                                "#{}",
-                                index + 1 + if self.settings.total_power_first { 1 } else { 0 },
-                            )));
+                        if selected_index.is_some() {
+                            let position = self.settings.menu_order.iter()
+                                .position(|entry| entry == &crate::fritz::normalize_ain_for_selection(&ain))
+                                .unwrap_or_else(|| selected_index.unwrap_or_default());
+                            row = row.push(widget::text::caption(format!("#{}", position + 1)));
                         }
                         let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
                         let alert_thresholds = self.settings.temperature_alerts.get(&normalized_ain).copied();
@@ -1587,7 +1662,7 @@ impl cosmic::Application for AppModel {
                             .push(row)
                             .push(widget::Row::new()
                                 .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::text::caption("Input (subtract from total)"))
+                                .push(widget::text::caption("Input device (separate total)"))
                                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                                 .push(widget::toggler(is_input)
                                     .on_toggle({
@@ -1657,10 +1732,17 @@ impl cosmic::Application for AppModel {
                             );
                         }
                     }
-                    if !self.settings.total_power_first {
-                        content = content.push(total_power_sort_row(self.selected_ains.len() + 1));
+                    if inserted_specials.insert(TOTAL_POWER_DRAG_ID) {
+                        let position = self.settings.menu_order.iter()
+                            .position(|entry| entry == TOTAL_POWER_DRAG_ID).unwrap_or(self.selected_ains.len());
+                        content = content.push(total_power_sort_row(position + 1));
                     }
-                    content = content.push(widget::text::caption("Drag the ⠿ handles to reorder devices and Total power output. Move Total power output to the top to show combined net watts in the panel; move it to the bottom to show the first device's power and temperature. Temperature alerts notify once when a device crosses its configured threshold."));
+                    if inserted_specials.insert(POWER_DIFFERENCE_DRAG_ID) {
+                        let position = self.settings.menu_order.iter()
+                            .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID).unwrap_or(self.selected_ains.len() + 1);
+                        content = content.push(power_difference_sort_row(position + 1));
+                    }
+                    content = content.push(widget::text::caption("Drag the ⠿ handles to reorder devices, Total power output with Total power input grouped alongside it, and Power difference. The order is saved automatically."));
                 }
             }
 
@@ -2007,23 +2089,8 @@ impl cosmic::Application for AppModel {
                 ));
             }
 
-                if self.settings.total_power_first {
-                    if let Some(overview) = total_power_overview(
-                        &self.readings,
-                        &self.settings,
-                        &self.history,
-                        &self.device_history,
-                    ) {
-                        content = content
-                            .push(overview)
-                            .push(widget::divider::horizontal::default());
-                    }
-                }
-                let mut device_cards = widget::Column::new().spacing(0);
+                let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
                 for (index, reading) in self.readings.iter().enumerate() {
-                    if index > 0 {
-                        device_cards = device_cards.push(widget::divider::horizontal::default());
-                    }
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                     let is_expanded = self.collapsed_devices.contains(&device_key);
                     let device_corner_radius = device_corner_radius(index, self.readings.len());
@@ -2178,7 +2245,26 @@ impl cosmic::Application for AppModel {
                                 ..Default::default()
                             }
                         });
-                    device_cards = device_cards.push(device_card);
+                    menu_cards.push((device_key, device_card.into()));
+                }
+                if let Some(overview) = total_power_overview(
+                    &self.readings, &self.settings, &self.history, &self.device_history,
+                ) {
+                    menu_cards.push((TOTAL_POWER_DRAG_ID.to_string(), overview));
+                }
+                if let Some(difference) = power_difference_overview(
+                    &self.readings, &self.settings, &self.history, &self.device_history,
+                ) {
+                    menu_cards.push((POWER_DIFFERENCE_DRAG_ID.to_string(), difference));
+                }
+                menu_cards.sort_by_key(|(id, _)| self.settings.menu_order.iter()
+                    .position(|entry| entry == id).unwrap_or(usize::MAX));
+                let mut device_cards = widget::Column::new().spacing(0);
+                for (index, (_, card)) in menu_cards.into_iter().enumerate() {
+                    if index > 0 {
+                        device_cards = device_cards.push(widget::divider::horizontal::default());
+                    }
+                    device_cards = device_cards.push(card);
                 }
                 let device_list = widget::container(device_cards)
                     .width(cosmic::iced::Length::Fill)
@@ -2186,7 +2272,6 @@ impl cosmic::Application for AppModel {
                         let cosmic = theme.cosmic();
                         cosmic::iced::widget::container::Style {
                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
-                            // Individual rows own the outer top/bottom corner rounding.
                             border: cosmic::iced::Border {
                                 radius: 0.0.into(),
                                 ..Default::default()
@@ -2194,19 +2279,7 @@ impl cosmic::Application for AppModel {
                             ..Default::default()
                         }
                     });
-                content = content
-                    .push(device_list)
-                    .push(widget::divider::horizontal::default());
-                if !self.settings.total_power_first {
-                    if let Some(overview) = total_power_overview(
-                        &self.readings,
-                        &self.settings,
-                        &self.history,
-                        &self.device_history,
-                    ) {
-                        content = content.push(overview);
-                    }
-                }
+                content = content.push(device_list);
             } else {
                 content = content.push(widget::text::body("Select one or more devices in Settings"));
             }
@@ -2763,7 +2836,20 @@ impl cosmic::Application for AppModel {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
                 self.selected_ains.retain(|existing|
                     crate::fritz::normalize_ain_for_selection(existing) != normalized);
-                if selected { self.selected_ains.push(ain); }
+                if selected {
+                    self.selected_ains.push(ain);
+                    if !self.settings.menu_order.iter().any(|entry|
+                        crate::fritz::normalize_ain_for_selection(entry) == normalized)
+                    {
+                        let insert_at = self.settings.menu_order.iter()
+                            .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID)
+                            .unwrap_or(self.settings.menu_order.len());
+                        self.settings.menu_order.insert(insert_at, normalized);
+                    }
+                } else {
+                    self.settings.menu_order.retain(|entry|
+                        crate::fritz::normalize_ain_for_selection(entry) != normalized);
+                }
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
                 self.persist_settings();
@@ -2782,7 +2868,7 @@ impl cosmic::Application for AppModel {
                 ).into_iter().collect();
             }
             Message::StartDeviceDrag(ain) => {
-                if ain == TOTAL_POWER_DRAG_ID || self.selected_ains.iter().any(|selected|
+                if ain == TOTAL_POWER_DRAG_ID || ain == POWER_DIFFERENCE_DRAG_ID || self.selected_ains.iter().any(|selected|
                     crate::fritz::normalize_ain_for_selection(selected)
                         == crate::fritz::normalize_ain_for_selection(&ain))
                 {
@@ -2792,11 +2878,13 @@ impl cosmic::Application for AppModel {
                     self.drag_scroll_direction = 0;
                     self.drag_original_ains = Some(self.selected_ains.clone());
                     self.drag_original_total_power_first = Some(self.settings.total_power_first);
+                    self.drag_original_menu_order = Some(self.settings.menu_order.clone());
                 }
             }
             Message::DragOverDevice(target_ain) => {
                 if let Some(dragged_ain) = self.dragging_device_ain.as_deref() {
                     let target_is_valid = target_ain == TOTAL_POWER_DRAG_ID
+                        || target_ain == POWER_DIFFERENCE_DRAG_ID
                         || self.selected_ains.iter().any(|selected|
                             crate::fritz::normalize_ain_for_selection(selected)
                                 == crate::fritz::normalize_ain_for_selection(&target_ain));
@@ -2807,11 +2895,9 @@ impl cosmic::Application for AppModel {
                     if target_is_valid && dragged_ain != target_ain && !same_target {
                         // Move the dragged entry as soon as a new row is entered.
                         // The insertion preview then animates at the live position.
-                        move_sortable_entry(
-                            &mut self.selected_ains,
-                            &mut self.settings.total_power_first,                            dragged_ain,
-                            &target_ain,
-                        );
+                        move_menu_entry(&mut self.settings.menu_order, dragged_ain, &target_ain);
+                        self.settings.total_power_first =
+                            self.settings.menu_order.first().is_some_and(|entry| entry == TOTAL_POWER_DRAG_ID);
                         self.drag_target_ain = Some(target_ain);
                         self.drag_target_since = Some(Instant::now());
                     }
@@ -2837,11 +2923,17 @@ impl cosmic::Application for AppModel {
                     let previous_ains = self.drag_original_ains.take().unwrap_or_default();
                     let previous_total_power_first =
                         self.drag_original_total_power_first.take().unwrap_or(self.settings.total_power_first);
+                    let previous_menu_order = self.drag_original_menu_order.take().unwrap_or_default();
                     self.drag_target_ain = None;
                     self.drag_target_since = None;
                     if self.selected_ains != previous_ains
                         || self.settings.total_power_first != previous_total_power_first
+                        || self.settings.menu_order != previous_menu_order
                     {
+                        let ordered_devices: Vec<String> = self.settings.menu_order.iter()
+                            .filter(|entry| entry.as_str() != TOTAL_POWER_DRAG_ID && entry.as_str() != POWER_DIFFERENCE_DRAG_ID)
+                            .cloned().collect();
+                        if !ordered_devices.is_empty() { self.selected_ains = ordered_devices; }
                         self.settings.ains = self.selected_ains.clone();
                         self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
                         self.persist_settings();
@@ -3298,30 +3390,41 @@ mod history_tests {
 
     #[test]
     fn live_drag_reorders_devices_as_targets_are_entered() {
-        let mut ains = vec!["a".into(), "b".into(), "c".into()];
-        let mut total_power_first = false;
+        let mut order = vec!["a".into(), "b".into(), "c".into()];
 
-        move_sortable_entry(&mut ains, &mut total_power_first, "a", "c");
+        move_sortable_entry(&mut order, "a", "c");
 
-        assert_eq!(ains, vec!["b", "c", "a"]);
-        assert!(!total_power_first);
+        assert_eq!(order, vec!["b".to_string(), "c".to_string(), "a".to_string()]);
 
-        move_sortable_entry(&mut ains, &mut total_power_first, "a", "b");
+        move_sortable_entry(&mut order, "a", "b");
 
-        assert_eq!(ains, vec!["a", "b", "c"]);
+        assert_eq!(order, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
     }
 
     #[test]
-    fn live_drag_moves_total_power_between_first_and_last_positions() {
-        let mut ains = vec!["a".into(), "b".into()];
-        let mut total_power_first = false;
+    fn live_drag_reorders_both_power_cards_with_devices() {
+        let mut order = vec![
+            TOTAL_POWER_DRAG_ID.into(),
+            "a".into(),
+            "b".into(),
+            POWER_DIFFERENCE_DRAG_ID.into(),
+        ];
 
-        move_sortable_entry(&mut ains, &mut total_power_first, TOTAL_POWER_DRAG_ID, "a");
-        assert!(total_power_first);
+        move_sortable_entry(&mut order, POWER_DIFFERENCE_DRAG_ID, "a");
+        assert_eq!(order, vec![
+            TOTAL_POWER_DRAG_ID.to_string(),
+            POWER_DIFFERENCE_DRAG_ID.to_string(),
+            "a".to_string(),
+            "b".to_string(),
+        ]);
 
-        move_sortable_entry(&mut ains, &mut total_power_first, "a", TOTAL_POWER_DRAG_ID);
-        assert!(!total_power_first);
-        assert_eq!(ains, vec!["b", "a"]);
+        move_sortable_entry(&mut order, "b", TOTAL_POWER_DRAG_ID);
+        assert_eq!(order, vec![
+            "b".to_string(),
+            TOTAL_POWER_DRAG_ID.to_string(),
+            POWER_DIFFERENCE_DRAG_ID.to_string(),
+            "a".to_string(),
+        ]);
     }
 
 }

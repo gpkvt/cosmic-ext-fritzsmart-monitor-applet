@@ -9,11 +9,11 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 - Displays current power in watts and temperature in the COSMIC panel, with a configurable text size, optional average FRITZ!Box device temperature, the current OpenWeatherMap temperature when weather is enabled, and a separate input-power figure accompanied by a dedicated solar-panel SVG icon when Total power is shown.
 - Settings open on a simple category index (Panel, Graph history, Automatic refresh, Weather, Connection, Devices and Diagnostics). Each category opens its own focused detail view with a consistent back action, keeping unrelated controls out of the way.
 - Device rows are rendered as a compact, gap-free list inspired by COSMIC Settings’ Add Applet list; each device can still be expanded independently. The popup uses a dedicated live-power summary with prominent net or selected-device wattage, optional input power and temperature metrics, and a device count. Weather, total-power and device content use consistent rounded, theme-aware cards.
-- Device cards separate the device identity and live state from prominent power/temperature metric tiles, the power switch and side-by-side history graphs. Total power keeps the net and input graphs side by side in a matching overview card. The popup is 440 px wide and each history sparkline is resampled to 12 columns so the graphs make better use of that space.
+- Device cards separate the device identity and live state from prominent power/temperature metric tiles, the power switch and side-by-side history graphs. Total power output and input remain together in one card; Power difference has its own independent card and graph. The popup is 440 px wide and each history sparkline is resampled to 12 columns so the graphs make better use of that space.
 - Settings use icon-led, descriptive section cards with clear subtitles, expandable controls and a dedicated settings heading.
-- Devices with “solar” in their name are automatically marked as inputs on first discovery; the default is applied only once so manual changes are preserved. Input wattage is subtracted from the net total, and each input gets its own graph in the total-power card.
+- Devices with “solar” in their name are automatically marked as inputs on first discovery; the default is applied only once so manual changes are preserved. Input wattage is tracked independently and does not alter Total power output; Power difference combines output with signed input wattage.
 - The main menu has a sticky title bar with icon-only Refresh and Settings actions; both use accessible labels and tooltips. The menu content scrolls independently beneath the title bar. The main menu and settings are vertically scrollable when their content exceeds the popup height.
-- The sortable Settings list includes a synthetic **Total power (net)** entry alongside devices. Move it to the top to show combined net watts in the panel, or to the bottom to restore the first selected device's power and temperature. Its position is persisted independently from the FRITZ!Box device selection.
+- The sortable Settings list includes independent **Total power output** and **Power difference** entries alongside selected devices. Total power input stays grouped with Total power output. The complete order is saved and restored.
 - The main popup shows live on/off state and a native toggle switch for selected devices that expose FRITZ!Box switching support. The switch remains disabled while the command is verified against the FRITZ!Box and until refreshed power and temperature readings arrive; non-switchable devices have no power toggle.
 - In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy; every setting is saved immediately when changed.
 - Optional per-device temperature alerts for readings above the upper limit or below the lower limit. Defaults are 40 °C and −10 °C; the upper limit is configurable from 0–40 °C and the lower limit from −10–0 °C. Desktop notifications fire when a device crosses out of the safe range and re-arm when it returns.
@@ -71,7 +71,7 @@ cargo build --release
 ```
 
 GitHub Actions formats the Rust sources, runs the test suite, checks compilation, builds the optimized binary and validates installation on pull requests and pushes to `main`. Pushing
-a version tag such as `v0.2.6` builds Linux x86_64 release packages and
+a version tag such as `v0.2.7` builds Linux x86_64 release packages and
 publishes them on the GitHub Releases page:
 
 - A Debian `.deb` package with runtime dependencies detected from the built
@@ -91,18 +91,15 @@ list.
 
 ## Configuration
 
-Open the applet popup and choose **Settings**. Adjust **Panel text size** (10–24 pt) to change the power and temperature labels in the panel. Enable **Show average temperature in panel** to show the mean temperature across selected devices instead of the first device's temperature (and alongside net power when Total power is first). When this option is enabled, **Exclude solar devices** can omit temperatures from devices whose names contain “solar” from the average; this is useful when inverter temperatures would skew the household average. Both preferences are saved. When Total power is first, input devices' combined signed wattage is also shown as a second power figure. These settings are saved with the rest of the applet configuration. Set **Automatic refresh** from 30 seconds to 1 hour; the main popup shows a live countdown to the next refresh. The default is 60 seconds. Enter the FRITZ!Box URL,
-username and password, then choose **Load devices**. The applet discovers
-devices that expose both power and temperature measurements. Check every
-device you want to monitor, then use the grip (⠿) handles to reorder selected
-devices and the **Total power (net)** entry in the same list. Move Total power
-to the top to display the combined net wattage in the panel without a
-temperature value; move it to the bottom to restore the first selected device's
-power and temperature. This position is saved independently of the FRITZ!Box
-device selection. The list reorders live as you drag over targets, with an animated insertion preview; release the mouse button to finish and save the new order. Enable **Input (subtract from total)**
-for devices that measure consumption rather than generation; their wattage is
-subtracted from the combined net-power reading and their individual signed
-history is shown in the total-power card. This role is saved per device.
+Open the applet popup and choose **Settings**. Adjust **Panel text size** (10–24 pt) to change the power and temperature labels in the panel. Enable **Show average temperature in panel** to show the mean temperature across selected devices instead of the first device's temperature. When enabled, **Exclude solar devices** can omit temperatures from devices whose names contain “solar” from the average. These preferences are saved. Set **Automatic refresh** from 30 seconds to 1 hour; the default is 60 seconds. Enter the FRITZ!Box URL,
+username and password, then choose **Load devices**. Select the devices to monitor,
+then use the grip (⠿) handles to reorder selected devices, **Total power output**
+(and its grouped **Total power input**) and **Power difference** in the same list.
+The order is saved automatically and restored after restarting the applet.
+Enable **Input (subtract from total)** for devices that measure consumption rather
+than generation. Input wattage remains a separate signed measurement and does not
+change Total power output; **Power difference** combines output and input readings.
+Each input device keeps its own history graph.
 For each device, enable **Temperature alerts** to receive notifications when its temperature
 rises above the upper limit or falls below the lower limit. The defaults are
 40 °C and −10 °C; both limits can be adjusted within their safe ranges in
