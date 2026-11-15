@@ -23,6 +23,7 @@ static DRAG_SCROLL_ID: LazyLock<widget::Id> =
 const TOTAL_POWER_DRAG_ID: &str = "__TOTAL_POWER__";
 const POWER_DIFFERENCE_DRAG_ID: &str = "__POWER_DIFFERENCE__";
 const SUMMARY_DRAG_ID: &str = "__LIVE_SUMMARY__";
+const WEATHER_DRAG_ID: &str = "__WEATHER__";
 
 #[derive(Default)]
 pub struct AppModel {
@@ -517,7 +518,7 @@ fn record_device_sample(
 
 fn move_menu_entry(order: &mut Vec<String>, dragged: &str, target: &str) {
     let normalize = |entry: &str| {
-        if entry == TOTAL_POWER_DRAG_ID || entry == POWER_DIFFERENCE_DRAG_ID || entry == SUMMARY_DRAG_ID {
+        if entry == TOTAL_POWER_DRAG_ID || entry == POWER_DIFFERENCE_DRAG_ID || entry == SUMMARY_DRAG_ID || entry == WEATHER_DRAG_ID {
             entry.to_string()
         } else {
             crate::fritz::normalize_ain_for_selection(entry)
@@ -2291,7 +2292,9 @@ impl cosmic::Application for AppModel {
                 content = content.push(widget::text::caption("✓ Saved"));
             }
         } else {
+            let mut weather_menu_card: Option<cosmic::Element<'_, Message>> = None;
             if let Some(weather) = &self.weather {
+                let mut weather_section = widget::Column::new().spacing(8);
                 let wind_direction = weather
                     .wind_direction_degrees
                     .map(|degrees| format!("{degrees}°"))
@@ -2473,7 +2476,7 @@ impl cosmic::Application for AppModel {
                 .padding([4, 0])
                 .width(cosmic::iced::Length::Fill)
                 .class(cosmic::theme::Button::Text);
-                content = content.push(weather_heading).push(weather_card);
+                weather_section = weather_section.push(weather_heading).push(weather_card);
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
                     let forecast_range_selector = widget::Row::new()
@@ -2517,7 +2520,7 @@ impl cosmic::Application for AppModel {
                                 cosmic::theme::Button::Text
                             }),
                         );
-                    content = content
+                    weather_section = weather_section
                         .push(widget::divider::horizontal::default())
                         .push(
                             widget::Row::new()
@@ -2531,10 +2534,10 @@ impl cosmic::Application for AppModel {
                         )
                         .push(widget::text::caption("Forecast data by Open-Meteo"));
                     if self.weather_forecast_loading {
-                        content = content.push(widget::text::caption("Loading forecast…"));
+                        weather_section = weather_section.push(widget::text::caption("Loading forecast…"));
                     }
                     if let Some(error) = &self.weather_forecast_error {
-                        content = content.push(error_notice("FORECAST UNAVAILABLE", error));
+                        weather_section = weather_section.push(error_notice("FORECAST UNAVAILABLE", error));
                     }
                     if let Some(forecast) = &self.weather_forecast {
                         for day in &forecast.days {
@@ -2581,22 +2584,25 @@ impl cosmic::Application for AppModel {
                                             day.wind_speed_kmh
                                         ))),
                                 );
-                            content = content.push(day_row);
+                            weather_section = weather_section.push(day_row);
                         }
                     }
                 }
                 if let Some(error) = &self.weather_error {
-                    content = content.push(error_notice("WEATHER UNAVAILABLE", error));
+                    weather_section = weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
                 }
-                content = content.push(widget::divider::horizontal::default());
+                weather_section = weather_section.push(widget::divider::horizontal::default());
+                weather_menu_card = Some(weather_section.into());
             } else if self.settings.weather_enabled {
-                content = content.push(widget::text::title3("Weather"));
+                let mut weather_section = widget::Column::new().spacing(8);
+                weather_section = weather_section.push(widget::text::title3("Weather"));
                 if let Some(error) = &self.weather_error {
-                    content = content.push(error_notice("WEATHER UNAVAILABLE", error));
+                    weather_section = weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
                 } else {
-                    content = content.push(widget::text::body("Weather data is loading…"));
+                    weather_section = weather_section.push(widget::text::body("Weather data is loading…"));
                 }
-                content = content.push(widget::divider::horizontal::default());
+                weather_section = weather_section.push(widget::divider::horizontal::default());
+                weather_menu_card = Some(weather_section.into());
             }
 
             if self.error.is_none() && !self.readings.is_empty() {
@@ -2653,6 +2659,9 @@ impl cosmic::Application for AppModel {
 
                     let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
                     menu_cards.push((SUMMARY_DRAG_ID.to_string(), summary_card));
+                    if let Some(weather_card) = weather_menu_card.take() {
+                        menu_cards.push((WEATHER_DRAG_ID.to_string(), weather_card));
+                    }
                 for (index, reading) in self.readings.iter().enumerate() {
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                     let is_expanded = self.collapsed_devices.contains(&device_key);
@@ -2954,6 +2963,10 @@ impl cosmic::Application for AppModel {
             } else {
                 content =
                     content.push(widget::text::body("Select one or more devices in Settings"));
+            }
+
+            if let Some(weather_card) = weather_menu_card.take() {
+                content = content.push(sortable_menu_card(WEATHER_DRAG_ID.to_string(), weather_card));
             }
 
             let remaining = self
@@ -3692,6 +3705,7 @@ impl cosmic::Application for AppModel {
                 if ain == TOTAL_POWER_DRAG_ID
                     || ain == POWER_DIFFERENCE_DRAG_ID
                     || ain == SUMMARY_DRAG_ID
+                    || ain == WEATHER_DRAG_ID
                     || self.selected_ains.iter().any(|selected| {
                         crate::fritz::normalize_ain_for_selection(selected)
                             == crate::fritz::normalize_ain_for_selection(&ain)
@@ -3711,6 +3725,7 @@ impl cosmic::Application for AppModel {
                     let target_is_valid = target_ain == TOTAL_POWER_DRAG_ID
                         || target_ain == POWER_DIFFERENCE_DRAG_ID
                         || target_ain == SUMMARY_DRAG_ID
+                        || target_ain == WEATHER_DRAG_ID
                         || self.selected_ains.iter().any(|selected| {
                             crate::fritz::normalize_ain_for_selection(selected)
                                 == crate::fritz::normalize_ain_for_selection(&target_ain)
@@ -3719,6 +3734,7 @@ impl cosmic::Application for AppModel {
                         id == TOTAL_POWER_DRAG_ID
                             || id == POWER_DIFFERENCE_DRAG_ID
                             || id == SUMMARY_DRAG_ID
+                            || id == WEATHER_DRAG_ID
                     };
                     let same_target = self.drag_target_ain.as_deref().is_some_and(|current| {
                         current == target_ain
@@ -3779,6 +3795,7 @@ impl cosmic::Application for AppModel {
                                 entry.as_str() != TOTAL_POWER_DRAG_ID
                                     && entry.as_str() != POWER_DIFFERENCE_DRAG_ID
                                     && entry.as_str() != SUMMARY_DRAG_ID
+                                    && entry.as_str() != WEATHER_DRAG_ID
                             })
                             .cloned()
                             .collect();
