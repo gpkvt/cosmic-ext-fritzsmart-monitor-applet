@@ -605,6 +605,7 @@ fn icon_action_button<'a>(
     .padding(0)
     .width(cosmic::iced::Length::Fixed(36.0))
     .height(cosmic::iced::Length::Fixed(36.0))
+    .class(cosmic::theme::Button::Icon)
     .name(accessible_name)
 }
 
@@ -649,6 +650,8 @@ fn action_button<'a>(
             .push(widget::text::body(label)),
     )
     .on_press(message)
+    .padding(8)
+    .class(cosmic::theme::Button::Standard)
 }
 
 impl AppModel {
@@ -787,8 +790,11 @@ impl cosmic::Application for AppModel {
             content
                 .push(
                     widget::container(
-                        widget::icon::from_name("solar-panel-symbolic")
-                            .size(suggested.1.saturating_sub(2)),
+                        // Use a font glyph instead of an optional icon-theme name:
+                        // the input indicator must remain visible on every COSMIC setup.
+                        widget::text("☀")
+                            .font(cosmic::font::default())
+                            .size(f32::from(suggested.1.saturating_sub(2))),
                     )
                     .padding([2, 0]),
                 )
@@ -1203,7 +1209,8 @@ impl cosmic::Application for AppModel {
                     content = content.push(
                         widget::button::custom(widget::text::caption(label))
                             .on_press(Message::ToggleWeatherAttribution)
-                            .padding([2, 0]),
+                            .padding(6)
+                            .class(cosmic::theme::Button::Standard),
                     );
                     if self.weather_attribution_expanded {
                         content = content.push(widget::container(
@@ -1413,6 +1420,8 @@ impl cosmic::Application for AppModel {
                         widget::text::body("Settings").width(cosmic::iced::Length::Fill),
                     )
                     .on_press(Message::ToggleSettings)
+                    .padding(10)
+                    .class(cosmic::theme::Button::Standard)
                     .width(cosmic::iced::Length::Fill),
                 );
         }
