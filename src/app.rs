@@ -545,7 +545,7 @@ fn move_menu_entry_at(order: &mut Vec<String>, dragged: &str, target: &str, afte
         order.insert(from.min(order.len()), entry);
         return;
     };
-    let insertion_index = target_index + usize::from(after);
+    let insertion_index = target_index + if after { 1 } else { 0 };
     order.insert(insertion_index.min(order.len()), entry);
 }
 
