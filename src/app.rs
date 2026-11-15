@@ -604,7 +604,7 @@ fn live_power_summary(
     }
     if let Some(temp) = temperature {
         has_supporting = true;
-        supporting = supporting.push(metric_tile("", temp, "thermometer-symbolic"));
+        supporting = supporting.push(metric_tile("TEMP", temp, "utilities-temperature-symbolic"));
     }
 
     let mut content = widget::Row::new()
@@ -1664,7 +1664,7 @@ impl cosmic::Application for AppModel {
                         .spacing(8)
                         .width(cosmic::iced::Length::Fill)
                         .push(metric_tile("POWER", format!("{} W", reading.power_w), "utilities-system-monitor-symbolic"))
-                        .push(metric_tile("", format!("{:.1} °C", reading.temperature_c), "thermometer-symbolic"));
+                        .push(metric_tile("TEMP", format!("{:.1} °C", reading.temperature_c), "utilities-temperature-symbolic"));
                     let device_content = widget::Column::new()
                         .spacing(10)
                         .push(metrics)
@@ -1728,8 +1728,7 @@ impl cosmic::Application for AppModel {
                                                 .push(widget::Row::new()
                                                     .spacing(6)
                                                     .align_y(cosmic::iced::Alignment::Center)
-                                                    .push(widget::icon::from_name("thermometer-symbolic").size(14))
-                                                    .push(widget::text::caption("(°C)")) )
+                                                    .push(widget::text::caption("TEMP (°C)")) )
                                                 .push(widget::text::body(temperature_graph)
                                                     .width(cosmic::iced::Length::Fill)
                                                     .align_x(cosmic::iced::Alignment::End))
