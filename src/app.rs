@@ -1174,6 +1174,9 @@ impl cosmic::Application for AppModel {
                     );
                     notify_missing_devices(&newly_missing);
                     let readings = result.readings;
+                    if readings.is_empty() {
+                        self.error = Some("No selected devices returned usable readings".into());
+                    } else {
                     let total_power = readings.iter().map(|reading| reading.power_w).sum();
                     let now = Instant::now();
                     let history_window = graph_history_window(self.settings.graph_timespan_minutes);
@@ -1199,6 +1202,7 @@ impl cosmic::Application for AppModel {
                     self.readings = readings;
                     self.error = None;
                     self.updated = Some(chrono::Local::now().format("%H:%M:%S").to_string());
+                    }
                 }
                 Err(error) => {
                     self.error = Some(error);
