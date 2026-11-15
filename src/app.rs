@@ -538,6 +538,44 @@ fn metric_tile<'a>(
     surface_card(content.into(), 10)
 }
 
+fn device_corner_radius(device_count: usize) -> f32 {
+    if device_count > 1 { 0.0 } else { 8.0 }
+}
+
+fn device_metric_tile<'a>(
+    label: impl Into<String>,
+    value: impl Into<String>,
+    icon: &'static str,
+    radius: f32,
+) -> cosmic::Element<'a, Message> {
+    let label = label.into();
+    let mut heading = widget::Row::new()
+        .spacing(6)
+        .align_y(cosmic::iced::Alignment::Start)
+        .push(widget::icon::from_name(icon).size(14));
+    if !label.is_empty() {
+        heading = heading.push(widget::text::caption(label));
+    }
+    let content = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Start)
+        .push(heading)
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+        .push(widget::text::title3(keep_value_unit_together(value.into())));
+    widget::container(content)
+        .width(cosmic::iced::Length::Fill)
+        .padding(10)
+        .style(move |theme| {
+            let cosmic = theme.cosmic();
+            cosmic::iced::widget::container::Style {
+                background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                border: cosmic::iced::Border { radius: radius.into(), ..Default::default() },
+                ..Default::default()
+            }
+        })
+        .into()
+}
+
 fn range_metric_tile<'a>(
     label: &'static str,
     value: String,
@@ -1598,6 +1636,7 @@ impl cosmic::Application for AppModel {
                     }
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                     let is_expanded = self.expanded_devices.contains(&device_key);
+                    let device_corner_radius = device_corner_radius(self.readings.len());
                     let device_history = self.device_history.get(&device_key);
                     let power_graph = device_history.map(|samples|
                         numeric_sparkline(samples.iter().map(|(_, power, _)| *power as f64)))
@@ -1649,8 +1688,8 @@ impl cosmic::Application for AppModel {
                     let metrics = widget::Row::new()
                         .spacing(8)
                         .width(cosmic::iced::Length::Fill)
-                        .push(metric_tile("POWER", format!("{} W", reading.power_w), "utilities-system-monitor-symbolic"))
-                        .push(metric_tile("TEMP", format!("{:.1} °C", reading.temperature_c), "utilities-temperature-symbolic"));
+                        .push(device_metric_tile("POWER", format!("{} W", reading.power_w), "utilities-system-monitor-symbolic", device_corner_radius))
+                        .push(device_metric_tile("TEMP", format!("{:.1} °C", reading.temperature_c), "utilities-temperature-symbolic", device_corner_radius));
                     let device_content = widget::Column::new()
                         .spacing(10)
                         .push(metrics)
@@ -1684,7 +1723,7 @@ impl cosmic::Application for AppModel {
                                             cosmic::iced::widget::container::Style {
                                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
                                                 border: cosmic::iced::Border {
-                                                    radius: 8.0.into(),
+                                                    radius: device_corner_radius.into(),
                                                     ..Default::default()
                                                 },
                                                 ..Default::default()
@@ -1698,7 +1737,7 @@ impl cosmic::Application for AppModel {
                                         cosmic::iced::widget::container::Style {
                                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
                                             border: cosmic::iced::Border {
-                                                radius: 8.0.into(),
+                                                radius: device_corner_radius.into(),
                                                 ..Default::default()
                                             },
                                             ..Default::default()
@@ -1733,7 +1772,7 @@ impl cosmic::Application for AppModel {
                                             cosmic::iced::widget::container::Style {
                                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
                                                 border: cosmic::iced::Border {
-                                                    radius: 8.0.into(),
+                                                    radius: device_corner_radius.into(),
                                                     ..Default::default()
                                                 },
                                                 ..Default::default()
@@ -1747,7 +1786,7 @@ impl cosmic::Application for AppModel {
                                         cosmic::iced::widget::container::Style {
                                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
                                             border: cosmic::iced::Border {
-                                                radius: 8.0.into(),
+                                                radius: device_corner_radius.into(),
                                                 ..Default::default()
                                             },
                                             ..Default::default()
@@ -1774,7 +1813,7 @@ impl cosmic::Application for AppModel {
                         cosmic::iced::widget::container::Style {
                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
                             border: cosmic::iced::Border {
-                                radius: 8.0.into(),
+                                radius: device_corner_radius.into(),
                                 ..Default::default()
                             },
                             ..Default::default()
@@ -2420,6 +2459,14 @@ impl cosmic::Application for AppModel {
 #[cfg(test)]
 mod history_tests {
     use super::*;
+
+    #[test]
+    fn adjacent_device_rows_have_square_corners_but_single_device_keeps_rounding() {
+        assert_eq!(device_corner_radius(0), 8.0);
+        assert_eq!(device_corner_radius(1), 8.0);
+        assert_eq!(device_corner_radius(2), 0.0);
+        assert_eq!(device_corner_radius(5), 0.0);
+    }
 
     #[test]
     fn displayed_power_uses_selected_device_or_net_total_by_layout_mode() {
