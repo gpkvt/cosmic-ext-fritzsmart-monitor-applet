@@ -67,6 +67,15 @@ jobs:
         run: |
           flatpak-builder --user --force-clean --repo=flatpak-repo \
             build-flatpak com.gpkvt.FritzPowerMonitor.yml
+      - name: Build and smoke-test distributable Flatpak bundle
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/fritz-power-monitor-ci.flatpak"
+          flatpak build-bundle flatpak-repo "$bundle" \
+            com.gpkvt.FritzPowerMonitor stable \
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user --noninteractive --bundle "$bundle"
+          flatpak uninstall --user --noninteractive com.gpkvt.FritzPowerMonitor
       - name: Run tests
         run: cargo test --locked
       - name: Check build
