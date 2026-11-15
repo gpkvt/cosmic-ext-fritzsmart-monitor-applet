@@ -1722,7 +1722,7 @@ impl cosmic::Application for AppModel {
                                     .style(|theme| {
                                         let cosmic = theme.cosmic();
                                         cosmic::iced::widget::container::Style {
-                                            background: Some(cosmic::iced::Color::from(cosmic.background(false).component).into()),
+                                            background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
                                             ..Default::default()
                                         }
                                     }),
