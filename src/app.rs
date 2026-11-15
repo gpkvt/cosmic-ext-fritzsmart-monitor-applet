@@ -79,7 +79,6 @@ pub enum Message {
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
-    PanelPaddingChanged(u8),
     PanelAverageTemperatureChanged(bool),
     PanelExcludeSolarTemperatureChanged(bool),
     GraphTimespanChanged(u16),
@@ -952,14 +951,12 @@ impl cosmic::Application for AppModel {
         };
 
         let suggested = self.core.applet.suggested_size(true);
-        let panel_padding = u16::from(self.settings.panel_padding);
-        // Keep a comfortable pointer/touch target even when panel padding is
-        // configured to its minimum.
-        let vertical_padding = panel_padding.max(8);
-        let horizontal_padding = panel_padding.max(10);
+        // Keep a comfortable pointer/touch target with a compact icon-to-value gap.
+        let vertical_padding = 8_u16;
+        let horizontal_padding = 10_u16;
 
         let content = widget::Row::new()
-            .spacing(8)
+            .spacing(3)
             .align_y(cosmic::iced::Alignment::Center)
             .push(
                 widget::container({
@@ -968,7 +965,7 @@ impl cosmic::Application for AppModel {
                     ).size(suggested.1.saturating_sub(2));
                     cosmic::iced::widget::Stack::new().push(solar_icon)
                 })
-                .padding(5)
+                .padding(3)
                 .style(|theme| {
                     let cosmic = theme.cosmic();
                     cosmic::iced::widget::container::Style {
@@ -1078,16 +1075,6 @@ impl cosmic::Application for AppModel {
                         .step(1.0),
                     )
                     .push(widget::text::caption("Adjusts the power and temperature text in the panel"))
-                    .push(widget::text::body(format!("Panel padding: {} px", self.settings.panel_padding)))
-                    .push(
-                        widget::slider(
-                            0.0..=16.0,
-                            f32::from(self.settings.panel_padding),
-                            |value| Message::PanelPaddingChanged(value.round() as u8),
-                        )
-                        .step(1.0),
-                    )
-                    .push(widget::text::caption("Controls the space around the panel contents"))
                     .push(widget::Row::new()
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::Column::new()
@@ -2194,10 +2181,6 @@ impl cosmic::Application for AppModel {
             }
             Message::PanelTextSizeChanged(value) => {
                 self.settings.panel_text_size = value.clamp(10, 24);
-                self.persist_settings();
-            }
-            Message::PanelPaddingChanged(value) => {
-                self.settings.panel_padding = value.min(16);
                 self.persist_settings();
             }
             Message::PanelAverageTemperatureChanged(value) => {
