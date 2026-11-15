@@ -531,7 +531,77 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
     if body.trim() != "1" {
         return Err(format!("FRITZ!Box did not confirm the power command: {}", body.trim()));
     }
-    Ok(())
+
+    wait_for_device_power_state(
+        &client,
+        base,
+        &sid,
+        &selected_ains,
+        &ain,
+        on,
+    ).await
+}
+
+const POWER_CONFIRM_TIMEOUT: Duration = Duration::from_secs(30);
+const POWER_CONFIRM_INTERVAL: Duration = Duration::from_secs(2);
+
+fn power_state_matches(
+    readings: &[FritzReading],
+    ain: &str,
+    requested_state: bool,
+) -> bool {
+    let key = normalize_ain_for_selection(ain);
+    readings.iter().any(|reading| {
+        normalize_ain_for_selection(&reading.ain) == key
+            && reading.power_state == Some(requested_state)
+    })
+}
+
+async fn wait_for_device_power_state(
+    client: &Client,
+    base: &str,
+    sid: &str,
+    selected_ains: &[String],
+    ain: &str,
+    requested_state: bool,
+) -> Result<(), String> {
+    let deadline = tokio::time::Instant::now() + POWER_CONFIRM_TIMEOUT;
+    let mut last_error: Option<String> = None;
+
+    loop {
+        let verification = async {
+            let response = client
+                .get(format!("{base}/webservices/homeautoswitch.lua"))
+                .query(&[("sid", sid), ("switchcmd", "getdevicelistinfos")])
+                .send()
+                .await
+                .map_err(|error| format!("Could not verify device state: {error}"))?;
+            let xml = read_xml_response(response, "Could not verify device state").await?;
+            let result = parse_device_readings_detailed_xml(&xml, selected_ains)?;
+            Ok::<bool, String>(power_state_matches(&result.readings, ain, requested_state))
+        }
+        .await;
+
+        match verification {
+            Ok(true) => return Ok(()),
+            Ok(false) => last_error = None,
+            Err(error) => last_error = Some(error),
+        }
+
+        let now = tokio::time::Instant::now();
+        if now >= deadline {
+            let detail = last_error
+                .map(|error| format!(" Last verification error: {error}"))
+                .unwrap_or_default();
+            return Err(format!(
+                "Device did not report {} within {} seconds.{detail}",
+                if requested_state { "on" } else { "off" },
+                POWER_CONFIRM_TIMEOUT.as_secs(),
+            ));
+        }
+
+        tokio::time::sleep(POWER_CONFIRM_INTERVAL.min(deadline - now)).await;
+    }
 }
 
 pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
@@ -833,6 +903,39 @@ mod tests {
         ).unwrap();
         assert_eq!(readings[0].power_state, Some(true));
         assert_eq!(readings[1].power_state, None);
+    }
+
+    #[test]
+    fn power_state_confirmation_matches_normalized_ain_and_requested_state() {
+        let readings = vec![
+            FritzReading {
+                ain: "12:34 56".into(),
+                name: "Smart plug".into(),
+                power_w: 0,
+                temperature_c: 20.0,
+                power_state: Some(true),
+            },
+        ];
+
+        assert!(power_state_matches(&readings, "123456", true));
+        assert!(!power_state_matches(&readings, "123456", false));
+        assert!(!power_state_matches(&readings, "999999", true));
+    }
+
+    #[test]
+    fn unknown_power_state_never_confirms_a_transition() {
+        let readings = vec![
+            FritzReading {
+                ain: "123456".into(),
+                name: "Smart plug".into(),
+                power_w: 0,
+                temperature_c: 20.0,
+                power_state: None,
+            },
+        ];
+
+        assert!(!power_state_matches(&readings, "123456", true));
+        assert!(!power_state_matches(&readings, "123456", false));
     }
 
     #[test]
