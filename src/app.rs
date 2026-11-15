@@ -375,7 +375,7 @@ fn rebuild_net_power_history(
 
 fn numeric_sparkline(values: impl Iterator<Item = f64>) -> String {
     const LEVELS: [&str; 8] = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
-    const GRAPH_COLUMNS: usize = 20;
+    const GRAPH_COLUMNS: usize = 12;
     let values: Vec<f64> = values.collect();
     let Some(minimum) = values.iter().copied().reduce(f64::min) else {
         return "Waiting for samples…".into();
@@ -599,7 +599,7 @@ fn total_power_overview(
     let total_graph: cosmic::Element<'static, Message> = widget::Column::new()
         .spacing(4)
         .push(widget::text::caption("TOTAL POWER (W)"))
-        .push(widget::text::body(power_sparkline(history)))
+        .push(widget::text::body(power_sparkline(history)).width(cosmic::iced::Length::Fill))
         .push(widget::Row::new()
             .width(cosmic::iced::Length::Fill)
             .push(widget::text::caption(axis_start.clone()))
@@ -628,7 +628,7 @@ fn total_power_overview(
                     reading.name,
                     signed_device_power(reading.power_w, true),
                 )))
-                .push(widget::text::body(graph))
+                .push(widget::text::body(graph).width(cosmic::iced::Length::Fill))
                 .push(widget::Row::new()
                     .width(cosmic::iced::Length::Fill)
                     .push(widget::text::caption(axis_start.clone()))
@@ -1641,7 +1641,7 @@ impl cosmic::Application for AppModel {
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
                                                 .push(widget::text::caption("POWER (W)"))
-                                                .push(widget::text::body(power_graph))
+                                                .push(widget::text::body(power_graph).width(cosmic::iced::Length::Fill))
                                                 .push(
                                                     widget::Row::new()
                                                         .width(cosmic::iced::Length::Fill)
@@ -1685,7 +1685,7 @@ impl cosmic::Application for AppModel {
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
                                                 .push(widget::text::caption("TEMPERATURE (°C)"))
-                                                .push(widget::text::body(temperature_graph))
+                                                .push(widget::text::body(temperature_graph).width(cosmic::iced::Length::Fill))
                                                 .push(
                                                     widget::Row::new()
                                                         .width(cosmic::iced::Length::Fill)
@@ -2721,7 +2721,7 @@ mod history_tests {
     fn sparkline_handles_constant_and_changing_values() {
         let now = Instant::now();
         let constant = VecDeque::from([(now, 42), (now, 42)]);
-        assert_eq!(power_sparkline(&constant), "▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄");
+        assert_eq!(power_sparkline(&constant), "▄▄▄▄▄▄▄▄▄▄▄▄");
         let changing = VecDeque::from([(now, 10), (now, 20)]);
         let graph = power_sparkline(&changing);
         assert_eq!(graph.chars().count(), 20);
