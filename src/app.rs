@@ -1925,11 +1925,34 @@ impl cosmic::Application for AppModel {
                             text_color: Some(cosmic::iced::Color::WHITE),
                             ..Default::default()
                         });
+                    let image_credit_button = widget::Column::new()
+                        .width(cosmic::iced::Length::Fill)
+                        .height(cosmic::iced::Length::Fill)
+                        .push(widget::Space::new().height(cosmic::iced::Length::Fill))
+                        .push(
+                            widget::Row::new()
+                                .width(cosmic::iced::Length::Fill)
+                                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                .push(
+                                    widget::button::custom(
+                                        widget::icon::from_name("image-x-generic-symbolic").size(16),
+                                    )
+                                    .on_press(Message::OpenCommonsPage(
+                                        weather.image_attribution.as_ref()
+                                            .map(|credit| credit.page_url.clone())
+                                            .unwrap_or_default(),
+                                    ))
+                                    .padding(7)
+                                    .class(cosmic::theme::Button::Standard),
+                                ),
+                        )
+                        .padding(8);
                     cosmic::iced::widget::Stack::new()
                         .width(cosmic::iced::Length::Fill)
                         .height(cosmic::iced::Length::Fixed(210.0))
                         .push(photo)
                         .push(details)
+                        .push(image_credit_button)
                         .into()
                 } else {
                     widget::container(weather_details).padding(10)
@@ -2078,11 +2101,7 @@ impl cosmic::Application for AppModel {
                             .spacing(5)
                             .push(widget::text::body(credit.title.clone()))
                             .push(widget::text::caption(format!("By {} · {}", credit.artist, credit.license)))
-                            .push(action_button(
-                                "web-browser-symbolic",
-                                "View on Wikimedia Commons",
-                                Message::OpenCommonsPage(credit.page_url.clone()),
-                            ));
+                            ;
                         content = content.push(
                             widget::container(attribution)
                                 .padding(12)
