@@ -16,6 +16,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 - Discovers compatible power-meter devices and lets the user select any combination with checkboxes.
 - Refreshes automatically on a configurable interval from 30 seconds to 1 hour (default 60 seconds), with a live countdown in the popup menu. Total and per-device graph samples are collected on each successful refresh.
 - Keeps the last successful reading visible when a later refresh fails.
+- Optional OpenWeatherMap integration replaces the panel sun icon with the current weather condition. Configure the API key, city or `latitude,longitude`, and an independent 5–60 minute refresh interval (default 10 minutes).
 - Uses FRITZ!Box challenge-response login and HTTPS certificate validation by
   default.
 
@@ -99,6 +100,8 @@ For example, extract the local router certificate with `openssl s_client` and
 store it in a user-readable file such as `~/.config/fritzbox-ca.pem`, then set
 that path in the applet. Use a URL hostname included in the certificate's SAN
 (e.g. `https://fritz.box/`) and ensure it resolves to the local router.
+
+Enable **Use current weather icon** and enter an OpenWeatherMap API key plus a city name or `latitude,longitude` to replace the static sun icon with current conditions. Weather updates independently every 5–60 minutes (default 10 minutes); failed requests do not affect FRITZ!Box readings. The API key is stored in the owner-only configuration file.
 
 The **Allow invalid TLS certificates** option remains available only for
 compatibility and disables certificate verification; leave it off when using a
