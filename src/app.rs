@@ -515,13 +515,15 @@ fn metric_tile<'a>(
     value: impl Into<String>,
     icon: &'static str,
 ) -> cosmic::Element<'a, Message> {
-    let content = widget::Column::new()
-        .spacing(5)
+    let content = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Start)
         .push(widget::Row::new()
             .spacing(6)
             .align_y(cosmic::iced::Alignment::Center)
             .push(widget::icon::from_name(icon).size(14))
             .push(widget::text::caption(label.into())))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
         .push(widget::text::title3(value.into()));
     surface_card(content.into(), 10)
 }
@@ -551,14 +553,18 @@ fn live_power_summary(
     temperature: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     let title = if is_net { "NET POWER" } else { "CURRENT POWER" };
-    let primary = widget::Column::new()
+    let primary = widget::Row::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
-        .push(widget::Row::new()
+        .align_y(cosmic::iced::Alignment::Start)
+        .push(widget::Column::new()
             .spacing(8)
-            .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(18))
-            .push(widget::text::caption(title)))
+            .push(widget::Row::new()
+                .spacing(8)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(18))
+                .push(widget::text::caption(title))))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
         .push(widget::text::title2(power));
 
     let mut supporting = widget::Column::new()
