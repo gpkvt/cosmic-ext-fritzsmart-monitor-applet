@@ -245,6 +245,14 @@ fn record_power_sample(
     }
 }
 
+fn solar_input_ains(devices: &[FritzDevice]) -> HashSet<String> {
+    devices.iter()
+        .filter(|device| device.name.to_lowercase().contains("solar"))
+        .map(|device| crate::fritz::normalize_ain_for_selection(&device.ain))
+        .filter(|ain| !ain.is_empty())
+        .collect()
+}
+
 fn signed_device_power(power_w: i64, is_input: bool) -> i64 {
     if is_input { -power_w.abs() } else { power_w }
 }
@@ -1458,6 +1466,11 @@ impl cosmic::Application for AppModel {
             Message::DevicesLoaded(result) => match result {
                 Ok(devices) => {
                     self.devices = devices;
+                    if !self.settings.input_defaults_initialized {
+                        self.settings.input_ains.extend(solar_input_ains(&self.devices));
+                        self.settings.input_defaults_initialized = true;
+                        self.persist_settings();
+                    }
                     self.selected_ains = if self.settings.ains.is_empty() {
                         if self.settings.ain.trim().is_empty() { Vec::new() } else { vec![self.settings.ain.clone()] }
                     } else { self.settings.ains.clone() };
@@ -1646,6 +1659,19 @@ mod history_tests {
         let inputs = HashSet::from(["222222".to_string()]);
         let history = rebuild_net_power_history(&device_history, &inputs);
         assert_eq!(history, VecDeque::from([(now, 650)]));
+    }
+
+    #[test]
+    fn solar_named_devices_are_default_inputs_case_insensitively() {
+        let devices = vec![
+            FritzDevice { name: "Solar inverter".into(), ain: "12:34-56".into() },
+            FritzDevice { name: "ROOF SOLAR METER".into(), ain: "222222".into() },
+            FritzDevice { name: "Battery inverter".into(), ain: "333333".into() },
+        ];
+        assert_eq!(solar_input_ains(&devices), HashSet::from([
+            "123456".to_string(),
+            "222222".to_string(),
+        ]));
     }
 
     #[test]
