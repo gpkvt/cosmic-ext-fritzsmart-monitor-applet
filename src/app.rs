@@ -683,8 +683,8 @@ impl cosmic::Application for AppModel {
         if self.settings_open {
             content = content
                 .push(widget::text::title3("FRITZ!Power Monitor settings"))
-                .push(widget::divider::horizontal::default())
-                            content = content.push(settings_section_header("Panel", self.expanded_settings_sections.contains("panel"), "panel"));
+                .push(widget::divider::horizontal::default());
+            content = content.push(settings_section_header("Panel", self.expanded_settings_sections.contains("panel"), "panel"));
             if self.expanded_settings_sections.contains("panel") {
                 content = content
                     .push(widget::text::body(format!("Panel text size: {} pt", self.settings.panel_text_size)))
