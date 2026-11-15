@@ -9,6 +9,7 @@ license = "MIT"
 libcosmic = { git = "https://github.com/pop-os/libcosmic.git", features = [
     "applet",
     "applet-token",
+    "image",
     "tokio",
     "wayland",
     "winit",
