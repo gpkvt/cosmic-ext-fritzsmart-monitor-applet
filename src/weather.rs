@@ -125,16 +125,19 @@ async fn fetch_commons_background(client: &Client, icon_code: &str) -> (Option<V
             ("prop", "imageinfo"), ("iiprop", "url|extmetadata"),
             ("iiurlwidth", "1000"), ("format", "json"),
         ])
-        .send().await.ok()?.json::<serde_json::Value>().await.ok();
-    let Some(response) = response else { return (None, None); };
+        .send().await;
+    let Ok(response) = response else { return (None, None); };
+    let response = response.json::<serde_json::Value>().await;
+    let Ok(response) = response else { return (None, None); };
     let Some(page) = response["query"]["pages"].as_object().and_then(|pages| pages.values().next()) else {
         return (None, None);
     };
     let info = &page["imageinfo"][0];
     let Some(image_url) = info["thumburl"].as_str() else { return (None, None); };
-    let image = client.get(image_url).send().await.ok()?.bytes().await.ok();
-    let Some(image) = image else { return (None, None); };
-    // Keep attribution visible in the popup and link users to the Commons file page.
+    let image_response = client.get(image_url).send().await;
+    let Ok(image_response) = image_response else { return (None, None); };
+    let image = image_response.bytes().await;
+    let Ok(image) = image else { return (None, None); };
     let artist = info["extmetadata"]["Artist"]["value"].as_str().unwrap_or("Unknown author");
     let license = info["extmetadata"]["LicenseShortName"]["value"].as_str().unwrap_or("See file page");
     let title = page["title"].as_str().unwrap_or("Wikimedia Commons photograph");
