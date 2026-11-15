@@ -67,6 +67,7 @@ pub enum Message {
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
     ToggleDevice(String, bool),
+    ToggleDeviceInput(String, bool),
     StartDeviceDrag(String),
     DragOverDevice(String),
     EndDeviceDrag,
@@ -242,6 +243,17 @@ fn record_power_sample(
     while history.len() > max_history_samples(window) {
         history.pop_front();
     }
+}
+
+fn signed_device_power(power_w: i64, is_input: bool) -> i64 {
+    if is_input { -power_w.abs() } else { power_w }
+}
+
+fn net_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
+    readings.iter().map(|reading| {
+        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
+        signed_device_power(reading.power_w, input_ains.contains(&key))
+    }).sum()
 }
 
 fn power_sparkline(history: &VecDeque<(Instant, i64)>) -> String {
@@ -665,9 +677,19 @@ impl cosmic::Application for AppModel {
                     }
                     let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
                     let alert_thresholds = self.settings.temperature_alerts.get(&normalized_ain).copied();
+                    let is_input = self.settings.input_ains.contains(&normalized_ain);
                     let mut device_row = widget::Column::new()
                         .spacing(6)
                         .push(row)
+                        .push(widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::text::caption("Input (subtract from total)"))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(widget::toggler(is_input)
+                                .on_toggle({
+                                    let ain = ain.clone();
+                                    move |enabled| Message::ToggleDeviceInput(ain.clone(), enabled)
+                                })))
                         .push(widget::Row::new()
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::text::caption("Temperature alerts"))
@@ -1008,7 +1030,7 @@ impl cosmic::Application for AppModel {
                     self.history.iter().map(|(_, value)| *value).min(),
                     self.history.iter().map(|(_, value)| *value).max(),
                 ) {
-                    let total_power = self.readings.iter().map(|reading| reading.power_w).sum::<i64>();
+                    let total_power = net_power_w(&self.readings, &self.settings.input_ains);
                     let total_power_content = widget::Column::new()
                         .spacing(6)
                         .push(widget::text::body(format!(
@@ -1259,7 +1281,7 @@ impl cosmic::Application for AppModel {
                     if readings.is_empty() {
                         self.error = Some("No selected devices returned usable readings".into());
                     } else {
-                    let total_power = readings.iter().map(|reading| reading.power_w).sum();
+                    let total_power = net_power_w(&readings, &self.settings.input_ains);
                     let now = Instant::now();
                     let history_window = graph_history_window(self.settings.graph_timespan_minutes);
                     record_power_sample(&mut self.history, total_power, now, history_window);
@@ -1401,6 +1423,19 @@ impl cosmic::Application for AppModel {
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
                 self.persist_settings();
+            }
+            Message::ToggleDeviceInput(ain, enabled) => {
+                let key = crate::fritz::normalize_ain_for_selection(&ain);
+                if enabled {
+                    self.settings.input_ains.insert(key);
+                } else {
+                    self.settings.input_ains.remove(&key);
+                }
+                self.persist_settings();
+                let total_power = net_power_w(&self.readings, &self.settings.input_ains);
+                if let Some((_, latest)) = self.history.back_mut() {
+                    *latest = total_power;
+                }
             }
             Message::StartDeviceDrag(ain) => {
                 if self.selected_ains.iter().any(|selected|
@@ -1546,6 +1581,31 @@ mod history_tests {
         assert_eq!(ains, vec!["333333333333", "222222222222", "111111111111"]);
         move_selected_device_to_drop_target(&mut ains, "missing", "222222222222");
         assert_eq!(ains, vec!["333333333333", "222222222222", "111111111111"]);
+    }
+
+    #[test]
+    fn input_devices_are_subtracted_from_net_power() {
+        let readings = vec![
+            FritzReading {
+                ain: "11:11 11".into(),
+                name: "Generation".into(),
+                power_w: 900,
+                temperature_c: 20.0,
+                power_state: None,
+            },
+            FritzReading {
+                ain: "22:22 22".into(),
+                name: "Consumption".into(),
+                power_w: 250,
+                temperature_c: 21.0,
+                power_state: None,
+            },
+        ];
+        let inputs = HashSet::from(["222222".to_string()]);
+        assert_eq!(signed_device_power(250, true), -250);
+        assert_eq!(signed_device_power(250, false), 250);
+        assert_eq!(net_power_w(&readings, &inputs), 650);
+        assert_eq!(net_power_w(&readings, &HashSet::new()), 1150);
     }
 
     #[test]
