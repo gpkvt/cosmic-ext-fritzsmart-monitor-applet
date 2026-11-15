@@ -1823,7 +1823,7 @@ impl cosmic::Application for AppModel {
                         if self.refresh_started_at.is_some() { "Refreshing readings" } else { "Refresh readings" },
                         Message::Refresh,
                     ))
-                    .push(action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
+                    .push(icon_action_button("⚙", "Settings", Message::ToggleSettings)),
             )
             .padding([12, 16])
             .width(cosmic::iced::Length::Fill);
