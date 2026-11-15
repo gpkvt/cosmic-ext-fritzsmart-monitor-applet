@@ -1484,7 +1484,6 @@ impl cosmic::Application for AppModel {
                         .push(widget::icon::from_name(weather.icon_name()).size(36))
                         .push(widget::Column::new()
                             .spacing(2)
-                            .push(widget::text::title2(format!("{:.1} °C", weather.temperature_c)))
                             .push(widget::text::body(weather.description.clone()))
                             .push(widget::text::caption(format!("Feels like {:.1} °C", weather.feels_like_c)))))
                     .push(widget::Row::new().spacing(8)
