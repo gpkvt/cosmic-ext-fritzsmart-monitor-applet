@@ -1819,8 +1819,9 @@ impl cosmic::Application for AppModel {
                         let cosmic = theme.cosmic();
                         cosmic::iced::widget::container::Style {
                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                            // Individual rows own the outer top/bottom corner rounding.
                             border: cosmic::iced::Border {
-                                radius: device_corner_radius.into(),
+                                radius: 0.0.into(),
                                 ..Default::default()
                             },
                             ..Default::default()
