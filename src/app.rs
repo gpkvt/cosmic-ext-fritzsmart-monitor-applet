@@ -254,15 +254,15 @@ fn move_selected_device(ains: &mut [String], ain: &str, move_up: bool) {
 }
 
 fn icon_action_button<'a>(
-    icon_name: &'static str,
+    glyph: &'static str,
     accessible_name: &'static str,
     message: Message,
 ) -> widget::Button<'a, Message> {
-    // Use a fixed-size custom icon button so both title-bar actions retain
-    // their hit targets inside the narrow 320px popup. The settings action
-    // uses a widely available symbolic icon name.
+    // Render the compact controls as text glyphs rather than theme icon names:
+    // icon themes may not provide every symbolic name on every COSMIC setup.
+    // Fixed dimensions keep both actions visible in the 320px popup.
     widget::button::custom(
-        widget::container(widget::icon::from_name(icon_name).symbolic(true).size(18))
+        widget::container(widget::text(glyph).size(20))
             .center_x(36)
             .center_y(36),
     )
@@ -780,8 +780,8 @@ impl cosmic::Application for AppModel {
                     .align_y(cosmic::iced::Alignment::Center)
                     .push(widget::text::title3("FRITZ!Power Monitor"))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                    .push(icon_action_button("view-refresh-symbolic", "Refresh readings", Message::Refresh))
-                    .push(icon_action_button("emblem-system-symbolic", "Settings", Message::ToggleSettings)),
+                    .push(icon_action_button("↻", "Refresh readings", Message::Refresh))
+                    .push(icon_action_button("⚙", "Settings", Message::ToggleSettings)),
             )
             .padding([12, 16])
             .width(cosmic::iced::Length::Fill);
