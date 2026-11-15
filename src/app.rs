@@ -1131,7 +1131,44 @@ impl cosmic::Application for AppModel {
                     self.history.iter().map(|(_, value)| *value).max(),
                 ) {
                     let total_power = net_power_w(&self.readings, &self.settings.input_ains);
-                    let mut total_power_content = widget::Column::new()
+                    let total_graph = widget::Column::new()
+                        .spacing(4)
+                        .push(widget::text::caption("TOTAL POWER (W)"))
+                        .push(widget::text::body(power_sparkline(&self.history)))
+                        .push(widget::Row::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::caption(format_graph_axis_start(self.settings.graph_timespan_minutes)))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(widget::text::caption("Now")));
+                    let mut input_graphs = widget::Column::new().spacing(8);
+                    let mut has_input_graph = false;
+                    for reading in self.readings.iter().filter(|reading|
+                        self.settings.input_ains.contains(
+                            &crate::fritz::normalize_ain_for_selection(&reading.ain),
+                        ))
+                    {
+                        has_input_graph = true;
+                        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
+                        let input_history = self.device_history.get(&key);
+                        let graph = input_history.map(|samples|
+                            numeric_sparkline(samples.iter().map(|(_, power, _)|
+                                signed_device_power(*power, true) as f64)))
+                            .unwrap_or_else(|| "Waiting for samples…".into());
+                        input_graphs = input_graphs.push(
+                            widget::Column::new()
+                                .spacing(4)
+                                .push(widget::text::caption(format!(
+                                    "{} · {} W",
+                                    reading.name,
+                                    signed_device_power(reading.power_w, true),
+                                )))
+                                .push(widget::text::body(graph)),
+                        );
+                    }
+                    if !has_input_graph {
+                        input_graphs = input_graphs.push(widget::text::caption("No input devices"));
+                    }
+                    let total_power_content = widget::Column::new()
                         .spacing(6)
                         .push(widget::text::body(format!(
                             "TOTAL POWER · LAST {}",
@@ -1140,44 +1177,30 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::title2(format!("{total_power} W")))
                         .push(widget::text::caption(format!("Low  {low} W     High  {high} W")))
                         .push(
-                            widget::container(widget::text::body(power_sparkline(&self.history)))
-                                .padding(8)
+                            widget::Row::new()
+                                .spacing(8)
                                 .width(cosmic::iced::Length::Fill)
-                                .style(|theme| {
-                                    let cosmic = theme.cosmic();
-                                    cosmic::iced::widget::container::Style {
-                                        background: Some(
-                                            cosmic::iced::Color::from(cosmic.background(false).base).into(),
-                                        ),
-                                        border: cosmic::iced::Border {
-                                            radius: 3.0.into(),
-                                            ..Default::default()
-                                        },
-                                        ..Default::default()
-                                    }
-                                }),
-                        );
-                    for reading in self.readings.iter().filter(|reading|
-                        self.settings.input_ains.contains(
-                            &crate::fritz::normalize_ain_for_selection(&reading.ain),
-                        ))
-                    {
-                        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                        let input_history = self.device_history.get(&key);
-                        let graph = input_history.map(|samples|
-                            numeric_sparkline(samples.iter().map(|(_, power, _)|
-                                signed_device_power(*power, true) as f64)))
-                            .unwrap_or_else(|| "Waiting for samples…".into());
-                        total_power_content = total_power_content.push(
-                            widget::Column::new()
-                                .spacing(4)
-                                .push(widget::text::caption(format!(
-                                    "INPUT · {} · {} W",
-                                    reading.name,
-                                    signed_device_power(reading.power_w, true),
-                                )))
+                                .align_y(cosmic::iced::Alignment::Start)
                                 .push(
-                                    widget::container(widget::text::body(graph))
+                                    widget::container(total_graph)
+                                        .padding(8)
+                                        .width(cosmic::iced::Length::Fill)
+                                        .style(|theme| {
+                                            let cosmic = theme.cosmic();
+                                            cosmic::iced::widget::container::Style {
+                                                background: Some(
+                                                    cosmic::iced::Color::from(cosmic.background(false).base).into(),
+                                                ),
+                                                border: cosmic::iced::Border {
+                                                    radius: 3.0.into(),
+                                                    ..Default::default()
+                                                },
+                                                ..Default::default()
+                                            }
+                                        }),
+                                )
+                                .push(
+                                    widget::container(input_graphs)
                                         .padding(8)
                                         .width(cosmic::iced::Length::Fill)
                                         .style(|theme| {
@@ -1195,7 +1218,6 @@ impl cosmic::Application for AppModel {
                                         }),
                                 ),
                         );
-                    }
                     content = content.push(
                         widget::container(total_power_content)
                             .padding(10)
