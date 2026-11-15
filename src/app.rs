@@ -29,7 +29,7 @@ pub struct AppModel {
     error: Option<String>,
     updated: Option<String>,
     settings_open: bool,
-    expanded_settings_sections: HashSet<&'static str>,
+    active_settings_section: Option<&'static str>,
     settings: FritzSettings,
     devices: Vec<FritzDevice>,
     devices_loaded: bool,
@@ -53,6 +53,7 @@ pub struct AppModel {
     weather: Option<WeatherData>,
     weather_attribution_expanded: bool,
     quick_options_expanded: bool,
+    collapsed_devices: HashSet<String>,
     quick_refresh_interval: u32,
     quick_graph_timespan: u16,
     next_weather_refresh_at: Option<Instant>,
@@ -71,14 +72,15 @@ pub enum Message {
     PowerCommandFinished(String, bool, Result<(), String>),
     ToggleSettings,
     ToggleSettingsSection(&'static str),
+    BackToSettingsCategories,
     UrlChanged(String),
     UsernameChanged(String),
     PasswordChanged(String),
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
-    PanelPaddingChanged(u8),
     PanelAverageTemperatureChanged(bool),
+    PanelExcludeSolarTemperatureChanged(bool),
     GraphTimespanChanged(u16),
     RefreshIntervalChanged(u32),
     DiscoverDevices,
@@ -98,6 +100,7 @@ pub enum Message {
     ToggleWeatherAttribution,
     OpenCommonsPage(String),
     ToggleQuickOptions,
+    ToggleDeviceDetails(String),
     QuickRefreshIntervalPreview(u32),
     CommitQuickRefreshInterval,
     QuickGraphTimespanPreview(u16),
@@ -346,9 +349,14 @@ fn input_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64
     }).map(|reading| signed_device_power(reading.power_w, true)).sum()
 }
 
-fn average_temperature_c(readings: &[FritzReading]) -> Option<f64> {
-    let count = readings.len();
-    (count > 0).then(|| readings.iter().map(|reading| reading.temperature_c).sum::<f64>() / count as f64)
+fn average_temperature_c(readings: &[FritzReading], exclude_solar: bool) -> Option<f64> {
+    let temperatures = readings.iter().filter(|reading| {
+        !exclude_solar || !reading.name.to_lowercase().contains("solar")
+    });
+    let (sum, count) = temperatures.fold((0.0, 0usize), |(sum, count), reading| {
+        (sum + reading.temperature_c, count + 1)
+    });
+    (count > 0).then(|| sum / count as f64)
 }
 
 fn rebuild_net_power_history(
@@ -439,11 +447,8 @@ fn move_sortable_entry(
                 == crate::fritz::normalize_ain_for_selection(dragged))
         {
             let device = ains.remove(index);
-            if *total_power_first {
-                ains.insert(0, device);
-            } else {
-                ains.push(device);
-            }
+            ains.push(device);
+            *total_power_first = false;
         }
     } else {
         move_selected_device_to_drop_target(ains, dragged, target);
@@ -484,12 +489,181 @@ fn graph_panel(content: cosmic::Element<'static, Message>) -> cosmic::Element<'s
     .into()
 }
 
+fn surface_card<'a>(
+    content: cosmic::Element<'a, Message>,
+    padding: u16,
+) -> cosmic::Element<'a, Message> {
+    widget::container(content)
+        .width(cosmic::iced::Length::Fill)
+        .padding(padding)
+        .style(|theme| {
+            let cosmic = theme.cosmic();
+            cosmic::iced::widget::container::Style {
+                background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                border: cosmic::iced::Border {
+                    radius: 12.0.into(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+        })
+        .into()
+}
+
+fn keep_value_unit_together(value: String) -> String {
+    value.rsplit_once(' ')
+        .map(|(number, unit)| format!("{number}\u{00a0}{unit}"))
+        .unwrap_or(value)
+}
+
+fn metric_tile<'a>(
+    label: impl Into<String>,
+    value: impl Into<String>,
+    icon: &'static str,
+) -> cosmic::Element<'a, Message> {
+    let label = label.into();
+    let mut heading = widget::Row::new()
+        .spacing(6)
+        .align_y(cosmic::iced::Alignment::Start)
+        .push(widget::icon::from_name(icon).size(14));
+    if !label.is_empty() {
+        heading = heading.push(widget::text::caption(label));
+    }
+    let content = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Start)
+        .push(heading)
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+        .push(widget::text::title3(keep_value_unit_together(value.into())));
+    surface_card(content.into(), 10)
+}
+
+fn device_corner_radius(index: usize, device_count: usize) -> cosmic::iced::border::Radius {
+    let top = index == 0;
+    let bottom = index + 1 == device_count;
+    cosmic::iced::border::Radius {
+        top_left: if top { 8.0 } else { 0.0 },
+        top_right: if top { 8.0 } else { 0.0 },
+        bottom_right: if bottom { 8.0 } else { 0.0 },
+        bottom_left: if bottom { 8.0 } else { 0.0 },
+    }
+}
+
+fn device_metric_tile<'a>(
+    label: impl Into<String>,
+    value: impl Into<String>,
+    icon: &'static str,
+    radius: cosmic::iced::border::Radius,
+) -> cosmic::Element<'a, Message> {
+    let label = label.into();
+    let mut heading = widget::Row::new()
+        .spacing(6)
+        .align_y(cosmic::iced::Alignment::Start)
+        .push(widget::icon::from_name(icon).size(14));
+    if !label.is_empty() {
+        heading = heading.push(widget::text::caption(label));
+    }
+    let content = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Start)
+        .push(heading)
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+        .push(widget::text::title3(keep_value_unit_together(value.into())));
+    widget::container(content)
+        .width(cosmic::iced::Length::Fill)
+        .padding(10)
+        .style(move |theme| {
+            let cosmic = theme.cosmic();
+            cosmic::iced::widget::container::Style {
+                background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                border: cosmic::iced::Border { radius, ..Default::default() },
+                ..Default::default()
+            }
+        })
+        .into()
+}
+
+fn range_metric_tile<'a>(
+    label: &'static str,
+    value: String,
+    icon: &'static str,
+) -> cosmic::Element<'a, Message> {
+    let content = widget::Column::new()
+        .spacing(8)
+        .width(cosmic::iced::Length::Fill)
+        .push(widget::Row::new()
+            .spacing(6)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::icon::from_name(icon).size(14))
+            .push(widget::text::caption(label)))
+        .push(widget::text::title2(keep_value_unit_together(value)));
+    surface_card(content.into(), 12)
+}
+
+fn displayed_power_w(
+    readings: &[FritzReading],
+    selected_ains: &[String],
+    total_power_first: bool,
+    input_ains: &HashSet<String>,
+) -> Option<i64> {
+    if total_power_first {
+        (!readings.is_empty()).then(|| net_power_w(readings, input_ains))
+    } else {
+        selected_ains.first()
+            .and_then(|selected| readings.iter().find(|reading|
+                crate::fritz::normalize_ain_for_selection(&reading.ain)
+                    == crate::fritz::normalize_ain_for_selection(selected)))
+            .or_else(|| readings.first())
+            .map(|reading| reading.power_w)
+    }
+}
+
+fn live_power_summary(
+    power: String,
+    is_net: bool,
+    input_power: Option<String>,
+    temperature: Option<String>,
+) -> cosmic::Element<'static, Message> {
+    let title = if is_net { "NET POWER" } else { "CURRENT POWER" };
+    let power_metric = widget::Column::new()
+        .spacing(8)
+        .width(cosmic::iced::Length::Fill)
+        .push(widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(18))
+            .push(widget::text::caption(title)))
+        .push(widget::text::title2(keep_value_unit_together(power)));
+
+    let mut metrics = widget::Row::new()
+        .spacing(12)
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Start)
+        .push(power_metric);
+    if let Some(temp) = temperature {
+        let temperature_metric = widget::Column::new()
+            .spacing(8)
+            .width(cosmic::iced::Length::Fill)
+            .push(widget::text::caption("TEMP"))
+            .push(widget::text::title2(keep_value_unit_together(temp)));
+        metrics = metrics.push(temperature_metric);
+    }
+
+    let mut content = widget::Column::new()
+        .spacing(10)
+        .width(cosmic::iced::Length::Fill)
+        .push(metrics);
+    if let Some(input) = input_power {
+        content = content.push(metric_tile("INPUT", input, "go-down-symbolic"));
+    }
+    surface_card(content.into(), 14)
+}
+
 fn total_power_overview(
     readings: &[FritzReading],
     settings: &FritzSettings,
     history: &VecDeque<(Instant, i64)>,
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
-    position: usize,
 ) -> Option<cosmic::Element<'static, Message>> {
     let low = history.iter().map(|(_, value)| *value).min()?;
     let high = history.iter().map(|(_, value)| *value).max()?;
@@ -499,7 +673,9 @@ fn total_power_overview(
     let total_graph: cosmic::Element<'static, Message> = widget::Column::new()
         .spacing(4)
         .push(widget::text::caption("TOTAL POWER (W)"))
-        .push(widget::text::body(power_sparkline(history)))
+        .push(widget::text::body(power_sparkline(history))
+            .width(cosmic::iced::Length::Fill)
+            .align_x(cosmic::iced::Alignment::End))
         .push(widget::Row::new()
             .width(cosmic::iced::Length::Fill)
             .push(widget::text::caption(axis_start.clone()))
@@ -528,7 +704,9 @@ fn total_power_overview(
                     reading.name,
                     signed_device_power(reading.power_w, true),
                 )))
-                .push(widget::text::body(graph))
+                .push(widget::text::body(graph)
+                    .width(cosmic::iced::Length::Fill)
+                    .align_x(cosmic::iced::Alignment::End))
                 .push(widget::Row::new()
                     .width(cosmic::iced::Length::Fill)
                     .push(widget::text::caption(axis_start.clone()))
@@ -541,65 +719,81 @@ fn total_power_overview(
     }
 
     let content = widget::Column::new()
-        .spacing(6)
-        .push(widget::text::caption(format!("TOTAL POWER · LAST {timespan}")))
-        .push(widget::text::title2(format!("{total_power} W")))
-        .push(widget::text::caption(format!("Low  {low} W     High  {high} W")))
+        .spacing(10)
+        .push(widget::Row::new()
+            .spacing(12)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::container(widget::icon::from_name("utilities-system-monitor-symbolic").size(20))
+                .center_x(32).center_y(36))
+            .push(widget::Column::new()
+                .spacing(3)
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::body("Total power"))
+                .push(widget::text::caption(format!("Net · Last {timespan}"))))
+            .push(widget::text::title3(format!("{} W", total_power))))
         .push(
             widget::Row::new()
                 .spacing(8)
                 .width(cosmic::iced::Length::Fill)
-                .align_y(cosmic::iced::Alignment::Start)
-                .push(graph_panel(total_graph))
-                .push(graph_panel(input_graphs.into())),
-        );
-    Some(
-        widget::container(content)
-            .padding(14)
-            .style(move |theme| {
-                let cosmic = theme.cosmic();
-                let base = cosmic::iced::Color::from(cosmic.background(false).base);
-                cosmic::iced::widget::container::Style {
-                    background: Some(device_background_color(base, position).into()),
-                    ..Default::default()
-                }
-            })
-            .into(),
-    )
+                .push(widget::container(range_metric_tile(
+                    "LOW",
+                    format!("{low} W"),
+                    "go-down-symbolic",
+                )).width(cosmic::iced::Length::Fill))
+                .push(widget::container(range_metric_tile(
+                    "HIGH",
+                    format!("{high} W"),
+                    "go-up-symbolic",
+                )).width(cosmic::iced::Length::Fill)),
+        )
+        .push(graph_panel(total_graph))
+        .push(graph_panel(input_graphs.into()));
+    Some(surface_card(content.into(), 14))
 }
 
-fn settings_section_header<'a>(title: &'a str, expanded: bool, section: &'static str) -> cosmic::Element<'a, Message> {
-    // Use COSMIC's standard button treatment so section navigation follows
-    // the same interaction, focus and theme conventions as system settings.
-    let section_icon = match section {
-        "panel" => "preferences-desktop-display-symbolic",
-        "graph" => "view-statistics-symbolic",
-        "refresh" => "view-refresh-symbolic",
-        "weather" => "weather-clear-symbolic",
-        "connection" => "network-server-symbolic",
-        "device" => "computer-symbolic",
-        "diagnostics" => "dialog-information-symbolic",
-        _ => "preferences-system-symbolic",
-    };
-    let disclosure_icon = if expanded {
-        "go-down-symbolic"
-    } else {
-        "go-next-symbolic"
-    };
+fn settings_section_details(section: &'static str) -> (&'static str, &'static str) {
+    match section {
+        "panel" => ("Panel", "Appearance and live readings in the panel"),
+        "graph" => ("Graph history", "Choose how much power history is displayed"),
+        "refresh" => ("Automatic refresh", "Control how often device readings update"),
+        "weather" => ("Weather", "Show local weather alongside power readings"),
+        "connection" => ("Connection", "FRITZ!Box address and security settings"),
+        "device" => ("Devices", "Select, order and configure monitored devices"),
+        "diagnostics" => ("Diagnostics", "Connection and settings status"),
+        _ => ("Settings", "Configure your power monitor"),
+    }
+}
 
-    widget::button::custom(
+fn settings_section_header<'a>(title: &'a str, section: &'static str) -> cosmic::Element<'a, Message> {
+    let (section_icon, description) = match section {
+        "panel" => ("preferences-desktop-display-symbolic", "Panel appearance and readings"),
+        "graph" => ("utilities-system-monitor-symbolic", "History shown in power graphs"),
+        "refresh" => ("view-refresh-symbolic", "How often readings are updated"),
+        "weather" => ("weather-clear-symbolic", "Current conditions and background"),
+        "connection" => ("network-server-symbolic", "FRITZ!Box access and security"),
+        "device" => ("computer-symbolic", "Choose, order and configure devices"),
+        "diagnostics" => ("dialog-information-symbolic", "Connection and save status"),
+        _ => ("preferences-system-symbolic", "Applet preferences"),
+    };
+    let section_row: cosmic::Element<'a, Message> = widget::button::custom(
         widget::Row::new()
-            .spacing(10)
+            .spacing(12)
             .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::icon::from_name(section_icon).size(18))
-            .push(widget::text::body(title).width(cosmic::iced::Length::Fill))
-            .push(widget::icon::from_name(disclosure_icon).size(16)),
+            .push(widget::container(widget::icon::from_name(section_icon).size(20))
+                .center_x(32).center_y(36))
+            .push(widget::Column::new()
+                .spacing(3)
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::body(title))
+                .push(widget::text::caption(description)))
+            .push(widget::icon::from_name("go-next-symbolic").size(16)),
     )
     .on_press(Message::ToggleSettingsSection(section))
-    .padding([10, 12])
+    .padding([8, 4])
     .width(cosmic::iced::Length::Fill)
-    .class(cosmic::theme::Button::Standard)
-    .into()
+    .class(cosmic::theme::Button::Text)
+    .into();
+    section_row
 }
 
 fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
@@ -607,7 +801,7 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
         .width(cosmic::iced::Length::Fill)
         .spacing(6)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::mouse_area(widget::text("⠿").font(cosmic::font::default()).size(20))
+        .push(widget::mouse_area(widget::text("⠿").size(20))
             .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string()))
             .on_release(Message::EndDeviceDrag))
         .push(widget::text::body("Total power (net)").width(cosmic::iced::Length::Fill))
@@ -660,7 +854,7 @@ fn icon_action_button<'a>(
     // icon themes may not provide every symbolic name on every COSMIC setup.
     // Fixed dimensions keep both actions visible in the 320px popup.
     widget::button::custom(
-        widget::container(widget::text(glyph).font(cosmic::font::default()).size(20))
+        widget::container(widget::text(glyph).size(20))
             .center_x(36)
             .center_y(36),
     )
@@ -811,7 +1005,7 @@ impl cosmic::Application for AppModel {
                 .unwrap_or_else(|| "-- W".to_string())
         };
         let temperature = if self.settings.panel_average_temperature {
-            Some(average_temperature_c(&self.readings)
+            Some(average_temperature_c(&self.readings, self.settings.panel_exclude_solar_temperature)
                 .map(|value| format!("{value:.1} °C"))
                 .unwrap_or_else(|| "-- °C".to_string()))
         } else if self.settings.total_power_first {
@@ -829,46 +1023,67 @@ impl cosmic::Application for AppModel {
         };
 
         let suggested = self.core.applet.suggested_size(true);
-        let panel_padding = u16::from(self.settings.panel_padding);
-        let vertical_padding = panel_padding;
-        let horizontal_padding = panel_padding;
+        // Keep a comfortable pointer/touch target with a compact icon-to-value gap.
+        let vertical_padding = 8_u16;
+        let horizontal_padding = 10_u16;
 
         let content = widget::Row::new()
-            .spacing(6)
+            .spacing(3)
             .align_y(cosmic::iced::Alignment::Center)
             .push(
                 widget::container({
                     let solar_icon = widget::icon::from_name(
                         self.weather.as_ref().map(|weather| weather.icon_name()).unwrap_or("weather-clear-symbolic"),
                     ).size(suggested.1.saturating_sub(2));
-                    if input_power.is_some() {
-                        cosmic::iced::widget::Stack::new()
-                            .push(solar_icon)
-                            .push(
-                                widget::container(
-                                    widget::text("↓")
-                                        .font(cosmic::font::default())
-                                        .size(f32::from(suggested.1 / 2)),
-                                )
-                                .align_x(cosmic::iced::alignment::Horizontal::Right)
-                                .align_y(cosmic::iced::alignment::Vertical::Top)
-                                .padding([0, 1]),
-                            )
-                    } else {
-                        cosmic::iced::widget::Stack::new().push(solar_icon)
-                    }
+                    cosmic::iced::widget::Stack::new().push(solar_icon)
                 })
-                // Overlay the input marker on the solar/weather icon's upper-right corner.
-                .padding([2, 0]),
-            )
+                .padding(3)
+                .style(|theme| {
+                    let cosmic = theme.cosmic();
+                    cosmic::iced::widget::container::Style {
+                        background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                        border: cosmic::iced::Border {
+                            radius: 8.0.into(),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    }
+                }),
+            );
+        let content = if self.settings.weather_enabled {
+            if let Some(weather) = &self.weather {
+                content
+                    .push(widget::icon::from_name("thermometer-symbolic").size(self.settings.panel_text_size.into()))
+                    .push(self.core.applet.text(format!("{:.0}°", weather.temperature_c))
+                        .size(f32::from(self.settings.panel_text_size)))
+            } else {
+                content
+            }
+        } else {
+            content
+        };
+        let content = content
+            .push(widget::icon::from_name("electricity-symbolic").size(self.settings.panel_text_size.into()))
             .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)));
         let content = if let Some(input_power) = input_power {
-            content.push(self.core.applet.text(input_power).size(f32::from(self.settings.panel_text_size)))
+            let icon_size = f32::from(self.settings.panel_text_size.clamp(12, 20));
+            let solar_panel = cosmic::iced::widget::svg(
+                cosmic::iced::widget::svg::Handle::from_memory(
+                    include_bytes!("../data/solar-panel.svg").to_vec(),
+                ),
+            )
+            .width(icon_size)
+            .height(icon_size);
+            content
+                .push(solar_panel)
+                .push(self.core.applet.text(input_power).size(f32::from(self.settings.panel_text_size)))
         } else {
             content
         };
         let content = if let Some(temperature) = temperature {
-            content.push(self.core.applet.text(temperature).size(f32::from(self.settings.panel_text_size)))
+            content
+                .push(widget::icon::from_name("thermometer-symbolic").size(self.settings.panel_text_size.into()))
+                .push(self.core.applet.text(temperature).size(f32::from(self.settings.panel_text_size)))
         } else {
             content
         };
@@ -879,7 +1094,7 @@ impl cosmic::Application for AppModel {
             .on_press_down(Message::TogglePopup)
             .padding([vertical_padding, horizontal_padding])
             .height(cosmic::iced::Length::Fixed(
-                f32::from(suggested.1 + 2 * vertical_padding),
+                f32::from((suggested.1 + 2 * vertical_padding).max(40)),
             ))
             .class(cosmic::theme::Button::AppletIcon);
 
@@ -896,20 +1111,44 @@ impl cosmic::Application for AppModel {
             return widget::text("").into();
         }
 
-        // popup_container fixes the popup width at 320px. Keep the content
-        // padded so controls and text do not touch the popup border.
+        // Give the graph cards enough horizontal room to use the available space.
+        // Keep this width explicit because the applet popup otherwise stays narrow.
         let mut content = widget::Column::new()
-            .spacing(14)
+            .spacing(16)
             .padding(16)
             .width(cosmic::iced::Length::Fill);
 
         if self.settings_open {
-            content = content
-                .push(widget::text::title2("Settings"))
-                .push(widget::text::caption("Configure your panel, devices and data sources"))
-                .push(widget::divider::horizontal::default());
-            content = content.push(settings_section_header("Panel", self.expanded_settings_sections.contains("panel"), "panel"));
-            if self.expanded_settings_sections.contains("panel") {
+            if let Some(section) = self.active_settings_section {
+                let (title, description) = settings_section_details(section);
+                content = content
+                    .push(widget::Row::new()
+                        .spacing(10)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(icon_action_button("‹", "Back to settings", Message::BackToSettingsCategories))
+                        .push(widget::Column::new()
+                            .spacing(2)
+                            .push(widget::text::title2(title))
+                            .push(widget::text::caption(description))));
+            } else {
+                let settings_heading = widget::Row::new()
+                    .spacing(12)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::icon::from_name("preferences-system-symbolic").size(24))
+                    .push(widget::Column::new()
+                        .spacing(2)
+                        .push(widget::text::title2("Settings"))
+                        .push(widget::text::caption("Configure your power monitor")));
+                content = content
+                    .push(settings_heading)
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::caption("GENERAL"));
+                for (title, section) in [("Panel", "panel"), ("Graph history", "graph"), ("Automatic refresh", "refresh"), ("Weather", "weather"), ("Connection", "connection"), ("Devices", "device"), ("Diagnostics", "diagnostics")] {
+                    content = content.push(settings_section_header(title, section));
+                }
+            }
+
+            if self.active_settings_section == Some("panel") {
                 content = content
                     .push(widget::text::body(format!("Panel text size: {} pt", self.settings.panel_text_size)))
                     .push(
@@ -921,33 +1160,37 @@ impl cosmic::Application for AppModel {
                         .step(1.0),
                     )
                     .push(widget::text::caption("Adjusts the power and temperature text in the panel"))
-                    .push(widget::text::body(format!("Panel padding: {} px", self.settings.panel_padding)))
-                    .push(
-                        widget::slider(
-                            0.0..=16.0,
-                            f32::from(self.settings.panel_padding),
-                            |value| Message::PanelPaddingChanged(value.round() as u8),
-                        )
-                        .step(1.0),
-                    )
-                    .push(widget::text::caption("Controls the space around the panel contents"))
                     .push(widget::Row::new()
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::Column::new()
                             .spacing(3)
                             .width(cosmic::iced::Length::Fill)
                             .push(widget::text::body("Average temperature"))
-                            .push(widget::text::caption("When enabled, the panel shows the mean temperature across all selected devices instead of a single device's temperature.")))
+                            .push(widget::text::caption("When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.")))
                         .push(widget::container(
                             widget::toggler(self.settings.panel_average_temperature)
                                 .on_toggle(Message::PanelAverageTemperatureChanged)
                         )
-                        .padding([8, 10])) )
-                    .push(widget::divider::horizontal::default())
+                        .padding([8, 10])) );
+                if self.settings.panel_average_temperature {
+                    content = content.push(
+                        widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::Column::new()
+                                .spacing(3)
+                                .width(cosmic::iced::Length::Fill)
+                                .push(widget::text::body("Exclude solar devices"))
+                                .push(widget::text::caption("Ignore temperatures from devices whose name contains “solar” when calculating the average.")))
+                            .push(widget::container(
+                                widget::toggler(self.settings.panel_exclude_solar_temperature)
+                                    .on_toggle(Message::PanelExcludeSolarTemperatureChanged)
+                            ).padding([8, 10]))
+                    );
+                }
+                content = content.push(widget::divider::horizontal::default());
             }
 
-            content = content.push(settings_section_header("Graph history", self.expanded_settings_sections.contains("graph"), "graph"));
-            if self.expanded_settings_sections.contains("graph") {
+            if self.active_settings_section == Some("graph") {
     content = content
         .push(widget::text::caption(format!(
                         "GRAPH HISTORY: {}",
@@ -965,8 +1208,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
             }
 
-            content = content.push(settings_section_header("Automatic refresh", self.expanded_settings_sections.contains("refresh"), "refresh"));
-            if self.expanded_settings_sections.contains("refresh") {
+            if self.active_settings_section == Some("refresh") {
     content = content
         .push(widget::text::caption(format!(
                         "AUTOMATIC REFRESH: {}",
@@ -984,8 +1226,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
             }
 
-            content = content.push(settings_section_header("Weather", self.expanded_settings_sections.contains("weather"), "weather"));
-            if self.expanded_settings_sections.contains("weather") {
+            if self.active_settings_section == Some("weather") {
                 content = content
                     .push(widget::Row::new()
                         .align_y(cosmic::iced::Alignment::Center)
@@ -1005,8 +1246,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
             }
 
-            content = content.push(settings_section_header("Connection", self.expanded_settings_sections.contains("connection"), "connection"));
-            if self.expanded_settings_sections.contains("connection") {
+            if self.active_settings_section == Some("connection") {
                 content = content
                     .push(widget::text::body("FRITZ!Box URL"))
                     .push(
@@ -1045,8 +1285,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
             }
 
-            content = content.push(settings_section_header("Devices", self.expanded_settings_sections.contains("device"), "device"));
-            if self.expanded_settings_sections.contains("device") {
+            if self.active_settings_section == Some("device") {
                 content = content
                     .push(action_button("view-refresh-symbolic", "Load devices", Message::DiscoverDevices));
     
@@ -1082,7 +1321,7 @@ impl cosmic::Application for AppModel {
                             .align_y(cosmic::iced::Alignment::Center);
                         if selected {
                             row = row.push(
-                                widget::mouse_area(widget::text("⠿").font(cosmic::font::default()).size(20))
+                                widget::mouse_area(widget::text("⠿").size(20))
                                     .on_press(Message::StartDeviceDrag(ain.clone()))
                                     .on_release(Message::EndDeviceDrag),
                             );
@@ -1169,7 +1408,7 @@ impl cosmic::Application for AppModel {
                             let gap_height = 18.0 * progress;
                             content = content.push(
                                 widget::container(
-                                    widget::text("Drop here").font(cosmic::font::default()).size(11)
+                                    widget::text("Drop here").size(11)
                                 )
                                 .height(cosmic::iced::Length::Fixed(gap_height))
                                 .width(cosmic::iced::Length::Fill)
@@ -1184,8 +1423,7 @@ impl cosmic::Application for AppModel {
                 }
             }
 
-            content = content.push(settings_section_header("Diagnostics", self.expanded_settings_sections.contains("diagnostics"), "diagnostics"));
-            if self.expanded_settings_sections.contains("diagnostics") {
+            if self.active_settings_section == Some("diagnostics") {
     content = content
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::caption("DIAGNOSTICS"));
@@ -1216,7 +1454,9 @@ impl cosmic::Application for AppModel {
             if self.settings_saved_until.is_some_and(|deadline| Instant::now() < deadline) {
                 content = content.push(widget::text::caption("✓ Saved"));
             }
-            content = content.push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings));
+            if self.active_settings_section.is_none() {
+                content = content.push(action_button("go-previous-symbolic", "Close settings", Message::ToggleSettings));
+            }
         } else {
             if let Some(weather) = &self.weather {
                 let wind_direction = weather.wind_direction_degrees
@@ -1239,7 +1479,6 @@ impl cosmic::Application for AppModel {
                             .push(widget::text::title2(format!("{:.1} °C", weather.temperature_c)))
                             .push(widget::text::body(weather.description.clone()))
                             .push(widget::text::caption(format!("Feels like {:.1} °C", weather.feels_like_c)))))
-                    .push(widget::text::caption(weather.location_name.clone()))
                     .push(widget::Row::new().spacing(8)
                         .push(widget::text::body(format!("Humidity  {}%", weather.humidity_percent)))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
@@ -1285,8 +1524,18 @@ impl cosmic::Application for AppModel {
                             }
                         }).into()
                 };
+                let weather_heading = widget::Row::new()
+                    .spacing(8)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::icon::from_name(weather.icon_name()).size(20))
+                    .push(widget::Column::new()
+                        .spacing(1)
+                        .width(cosmic::iced::Length::Fill)
+                        .push(widget::text::title3("Weather"))
+                        .push(widget::text::caption(weather.location_name.clone())))
+                    .push(widget::text::caption(format!("{:.0}°", weather.temperature_c)));
                 content = content
-                    .push(widget::text::title3("Weather"))
+                    .push(weather_heading)
                     .push(weather_card);
                 if let Some(credit) = weather.image_attribution.as_ref() {
                     let label = if self.weather_attribution_expanded {
@@ -1344,25 +1593,58 @@ impl cosmic::Application for AppModel {
             }
 
             if !self.readings.is_empty() {
+            if !self.readings.is_empty() {
+                let primary = self.selected_ains.first()
+                    .and_then(|selected| self.readings.iter().find(|reading|
+                        crate::fritz::normalize_ain_for_selection(&reading.ain)
+                            == crate::fritz::normalize_ain_for_selection(selected)))
+                    .or_else(|| self.readings.first());
+                let summary_power = displayed_power_w(
+                    &self.readings,
+                    &self.selected_ains,
+                    self.settings.total_power_first,
+                    &self.settings.input_ains,
+                ).map(|power| format!("{power} W"))
+                    .unwrap_or_else(|| "-- W".into());
+                let summary_temperature = if self.settings.panel_average_temperature {
+                    average_temperature_c(&self.readings, self.settings.panel_exclude_solar_temperature).map(|value| format!("{value:.1} °C"))
+                } else if self.settings.total_power_first {
+                    None
+                } else {
+                    primary.map(|reading| format!("{:.1} °C", reading.temperature_c))
+                };
+                let summary_input = self.readings.iter().any(|reading|
+                    self.settings.input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain)))
+                    .then(|| format!("{} W", input_power_w(&self.readings, &self.settings.input_ains)));
+                content = content.push(live_power_summary(
+                    summary_power,
+                    self.settings.total_power_first,
+                    summary_input,
+                    summary_temperature,
+                ));
+            }
+
                 if self.settings.total_power_first {
                     if let Some(overview) = total_power_overview(
                         &self.readings,
                         &self.settings,
                         &self.history,
                         &self.device_history,
-                        0,
                     ) {
                         content = content
                             .push(overview)
                             .push(widget::divider::horizontal::default());
                     }
                 }
-                content = content.push(widget::text::title3("Devices"))
-                    .push(widget::text::caption("LIVE POWER AND TEMPERATURE"));
+                let mut device_cards = widget::Column::new().spacing(0);
                 for (index, reading) in self.readings.iter().enumerate() {
-                    let device_history = self.device_history.get(
-                        &crate::fritz::normalize_ain_for_selection(&reading.ain),
-                    );
+                    if index > 0 {
+                        device_cards = device_cards.push(widget::divider::horizontal::default());
+                    }
+                    let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
+                    let is_expanded = !self.collapsed_devices.contains(&device_key);
+                    let device_corner_radius = device_corner_radius(index, self.readings.len());
+                    let device_history = self.device_history.get(&device_key);
                     let power_graph = device_history.map(|samples|
                         numeric_sparkline(samples.iter().map(|(_, power, _)| *power as f64)))
                         .unwrap_or_else(|| "Waiting for samples…".into());
@@ -1390,13 +1672,34 @@ impl cosmic::Application for AppModel {
                             .push(toggle)
                             .into()
                     });
+                    let state_label = reading.power_state.map(|on| if on { "ON" } else { "OFF" })
+                        .unwrap_or("UNKNOWN");
+                    let device_heading = widget::button::custom(
+                        widget::Row::new()
+                            .spacing(12)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::container(widget::icon::from_name("computer-symbolic").size(20))
+                                .center_x(32).center_y(36))
+                            .push(widget::Column::new()
+                                .spacing(3)
+                                .width(cosmic::iced::Length::Fill)
+                                .push(widget::text::body(reading.name.clone()).class(cosmic::theme::Text::Accent))
+                                .push(widget::text::caption(format!("{} · LAST {}", state_label, format_graph_timespan(self.settings.graph_timespan_minutes)))))
+                            .push(widget::text::caption(format!("#{}", index + 1)))
+                            .push(widget::icon::from_name(if is_expanded { "go-down-symbolic" } else { "go-next-symbolic" }).size(16)),
+                    )
+                    .on_press(Message::ToggleDeviceDetails(reading.ain.clone()))
+                    .width(cosmic::iced::Length::Fill)
+                    .padding([8, 12])
+                    .class(cosmic::theme::Button::Standard);
+                    let metrics = widget::Row::new()
+                        .spacing(8)
+                        .width(cosmic::iced::Length::Fill)
+                        .push(device_metric_tile("POWER", format!("{} W", reading.power_w), "utilities-system-monitor-symbolic", device_corner_radius))
+                        .push(device_metric_tile("TEMP", format!("{:.1} °C", reading.temperature_c), "utilities-temperature-symbolic", device_corner_radius));
                     let device_content = widget::Column::new()
-                        .spacing(6)
-                        .push(widget::text::body(reading.name.clone()))
-                        .push(widget::text::caption(format!("LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
-                        .push(widget::Row::new().spacing(12).align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::text::title2(format!("{} W", reading.power_w)))
-                            .push(widget::text::body(format!("{:.1} °C", reading.temperature_c))))
+                        .spacing(10)
+                        .push(metrics)
                         .push_maybe(power_control)
                         .push(
                             widget::Row::new()
@@ -1409,7 +1712,9 @@ impl cosmic::Application for AppModel {
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
                                                 .push(widget::text::caption("POWER (W)"))
-                                                .push(widget::text::body(power_graph))
+                                                .push(widget::text::body(power_graph)
+                                                    .width(cosmic::iced::Length::Fill)
+                                                    .align_x(cosmic::iced::Alignment::End))
                                                 .push(
                                                     widget::Row::new()
                                                         .width(cosmic::iced::Length::Fill)
@@ -1420,12 +1725,12 @@ impl cosmic::Application for AppModel {
                                         )
                                         .padding(8)
                                         .width(cosmic::iced::Length::Fill)
-                                        .style(|theme| {
+                                        .style(move |theme| {
                                             let cosmic = theme.cosmic();
                                             cosmic::iced::widget::container::Style {
                                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
                                                 border: cosmic::iced::Border {
-                                                    radius: 8.0.into(),
+                                                    radius: device_corner_radius,
                                                     ..Default::default()
                                                 },
                                                 ..Default::default()
@@ -1434,12 +1739,12 @@ impl cosmic::Application for AppModel {
                                     )
                                     .padding(1)
                                     .width(cosmic::iced::Length::Fill)
-                                    .style(|theme| {
+                                    .style(move |theme| {
                                         let cosmic = theme.cosmic();
                                         cosmic::iced::widget::container::Style {
                                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
                                             border: cosmic::iced::Border {
-                                                radius: 8.0.into(),
+                                                radius: device_corner_radius.into(),
                                                 ..Default::default()
                                             },
                                             ..Default::default()
@@ -1452,8 +1757,13 @@ impl cosmic::Application for AppModel {
                                             widget::Column::new()
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
-                                                .push(widget::text::caption("TEMPERATURE (°C)"))
-                                                .push(widget::text::body(temperature_graph))
+                                                .push(widget::Row::new()
+                                                    .spacing(6)
+                                                    .align_y(cosmic::iced::Alignment::Center)
+                                                    .push(widget::text::caption("TEMP (°C)")) )
+                                                .push(widget::text::body(temperature_graph)
+                                                    .width(cosmic::iced::Length::Fill)
+                                                    .align_x(cosmic::iced::Alignment::End))
                                                 .push(
                                                     widget::Row::new()
                                                         .width(cosmic::iced::Length::Fill)
@@ -1464,12 +1774,12 @@ impl cosmic::Application for AppModel {
                                         )
                                         .padding(8)
                                         .width(cosmic::iced::Length::Fill)
-                                        .style(|theme| {
+                                        .style(move |theme| {
                                             let cosmic = theme.cosmic();
                                             cosmic::iced::widget::container::Style {
                                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
                                                 border: cosmic::iced::Border {
-                                                    radius: 8.0.into(),
+                                                    radius: device_corner_radius.into(),
                                                     ..Default::default()
                                                 },
                                                 ..Default::default()
@@ -1478,12 +1788,12 @@ impl cosmic::Application for AppModel {
                                     )
                                     .padding(1)
                                     .width(cosmic::iced::Length::Fill)
-                                    .style(|theme| {
+                                    .style(move |theme| {
                                         let cosmic = theme.cosmic();
                                         cosmic::iced::widget::container::Style {
                                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
                                             border: cosmic::iced::Border {
-                                                radius: 8.0.into(),
+                                                radius: device_corner_radius.into(),
                                                 ..Default::default()
                                             },
                                             ..Default::default()
@@ -1491,25 +1801,41 @@ impl cosmic::Application for AppModel {
                                     }),
                                 ),
                         );
-                    content = content.push(widget::container(device_content)
-                        .padding(10)
-                        .style(move |theme| {
-                            let cosmic = theme.cosmic();
-                            let base = cosmic::iced::Color::from(cosmic.background(false).base);
-                            cosmic::iced::widget::container::Style {
-                                background: Some(device_background_color(base, index).into()),
-                                ..Default::default()
-                            }
-                        }));
+                    let mut card_column = widget::Column::new()
+                        .spacing(0)
+                        .push(device_heading);
+                    if is_expanded {
+                        card_column = card_column
+                            .push(widget::divider::horizontal::default())
+                            .push(widget::container(device_content).padding(12));
+                    }
+                    let device_card = widget::container(card_column)
+                        .width(cosmic::iced::Length::Fill);
+                    device_cards = device_cards.push(device_card);
                 }
-                content = content.push(widget::divider::horizontal::default());
+                let device_list = widget::container(device_cards)
+                    .width(cosmic::iced::Length::Fill)
+                    .style(|theme| {
+                        let cosmic = theme.cosmic();
+                        cosmic::iced::widget::container::Style {
+                            background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                            // Individual rows own the outer top/bottom corner rounding.
+                            border: cosmic::iced::Border {
+                                radius: 0.0.into(),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        }
+                    });
+                content = content
+                    .push(device_list)
+                    .push(widget::divider::horizontal::default());
                 if !self.settings.total_power_first {
                     if let Some(overview) = total_power_overview(
                         &self.readings,
                         &self.settings,
                         &self.history,
                         &self.device_history,
-                        self.selected_ains.len(),
                     ) {
                         content = content.push(overview);
                     }
@@ -1523,28 +1849,17 @@ impl cosmic::Application for AppModel {
             let countdown = remaining
                 .map(|duration| format_countdown(duration.as_secs()))
                 .unwrap_or_else(|| "Refreshing…".into());
-            content = content.push(widget::text::caption(format!("Next refresh in {countdown}")));
+            content = content.push(
+                widget::Row::new()
+                    .width(cosmic::iced::Length::Fill)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::text::caption(format!("Next refresh in {countdown}")))
+                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                    .push(icon_action_button("⚙", "Quick settings", Message::ToggleQuickOptions)),
+            );
             if let Some(updated) = &self.updated {
                 content = content.push(widget::text::caption(format!("Updated at {updated}")));
             }
-
-            let quick_options_label = if self.quick_options_expanded {
-                "▾ Quick options"
-            } else {
-                "▸ Quick options"
-            };
-            content = content.push(
-                widget::button::custom(
-                    widget::Row::new()
-                        .spacing(8)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::icon::from_name("preferences-system-symbolic").size(14))
-                        .push(widget::text::body(quick_options_label)),
-                )
-                .on_press(Message::ToggleQuickOptions)
-                .padding([8, 10])
-                .class(cosmic::theme::Button::Standard),
-            );
             if self.quick_options_expanded {
                 const REFRESH_ANCHORS: [f32; 5] = [30.0, 300.0, 900.0, 1800.0, 3600.0];
                 const GRAPH_ANCHORS: [f32; 5] = [5.0, 60.0, 360.0, 720.0, 1440.0];
@@ -1588,7 +1903,9 @@ impl cosmic::Application for AppModel {
         }
 
         content = content.push(
-            widget::text::caption(format!("v{}", env!("APP_VERSION"))),
+            widget::container(widget::text::caption(format!("FRITZ!Power Monitor · v{}", env!("APP_VERSION"))))
+                .width(cosmic::iced::Length::Fill)
+                .center_x(cosmic::iced::Length::Fill),
         );
 
         // Give the popup content an opaque base so it remains readable even
@@ -1628,16 +1945,18 @@ impl cosmic::Application for AppModel {
                 widget::Row::new()
                     .spacing(8)
                     .align_y(cosmic::iced::Alignment::Center)
-                    .push(widget::text::title2("FRITZ!Power Monitor"))
-                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                    .push(widget::container(widget::icon::from_name("utilities-system-monitor-symbolic").size(20))
+                        .center_x(36).center_y(36))
+                    .push(widget::text::body("FRITZ!Power Monitor")
+                        .width(cosmic::iced::Length::Fill))
                     .push(icon_action_button(
                         self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("↻"),
                         if self.refresh_started_at.is_some() { "Refreshing readings" } else { "Refresh readings" },
                         Message::Refresh,
                     ))
-                    .push(action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
+                    .push(icon_action_button("⚙", "Settings", Message::ToggleSettings)),
             )
-            .padding([14, 16])
+            .padding([8, 12])
             .width(cosmic::iced::Length::Fill);
 
             widget::Column::new()
@@ -1654,7 +1973,7 @@ impl cosmic::Application for AppModel {
         self.core.applet
             .popup_container(
                 widget::container(popup_content)
-                    .width(cosmic::iced::Length::Fill)
+                    .width(cosmic::iced::Length::Fixed(440.0))
                     .height(cosmic::iced::Length::Fill)
                     .style(|theme| {
                         let cosmic = theme.cosmic();
@@ -1810,6 +2129,10 @@ impl cosmic::Application for AppModel {
                     }
                 }
                 Err(error) => {
+                    // Do not continue presenting the last known switch state as live.
+                    for reading in &mut self.readings {
+                        reading.power_state = None;
+                    }
                     self.error = Some(error);
                 },
                 }
@@ -1823,6 +2146,12 @@ impl cosmic::Application for AppModel {
             Message::OpenCommonsPage(url) => {
                 if url.starts_with("https://commons.wikimedia.org/wiki/File:") {
                     let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+                }
+            }
+            Message::ToggleDeviceDetails(ain) => {
+                let key = crate::fritz::normalize_ain_for_selection(&ain);
+                if !self.collapsed_devices.remove(&key) {
+                    self.collapsed_devices.insert(key);
                 }
             }
             Message::ToggleQuickOptions => {
@@ -1894,22 +2223,21 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleSettings => {
                 self.settings_open = !self.settings_open;
+                self.active_settings_section = None;
                 self.settings_status = None;
             }
             Message::ToggleSettingsSection(section) => {
-                let expanded = if self.expanded_settings_sections.remove(section) {
-                    false
-                } else {
-                    self.expanded_settings_sections.insert(section);
-                    true
-                };
-                if section == "device" && expanded && !self.devices_loaded && !self.devices_loading {
+                self.active_settings_section = Some(section);
+                if section == "device" && !self.devices_loaded && !self.devices_loading {
                     self.devices_loading = true;
                     let settings = self.settings.clone();
                     self.settings_status = Some("Connecting and loading devices…".into());
                     return Task::perform(discover_devices(settings), |result|
                         cosmic::Action::App(Message::DevicesLoaded(result)));
                 }
+            }
+            Message::BackToSettingsCategories => {
+                self.active_settings_section = None;
             }
             Message::UrlChanged(value) => {
                 self.settings.url = value;
@@ -1935,12 +2263,12 @@ impl cosmic::Application for AppModel {
                 self.settings.panel_text_size = value.clamp(10, 24);
                 self.persist_settings();
             }
-            Message::PanelPaddingChanged(value) => {
-                self.settings.panel_padding = value.min(16);
-                self.persist_settings();
-            }
             Message::PanelAverageTemperatureChanged(value) => {
                 self.settings.panel_average_temperature = value;
+                self.persist_settings();
+            }
+            Message::PanelExcludeSolarTemperatureChanged(value) => {
+                self.settings.panel_exclude_solar_temperature = value;
                 self.persist_settings();
             }
             Message::GraphTimespanChanged(value) => {
@@ -2141,6 +2469,33 @@ mod history_tests {
     use super::*;
 
     #[test]
+    fn device_rows_only_round_the_outer_list_corners() {
+        let first = device_corner_radius(0, 3);
+        assert_eq!((first.top_left, first.top_right, first.bottom_right, first.bottom_left), (8.0, 8.0, 0.0, 0.0));
+        let middle = device_corner_radius(1, 3);
+        assert_eq!((middle.top_left, middle.top_right, middle.bottom_right, middle.bottom_left), (0.0, 0.0, 0.0, 0.0));
+        let last = device_corner_radius(2, 3);
+        assert_eq!((last.top_left, last.top_right, last.bottom_right, last.bottom_left), (0.0, 0.0, 8.0, 8.0));
+        let single = device_corner_radius(0, 1);
+        assert_eq!((single.top_left, single.top_right, single.bottom_right, single.bottom_left), (8.0, 8.0, 8.0, 8.0));
+    }
+
+    #[test]
+    fn displayed_power_uses_selected_device_or_net_total_by_layout_mode() {
+        let readings = vec![
+            FritzReading { ain: "111111".into(), name: "First".into(), power_w: 800, temperature_c: 20.0, power_state: None },
+            FritzReading { ain: "222222".into(), name: "Solar input".into(), power_w: 250, temperature_c: 21.0, power_state: None },
+        ];
+        let selected = vec!["222222".to_string(), "111111".to_string()];
+        let inputs = HashSet::from(["222222".to_string()]);
+
+        assert_eq!(displayed_power_w(&readings, &selected, false, &inputs), Some(250));
+        assert_eq!(displayed_power_w(&readings, &selected, true, &inputs), Some(550));
+        assert_eq!(displayed_power_w(&[], &selected, true, &inputs), None);
+        assert_eq!(displayed_power_w(&[], &selected, false, &inputs), None);
+    }
+
+    #[test]
     fn quick_setting_sliders_snap_to_anchor_points() {
         for anchor in 0..=4 {
             assert_eq!(quick_slider_snap_position(anchor as f32 + 0.04), anchor as f32);
@@ -2245,8 +2600,8 @@ mod history_tests {
         move_sortable_entry(&mut ains, &mut total_first, TOTAL_POWER_DRAG_ID, "222222222222");
         assert!(total_first);
         move_sortable_entry(&mut ains, &mut total_first, "111111111111", TOTAL_POWER_DRAG_ID);
-        assert!(total_first);
-        assert_eq!(ains, vec!["111111111111", "222222222222"]);
+        assert!(!total_first);
+        assert_eq!(ains, vec!["222222222222", "111111111111"]);
     }
 
     #[test]
@@ -2274,13 +2629,33 @@ mod history_tests {
     }
 
     #[test]
+    fn metric_values_keep_units_on_the_same_line() {
+        assert_eq!(keep_value_unit_together("32 W".into()), "32\u{00a0}W");
+        assert_eq!(keep_value_unit_together("15.0 °C".into()), "15.0\u{00a0}°C");
+        assert_eq!(keep_value_unit_together("Unknown".into()), "Unknown");
+    }
+
+    #[test]
     fn average_temperature_uses_all_available_selected_readings() {
         let readings = vec![
             FritzReading { ain: "111111".into(), name: "First".into(), power_w: 100, temperature_c: 20.0, power_state: None },
             FritzReading { ain: "222222".into(), name: "Second".into(), power_w: 200, temperature_c: 24.0, power_state: None },
         ];
-        assert_eq!(average_temperature_c(&readings), Some(22.0));
-        assert_eq!(average_temperature_c(&[]), None);
+        assert_eq!(average_temperature_c(&readings, false), Some(22.0));
+        assert_eq!(average_temperature_c(&readings, true), Some(22.0));
+        assert_eq!(average_temperature_c(&[], false), None);
+    }
+
+    #[test]
+    fn average_temperature_can_exclude_solar_named_devices_case_insensitively() {
+        let readings = vec![
+            FritzReading { ain: "111111".into(), name: "Living room".into(), power_w: 100, temperature_c: 20.0, power_state: None },
+            FritzReading { ain: "222222".into(), name: "Solar inverter".into(), power_w: 200, temperature_c: 40.0, power_state: None },
+            FritzReading { ain: "333333".into(), name: "ROOF SOLAR METER".into(), power_w: 300, temperature_c: 50.0, power_state: None },
+        ];
+        assert_eq!(average_temperature_c(&readings, false), Some(110.0 / 3.0));
+        assert_eq!(average_temperature_c(&readings, true), Some(20.0));
+        assert_eq!(average_temperature_c(&readings[1..], true), None);
     }
 
     #[test]

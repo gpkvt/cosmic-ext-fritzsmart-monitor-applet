@@ -46,8 +46,8 @@ pub struct FritzSettings {
     pub allow_invalid_certs: bool,
     pub ca_cert_path: String,
     pub panel_text_size: u8,
-    pub panel_padding: u8,
     pub panel_average_temperature: bool,
+    pub panel_exclude_solar_temperature: bool,
     pub graph_timespan_minutes: u16,
     pub refresh_interval_seconds: u32,
     pub temperature_alerts: HashMap<String, TemperatureAlertThresholds>,
@@ -71,8 +71,8 @@ impl Default for FritzSettings {
             allow_invalid_certs: false,
             ca_cert_path: String::new(),
             panel_text_size: 14,
-            panel_padding: 4,
             panel_average_temperature: false,
+            panel_exclude_solar_temperature: false,
             graph_timespan_minutes: 15,
             refresh_interval_seconds: 60,
             temperature_alerts: HashMap::new(),
@@ -89,10 +89,6 @@ impl Default for FritzSettings {
 
 fn parse_panel_text_size(value: &str) -> u8 {
     value.parse::<u8>().unwrap_or(14).clamp(10, 24)
-}
-
-fn parse_panel_padding(value: &str) -> u8 {
-    value.parse::<u8>().unwrap_or(4).min(16)
 }
 
 fn parse_graph_timespan_minutes(value: &str) -> u16 {
@@ -157,8 +153,8 @@ impl FritzSettings {
             allow_invalid_certs: get("ALLOW_INVALID_CERTS").eq_ignore_ascii_case("true"),
             ca_cert_path: get("CA_CERT_PATH"),
             panel_text_size: parse_panel_text_size(&get("PANEL_TEXT_SIZE")),
-            panel_padding: parse_panel_padding(&get("PANEL_PADDING")),
             panel_average_temperature: get("PANEL_AVERAGE_TEMPERATURE").eq_ignore_ascii_case("true"),
+            panel_exclude_solar_temperature: get("PANEL_EXCLUDE_SOLAR_TEMPERATURE").eq_ignore_ascii_case("true"),
             graph_timespan_minutes: parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")),
             refresh_interval_seconds: parse_refresh_interval_seconds(&get("REFRESH_INTERVAL_SECONDS")),
             temperature_alerts: parse_temperature_alerts(&get("TEMPERATURE_ALERTS")),
@@ -201,11 +197,12 @@ impl FritzSettings {
         input_ains.sort_unstable();
         let input_ains = input_ains.join(",");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_PADDING={}\nPANEL_AVERAGE_TEMPERATURE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nTOTAL_POWER_FIRST={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nTOTAL_POWER_FIRST={}\n",
             self.url, self.username, self.password, first_ain, selected_ains,
             if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path,
-            self.panel_text_size.clamp(10, 24), self.panel_padding.min(16),
+            self.panel_text_size.clamp(10, 24),
             if self.panel_average_temperature { "true" } else { "false" },
+            if self.panel_exclude_solar_temperature { "true" } else { "false" },
             self.graph_timespan_minutes.clamp(5, 1440),
             self.refresh_interval_seconds.clamp(30, 3600), temperature_alerts,
             if self.weather_enabled { "true" } else { "false" }, self.openweathermap_api_key,
@@ -483,6 +480,35 @@ async fn fetch_device_list_xml(client: &Client, base: &str, sid: &str) -> Result
     read_xml_response(response, "FRITZ!Box device request failed").await
 }
 
+fn parse_switch_state_response(body: &str) -> Option<bool> {
+    match body.trim() {
+        "1" => Some(true),
+        "0" => Some(false),
+        _ => None,
+    }
+}
+
+fn switch_command_response_matches(body: &str, on: bool) -> bool {
+    body.trim() == if on { "1" } else { "0" }
+}
+
+async fn fetch_switch_state(
+    client: &Client,
+    base: &str,
+    sid: &str,
+    ain: &str,
+) -> Result<Option<bool>, String> {
+    let response = client.get(format!("{base}/webservices/homeautoswitch.lua"))
+        .query(&[
+            ("sid", sid),
+            ("switchcmd", "getswitchstate"),
+            ("ain", ain),
+        ])
+        .send().await.map_err(|error| format!("FRITZ!Box switch-state request failed: {error}"))?;
+    let body = read_xml_response(response, "FRITZ!Box switch-state request failed").await?;
+    Ok(parse_switch_state_response(&body))
+}
+
 fn parse_fetch_result_xml(xml: &str, selected_ains: &[String]) -> Result<FritzFetchResult, String> {
     let document = Document::parse(xml).map_err(|error| format!("Invalid device XML: {error}"))?;
     let mut readings = Vec::new();
@@ -519,7 +545,18 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     let (client, sid) = authenticated_client(&settings).await?;
     let base = settings.url.trim_end_matches('/');
     let devices_xml = fetch_device_list_xml(&client, base, &sid).await?;
-    parse_fetch_result_xml(&devices_xml, &selected_ains)
+    let mut result = parse_fetch_result_xml(&devices_xml, &selected_ains)?;
+
+    // Query the dedicated switch-state endpoint: power-meter XML can lag behind
+    // the actual actuator state on some FRITZ!Box devices.
+    let states = futures::future::join_all(result.readings.iter().map(|reading|
+        fetch_switch_state(&client, base, &sid, &reading.ain),
+    )).await;
+    for (reading, state) in result.readings.iter_mut().zip(states) {
+        reading.power_state = state.unwrap_or(None);
+    }
+
+    Ok(result)
 }
 
 pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
@@ -532,21 +569,16 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
         .query(&[("sid", sid.as_str()), ("switchcmd", command), ("ain", ain.as_str())])
         .send().await.map_err(|error| format!("FRITZ!Box power command failed: {error}"))?;
     let body = read_xml_response(response, "FRITZ!Box power command failed").await?;
-    if body.trim() != "1" {
+    if !switch_command_response_matches(&body, on) {
         return Err(format!("FRITZ!Box rejected the power command: {}", body.trim()));
     }
 
-    let key = normalize_ain_for_selection(&ain);
     let deadline = Instant::now() + Duration::from_secs(30);
     let mut last_error = None;
     while Instant::now() < deadline {
-        match fetch_device_list_xml(&client, base, &sid).await {
-            Ok(xml) => match parse_device_readings_xml(&xml, std::slice::from_ref(&ain)) {
-                Ok(readings) if readings.iter().any(|reading|
-                    normalize_ain_for_selection(&reading.ain) == key && reading.power_state == Some(on)) => return Ok(()),
-                Ok(_) => {},
-                Err(error) => last_error = Some(error),
-            },
+        match fetch_switch_state(&client, base, &sid, &ain).await {
+            Ok(Some(state)) if state == on => return Ok(()),
+            Ok(_) => {},
             Err(error) => last_error = Some(error),
         }
         tokio::time::sleep(Duration::from_secs(2)).await;
@@ -564,12 +596,6 @@ mod tests {
     #[test]
     fn panel_text_size_defaults_and_is_clamped() {
         assert_eq!(FritzSettings::default().panel_text_size, 14);
-        assert_eq!(FritzSettings::default().panel_padding, 4);
-        assert_eq!(parse_panel_padding(""), 4);
-        assert_eq!(parse_panel_padding("invalid"), 4);
-        assert_eq!(parse_panel_padding("0"), 0);
-        assert_eq!(parse_panel_padding("12"), 12);
-        assert_eq!(parse_panel_padding("30"), 16);
         assert_eq!(parse_panel_text_size(""), 14);
         assert_eq!(parse_panel_text_size("invalid"), 14);
         assert_eq!(parse_panel_text_size("8"), 10);
@@ -780,6 +806,24 @@ mod tests {
         assert!(parse_device_xml(xml, "123456789012").is_err());
     }
     #[test]
+    fn validates_on_and_off_command_responses() {
+        assert!(switch_command_response_matches("1", true));
+        assert!(!switch_command_response_matches("0", true));
+        assert!(switch_command_response_matches("0", false));
+        assert!(!switch_command_response_matches("1", false));
+        assert!(!switch_command_response_matches("inval", false));
+    }
+
+    #[test]
+    fn parses_dedicated_switch_state_responses() {
+        assert_eq!(parse_switch_state_response("1"), Some(true));
+        assert_eq!(parse_switch_state_response("0"), Some(false));
+        assert_eq!(parse_switch_state_response(" inval\\n"), None);
+        assert_eq!(parse_switch_state_response(""), None);
+        assert_eq!(parse_switch_state_response("2"), None);
+    }
+
+    #[test]
     fn parses_switch_power_state_when_available() {
         for (state, expected) in [("1", Some(true)), ("0", Some(false)), ("unknown", None)] {
             let xml = format!(r#"
@@ -820,6 +864,7 @@ mod tests {
         let settings = FritzSettings::default();
         assert!(!settings.weather_enabled);
         assert!(!settings.total_power_first);
+        assert!(!settings.panel_exclude_solar_temperature);
         assert!(settings.openweathermap_api_key.is_empty());
         assert!(settings.weather_location.is_empty());
         assert_eq!(settings.weather_refresh_interval_minutes, 10);
