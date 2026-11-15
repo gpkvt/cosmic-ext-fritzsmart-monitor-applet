@@ -585,7 +585,6 @@ fn total_power_overview(
     settings: &FritzSettings,
     history: &VecDeque<(Instant, i64)>,
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
-    position: usize,
 ) -> Option<cosmic::Element<'static, Message>> {
     let low = history.iter().map(|(_, value)| *value).min()?;
     let high = history.iter().map(|(_, value)| *value).max()?;
@@ -670,7 +669,6 @@ fn total_power_overview(
                 .push(graph_panel(total_graph))
                 .push(graph_panel(input_graphs.into())),
         );
-    let _ = position;
     Some(surface_card(content.into(), 14))
 }
 
@@ -1548,7 +1546,6 @@ impl cosmic::Application for AppModel {
                         &self.settings,
                         &self.history,
                         &self.device_history,
-                        0,
                     ) {
                         content = content
                             .push(overview)
@@ -1723,7 +1720,6 @@ impl cosmic::Application for AppModel {
                         &self.settings,
                         &self.history,
                         &self.device_history,
-                        self.selected_ains.len(),
                     ) {
                         content = content.push(overview);
                     }
