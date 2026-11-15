@@ -2761,7 +2761,7 @@ mod history_tests {
     }
 
     #[test]
-    fn displayed_power_uses_selected_device_or_net_total_by_layout_mode() {
+    fn displayed_power_uses_selected_device_or_output_total_by_layout_mode() {
         let readings = vec![
             FritzReading { ain: "111111".into(), name: "First".into(), power_w: 800, temperature_c: 20.0, power_state: None },
             FritzReading { ain: "222222".into(), name: "Solar input".into(), power_w: 250, temperature_c: 21.0, power_state: None },
@@ -2770,7 +2770,7 @@ mod history_tests {
         let inputs = HashSet::from(["222222".to_string()]);
 
         assert_eq!(displayed_power_w(&readings, &selected, false, &inputs), Some(250));
-        assert_eq!(displayed_power_w(&readings, &selected, true, &inputs), Some(550));
+        assert_eq!(displayed_power_w(&readings, &selected, true, &inputs), Some(800));
         assert_eq!(displayed_power_w(&[], &selected, true, &inputs), None);
         assert_eq!(displayed_power_w(&[], &selected, false, &inputs), None);
     }
