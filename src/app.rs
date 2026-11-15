@@ -225,6 +225,43 @@ fn max_history_samples(window: Duration) -> usize {
     (window.as_secs() / 60) as usize + 1
 }
 
+fn quick_slider_snap_position(position: f32) -> f32 {
+    let position = position.clamp(0.0, 4.0);
+    let anchor = position.round();
+    if (position - anchor).abs() <= 0.08 {
+        anchor
+    } else {
+        position
+    }
+}
+
+fn quick_slider_value(position: f32, anchors: [f32; 5]) -> f32 {
+    let position = quick_slider_snap_position(position);
+    let segment = (position.floor() as usize).min(3);
+    let fraction = position - segment as f32;
+    anchors[segment] + (anchors[segment + 1] - anchors[segment]) * fraction
+}
+
+fn quick_slider_position(value: f32, anchors: [f32; 5]) -> f32 {
+    let value = value.clamp(anchors[0], anchors[4]);
+    let segment = (0..4)
+        .find(|index| value <= anchors[index + 1])
+        .unwrap_or(3);
+    let span = anchors[segment + 1] - anchors[segment];
+    segment as f32 + (value - anchors[segment]) / span
+}
+
+fn quick_slider_anchor_labels(labels: [&'static str; 5]) -> widget::Row<'static, Message> {
+    labels.into_iter().fold(
+        widget::Row::new().width(cosmic::iced::Length::Fill).spacing(0),
+        |row, label| row.push(
+            widget::container(widget::text(label))
+                .width(cosmic::iced::Length::Fill)
+                .align_x(cosmic::iced::alignment::Horizontal::Center),
+        ),
+    )
+}
+
 fn format_countdown(seconds: u64) -> String {
     let hours = seconds / 3600;
     let minutes = (seconds % 3600) / 60;
@@ -1458,27 +1495,33 @@ impl cosmic::Application for AppModel {
                 .class(cosmic::theme::Button::Standard),
             );
             if self.quick_options_expanded {
+                const REFRESH_ANCHORS: [f32; 5] = [30.0, 300.0, 900.0, 1800.0, 3600.0];
+                const GRAPH_ANCHORS: [f32; 5] = [5.0, 60.0, 360.0, 720.0, 1440.0];
                 content = content
                     .push(widget::text::caption(format!(
                         "REFRESH INTERVAL · {}",
                         format_countdown(u64::from(self.quick_refresh_interval))
                     )))
                     .push(widget::slider(
-                        30.0..=3600.0,
-                        self.quick_refresh_interval as f32,
-                        |value| Message::QuickRefreshIntervalPreview(value.round() as u32),
-                    ).step(30.0).on_release(Message::CommitQuickRefreshInterval))
-                    .push(widget::text::caption("30s          5m          15m          30m          60m"))
+                        0.0..=4.0,
+                        quick_slider_position(self.quick_refresh_interval as f32, REFRESH_ANCHORS),
+                        |position| Message::QuickRefreshIntervalPreview(
+                            quick_slider_value(position, REFRESH_ANCHORS).round() as u32
+                        ),
+                    ).step(0.01).on_release(Message::CommitQuickRefreshInterval))
+                    .push(quick_slider_anchor_labels(["30s", "5m", "15m", "30m", "60m"]))
                     .push(widget::text::caption(format!(
                         "GRAPH DURATION · {}",
                         format_graph_timespan(self.quick_graph_timespan)
                     )))
                     .push(widget::slider(
-                        5.0..=1440.0,
-                        f32::from(self.quick_graph_timespan),
-                        |value| Message::QuickGraphTimespanPreview(value.round() as u16),
-                    ).step(5.0).on_release(Message::CommitQuickGraphTimespan))
-                    .push(widget::text::caption("5m          1h          6h          12h          24h"));
+                        0.0..=4.0,
+                        quick_slider_position(f32::from(self.quick_graph_timespan), GRAPH_ANCHORS),
+                        |position| Message::QuickGraphTimespanPreview(
+                            quick_slider_value(position, GRAPH_ANCHORS).round() as u16
+                        ),
+                    ).step(0.01).on_release(Message::CommitQuickGraphTimespan))
+                    .push(quick_slider_anchor_labels(["5m", "1h", "6h", "12h", "24h"]));
             }
 
             if let Some(error) = &self.error {
@@ -2036,6 +2079,29 @@ impl cosmic::Application for AppModel {
 
 #[cfg(test)]
 mod history_tests {
+    #[test]
+    fn quick_setting_sliders_snap_to_anchor_points() {
+        for anchor in 0..=4 {
+            assert_eq!(quick_slider_snap_position(anchor as f32 + 0.04), anchor as f32);
+        }
+        assert!((quick_slider_snap_position(1.2) - 1.2).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn quick_setting_slider_maps_anchor_values_to_aligned_positions() {
+        let refresh = [30.0, 300.0, 900.0, 1800.0, 3600.0];
+        let graph = [5.0, 60.0, 360.0, 720.0, 1440.0];
+        for (position, value) in refresh.into_iter().enumerate() {
+            assert!((quick_slider_position(value, refresh) - position as f32).abs() < 0.001);
+            assert!((quick_slider_value(position as f32, refresh) - value).abs() < 0.001);
+        }
+        for (position, value) in graph.into_iter().enumerate() {
+            assert!((quick_slider_position(value, graph) - position as f32).abs() < 0.001);
+            assert!((quick_slider_value(position as f32, graph) - value).abs() < 0.001);
+        }
+    }
+
+     {
     use super::*;
 
     #[test]
