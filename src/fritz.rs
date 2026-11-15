@@ -159,10 +159,11 @@ fn parse_refresh_interval_seconds(value: &str) -> u32 {
 fn parse_menu_order(value: &str, selected_ains: &str, total_power_first: bool) -> Vec<String> {
     const TOTAL: &str = "__TOTAL_POWER__";
     const DIFFERENCE: &str = "__POWER_DIFFERENCE__";
+    const SUMMARY: &str = "__LIVE_SUMMARY__";
     let mut order = Vec::new();
     if !value.trim().is_empty() {
         for entry in value.split(',') {
-            let normalized = if entry == TOTAL || entry == DIFFERENCE {
+            let normalized = if entry == TOTAL || entry == DIFFERENCE || entry == SUMMARY {
                 entry.to_string()
             } else {
                 normalize_ain_for_selection(entry)
@@ -188,6 +189,9 @@ fn parse_menu_order(value: &str, selected_ains: &str, total_power_first: bool) -
             order.push(TOTAL.into());
         }
         order.push(DIFFERENCE.into());
+    }
+    if !order.contains(&SUMMARY.to_string()) {
+        order.push(SUMMARY.into());
     }
     order
 }
