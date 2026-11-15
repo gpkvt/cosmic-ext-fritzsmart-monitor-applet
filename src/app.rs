@@ -625,28 +625,37 @@ fn live_power_summary(
     temperature: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     let title = if is_net { "NET POWER" } else { "CURRENT POWER" };
-    let power_metric = widget::Column::new()
+    // Keep the heading on its own full-width row so the power and
+    // temperature values share the same baseline beneath it.
+    let heading = widget::Row::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
-        .push(widget::Row::new()
-            .spacing(8)
-            .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(18))
-            .push(widget::text::caption(title)))
-        .push(widget::text::title2(keep_value_unit_together(power)));
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(18))
+        .push(widget::text::caption(title));
 
-    let mut metrics = widget::Row::new()
+    let mut values = widget::Row::new()
         .spacing(12)
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Start)
-        .push(power_metric);
+        .push(
+            widget::Column::new()
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::title2(keep_value_unit_together(power))),
+        );
     if let Some(temp) = temperature {
         let temperature_metric = widget::Column::new()
-            .spacing(8)
             .width(cosmic::iced::Length::Fill)
+            .align_x(cosmic::iced::Alignment::End)
             .push(widget::text::title2(keep_value_unit_together(temp)));
-        metrics = metrics.push(temperature_metric);
+        values = values.push(temperature_metric);
     }
+
+    let metrics = widget::Column::new()
+        .spacing(8)
+        .width(cosmic::iced::Length::Fill)
+        .push(heading)
+        .push(values);
 
     let mut content = widget::Column::new()
         .spacing(10)
