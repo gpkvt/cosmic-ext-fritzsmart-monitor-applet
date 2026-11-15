@@ -620,6 +620,59 @@ impl cosmic::Application for AppModel {
             }
             content = content.push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings));
         } else {
+            if let Some(weather) = &self.weather {
+                let wind_direction = weather.wind_direction_degrees
+                    .map(|degrees| format!(" · {degrees}°"))
+                    .unwrap_or_default();
+                let sunrise = chrono::DateTime::from_timestamp(weather.sunrise_unix, 0)
+                    .map(|time| time.with_timezone(&chrono::Local).format("%H:%M").to_string())
+                    .unwrap_or_else(|| "—".into());
+                let sunset = chrono::DateTime::from_timestamp(weather.sunset_unix, 0)
+                    .map(|time| time.with_timezone(&chrono::Local).format("%H:%M").to_string())
+                    .unwrap_or_else(|| "—".into());
+                let weather_details = widget::Column::new()
+                    .spacing(6)
+                    .push(widget::Row::new()
+                        .spacing(10)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::icon::from_name(weather.icon_name()).size(36))
+                        .push(widget::Column::new()
+                            .spacing(2)
+                            .push(widget::text::title2(format!("{:.1} °C", weather.temperature_c)))
+                            .push(widget::text::body(weather.description.clone()))
+                            .push(widget::text::caption(format!("Feels like {:.1} °C", weather.feels_like_c)))))
+                    .push(widget::text::caption(weather.location_name.clone()))
+                    .push(widget::Row::new().spacing(8)
+                        .push(widget::text::body(format!("Humidity  {}%", weather.humidity_percent)))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(widget::text::body(format!("Clouds  {}%", weather.cloudiness_percent))))
+                    .push(widget::Row::new().spacing(8)
+                        .push(widget::text::body(format!("Wind  {:.1} m/s{}", weather.wind_speed_mps, wind_direction)))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(widget::text::body(format!("Pressure  {} hPa", weather.pressure_hpa))))
+                    .push(widget::Row::new().spacing(8)
+                        .push(widget::text::body(format!("Visibility  {:.1} km", f64::from(weather.visibility_m) / 1000.0)))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(widget::text::body(format!("Sunrise  {sunrise}"))))
+                    .push(widget::text::body(format!("Sunset  {sunset}")));
+                content = content
+                    .push(widget::text::caption("WEATHER"))
+                    .push(widget::container(weather_details).padding(10)
+                        .style(|theme| {
+                            let cosmic = theme.cosmic();
+                            cosmic::iced::widget::container::Style {
+                                background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                                ..Default::default()
+                            }
+                        }))
+                    .push(widget::divider::horizontal::default());
+            } else if self.settings.weather_enabled {
+                content = content
+                    .push(widget::text::caption("WEATHER"))
+                    .push(widget::text::body("Weather data is loading…"))
+                    .push(widget::divider::horizontal::default());
+            }
+
             if !self.readings.is_empty() {
                 content = content.push(widget::text::caption("SELECTED DEVICES"));
                 for (index, reading) in self.readings.iter().enumerate() {
@@ -739,9 +792,6 @@ impl cosmic::Application for AppModel {
                 content = content.push(widget::text::body("Select one or more devices in Settings"));
             }
 
-            if let Some(weather) = &self.weather {
-                content = content.push(widget::text::caption(format!("WEATHER · {} · {:.1} °C", weather.description, weather.temperature_c)));
-            }
             let remaining = self.next_refresh_at
                 .map(|deadline| deadline.saturating_duration_since(Instant::now()));
             let countdown = remaining
