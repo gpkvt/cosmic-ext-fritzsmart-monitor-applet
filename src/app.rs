@@ -1472,6 +1472,50 @@ impl cosmic::Application for AppModel {
             }
 
             if self.active_settings_section == Some("diagnostics") {
+                let endpoint = self.settings.url.trim();
+                let uses_https = endpoint.to_ascii_lowercase().starts_with("https://");
+                let tls_status = if uses_https {
+                    if self.settings.allow_invalid_certs {
+                        "HTTPS enabled · certificate validation disabled"
+                    } else if !self.settings.ca_cert_path.trim().is_empty() {
+                        "HTTPS enabled · custom CA certificate configured"
+                    } else {
+                        "HTTPS enabled · system certificate roots"
+                    }
+                } else if endpoint.to_ascii_lowercase().starts_with("http://") {
+                    "HTTPS disabled · using plain HTTP"
+                } else {
+                    "HTTPS status unavailable · invalid or empty URL"
+                };
+                content = content
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::caption("DIAGNOSTICS"))
+                    .push(widget::text::title3("HTTPS / TLS"))
+                    .push(widget::text::body(tls_status))
+                    .push(widget::text::caption(format!("Endpoint: {}", if endpoint.is_empty() { "Not configured" } else { endpoint })));
+                let requests = crate::fritz::http_request_diagnostics();
+                content = content
+                    .push(widget::text::title3("HTTP requests"))
+                    .push(widget::text::caption("Most recent responses · query parameters and session IDs are omitted"));
+                if requests.is_empty() {
+                    content = content.push(widget::text::caption("No HTTP responses recorded yet"));
+                } else {
+                    for request in requests.iter().rev() {
+                        content = content.push(
+                            widget::row()
+                                .spacing(8)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::text::body(format!("{} {}", request.method, request.path))
+                                    .width(cosmic::iced::Length::Fill))
+                                .push(widget::text::caption(format!(
+                                    "{} {}",
+                                    if request.https { "HTTPS" } else { "HTTP" },
+                                    request.status
+                                )))
+                        );
+                    }
+                }
+
     content = content
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::caption("DIAGNOSTICS"));
