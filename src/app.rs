@@ -3893,9 +3893,12 @@ impl cosmic::Application for AppModel {
                                 && crate::fritz::normalize_ain_for_selection(current)
                                     == crate::fritz::normalize_ain_for_selection(&target_ain))
                     });
-                    if target_is_valid && dragged_ain != target_ain && !same_target {
-                        // Move the dragged entry as soon as a new row is entered.
-                        // The insertion preview then animates at the live position.
+                    if target_is_valid
+                        && dragged_ain != target_ain
+                        && (!same_target || self.drag_target_after != insert_after)
+                    {
+                        // Drop zones on both edges make the insertion point explicit,
+                        // just like the insertion marker between browser tabs.
                         move_menu_entry_at(
                             &mut self.settings.menu_order,
                             dragged_ain,
@@ -3908,6 +3911,7 @@ impl cosmic::Application for AppModel {
                             .first()
                             .is_some_and(|entry| entry == TOTAL_POWER_DRAG_ID);
                         self.drag_target_ain = Some(target_ain);
+                        self.drag_target_after = insert_after;
                         self.drag_target_since = Some(Instant::now());
                     }
                 }
