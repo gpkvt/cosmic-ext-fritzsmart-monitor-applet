@@ -643,7 +643,7 @@ fn live_power_summary(
     input_power: Option<String>,
     temperature: Option<String>,
 ) -> cosmic::Element<'static, Message> {
-    let title = if is_net { "NET POWER" } else { "CURRENT POWER" };
+    let title = if is_net { "TOTAL POWER OUTPUT" } else { "CURRENT POWER" };
     // Keep the heading on its own full-width row so the power and
     // temperature values share the same baseline beneath it.
     let heading = widget::Row::new()
