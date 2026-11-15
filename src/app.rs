@@ -158,7 +158,7 @@ fn move_selected_device(ains: &mut [String], ain: &str, move_up: bool) {
     }
 }
 
-fn graph_frame<'a>(content: impl Into<widget::Element<'a, Message>>) -> widget::Container<'a, Message> {
+fn graph_frame<'a>(content: impl Into<cosmic::iced::Element<'a, Message>>) -> widget::Container<'a, Message> {
     // A one-pixel inset of the contrasting theme surface creates a clear,
     // rounded-looking frame without relying on hard-coded light/dark colors.
     let content = widget::container(content)
