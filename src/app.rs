@@ -271,7 +271,6 @@ fn icon_action_button<'a>(
     .width(cosmic::iced::Length::Fixed(36.0))
     .height(cosmic::iced::Length::Fixed(36.0))
     .name(accessible_name)
-    .tooltip(accessible_name)
 }
 
 fn action_button<'a>(
