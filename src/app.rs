@@ -534,6 +534,23 @@ fn metric_tile<'a>(
     surface_card(content.into(), 10)
 }
 
+fn range_metric_tile<'a>(
+    label: &'static str,
+    value: String,
+    icon: &'static str,
+) -> cosmic::Element<'a, Message> {
+    let content = widget::Column::new()
+        .spacing(8)
+        .width(cosmic::iced::Length::Fill)
+        .push(widget::Row::new()
+            .spacing(6)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::icon::from_name(icon).size(14))
+            .push(widget::text::caption(label)))
+        .push(widget::text::title2(keep_value_unit_together(value)));
+    surface_card(content.into(), 12)
+}
+
 fn displayed_power_w(
     readings: &[FritzReading],
     selected_ains: &[String],
@@ -673,16 +690,16 @@ fn total_power_overview(
             widget::Row::new()
                 .spacing(8)
                 .width(cosmic::iced::Length::Fill)
-                .push(widget::container(metric_tile(
+                .push(widget::container(range_metric_tile(
                     "LOW",
                     format!("{low} W"),
                     "go-down-symbolic",
-                )).width(cosmic::iced::Length::Fill))
-                .push(widget::container(metric_tile(
+                )).width(cosmic::iced::Length::Fill)
+                .push(widget::container(range_metric_tile(
                     "HIGH",
                     format!("{high} W"),
                     "go-up-symbolic",
-                )).width(cosmic::iced::Length::Fill)),
+                )).width(cosmic::iced::Length::Fill)).width(cosmic::iced::Length::Fill)),
         )
         .push(graph_panel(total_graph))
         .push(graph_panel(input_graphs.into()));
