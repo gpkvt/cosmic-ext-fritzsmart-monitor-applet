@@ -1620,7 +1620,7 @@ impl cosmic::Application for AppModel {
                             .into()
                     });
                     let state_label = reading.power_state.map(|on| if on { "ON" } else { "OFF" })
-                        .unwrap_or("MONITORING");
+                        .unwrap_or("UNKNOWN");
                     let device_heading = widget::button::custom(
                         widget::Row::new()
                             .spacing(12)
@@ -2077,6 +2077,10 @@ impl cosmic::Application for AppModel {
                     }
                 }
                 Err(error) => {
+                    // Do not continue presenting the last known switch state as live.
+                    for reading in &mut self.readings {
+                        reading.power_state = None;
+                    }
                     self.error = Some(error);
                 },
                 }
