@@ -44,6 +44,7 @@ pub struct AppModel {
     dragging_device_ain: Option<String>,
     drag_scroll_direction: i8,
     drag_target_ain: Option<String>,
+    drag_target_after: bool,
     drag_target_since: Option<Instant>,
     drag_original_ains: Option<Vec<String>>,
     drag_original_total_power_first: Option<bool>,
@@ -102,7 +103,7 @@ pub enum Message {
     ToggleDevice(String, bool),
     ToggleDeviceInput(String, bool),
     StartDeviceDrag(String),
-    DragOverDevice(String),
+    DragOverDevice(String, bool),
     DragPointerMoved(f32),
     DragPointerLeft,
     EndDeviceDrag,
@@ -514,6 +515,38 @@ fn record_device_sample(
     while samples.len() > max_history_samples(window) {
         samples.pop_front();
     }
+}
+
+fn move_menu_entry_at(order: &mut Vec<String>, dragged: &str, target: &str, after: bool) {
+    let normalize = |entry: &str| {
+        if entry == TOTAL_POWER_DRAG_ID
+            || entry == POWER_DIFFERENCE_DRAG_ID
+            || entry == SUMMARY_DRAG_ID
+            || entry == WEATHER_DRAG_ID
+        {
+            entry.to_string()
+        } else {
+            crate::fritz::normalize_ain_for_selection(entry)
+        }
+    };
+    let dragged = normalize(dragged);
+    let target = normalize(target);
+    let Some(from) = order.iter().position(|entry| normalize(entry) == dragged) else {
+        return;
+    };
+    let Some(target_before_removal) = order.iter().position(|entry| normalize(entry) == target) else {
+        return;
+    };
+    if from == target_before_removal {
+        return;
+    }
+    let entry = order.remove(from);
+    let Some(target_index) = order.iter().position(|item| normalize(item) == target) else {
+        order.insert(from.min(order.len()), entry);
+        return;
+    };
+    let insertion_index = target_index + if after { 1 } else { 0 };
+    order.insert(insertion_index.min(order.len()), entry);
 }
 
 fn move_menu_entry(order: &mut Vec<String>, dragged: &str, target: &str) {
@@ -1104,18 +1137,41 @@ fn sortable_menu_card<'a>(
     id: String,
     card: cosmic::Element<'a, Message>,
 ) -> cosmic::Element<'a, Message> {
-    let drag_handle = widget::mouse_area(widget::text("⠿").size(20))
-        .on_press(Message::StartDeviceDrag(id.clone()))
-        .on_release(Message::EndDeviceDrag);
+    let drag_handle = widget::mouse_area(
+        widget::container(widget::text("⠿").size(24)).padding([10, 10]),
+    )
+    .on_press(Message::StartDeviceDrag(id.clone()))
+    .on_release(Message::EndDeviceDrag);
+    let before = widget::mouse_area(
+        widget::container(widget::divider::horizontal::default())
+            .height(cosmic::iced::Length::Fixed(10.0))
+            .width(cosmic::iced::Length::Fill),
+    )
+    .on_enter(Message::DragOverDevice(id.clone(), false))
+    .on_release(Message::EndDeviceDrag);
+    let after = widget::mouse_area(
+        widget::container(widget::divider::horizontal::default())
+            .height(cosmic::iced::Length::Fixed(10.0))
+            .width(cosmic::iced::Length::Fill),
+    )
+    .on_enter(Message::DragOverDevice(id.clone(), true))
+    .on_release(Message::EndDeviceDrag);
     let drop_target = widget::mouse_area(card)
-        .on_enter(Message::DragOverDevice(id))
+        .on_enter(Message::DragOverDevice(id, false))
         .on_release(Message::EndDeviceDrag);
-    widget::Row::new()
-        .spacing(6)
-        .align_y(cosmic::iced::Alignment::Start)
+    widget::Column::new()
+        .spacing(0)
         .width(cosmic::iced::Length::Fill)
-        .push(widget::container(drag_handle).padding([8, 2]))
-        .push(widget::container(drop_target).width(cosmic::iced::Length::Fill))
+        .push(before)
+        .push(
+            widget::Row::new()
+                .spacing(6)
+                .align_y(cosmic::iced::Alignment::Start)
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::container(drag_handle).padding([8, 2]))
+                .push(widget::container(drop_target).width(cosmic::iced::Length::Fill)),
+        )
+        .push(after)
         .into()
 }
 
@@ -1148,7 +1204,7 @@ fn special_menu_sort_row(
                 }
             }),
     )
-    .on_enter(Message::DragOverDevice(id.to_string()))
+    .on_enter(Message::DragOverDevice(id.to_string(), false))
     .on_release(Message::EndDeviceDrag)
     .into()
 }
@@ -1178,7 +1234,7 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
                 }
             }),
     )
-    .on_enter(Message::DragOverDevice(TOTAL_POWER_DRAG_ID.to_string()))
+    .on_enter(Message::DragOverDevice(TOTAL_POWER_DRAG_ID.to_string(), false))
     .on_release(Message::EndDeviceDrag)
     .into()
 }
@@ -1212,6 +1268,7 @@ fn power_difference_sort_row(position: usize) -> cosmic::Element<'static, Messag
     )
     .on_enter(Message::DragOverDevice(
         POWER_DIFFERENCE_DRAG_ID.to_string(),
+        false,
     ))
     .on_release(Message::EndDeviceDrag)
     .into()
@@ -2164,7 +2221,7 @@ impl cosmic::Application for AppModel {
                                     }
                                 },
                             ))
-                            .on_enter(Message::DragOverDevice(ain.clone()))
+                            .on_enter(Message::DragOverDevice(ain.clone(), false))
                             .on_release(Message::EndDeviceDrag),
                         );
                         if self.dragging_device_ain.is_some()
@@ -3807,6 +3864,7 @@ impl cosmic::Application for AppModel {
                 {
                     self.dragging_device_ain = Some(ain);
                     self.drag_target_ain = None;
+                    self.drag_target_after = false;
                     self.drag_target_since = None;
                     self.drag_scroll_direction = 0;
                     self.drag_original_ains = Some(self.selected_ains.clone());
@@ -3814,7 +3872,7 @@ impl cosmic::Application for AppModel {
                     self.drag_original_menu_order = Some(self.settings.menu_order.clone());
                 }
             }
-            Message::DragOverDevice(target_ain) => {
+            Message::DragOverDevice(target_ain, insert_after) => {
                 if let Some(dragged_ain) = self.dragging_device_ain.as_deref() {
                     let target_is_valid = target_ain == TOTAL_POWER_DRAG_ID
                         || target_ain == POWER_DIFFERENCE_DRAG_ID
@@ -3837,16 +3895,25 @@ impl cosmic::Application for AppModel {
                                 && crate::fritz::normalize_ain_for_selection(current)
                                     == crate::fritz::normalize_ain_for_selection(&target_ain))
                     });
-                    if target_is_valid && dragged_ain != target_ain && !same_target {
-                        // Move the dragged entry as soon as a new row is entered.
-                        // The insertion preview then animates at the live position.
-                        move_menu_entry(&mut self.settings.menu_order, dragged_ain, &target_ain);
+                    if target_is_valid
+                        && dragged_ain != target_ain
+                        && (!same_target || self.drag_target_after != insert_after)
+                    {
+                        // Drop zones on both edges make the insertion point explicit,
+                        // just like the insertion marker between browser tabs.
+                        move_menu_entry_at(
+                            &mut self.settings.menu_order,
+                            dragged_ain,
+                            &target_ain,
+                            insert_after,
+                        );
                         self.settings.total_power_first = self
                             .settings
                             .menu_order
                             .first()
                             .is_some_and(|entry| entry == TOTAL_POWER_DRAG_ID);
                         self.drag_target_ain = Some(target_ain);
+                        self.drag_target_after = insert_after;
                         self.drag_target_since = Some(Instant::now());
                     }
                 }
@@ -3876,6 +3943,7 @@ impl cosmic::Application for AppModel {
                     let previous_menu_order =
                         self.drag_original_menu_order.take().unwrap_or_default();
                     self.drag_target_ain = None;
+                    self.drag_target_after = false;
                     self.drag_target_since = None;
                     if self.selected_ains != previous_ains
                         || self.settings.total_power_first != previous_total_power_first
@@ -4517,6 +4585,20 @@ mod history_tests {
             );
             assert_eq!(pending_changes.contains("123456"), should_remain_pending);
         }
+    }
+
+    #[test]
+    fn drag_drop_inserts_before_or_after_the_explicit_target_edge() {
+        let mut order = vec!["a".into(), "b".into(), "c".into()];
+
+        move_menu_entry_at(&mut order, "a", "c", false);
+        assert_eq!(order, vec!["b", "a", "c"]);
+
+        move_menu_entry_at(&mut order, "b", "c", true);
+        assert_eq!(order, vec!["a", "c", "b"]);
+
+        move_menu_entry_at(&mut order, "b", "a", false);
+        assert_eq!(order, vec!["b", "a", "c"]);
     }
 
     #[test]
