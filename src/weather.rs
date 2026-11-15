@@ -107,7 +107,7 @@ pub async fn fetch_weather_forecast(location: String, requested_days: u8) -> Res
     if location.is_empty() {
         return Err("Weather location is empty".into());
     }
-    let forecast_days = if requested_days == 14 { 14 } else { 7 };
+    let forecast_days: u8 = if requested_days == 14 { 14 } else { 7 };
     let client = Client::builder()
         .user_agent("FRITZ-Power-Monitor/0.2.6")
         .timeout(Duration::from_secs(15))
