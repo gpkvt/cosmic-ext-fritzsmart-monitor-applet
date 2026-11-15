@@ -41,7 +41,7 @@ directly and does **not** execute or depend on `fritz_solar.sh`.
 - Configure panel text size (10–24 pt).
 - Show the average temperature across selected devices, with an option to
   exclude devices whose names contain `solar`.
-- View menu cards in a consistent, fixed order without drag-and-drop controls.
+- Reorder popup sections (summary, weather, devices and power overviews) in Settings; the chosen order is saved across restarts.
 - Use the popup's sticky title bar for Refresh and Settings. Its content scrolls
   independently when needed.
 - View a live refresh countdown and configure automatic refresh from
@@ -143,7 +143,7 @@ checks for pull requests and pushes to `main`.
 
 Open the applet popup and select **Settings**. Settings are grouped into focused
 categories: Panel, Graph history, Automatic refresh, Weather, Connection,
-Devices and Diagnostics.
+Devices, Menu order and Diagnostics.
 
 ### Panel and device selection
 
@@ -158,7 +158,7 @@ Devices and Diagnostics.
 5. Enter the FRITZ!Box URL, username and password, then choose **Load devices**.
 6. Select the devices to monitor.
 
-Menu cards use a fixed order: live power summary, weather, selected devices (sorted by AIN), Total power output and Power difference. Device settings list available devices in the order returned by the FRITZ!Box.
+Use **Menu order** in Settings to arrange the live power summary, weather, device cards, Total power output and Power difference. Device cards retain their relative order. Device settings list available devices in the order returned by the FRITZ!Box.
 Each selected device appears separately in the popup with its own readings and
 history graphs.
 
