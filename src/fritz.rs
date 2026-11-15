@@ -308,8 +308,27 @@ fn format_response_read_error(
     )
 }
 
+fn is_fritzbox_unclean_tls_eof(error: &reqwest::Error) -> bool {
+    // rustls reports a close-delimited response as UnexpectedEof when some
+    // FRITZ!Box firmware closes TLS without sending close_notify. Keep this
+    // exception narrow: it must be that exact TLS shutdown error.
+    let details = format!("{error:?}");
+    details.contains("UnexpectedEof") && details.contains("close_notify")
+}
+
+fn is_complete_protocol_payload(bytes: &[u8]) -> bool {
+    let Ok(body) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+
+    // FRITZ!Box endpoints normally return XML. The switch endpoints also
+    // legitimately return the scalar values "0" and "1".
+    let body = body.trim();
+    body == "0" || body == "1" || Document::parse(body).is_ok()
+}
+
 async fn read_xml_response(
-    response: reqwest::Response,
+    mut response: reqwest::Response,
     context: &str,
 ) -> Result<String, String> {
     let status = response.status();
@@ -335,21 +354,37 @@ async fn read_xml_response(
         .and_then(|value| value.to_str().ok())
         .map(str::to_owned);
 
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|error| {
-            format_response_read_error(
-                context,
-                &url_path,
-                status,
-                version,
-                content_type.as_deref(),
-                content_length.as_deref(),
-                connection.as_deref(),
-                &error,
-            )
-        })?;
+    // Read incrementally: Response::bytes() discards already-received bytes
+    // when the TLS layer reports an unclean EOF. Keeping chunks lets us verify
+    // that the complete application payload arrived before accepting that one
+    // known FRITZ!Box shutdown defect.
+    let mut bytes = Vec::new();
+    loop {
+        match response.chunk().await {
+            Ok(Some(chunk)) => bytes.extend_from_slice(&chunk),
+            Ok(None) => break,
+            Err(error)
+                if content_length.is_none()
+                    && connection.as_deref().is_some_and(|value| value.eq_ignore_ascii_case("close"))
+                    && is_fritzbox_unclean_tls_eof(&error)
+                    && is_complete_protocol_payload(&bytes) =>
+            {
+                break;
+            }
+            Err(error) => {
+                return Err(format_response_read_error(
+                    context,
+                    &url_path,
+                    status,
+                    version,
+                    content_type.as_deref(),
+                    content_length.as_deref(),
+                    connection.as_deref(),
+                    &error,
+                ));
+            }
+        }
+    }
 
     decode_xml_response(&bytes, context)
 }
@@ -710,6 +745,22 @@ mod tests {
         assert!(message.contains("Content-Length: 123"));
         assert!(message.contains("Error details:"));
         assert!(message.contains(&error.to_string()));
+    }
+
+    #[test]
+    fn only_recognizes_rustls_unexpected_eof_as_fritzbox_shutdown() {
+        let tls_eof = reqwest::Error::from(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            "peer closed connection without sending TLS close_notify",
+        ));
+        assert!(!is_fritzbox_unclean_tls_eof(&tls_eof));
+        assert!(is_complete_protocol_payload(
+            br#"<?xml version="1.0"?><SessionInfo><SID>0000000000000000</SID></SessionInfo>"#
+        ));
+        assert!(is_complete_protocol_payload(b"0"));
+        assert!(is_complete_protocol_payload(b"1"));
+        assert!(!is_complete_protocol_payload(b"<SessionInfo><SID>"));
+        assert!(!is_complete_protocol_payload(b"0\n1"));
     }
 
     #[test]
