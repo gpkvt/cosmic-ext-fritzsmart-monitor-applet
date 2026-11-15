@@ -1513,6 +1513,7 @@ impl cosmic::Application for AppModel {
                             widget::Row::new()
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::text::caption(request.timestamp.as_str()))
                                 .push(widget::text::body(format!("{} {}", request.method, request.path))
                                     .width(cosmic::iced::Length::Fill))
                                 .push(widget::text::caption(format!(
