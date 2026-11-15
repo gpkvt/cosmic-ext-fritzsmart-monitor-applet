@@ -1560,7 +1560,7 @@ impl cosmic::Application for AppModel {
                             .width(cosmic::iced::Length::Fill)
                             .push(widget::text::body(reading.name.clone()))
                             .push(widget::text::caption(format!("{} · LAST {}", state_label, format_graph_timespan(self.settings.graph_timespan_minutes)))))
-                        .push(widget::text::caption(format!("#{index + 1}")));
+                        .push(widget::text::caption(format!("#{}", index + 1)));
                     let metrics = widget::Row::new()
                         .spacing(8)
                         .width(cosmic::iced::Length::Fill)
