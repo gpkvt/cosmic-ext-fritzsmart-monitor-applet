@@ -19,25 +19,63 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
       - name: Create or repair version tag
-        run: |
-          set -euo pipefail
-          version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n1)"
-          test -n "$version"
-          tag="v$version"
-          release_commit="$(git log --first-parent -G "^version = \"$version\"" --format=%H -- Cargo.toml | head -n1)"
-          test -n "$release_commit"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch --tags origin
-          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-            current_target="$(git rev-parse "$tag^{commit}")"
-            if [ "$current_target" = "$release_commit" ]; then
-              echo "$tag already points to the version bump commit."
-              exit 0
-            fi
-            echo "$tag points to $current_target; repairing it to $release_commit."
-            git tag -d "$tag"
-            git push origin ":refs/tags/$tag"
-          fi
-          git tag -a "$tag" -m "Release $tag" "$release_commit"
-          git push origin "refs/tags/$tag"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { execFileSync } = require('node:child_process');
+            const fs = require('node:fs');
+            const cargo = fs.readFileSync('Cargo.toml', 'utf8');
+            const version = cargo.match(/^version = "([^"]+)"/m)?.[1];
+            if (!version) throw new Error('Could not read Cargo.toml package version');
+
+            const tag = `v${version}`;
+            const history = execFileSync('git', [
+              'log', '--first-parent', '-G', `^version = "${version}"`,
+              '--format=%H', '--', 'Cargo.toml'
+            ], { encoding: 'utf8' }).trim();
+            const releaseCommit = history.split('\n')[0];
+            if (!releaseCommit) throw new Error(`Could not find the commit that introduced ${version}`);
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            let existing;
+            try {
+              existing = await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            if (existing) {
+              let target = existing.data.object.sha;
+              if (existing.data.object.type === 'tag') {
+                const annotated = await github.rest.git.getTag({ owner, repo, tag_sha: target });
+                target = annotated.data.object.sha;
+              }
+              if (target === releaseCommit) {
+                core.info(`${tag} already points to the version bump commit.`);
+                return;
+              }
+              core.warning(`${tag} points to ${target}; repairing it to ${releaseCommit}.`);
+              await github.rest.git.deleteRef({ owner, repo, ref: `tags/${tag}` });
+            }
+
+            const annotated = await github.rest.git.createTag({
+              owner,
+              repo,
+              tag,
+              message: `Release ${tag}`,
+              object: releaseCommit,
+              type: 'commit',
+              tagger: {
+                name: 'gpkvt',
+                email: 'git@21x9.org',
+                date: new Date().toISOString()
+              }
+            });
+            await github.rest.git.createRef({
+              owner,
+              repo,
+              ref: `refs/tags/${tag}`,
+              sha: annotated.data.sha
+            });
+            core.info(`Created ${tag} at ${releaseCommit}`);
