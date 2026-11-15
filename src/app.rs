@@ -29,6 +29,7 @@ pub struct AppModel {
     devices: Vec<FritzDevice>,
     selected_ains: Vec<String>,
     settings_status: Option<String>,
+    settings_saved_until: Option<Instant>,
     history: VecDeque<(Instant, i64)>,
     device_history: HashMap<String, VecDeque<(Instant, i64, f64)>>,
     temperature_alert_state: HashMap<String, bool>,
@@ -289,10 +290,16 @@ fn action_button<'a>(
 
 impl AppModel {
     fn persist_settings(&mut self) {
-        self.settings_status = match self.settings.save() {
-            Ok(()) => Some("Settings saved automatically".into()),
-            Err(error) => Some(format!("Could not save settings: {error}")),
-        };
+        match self.settings.save() {
+            Ok(()) => {
+                self.settings_saved_until = Some(Instant::now() + Duration::from_secs(2));
+                self.settings_status = None;
+            }
+            Err(error) => {
+                self.settings_saved_until = None;
+                self.settings_status = Some(format!("Could not save settings: {error}"));
+            }
+        }
     }
 }
 
@@ -594,9 +601,11 @@ impl cosmic::Application for AppModel {
             }
 
             content = content
-                .push(widget::divider::horizontal::default())
-                .push(widget::text::caption("Settings are saved automatically as you change them."))
-                .push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings));
+                .push(widget::divider::horizontal::default());
+            if self.settings_saved_until.is_some_and(|deadline| Instant::now() < deadline) {
+                content = content.push(widget::text::caption("✓ Saved"));
+            }
+            content = content.push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings));
         } else {
             if !self.readings.is_empty() {
                 content = content.push(widget::text::caption("SELECTED DEVICES"));
@@ -830,6 +839,9 @@ impl cosmic::Application for AppModel {
                 return Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result)));
             }
             Message::ClockTick => {
+                if self.settings_saved_until.is_some_and(|deadline| Instant::now() >= deadline) {
+                    self.settings_saved_until = None;
+                }
                 if self.settings.weather_enabled
                     && self.next_weather_refresh_at.is_none()
                     && !self.settings.openweathermap_api_key.trim().is_empty()
