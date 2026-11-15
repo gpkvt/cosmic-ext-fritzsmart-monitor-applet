@@ -860,11 +860,16 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption("Controls the space around the panel contents"))
                     .push(widget::Row::new()
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::body("Show average temperature in panel")
-                            .width(cosmic::iced::Length::Fill))
-                        .push(widget::toggler(self.settings.panel_average_temperature)
-                            .on_toggle(Message::PanelAverageTemperatureChanged)))
-                    .push(widget::text::caption("Uses the mean temperature of all selected devices"))
+                        .push(widget::Column::new()
+                            .spacing(3)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::body("Average temperature"))
+                            .push(widget::text::caption("When enabled, the panel shows the mean temperature across all selected devices instead of a single device's temperature.")))
+                        .push(widget::container(
+                            widget::toggler(self.settings.panel_average_temperature)
+                                .on_toggle(Message::PanelAverageTemperatureChanged)
+                        )
+                        .padding([8, 10])) )
                     .push(widget::divider::horizontal::default())
             }
 
