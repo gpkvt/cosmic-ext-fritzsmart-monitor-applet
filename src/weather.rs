@@ -235,7 +235,7 @@ mod tests {
 
         let blurred = blur_background_image(encoded.into_inner()).unwrap();
         let decoded = image::load_from_memory(&blurred).unwrap();
-        assert_eq!(decoded.dimensions(), (16, 12));
+        assert_eq!((decoded.width(), decoded.height()), (16, 12));
     }
 
     #[test]
