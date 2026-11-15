@@ -29,6 +29,8 @@ pub struct AppModel {
     devices: Vec<FritzDevice>,
     selected_ains: Vec<String>,
     dragging_device_ain: Option<String>,
+    drag_target_ain: Option<String>,
+    drag_target_since: Option<Instant>,
     settings_status: Option<String>,
     settings_saved_until: Option<Instant>,
     history: VecDeque<(Instant, i64)>,
@@ -335,9 +337,14 @@ impl cosmic::Application for AppModel {
     fn subscription(&self) -> Subscription<Self::Message> {
         // A lightweight one-second tick updates the visible countdown and
         // checks the deadline. Refresh timing itself remains configurable.
-        Subscription::run(|| {
-            cosmic::iced::stream::channel(4, |mut output: futures::channel::mpsc::Sender<Message>| async move {
-                let mut interval = tokio::time::interval(Duration::from_secs(1));
+        let tick_interval = if self.dragging_device_ain.is_some() {
+            Duration::from_millis(16)
+        } else {
+            Duration::from_secs(1)
+        };
+        Subscription::run(move || {
+            cosmic::iced::stream::channel(4, move |mut output: futures::channel::mpsc::Sender<Message>| async move {
+                let mut interval = tokio::time::interval(tick_interval);
                 interval.tick().await;
                 loop {
                     interval.tick().await;
@@ -596,6 +603,24 @@ impl cosmic::Application for AppModel {
                             }
                         })
                     ).on_enter(Message::DragOverDevice(ain.clone())));
+                    if self.dragging_device_ain.is_some()
+                        && self.drag_target_ain.as_deref().is_some_and(|target|
+                            crate::fritz::normalize_ain_for_selection(target)
+                                == crate::fritz::normalize_ain_for_selection(&ain))
+                    {
+                        let progress = self.drag_target_since
+                            .map(|started| (started.elapsed().as_secs_f32() / 0.18).clamp(0.0, 1.0))
+                            .unwrap_or(1.0);
+                        let gap_height = 18.0 * progress;
+                        content = content.push(
+                            widget::container(
+                                widget::text("Drop here").size(11)
+                            )
+                            .height(cosmic::iced::Length::Fixed(gap_height))
+                            .width(cosmic::iced::Length::Fill)
+                            .padding([0, 8])
+                        );
+                    }
                 }
                 content = content.push(widget::text::caption("Drag the ⠿ handle to reorder selected devices. The first selected device supplies the panel readings. Temperature alerts notify once when a device crosses its configured threshold."));
             }
@@ -1077,19 +1102,33 @@ impl cosmic::Application for AppModel {
                         == crate::fritz::normalize_ain_for_selection(&ain))
                 {
                     self.dragging_device_ain = Some(ain);
+                    self.drag_target_ain = None;
+                    self.drag_target_since = None;
                 }
             }
             Message::DragOverDevice(target_ain) => {
                 if let Some(dragged_ain) = self.dragging_device_ain.as_deref() {
-                    move_selected_device_to_drop_target(
-                        &mut self.selected_ains,
-                        dragged_ain,
-                        &target_ain,
-                    );
+                    let dragged = crate::fritz::normalize_ain_for_selection(dragged_ain);
+                    let target = crate::fritz::normalize_ain_for_selection(&target_ain);
+                    if dragged != target
+                        && self.drag_target_ain.as_deref().is_none_or(|current|
+                            crate::fritz::normalize_ain_for_selection(current) != target)
+                    {
+                        self.drag_target_ain = Some(target_ain);
+                        self.drag_target_since = Some(Instant::now());
+                    }
                 }
             }
             Message::EndDeviceDrag => {
-                if self.dragging_device_ain.take().is_some() {
+                if let Some(dragged_ain) = self.dragging_device_ain.take() {
+                    if let Some(target_ain) = self.drag_target_ain.take() {
+                        move_selected_device_to_drop_target(
+                            &mut self.selected_ains,
+                            &dragged_ain,
+                            &target_ain,
+                        );
+                    }
+                    self.drag_target_since = None;
                     self.settings.ains = self.selected_ains.clone();
                     self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
                     self.persist_settings();
