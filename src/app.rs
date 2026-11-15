@@ -751,17 +751,23 @@ impl cosmic::Application for AppModel {
                         widget::image::Handle::from_bytes(image_bytes.clone()),
                     )
                     .width(cosmic::iced::Length::Fill)
-                    .height(cosmic::iced::Length::Fixed(104.0))
+                    .height(cosmic::iced::Length::Fixed(210.0))
                     .content_fit(cosmic::iced::ContentFit::Cover);
                     let details = widget::container(weather_details)
                         .width(cosmic::iced::Length::Fill)
+                        .height(cosmic::iced::Length::Fill)
                         .padding(10)
                         .style(|_| cosmic::iced::widget::container::Style {
-                            background: Some(cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.94).into()),
+                            background: Some(cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.58).into()),
                             text_color: Some(cosmic::iced::Color::WHITE),
                             ..Default::default()
                         });
-                    widget::Column::new().push(photo).push(details).into()
+                    cosmic::iced::widget::Stack::new()
+                        .width(cosmic::iced::Length::Fill)
+                        .height(cosmic::iced::Length::Fixed(210.0))
+                        .push(photo)
+                        .push(details)
+                        .into()
                 } else {
                     widget::container(weather_details).padding(10)
                         .style(|theme| {
