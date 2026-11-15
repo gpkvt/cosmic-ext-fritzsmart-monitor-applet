@@ -1307,4 +1307,27 @@ mod tests {
         assert!(settings.weather_location.is_empty());
         assert_eq!(settings.weather_refresh_interval_minutes, 10);
     }
+
+    #[test]
+    fn menu_order_defaults_to_all_popup_sections() {
+        assert_eq!(
+            FritzSettings::default().menu_order,
+            vec!["summary", "weather", "devices", "total-power", "power-difference"]
+                .into_iter()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn menu_order_parser_preserves_custom_order_and_repairs_invalid_entries() {
+        assert_eq!(
+            parse_menu_order("devices,summary,devices,unknown"),
+            vec!["devices", "summary", "weather", "total-power", "power-difference"]
+                .into_iter()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(parse_menu_order(""), default_menu_order());
+    }
 }
