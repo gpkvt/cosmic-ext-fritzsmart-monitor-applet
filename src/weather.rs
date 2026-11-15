@@ -139,12 +139,25 @@ async fn fetch_commons_background(client: &Client, icon_code: &str) -> (Option<V
     let Ok(image_response) = image_response else { return (None, None); };
     let image = image_response.bytes().await;
     let Ok(image) = image else { return (None, None); };
+    // Blur the decorative photo before displaying it behind weather details,
+    // keeping the text legible without hiding the condition-matched image.
+    let image = blur_background_image(image.to_vec()).unwrap_or_else(|| image.to_vec());
     let artist = info["extmetadata"]["Artist"]["value"].as_str().unwrap_or("Unknown author");
     let license = info["extmetadata"]["LicenseShortName"]["value"].as_str().unwrap_or("See file page");
     let title = page["title"].as_str().unwrap_or("Wikimedia Commons photograph");
     let page_url = info["descriptionurl"].as_str().unwrap_or("https://commons.wikimedia.org/");
     let attribution = format!("{} · {} · {} · {}", title, strip_html(artist), license, page_url);
-    (Some(image.to_vec()), Some(attribution))
+    (Some(image), Some(attribution))
+}
+
+fn blur_background_image(bytes: Vec<u8>) -> Option<Vec<u8>> {
+    let decoded = image::load_from_memory(&bytes).ok()?;
+    let blurred = decoded.blur(6.0).to_rgb8();
+    let mut output = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgb8(blurred)
+        .write_to(&mut output, image::ImageFormat::Jpeg)
+        .ok()?;
+    Some(output.into_inner())
 }
 
 fn strip_html(value: &str) -> String {
