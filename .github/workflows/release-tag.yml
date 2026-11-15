@@ -23,7 +23,7 @@ jobs:
   tag-release:
     # The manual run handles its own version-bump push. Skip the duplicate
     # push-triggered run for that commit; ordinary main pushes still tag.
-    if: github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ')
+    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ') }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out main history
