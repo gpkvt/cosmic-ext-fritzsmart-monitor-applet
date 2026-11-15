@@ -1502,7 +1502,7 @@ impl cosmic::Application for AppModel {
                 } else {
                     for request in requests.iter().rev() {
                         content = content.push(
-                            widget::row()
+                            widget::Row::new()
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
                                 .push(widget::text::body(format!("{} {}", request.method, request.path))
