@@ -43,6 +43,7 @@ pub struct AppModel {
     weather_attribution_expanded: bool,
     next_weather_refresh_at: Option<Instant>,
     pending_power_changes: HashSet<String>,
+    pending_power_targets: HashMap<String, bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -857,22 +858,21 @@ impl cosmic::Application for AppModel {
                         let ain = reading.ain.clone();
                         let key = crate::fritz::normalize_ain_for_selection(&ain);
                         let pending = self.pending_power_changes.contains(&key);
-                        let action: cosmic::Element<'_, Message> = if pending {
-                            widget::text::caption("Switching…").into()
+                        let toggle: cosmic::Element<'_, Message> = if pending {
+                            widget::toggler(is_on).into()
                         } else {
-                            widget::button::custom(widget::text::body(
-                                if is_on { "Turn off" } else { "Turn on" },
-                            ))
-                            .on_press(Message::SetDevicePower(ain, !is_on))
-                            .into()
+                            widget::toggler(is_on)
+                                .on_toggle(move |requested| Message::SetDevicePower(ain.clone(), requested))
+                                .into()
                         };
                         widget::Row::new()
                             .spacing(8)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::text::caption("POWER"))
-                            .push(widget::text::body(if is_on { "● ON" } else { "○ OFF" }))
+                            .push(widget::text::body(if is_on { "ON" } else { "OFF" }))
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(action)
+                            .push_maybe(if pending { Some(widget::text::caption("Updating…")) } else { None })
+                            .push(toggle)
                             .into()
                     });
                     let device_content = widget::Column::new()
@@ -1135,7 +1135,8 @@ impl cosmic::Application for AppModel {
                 {
                     return Task::none();
                 }
-                self.pending_power_changes.insert(key);
+                self.pending_power_changes.insert(key.clone());
+                self.pending_power_targets.insert(key, on);
                 return Task::perform(
                     crate::fritz::set_device_power(ain.clone(), on),
                     move |result| cosmic::Action::App(
@@ -1147,14 +1148,8 @@ impl cosmic::Application for AppModel {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
                 match result {
                     Ok(()) => {
-                        // The FRITZ!Box has now reported the requested state;
-                        // update the UI only after that confirmation.
-                        for reading in &mut self.readings {
-                            if crate::fritz::normalize_ain_for_selection(&reading.ain) == key {
-                                reading.power_state = Some(on);
-                            }
-                        }
-                        self.pending_power_changes.remove(&key);
+                        // Keep the control pending until a subsequent full refresh
+                        // supplies the confirmed state and fresh meter readings.
                         self.error = None;
                         self.refresh_started_at = Some(Instant::now());
                         self.next_refresh_at = None;
@@ -1163,6 +1158,7 @@ impl cosmic::Application for AppModel {
                     }
                     Err(error) => {
                         self.pending_power_changes.remove(&key);
+                        self.pending_power_targets.remove(&key);
                         let device_name = self.readings.iter().find(|reading|
                             crate::fritz::normalize_ain_for_selection(&reading.ain)
                                 == crate::fritz::normalize_ain_for_selection(&ain))
@@ -1186,6 +1182,15 @@ impl cosmic::Application for AppModel {
                     );
                     notify_missing_devices(&newly_missing);
                     let readings = result.readings;
+                    for reading in &readings {
+                        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
+                        if self.pending_power_targets.get(&key)
+                            .is_some_and(|requested| reading.power_state == Some(*requested))
+                        {
+                            self.pending_power_targets.remove(&key);
+                            self.pending_power_changes.remove(&key);
+                        }
+                    }
                     if readings.is_empty() {
                         self.error = Some("No selected devices returned usable readings".into());
                     } else {
