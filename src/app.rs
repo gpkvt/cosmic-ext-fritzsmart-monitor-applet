@@ -1308,11 +1308,16 @@ impl cosmic::Application for AppModel {
         // The configurable row spacing is applied only between these grouped items.
         let panel_item = |icon: cosmic::Element<'static, Message>,
                           value: cosmic::Element<'static, Message>| {
+            let icon_slot = widget::container(icon)
+                .width(cosmic::iced::Length::Fixed(24.0))
+                .height(cosmic::iced::Length::Fixed(24.0))
+                .center_x(24)
+                .center_y(24);
             widget::container(
                 widget::Row::new()
                     .spacing(4)
                     .align_y(cosmic::iced::Alignment::Center)
-                    .push(icon)
+                    .push(icon_slot)
                     .push(value),
             )
             .padding(4)
@@ -1329,10 +1334,13 @@ impl cosmic::Application for AppModel {
                             .map(|weather| weather.icon_name())
                             .unwrap_or("weather-clear-symbolic"),
                     )
-                    .size(suggested.1.saturating_sub(2));
+                    .size(24);
                     cosmic::iced::widget::Stack::new().push(solar_icon)
                 })
-                .padding(4)
+                .width(cosmic::iced::Length::Fixed(32.0))
+                .height(cosmic::iced::Length::Fixed(32.0))
+                .center_x(32)
+                .center_y(32)
                 .style(|theme| {
                     let cosmic = theme.cosmic();
                     cosmic::iced::widget::container::Style {
