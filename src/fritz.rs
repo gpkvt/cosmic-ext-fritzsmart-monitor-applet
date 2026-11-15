@@ -1,7 +1,36 @@
 use md5::{Digest, Md5};
 use reqwest::Client;
 use roxmltree::{Document, Node};
-use std::{collections::{HashMap, HashSet}, env, fs, io::Write, time::{Duration, Instant}};
+use std::{collections::{HashMap, HashSet, VecDeque}, env, fs, io::Write, sync::{LazyLock, Mutex}, time::{Duration, Instant}};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct HttpRequestDiagnostic {
+    pub method: &'static str,
+    pub path: String,
+    pub status: u16,
+    pub https: bool,
+}
+
+static HTTP_REQUEST_LOG: LazyLock<Mutex<VecDeque<HttpRequestDiagnostic>>> =
+    LazyLock::new(|| Mutex::new(VecDeque::new()));
+
+pub fn http_request_diagnostics() -> Vec<HttpRequestDiagnostic> {
+    HTTP_REQUEST_LOG.lock().map(|log| log.iter().cloned().collect()).unwrap_or_default()
+}
+
+fn record_http_response(url: &reqwest::Url, status: reqwest::StatusCode) {
+    if let Ok(mut log) = HTTP_REQUEST_LOG.lock() {
+        log.push_back(HttpRequestDiagnostic {
+            method: "GET",
+            path: url.path().to_string(),
+            status: status.as_u16(),
+            https: url.scheme() == "https",
+        });
+        while log.len() > 30 {
+            log.pop_front();
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FritzReading {
@@ -335,6 +364,7 @@ async fn read_xml_response(
     context: &str,
 ) -> Result<String, String> {
     let status = response.status();
+    record_http_response(response.url(), status);
     if !status.is_success() {
         return Err(format!("{context}: HTTP {status}"));
     }
