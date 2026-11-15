@@ -91,6 +91,13 @@ fn parse_refresh_interval_seconds(value: &str) -> u32 {
     value.parse::<u32>().unwrap_or(60).clamp(30, 3600)
 }
 
+fn parse_input_ains(value: &str) -> HashSet<String> {
+    value.split(',')
+        .map(normalize_ain_for_selection)
+        .filter(|ain| !ain.is_empty())
+        .collect()
+}
+
 fn parse_temperature_alerts(value: &str) -> HashMap<String, TemperatureAlertThresholds> {
     value.split(';').filter_map(|entry| {
         // Split from the right so AINs containing colons remain supported.
@@ -141,8 +148,7 @@ impl FritzSettings {
             graph_timespan_minutes: parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")),
             refresh_interval_seconds: parse_refresh_interval_seconds(&get("REFRESH_INTERVAL_SECONDS")),
             temperature_alerts: parse_temperature_alerts(&get("TEMPERATURE_ALERTS")),
-            input_ains: get("INPUT_AINS").split(',')
-                .map(normalize_ain_for_selection).filter(|ain| !ain.is_empty()).collect(),
+            input_ains: parse_input_ains(&get("INPUT_AINS")),
             weather_enabled: get("WEATHER_ENABLED").eq_ignore_ascii_case("true"),
             openweathermap_api_key: get("OPENWEATHERMAP_API_KEY"),
             weather_location: get("WEATHER_LOCATION"),
@@ -554,6 +560,13 @@ mod tests {
         assert_eq!(parse_refresh_interval_seconds("1"), 30);
         assert_eq!(parse_refresh_interval_seconds("300"), 300);
         assert_eq!(parse_refresh_interval_seconds("7200"), 3600);
+    }
+
+    #[test]
+    fn input_device_ains_parse_and_normalize() {
+        let inputs = parse_input_ains("12:34-56, 123456, , 78:90-12");
+        assert_eq!(inputs, HashSet::from(["123456".to_string(), "789012".to_string()]));
+        assert!(parse_input_ains("").is_empty());
     }
 
     #[test]
