@@ -824,6 +824,7 @@ mod tests {
         let settings = FritzSettings::default();
         assert!(!settings.weather_enabled);
         assert!(!settings.total_power_first);
+        assert!(!settings.panel_exclude_solar_temperature);
         assert!(settings.openweathermap_api_key.is_empty());
         assert!(settings.weather_location.is_empty());
         assert_eq!(settings.weather_refresh_interval_minutes, 10);
