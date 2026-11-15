@@ -58,7 +58,7 @@ fn parse_graph_timespan_minutes(value: &str) -> u16 {
 
 fn parse_temperature_alerts(value: &str) -> HashMap<String, u16> {
     value.split(';').filter_map(|entry| {
-        let (ain, threshold) = entry.split_once(':')?;
+        let (ain, threshold) = entry.rsplit_once(':')?;
         let ain = normalize_ain_for_selection(ain);
         let threshold = threshold.parse::<u16>().ok()?.clamp(30, 100);
         (!ain.is_empty()).then_some((ain, threshold))
