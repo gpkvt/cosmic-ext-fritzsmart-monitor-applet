@@ -652,13 +652,13 @@ fn live_power_summary(
     }
 
     let metrics = widget::Column::new()
-        .spacing(8)
+        .spacing(4)
         .width(cosmic::iced::Length::Fill)
         .push(heading)
         .push(values);
 
     let mut content = widget::Column::new()
-        .spacing(10)
+        .spacing(6)
         .width(cosmic::iced::Length::Fill)
         .push(metrics);
     if let Some(input) = input_power {
@@ -1169,8 +1169,8 @@ impl cosmic::Application for AppModel {
         // Give the graph cards enough horizontal room to use the available space.
         // Keep this width explicit because the applet popup otherwise stays narrow.
         let mut content = widget::Column::new()
-            .spacing(16)
-            .padding(16)
+            .spacing(10)
+            .padding(12)
             .width(cosmic::iced::Length::Fill);
 
         if self.settings_open {
