@@ -247,11 +247,17 @@ fn move_selected_device(ains: &mut [String], ain: &str, move_up: bool) {
 
 fn icon_action_button<'a>(
     icon_name: &'static str,
+    accessible_name: &'static str,
     message: Message,
 ) -> widget::Button<'a, Message> {
-    widget::button::custom(widget::icon::from_name(icon_name).size(18))
+    // Use COSMIC's dedicated icon-button builder rather than wrapping an icon
+    // in a generic custom button. This gives the controls a proper hit target,
+    // standard button styling, and accessible names/tooltips.
+    widget::button::icon(widget::icon::from_name(icon_name).symbolic(true).size(18))
         .on_press(message)
         .padding(8)
+        .name(accessible_name)
+        .tooltip(accessible_name)
 }
 
 fn action_button<'a>(
@@ -564,8 +570,8 @@ impl cosmic::Application for AppModel {
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::text::title3("FRITZ!Power Monitor"))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                        .push(icon_action_button("view-refresh-symbolic", Message::Refresh))
-                        .push(icon_action_button("preferences-system-symbolic", Message::ToggleSettings)),
+                        .push(icon_action_button("view-refresh-symbolic", "Refresh readings", Message::Refresh))
+                        .push(icon_action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
                 )
                 .push(widget::divider::horizontal::default());
 
