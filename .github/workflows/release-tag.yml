@@ -82,7 +82,7 @@ jobs:
 
           new_version = f"{major}.{minor}.{patch}"
           lines[version_line] = f'version = "{new_version}"'
-          path.write_text("\\n".join(lines) + "\\n")
+          path.write_text("\n".join(lines) + "\n")
           print(new_version)
           PY
           )"
@@ -110,7 +110,7 @@ jobs:
               'log', '--first-parent', '-G', `^version = "${version}"`,
               '--format=%H', '--', 'Cargo.toml'
             ], { encoding: 'utf8' }).trim();
-            const releaseCommit = history.split('\\n')[0];
+            const releaseCommit = history.split('\n')[0];
             if (!releaseCommit) throw new Error(`Could not find the commit that introduced ${version}`);
 
             const owner = context.repo.owner;
