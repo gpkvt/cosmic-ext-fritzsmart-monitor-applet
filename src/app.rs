@@ -2487,7 +2487,11 @@ impl cosmic::Application for AppModel {
                             "utilities-temperature-symbolic",
                             device_corner_radius,
                         ));
-                    let device_content = widget::Column::new().spacing(10).push(metrics).push(
+                    let device_content = widget::Column::new()
+                        .spacing(10)
+                        .width(cosmic::iced::Length::Fill)
+                        .push(metrics)
+                        .push(
                         widget::Column::new()
                             .spacing(8)
                             .width(cosmic::iced::Length::Fill)
@@ -2634,7 +2638,11 @@ impl cosmic::Application for AppModel {
                     if is_expanded {
                         card_column = card_column
                             .push(widget::divider::horizontal::default())
-                            .push(widget::container(device_content).padding(12));
+                            .push(
+                                widget::container(device_content)
+                                    .padding(12)
+                                    .width(cosmic::iced::Length::Fill),
+                            );
                     }
                     let device_card = widget::container(card_column)
                         .width(cosmic::iced::Length::Fill)
