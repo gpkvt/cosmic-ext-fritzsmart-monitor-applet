@@ -420,6 +420,7 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
             })
     )
     .on_enter(Message::DragOverDevice(TOTAL_POWER_DRAG_ID.to_string()))
+    .on_release(Message::EndDeviceDrag)
     .into()
 }
 
@@ -918,7 +919,8 @@ impl cosmic::Application for AppModel {
                                     ..Default::default()
                                 }
                             })
-                        ).on_enter(Message::DragOverDevice(ain.clone())));
+                        ).on_enter(Message::DragOverDevice(ain.clone()))
+                            .on_release(Message::EndDeviceDrag));
                         if self.dragging_device_ain.is_some()
                             && self.drag_target_ain.as_deref().is_some_and(|target|
                                 crate::fritz::normalize_ain_for_selection(target)
