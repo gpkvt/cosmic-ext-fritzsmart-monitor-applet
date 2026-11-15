@@ -45,7 +45,6 @@ impl WeatherData {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct WeatherForecast {
     pub days: Vec<WeatherForecastDay>,
@@ -102,7 +101,10 @@ fn weather_code_description(code: u8) -> &'static str {
     }
 }
 
-pub async fn fetch_weather_forecast(location: String, requested_days: u8) -> Result<WeatherForecast, String> {
+pub async fn fetch_weather_forecast(
+    location: String,
+    requested_days: u8,
+) -> Result<WeatherForecast, String> {
     let location = location.trim();
     if location.is_empty() {
         return Err("Weather location is empty".into());
@@ -129,17 +131,26 @@ pub async fn fetch_weather_forecast(location: String, requested_days: u8) -> Res
             .await
             .map_err(|error| format!("Location lookup failed: {error}"))?;
         if !response.status().is_success() {
-            return Err(format!("Location lookup returned HTTP {}", response.status()));
+            return Err(format!(
+                "Location lookup returned HTTP {}",
+                response.status()
+            ));
         }
-        let payload: serde_json::Value = response.json().await
+        let payload: serde_json::Value = response
+            .json()
+            .await
             .map_err(|error| format!("Invalid location response: {error}"))?;
         let result = payload["results"]
             .as_array()
             .and_then(|results| results.first())
             .ok_or_else(|| format!("Could not find weather location '{location}'"))?;
         (
-            result["latitude"].as_f64().ok_or("Location has no latitude")?,
-            result["longitude"].as_f64().ok_or("Location has no longitude")?,
+            result["latitude"]
+                .as_f64()
+                .ok_or("Location has no latitude")?,
+            result["longitude"]
+                .as_f64()
+                .ok_or("Location has no longitude")?,
         )
     };
 
@@ -159,31 +170,44 @@ pub async fn fetch_weather_forecast(location: String, requested_days: u8) -> Res
         .await
         .map_err(|error| format!("{forecast_days}-day forecast request failed: {error}"))?;
     if !response.status().is_success() {
-        return Err(format!("Forecast provider returned HTTP {}", response.status()));
+        return Err(format!(
+            "Forecast provider returned HTTP {}",
+            response.status()
+        ));
     }
-    let payload: serde_json::Value = response.json().await
+    let payload: serde_json::Value = response
+        .json()
+        .await
         .map_err(|error| format!("Invalid forecast response: {error}"))?;
     let daily = &payload["daily"];
     let dates = daily["time"].as_array().ok_or("Forecast has no dates")?;
-    let codes = daily["weather_code"].as_array().ok_or("Forecast has no weather codes")?;
-    let minimums = daily["temperature_2m_min"].as_array()
+    let codes = daily["weather_code"]
+        .as_array()
+        .ok_or("Forecast has no weather codes")?;
+    let minimums = daily["temperature_2m_min"]
+        .as_array()
         .ok_or("Forecast has no minimum temperatures")?;
-    let maximums = daily["temperature_2m_max"].as_array()
+    let maximums = daily["temperature_2m_max"]
+        .as_array()
         .ok_or("Forecast has no maximum temperatures")?;
     let precipitation = daily["precipitation_probability_max"].as_array();
     let wind = daily["wind_speed_10m_max"].as_array();
     let mut days = Vec::with_capacity(usize::from(forecast_days));
     for index in 0..dates.len().min(usize::from(forecast_days)) {
         let date = dates[index].as_str().ok_or("Invalid forecast date")?;
-        let code = codes[index].as_u64().ok_or("Invalid forecast weather code")?
+        let code = codes[index]
+            .as_u64()
+            .ok_or("Invalid forecast weather code")?
             .min(255) as u8;
         days.push(WeatherForecastDay {
             date: date.to_string(),
             weather_code: code,
             description: weather_code_description(code).to_string(),
-            min_temperature_c: minimums[index].as_f64()
+            min_temperature_c: minimums[index]
+                .as_f64()
                 .ok_or("Invalid minimum temperature")?,
-            max_temperature_c: maximums[index].as_f64()
+            max_temperature_c: maximums[index]
+                .as_f64()
                 .ok_or("Invalid maximum temperature")?,
             precipitation_probability_percent: precipitation
                 .and_then(|values| values.get(index))
@@ -216,33 +240,47 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
         .timeout(Duration::from_secs(10))
         .build()
         .map_err(|error| format!("Weather client error: {error}"))?;
-    let mut request = client.get("https://api.openweathermap.org/data/2.5/weather")
+    let mut request = client
+        .get("https://api.openweathermap.org/data/2.5/weather")
         .query(&[("appid", api_key.as_str()), ("units", "metric")]);
     if let Some((latitude, longitude)) = parse_coordinates(location) {
-        request = request.query(&[("lat", latitude.to_string()), ("lon", longitude.to_string())]);
+        request = request.query(&[
+            ("lat", latitude.to_string()),
+            ("lon", longitude.to_string()),
+        ]);
     } else {
         request = request.query(&[("q", location.to_string())]);
     }
-    let response = request.send().await
+    let response = request
+        .send()
+        .await
         .map_err(|error| format!("OpenWeatherMap request failed: {error}"))?;
     let status = response.status();
     if !status.is_success() {
         return Err(format!("OpenWeatherMap returned HTTP {status}"));
     }
-    let payload: serde_json::Value = response.json().await
+    let payload: serde_json::Value = response
+        .json()
+        .await
         .map_err(|error| format!("Invalid OpenWeatherMap response: {error}"))?;
-    let icon_code = payload["weather"][0]["icon"].as_str()
+    let icon_code = payload["weather"][0]["icon"]
+        .as_str()
         .ok_or_else(|| "OpenWeatherMap response has no weather icon".to_string())?;
-    let description = payload["weather"][0]["description"].as_str()
-        .unwrap_or("Current conditions").to_string();
+    let description = payload["weather"][0]["description"]
+        .as_str()
+        .unwrap_or("Current conditions")
+        .to_string();
     let main = &payload["main"];
-    let temperature_c = main["temp"].as_f64()
+    let temperature_c = main["temp"]
+        .as_f64()
         .ok_or_else(|| "OpenWeatherMap response has no temperature".to_string())?;
     let feels_like_c = main["feels_like"].as_f64().unwrap_or(temperature_c);
     let humidity_percent = main["humidity"].as_u64().unwrap_or(0).min(100) as u8;
     let pressure_hpa = main["pressure"].as_u64().unwrap_or(0) as u32;
     let wind_speed_mps = payload["wind"]["speed"].as_f64().unwrap_or(0.0);
-    let wind_direction_degrees = payload["wind"]["deg"].as_u64().map(|value| (value % 360) as u16);
+    let wind_direction_degrees = payload["wind"]["deg"]
+        .as_u64()
+        .map(|value| (value % 360) as u16);
     let cloudiness_percent = payload["clouds"]["all"].as_u64().unwrap_or(0).min(100) as u8;
     let visibility_m = payload["visibility"].as_u64().unwrap_or(0) as u32;
     let sunrise_unix = payload["sys"]["sunrise"].as_i64().unwrap_or(0);
@@ -282,35 +320,66 @@ fn commons_search_term(icon_code: &str) -> &'static str {
     }
 }
 
-async fn fetch_commons_background(client: &Client, icon_code: &str) -> (Option<Vec<u8>>, Option<CommonsAttribution>) {
+async fn fetch_commons_background(
+    client: &Client,
+    icon_code: &str,
+) -> (Option<Vec<u8>>, Option<CommonsAttribution>) {
     let search = commons_search_term(icon_code);
-    let response = client.get("https://commons.wikimedia.org/w/api.php")
+    let response = client
+        .get("https://commons.wikimedia.org/w/api.php")
         .query(&[
-            ("action", "query"), ("generator", "search"),
-            ("gsrsearch", search), ("gsrnamespace", "6"), ("gsrlimit", "1"),
-            ("prop", "imageinfo"), ("iiprop", "url|extmetadata"),
-            ("iiurlwidth", "1000"), ("format", "json"),
+            ("action", "query"),
+            ("generator", "search"),
+            ("gsrsearch", search),
+            ("gsrnamespace", "6"),
+            ("gsrlimit", "1"),
+            ("prop", "imageinfo"),
+            ("iiprop", "url|extmetadata"),
+            ("iiurlwidth", "1000"),
+            ("format", "json"),
         ])
-        .send().await;
-    let Ok(response) = response else { return (None, None); };
+        .send()
+        .await;
+    let Ok(response) = response else {
+        return (None, None);
+    };
     let response = response.json::<serde_json::Value>().await;
-    let Ok(response) = response else { return (None, None); };
-    let Some(page) = response["query"]["pages"].as_object().and_then(|pages| pages.values().next()) else {
+    let Ok(response) = response else {
+        return (None, None);
+    };
+    let Some(page) = response["query"]["pages"]
+        .as_object()
+        .and_then(|pages| pages.values().next())
+    else {
         return (None, None);
     };
     let info = &page["imageinfo"][0];
-    let Some(image_url) = info["thumburl"].as_str() else { return (None, None); };
+    let Some(image_url) = info["thumburl"].as_str() else {
+        return (None, None);
+    };
     let image_response = client.get(image_url).send().await;
-    let Ok(image_response) = image_response else { return (None, None); };
+    let Ok(image_response) = image_response else {
+        return (None, None);
+    };
     let image = image_response.bytes().await;
-    let Ok(image) = image else { return (None, None); };
+    let Ok(image) = image else {
+        return (None, None);
+    };
     // Blur the decorative photo before displaying it behind weather details,
     // keeping the text legible without hiding the condition-matched image.
     let image = blur_background_image(image.to_vec()).unwrap_or_else(|| image.to_vec());
-    let artist = info["extmetadata"]["Artist"]["value"].as_str().unwrap_or("Unknown author");
-    let license = info["extmetadata"]["LicenseShortName"]["value"].as_str().unwrap_or("See file page");
-    let title = page["title"].as_str().unwrap_or("Wikimedia Commons photograph");
-    let page_url = info["descriptionurl"].as_str().unwrap_or("https://commons.wikimedia.org/");
+    let artist = info["extmetadata"]["Artist"]["value"]
+        .as_str()
+        .unwrap_or("Unknown author");
+    let license = info["extmetadata"]["LicenseShortName"]["value"]
+        .as_str()
+        .unwrap_or("See file page");
+    let title = page["title"]
+        .as_str()
+        .unwrap_or("Wikimedia Commons photograph");
+    let page_url = info["descriptionurl"]
+        .as_str()
+        .unwrap_or("https://commons.wikimedia.org/");
     let attribution = CommonsAttribution {
         title: title.to_string(),
         artist: strip_html(artist),
@@ -348,7 +417,7 @@ fn strip_html(value: &str) -> String {
             '<' => inside_tag = true,
             '>' => inside_tag = false,
             _ if !inside_tag => output.push(character),
-            _ => {},
+            _ => {}
         }
     }
     output.split_whitespace().collect::<Vec<_>>().join(" ")
@@ -358,7 +427,8 @@ fn parse_coordinates(location: &str) -> Option<(f64, f64)> {
     let (latitude, longitude) = location.split_once(',')?;
     let latitude = latitude.trim().parse::<f64>().ok()?;
     let longitude = longitude.trim().parse::<f64>().ok()?;
-    if !latitude.is_finite() || !longitude.is_finite()
+    if !latitude.is_finite()
+        || !longitude.is_finite()
         || !(-90.0..=90.0).contains(&latitude)
         || !(-180.0..=180.0).contains(&longitude)
     {
@@ -425,12 +495,21 @@ mod tests {
             ("50d", "weather-fog-symbolic"),
         ] {
             let weather = WeatherData {
-                icon_code: code.into(), description: String::new(), temperature_c: 0.0,
-                feels_like_c: 0.0, humidity_percent: 0, pressure_hpa: 0,
-                wind_speed_mps: 0.0, wind_direction_degrees: None,
-                cloudiness_percent: 0, visibility_m: 0, sunrise_unix: 0,
-                sunset_unix: 0, location_name: String::new(),
-                background_image: None, image_attribution: None,
+                icon_code: code.into(),
+                description: String::new(),
+                temperature_c: 0.0,
+                feels_like_c: 0.0,
+                humidity_percent: 0,
+                pressure_hpa: 0,
+                wind_speed_mps: 0.0,
+                wind_direction_degrees: None,
+                cloudiness_percent: 0,
+                visibility_m: 0,
+                sunrise_unix: 0,
+                sunset_unix: 0,
+                location_name: String::new(),
+                background_image: None,
+                image_attribution: None,
             };
             assert_eq!(weather.icon_name(), expected);
         }
@@ -447,11 +526,15 @@ mod tests {
 
     #[test]
     fn blurs_background_photos_without_changing_their_dimensions() {
-        let source = image::DynamicImage::ImageRgb8(
-            image::RgbImage::from_pixel(16, 12, image::Rgb([120, 80, 40])),
-        );
+        let source = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
+            16,
+            12,
+            image::Rgb([120, 80, 40]),
+        ));
         let mut encoded = std::io::Cursor::new(Vec::new());
-        source.write_to(&mut encoded, image::ImageFormat::Png).unwrap();
+        source
+            .write_to(&mut encoded, image::ImageFormat::Png)
+            .unwrap();
 
         let blurred = blur_background_image(encoded.into_inner()).unwrap();
         let decoded = image::load_from_memory(&blurred).unwrap();
