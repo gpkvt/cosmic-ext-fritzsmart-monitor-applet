@@ -297,8 +297,7 @@ fn format_graph_timespan(minutes: u16) -> String {
         format!("{days} {}", if days == 1 { "day" } else { "days" })
     } else if minutes % 60 == 0 {
         let hours = minutes / 60;
-        format!("{hours} {}", if hours == 1 { "hour" } else { "hours" })
-    } else if minutes > 60 {
+        format!("{hours} {}", if hours == 1 { "hour" } else { "hours" })    } else if minutes > 60 {
         format!("{}h {}m", minutes / 60, minutes % 60)
     } else {
         format!("{minutes} minutes")
@@ -597,8 +596,7 @@ fn range_metric_tile<'a>(
             .push(widget::icon::from_name(icon).size(14))
             .push(widget::text::caption(label)))
         .push(widget::text::title2(keep_value_unit_together(value)));
-    surface_card(content.into(), 12)
-}
+    surface_card(content.into(), 12)}
 
 fn displayed_power_w(
     readings: &[FritzReading],
@@ -897,8 +895,7 @@ fn error_notice<'a>(title: &'static str, message: &'a str) -> cosmic::Element<'a
     .into()
 }
 
-fn is_error_status(status: &str) -> bool {
-    status.starts_with("Could not save settings:")
+fn is_error_status(status: &str) -> bool {    status.starts_with("Could not save settings:")
         || status.starts_with("Weather unavailable:")
         || status.starts_with("Connection failed:")
 }
@@ -1197,8 +1194,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::container(
                             widget::toggler(self.settings.panel_average_temperature)
                                 .on_toggle(Message::PanelAverageTemperatureChanged)
-                        )
-                        .padding([8, 10])) );
+                        )                        .padding([8, 10])) );
                 if self.settings.panel_average_temperature {
                     content = content.push(
                         widget::Row::new()
@@ -1497,8 +1493,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::Row::new()
                         .spacing(10)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::icon::from_name(weather.icon_name()).size(36))
-                        .push(widget::Column::new()
+                        .push(widget::icon::from_name(weather.icon_name()).size(36))                        .push(widget::Column::new()
                             .spacing(2)
                             .push(widget::text::body(weather.description.clone()))
                             .push(widget::text::caption(format!("Feels like {:.1} °C", weather.feels_like_c)))))
@@ -1797,8 +1792,7 @@ impl cosmic::Application for AppModel {
                                                 ..Default::default()
                                             }
                                         }),
-                                    )
-                                    .padding(1)
+                                    )                                    .padding(1)
                                     .width(cosmic::iced::Length::Fill)
                                     .style(move |theme| {
                                         let cosmic = theme.cosmic();
@@ -2008,7 +2002,7 @@ impl cosmic::Application for AppModel {
                         }
                     }),
             )
-            .max_height(600.0)
+            .max_height(800.0)
             .into()
     }
 
@@ -2097,8 +2091,7 @@ impl cosmic::Application for AppModel {
                             crate::fritz::normalize_ain_for_selection(&reading.ain)
                                 == crate::fritz::normalize_ain_for_selection(&ain))
                             .map(|reading| reading.name.as_str())
-                            .unwrap_or("device");
-                        self.error = Some(format!(
+                            .unwrap_or("device");                        self.error = Some(format!(
                             "Could not turn {} {device_name}: {error}",
                             if on { "on" } else { "off" },
                         ));
@@ -2397,8 +2390,7 @@ impl cosmic::Application for AppModel {
                         // The insertion preview then animates at the live position.
                         move_sortable_entry(
                             &mut self.selected_ains,
-                            &mut self.settings.total_power_first,
-                            dragged_ain,
+                            &mut self.settings.total_power_first,                            dragged_ain,
                             &target_ain,
                         );
                         self.drag_target_ain = Some(target_ain);
@@ -2471,7 +2463,7 @@ impl cosmic::Application for AppModel {
                     settings.positioner.size_limits = Limits::NONE
                         .max_width(320.0)
                         .min_width(320.0)
-                        .max_height(600.0);
+                        .max_height(800.0);
                     get_popup(settings)
                 };
             }
@@ -2697,8 +2689,7 @@ mod history_tests {
     fn solar_named_devices_are_default_inputs_case_insensitively() {
         let devices = vec![
             FritzDevice { name: "Solar inverter".into(), ain: "12:34-56".into() },
-            FritzDevice { name: "ROOF SOLAR METER".into(), ain: "222222".into() },
-            FritzDevice { name: "Battery inverter".into(), ain: "333333".into() },
+            FritzDevice { name: "ROOF SOLAR METER".into(), ain: "222222".into() },            FritzDevice { name: "Battery inverter".into(), ain: "333333".into() },
         ];
         assert_eq!(solar_input_ains(&devices), HashSet::from([
             "123456".to_string(),
