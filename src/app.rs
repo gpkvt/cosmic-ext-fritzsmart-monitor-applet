@@ -1593,6 +1593,9 @@ impl cosmic::Application for AppModel {
                 }
                 let mut device_cards = widget::Column::new().spacing(0);
                 for (index, reading) in self.readings.iter().enumerate() {
+                    if index > 0 {
+                        device_cards = device_cards.push(widget::divider::horizontal::default());
+                    }
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                     let is_expanded = self.expanded_devices.contains(&device_key);
                     let device_history = self.device_history.get(&device_key);
@@ -1760,33 +1763,25 @@ impl cosmic::Application for AppModel {
                             .push(widget::divider::horizontal::default())
                             .push(widget::container(device_content).padding(12));
                     }
-                    let (top_radius, bottom_radius) = if self.readings.len() > 1 {
-                        (0.0, 0.0)
-                    } else {
-                        (12.0, 12.0)
-                    };
                     let device_card = widget::container(card_column)
-                        .width(cosmic::iced::Length::Fill)
-                        .style(move |theme| {
-                            let cosmic = theme.cosmic();
-                            cosmic::iced::widget::container::Style {
-                                background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
-                                border: cosmic::iced::Border {
-                                    radius: [
-                                        top_radius,
-                                        top_radius,
-                                        bottom_radius,
-                                        bottom_radius,
-                                    ].into(),
-                                    ..Default::default()
-                                },
-                                ..Default::default()
-                            }
-                        });
+                        .width(cosmic::iced::Length::Fill);
                     device_cards = device_cards.push(device_card);
                 }
+                let device_list = widget::container(device_cards)
+                    .width(cosmic::iced::Length::Fill)
+                    .style(|theme| {
+                        let cosmic = theme.cosmic();
+                        cosmic::iced::widget::container::Style {
+                            background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                            border: cosmic::iced::Border {
+                                radius: 8.0.into(),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        }
+                    });
                 content = content
-                    .push(device_cards)
+                    .push(device_list)
                     .push(widget::divider::horizontal::default());
                 if !self.settings.total_power_first {
                     if let Some(overview) = total_power_overview(
