@@ -1723,12 +1723,12 @@ impl cosmic::Application for AppModel {
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::text::body(label).width(cosmic::iced::Length::Fill));
                     row = row.push(icon_action_button(
-                        "go-up-symbolic",
+                        "+",
                         "Move up",
                         Message::MoveMenuElement(id, true),
                     ));
                     row = row.push(icon_action_button(
-                        "go-down-symbolic",
+                        "−",
                         "Move down",
                         Message::MoveMenuElement(id, false),
                     ));
