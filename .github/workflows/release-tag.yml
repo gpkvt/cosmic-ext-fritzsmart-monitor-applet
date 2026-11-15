@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   tag-release:
@@ -69,7 +69,30 @@ jobs:
                 return;
               }
               core.warning(`${tag} points to ${target}; repairing it to ${releaseCommit}.`);
-              await github.rest.git.deleteRef({ owner, repo, ref: `tags/${tag}` });
+              // Update the existing ref directly; deleting it first is rejected
+              // by GitHub for some fine-grained PAT configurations.
+              const annotated = await github.rest.git.createTag({
+                owner,
+                repo,
+                tag,
+                message: `Release ${tag}`,
+                object: releaseCommit,
+                type: 'commit',
+                tagger: {
+                  name: 'gpkvt',
+                  email: 'git@21x9.org',
+                  date: new Date().toISOString()
+                }
+              });
+              await github.rest.git.updateRef({
+                owner,
+                repo,
+                ref: `tags/${tag}`,
+                sha: annotated.data.sha,
+                force: true
+              });
+              core.info(`Repaired ${tag} at ${releaseCommit}`);
+              return;
             }
 
             const annotated = await github.rest.git.createTag({
