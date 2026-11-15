@@ -57,6 +57,10 @@ pub enum Message {
 
 
 
+fn should_notify_temperature_alert(previously_above: Option<bool>, currently_above: bool) -> bool {
+    previously_above == Some(false) && currently_above
+}
+
 fn notify_temperature_alert(name: &str, temperature: f64, threshold: u16) {
     let summary = format!("High temperature: {name}");
     let body = format!("{temperature:.1} °C (alert threshold: {threshold} °C)");
@@ -663,7 +667,10 @@ impl cosmic::Application for AppModel {
                         let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                         if let Some(threshold) = self.settings.temperature_alerts.get(&key).copied() {
                             let above_threshold = reading.temperature_c >= f64::from(threshold);
-                            if self.temperature_alert_state.get(&key) == Some(&false) && above_threshold {
+                            if should_notify_temperature_alert(
+                                self.temperature_alert_state.get(&key).copied(),
+                                above_threshold,
+                            ) {
                                 notify_temperature_alert(&reading.name, reading.temperature_c, threshold);
                             }
                             // First observation establishes a baseline without
@@ -801,6 +808,14 @@ impl cosmic::Application for AppModel {
 mod history_tests {
     use super::*;
 
+
+    #[test]
+    fn temperature_alerts_only_fire_on_a_below_to_above_transition() {
+        assert!(!should_notify_temperature_alert(None, true));
+        assert!(!should_notify_temperature_alert(Some(true), true));
+        assert!(!should_notify_temperature_alert(Some(false), false));
+        assert!(should_notify_temperature_alert(Some(false), true));
+    }
 
     #[test]
     fn moving_selected_devices_preserves_order_and_boundaries() {
