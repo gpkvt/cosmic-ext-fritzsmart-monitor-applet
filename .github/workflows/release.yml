@@ -74,7 +74,11 @@ jobs:
           flatpak build-bundle flatpak-repo \
             "dist/fritz-power-monitor-${GITHUB_REF_NAME}.flatpak" \
             com.gpkvt.FritzPowerMonitor stable \
-            --runtime-repo=https://dl.flathub.org/repo/flathub
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
+          # Verify that the generated bundle installs with the runtime already installed above.
+          flatpak install --user --noninteractive --bundle \
+            "dist/fritz-power-monitor-${GITHUB_REF_NAME}.flatpak"
+          flatpak uninstall --user --noninteractive com.gpkvt.FritzPowerMonitor
           sha256sum dist/*.flatpak > "dist/fritz-power-monitor-${GITHUB_REF_NAME}.flatpak.sha256"
       - name: Assemble release archive
         shell: bash
