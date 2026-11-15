@@ -952,6 +952,10 @@ fn regular_clock_ticks() -> impl futures::Stream<Item = Message> {
     clock_ticks(Duration::from_secs(1))
 }
 
+fn diagnostics_clock_ticks() -> impl futures::Stream<Item = Message> {
+    clock_ticks(Duration::from_millis(250))
+}
+
 fn drag_animation_ticks() -> impl futures::Stream<Item = Message> {
     clock_ticks(Duration::from_millis(16))
 }
@@ -981,6 +985,10 @@ impl cosmic::Application for AppModel {
         // otherwise a one-second tick updates countdowns and deadlines.
         if self.dragging_device_ain.is_some() || self.refresh_started_at.is_some() {
             Subscription::run(drag_animation_ticks)
+        } else if self.active_settings_section == Some("diagnostics") {
+            // Refresh the diagnostics view frequently so newly recorded HTTP
+            // responses appear while the section remains open.
+            Subscription::run(diagnostics_clock_ticks)
         } else {
             Subscription::run(regular_clock_ticks)
         }
