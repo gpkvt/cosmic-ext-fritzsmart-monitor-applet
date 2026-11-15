@@ -455,7 +455,7 @@ fn parse_device_readings_detailed_xml(
 
         match reading {
             Ok(reading) => readings.push(reading),
-            Err(error) => missing_devices.push((name, format!("{ain}: {error}"))),
+            Err(_error) => missing_devices.push((normalized_ain, name)),
         }
     }
 
@@ -750,6 +750,32 @@ mod tests {
         assert_eq!(readings[1].name, "Solar inverter");
         assert_eq!(readings[1].power_w, 123);
         assert_eq!(readings[1].temperature_c, 21.5);
+    }
+
+    #[test]
+    fn reports_missing_selected_devices_alongside_healthy_readings() {
+        let xml = r#"
+            <devicelist>
+              <device identifier="111111111111">
+                <name>Offline inverter</name>
+                <present>0</present>
+              </device>
+              <device identifier="222222222222">
+                <name>Working inverter</name>
+                <powermeter><power>456000</power></powermeter>
+                <temperature><celsius>198</celsius></temperature>
+              </device>
+            </devicelist>
+        "#;
+        let result = parse_device_readings_detailed_xml(
+            xml,
+            &["111111111111".into(), "222222222222".into(), "333333333333".into()],
+        ).unwrap();
+        assert_eq!(result.readings.len(), 1);
+        assert_eq!(result.missing_devices, vec![
+            ("111111111111".into(), "Offline inverter".into()),
+            ("333333333333".into(), "Device 333333333333".into()),
+        ]);
     }
 
     #[test]
