@@ -15,7 +15,9 @@ build:
 update:
 	git pull --ff-only
 
-install: update
+install:
+	clear || true
+	$(MAKE) update
 	$(MAKE) build
 	install -Dm0755 target/release/$(APP_NAME) "$(BINDIR)/$(APP_NAME)"
 	install -d "$(DATADIR)/applications"
