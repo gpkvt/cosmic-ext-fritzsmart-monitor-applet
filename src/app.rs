@@ -203,6 +203,15 @@ fn action_button<'a>(
     .on_press(message)
 }
 
+impl AppModel {
+    fn persist_settings(&mut self) {
+        self.settings_status = match self.settings.save() {
+            Ok(()) => Some("Settings saved automatically".into()),
+            Err(error) => Some(format!("Could not save settings: {error}")),
+        };
+    }
+}
+
 impl cosmic::Application for AppModel {
     type Executor = cosmic::executor::Default;
     type Flags = ();
@@ -779,13 +788,6 @@ impl cosmic::Application for AppModel {
             }
         }
         Task::none()
-    }
-
-    fn persist_settings(&mut self) {
-        self.settings_status = match self.settings.save() {
-            Ok(()) => Some("Settings saved automatically".into()),
-            Err(error) => Some(format!("Could not save settings: {error}")),
-        };
     }
 
     fn on_close_requested(&self, id: Id) -> Option<Message> { Some(Message::PopupClosed(id)) }
