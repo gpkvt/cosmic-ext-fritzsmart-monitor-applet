@@ -940,24 +940,8 @@ impl cosmic::Application for AppModel {
                     let solar_icon = widget::icon::from_name(
                         self.weather.as_ref().map(|weather| weather.icon_name()).unwrap_or("weather-clear-symbolic"),
                     ).size(suggested.1.saturating_sub(2));
-                    if input_power.is_some() {
-                        cosmic::iced::widget::Stack::new()
-                            .push(solar_icon)
-                            .push(
-                                widget::container(
-                                    widget::text("↓")
-                                        .font(cosmic::font::default())
-                                        .size(f32::from(suggested.1 / 2)),
-                                )
-                                .align_x(cosmic::iced::alignment::Horizontal::Right)
-                                .align_y(cosmic::iced::alignment::Vertical::Top)
-                                .padding([0, 1]),
-                            )
-                    } else {
-                        cosmic::iced::widget::Stack::new().push(solar_icon)
-                    }
+                    cosmic::iced::widget::Stack::new().push(solar_icon)
                 })
-                // Overlay the input marker on the solar/weather icon's upper-right corner.
                 .padding(5)
                 .style(|theme| {
                     let cosmic = theme.cosmic();
@@ -973,7 +957,17 @@ impl cosmic::Application for AppModel {
             )
             .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)));
         let content = if let Some(input_power) = input_power {
-            content.push(self.core.applet.text(input_power).size(f32::from(self.settings.panel_text_size)))
+            let icon_size = f32::from(self.settings.panel_text_size.clamp(12, 20));
+            let solar_panel = cosmic::iced::widget::svg(
+                cosmic::iced::widget::svg::Handle::from_memory(
+                    include_bytes!("../data/solar-panel.svg").to_vec(),
+                ),
+            )
+            .width(icon_size)
+            .height(icon_size);
+            content
+                .push(solar_panel)
+                .push(self.core.applet.text(input_power).size(f32::from(self.settings.panel_text_size)))
         } else {
             content
         };
