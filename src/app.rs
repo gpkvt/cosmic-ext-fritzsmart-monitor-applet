@@ -55,6 +55,7 @@ pub struct AppModel {
     refresh_started_at: Option<Instant>,
     weather: Option<WeatherData>,
     weather_forecast: Option<WeatherForecast>,
+    weather_forecast_days: Option<u8>,
     weather_forecast_error: Option<String>,
     weather_forecast_loading: bool,
     weather_forecast_expanded: bool,
@@ -108,7 +109,8 @@ pub enum Message {
     TemperatureAlertLowChanged(String, i16),
     WeatherUpdated(Result<WeatherData, String>),
     ToggleWeatherForecast,
-    WeatherForecastUpdated(Result<WeatherForecast, String>),
+    SelectWeatherForecast(u8),
+    WeatherForecastUpdated(u8, Result<WeatherForecast, String>),
     ToggleWeatherAttribution,
     OpenCommonsPage(String),
     ToggleQuickOptions,
@@ -1962,9 +1964,50 @@ impl cosmic::Application for AppModel {
                     .push(weather_heading)
                     .push(weather_card);
                 if self.weather_forecast_expanded {
+                    let forecast_days = self.weather_forecast_days.unwrap_or(7);
+                    let forecast_range_selector = widget::Row::new()
+                        .spacing(4)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(
+                            widget::button::custom(
+                                widget::Row::new()
+                                    .spacing(5)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(widget::icon::from_name("x-office-calendar-symbolic").size(14))
+                                    .push(widget::text::caption("7d")),
+                            )
+                            .on_press(Message::SelectWeatherForecast(7))
+                            .padding([4, 8])
+                            .class(if forecast_days == 7 {
+                                cosmic::theme::Button::Standard
+                            } else {
+                                cosmic::theme::Button::Text
+                            }),
+                        )
+                        .push(
+                            widget::button::custom(
+                                widget::Row::new()
+                                    .spacing(5)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(widget::icon::from_name("x-office-calendar-symbolic").size(14))
+                                    .push(widget::text::caption("14d")),
+                            )
+                            .on_press(Message::SelectWeatherForecast(14))
+                            .padding([4, 8])
+                            .class(if forecast_days == 14 {
+                                cosmic::theme::Button::Standard
+                            } else {
+                                cosmic::theme::Button::Text
+                            }),
+                        );
                     content = content
                         .push(widget::divider::horizontal::default())
-                        .push(widget::text::title3("7-day forecast"))
+                        .push(widget::Row::new()
+                            .spacing(8)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::text::title3(format!("{forecast_days}-day forecast")))
+                            .push(forecast_range_selector))
                         .push(widget::text::caption("Forecast data by Open-Meteo"));
                     if self.weather_forecast_loading {
                         content = content.push(widget::text::caption("Loading forecast…"));
@@ -2603,11 +2646,28 @@ impl cosmic::Application for AppModel {
                     self.weather_forecast_loading = true;
                     self.weather_forecast_error = None;
                     let location = self.settings.weather_location.clone();
-                    return Task::perform(fetch_weather_forecast(location), |result|
-                        cosmic::Action::App(Message::WeatherForecastUpdated(result)));
+                    let days = self.weather_forecast_days.unwrap_or(7);
+                    self.weather_forecast_days = Some(days);
+                    return Task::perform(fetch_weather_forecast(location, days), move |result|
+                        cosmic::Action::App(Message::WeatherForecastUpdated(days, result)));
                 }
             }
-            Message::WeatherForecastUpdated(result) => {
+            Message::SelectWeatherForecast(requested_days) => {
+                let days = if requested_days == 14 { 14 } else { 7 };
+                if self.weather_forecast_days != Some(days) {
+                    self.weather_forecast_days = Some(days);
+                    self.weather_forecast = None;
+                    self.weather_forecast_error = None;
+                    self.weather_forecast_loading = true;
+                    let location = self.settings.weather_location.clone();
+                    return Task::perform(fetch_weather_forecast(location, days), move |result|
+                        cosmic::Action::App(Message::WeatherForecastUpdated(days, result)));
+                }
+            }
+            Message::WeatherForecastUpdated(days, result) => {
+                if self.weather_forecast_days.unwrap_or(7) != days {
+                    return Task::none();
+                }
                 self.weather_forecast_loading = false;
                 match result {
                     Ok(forecast) => {
