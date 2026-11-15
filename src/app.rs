@@ -145,6 +145,36 @@ fn move_selected_device(ains: &mut [String], ain: &str, move_up: bool) {
     }
 }
 
+fn graph_frame<'a>(content: impl Into<widget::Element<'a, Message>>) -> widget::Container<'a, Message> {
+    // A one-pixel inset of the contrasting theme surface creates a clear,
+    // rounded-looking frame without relying on hard-coded light/dark colors.
+    let content = widget::container(content)
+        .padding(8)
+        .width(cosmic::iced::Length::Fill)
+        .style(|theme| {
+            let cosmic = theme.cosmic();
+            cosmic::iced::widget::container::Style {
+                background: Some(
+                    cosmic::iced::Color::from(cosmic.background(false).base).into(),
+                ),
+                ..Default::default()
+            }
+        });
+
+    widget::container(content)
+        .padding(1)
+        .width(cosmic::iced::Length::Fill)
+        .style(|theme| {
+            let cosmic = theme.cosmic();
+            cosmic::iced::widget::container::Style {
+                background: Some(
+                    cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
+                ),
+                ..Default::default()
+            }
+        })
+}
+
 fn action_button<'a>(
     icon_name: &'static str,
     label: &'static str,
@@ -424,18 +454,22 @@ impl cosmic::Application for AppModel {
                                 .spacing(12)
                                 .width(cosmic::iced::Length::Fill)
                                 .push(
-                                    widget::Column::new()
-                                        .spacing(4)
-                                        .width(cosmic::iced::Length::Fill)
-                                        .push(widget::text::caption("POWER"))
-                                        .push(widget::text::body(power_graph)),
+                                    graph_frame(
+                                        widget::Column::new()
+                                            .spacing(4)
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::text::caption("POWER"))
+                                            .push(widget::text::body(power_graph)),
+                                    ),
                                 )
                                 .push(
-                                    widget::Column::new()
-                                        .spacing(4)
-                                        .width(cosmic::iced::Length::Fill)
-                                        .push(widget::text::caption("TEMPERATURE"))
-                                        .push(widget::text::body(temperature_graph)),
+                                    graph_frame(
+                                        widget::Column::new()
+                                            .spacing(4)
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::text::caption("TEMPERATURE"))
+                                            .push(widget::text::body(temperature_graph)),
+                                    ),
                                 ),
                         );
                     let alternate = index % 2 == 1;
