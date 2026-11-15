@@ -159,7 +159,7 @@ Devices and Diagnostics.
 5. Enter the FRITZ!Box URL, username and password, then choose **Load devices**.
 6. Select the devices to monitor.
 
-Use the grip (⠿) handles in the popup itself to drag and reorder the live power summary, Total power output, Power difference and individual device cards. The same ordering is available in Devices settings. The order is saved automatically and restored after restarting the applet.
+Use the grip (⠿) handles in the popup itself to drag and reorder the weather section (including its forecast), live power summary, Total power output, Power difference and individual device cards. The device and power-card ordering is also available in Devices settings. The order is saved automatically and restored after restarting the applet.
 Each selected device appears separately in the popup with its own readings and
 history graphs.
 
