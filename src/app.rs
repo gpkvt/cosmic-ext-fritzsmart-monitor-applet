@@ -1215,10 +1215,16 @@ impl cosmic::Application for AppModel {
                         "▸ Wikimedia Commons image credit"
                     };
                     content = content.push(
-                        widget::button::custom(widget::text::caption(label))
-                            .on_press(Message::ToggleWeatherAttribution)
-                            .padding(6)
-                            .class(cosmic::theme::Button::Standard),
+                        widget::button::custom(
+                            widget::Row::new()
+                                .spacing(8)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::icon::from_name("image-x-generic-symbolic").size(14))
+                                .push(widget::text::caption(label)),
+                        )
+                        .on_press(Message::ToggleWeatherAttribution)
+                        .padding([8, 10])
+                        .class(cosmic::theme::Button::Standard),
                     );
                     if self.weather_attribution_expanded {
                         content = content.push(widget::container(
