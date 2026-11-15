@@ -55,6 +55,19 @@ pub enum Message {
 
 
 
+fn format_graph_axis_start(minutes: u16) -> String {
+    let minutes = u32::from(minutes);
+    if minutes % 1440 == 0 {
+        format!("{}d ago", minutes / 1440)
+    } else if minutes % 60 == 0 {
+        format!("{}h ago", minutes / 60)
+    } else if minutes > 60 {
+        format!("{}h {}m ago", minutes / 60, minutes % 60)
+    } else {
+        format!("{minutes}m ago")
+    }
+}
+
 fn graph_history_window(minutes: u16) -> Duration {
     Duration::from_secs(u64::from(minutes.clamp(5, 1440)) * 60)
 }
@@ -458,8 +471,15 @@ impl cosmic::Application for AppModel {
                                         widget::Column::new()
                                             .spacing(4)
                                             .width(cosmic::iced::Length::Fill)
-                                            .push(widget::text::caption("POWER"))
-                                            .push(widget::text::body(power_graph)),
+                                            .push(widget::text::caption("POWER (W)"))
+                                            .push(widget::text::body(power_graph))
+                                            .push(
+                                                widget::Row::new()
+                                                    .width(cosmic::iced::Length::Fill)
+                                                    .push(widget::text::caption(format_graph_axis_start(self.settings.graph_timespan_minutes)))
+                                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                                    .push(widget::text::caption("Now")),
+                                            ),
                                     ),
                                 )
                                 .push(
@@ -467,8 +487,15 @@ impl cosmic::Application for AppModel {
                                         widget::Column::new()
                                             .spacing(4)
                                             .width(cosmic::iced::Length::Fill)
-                                            .push(widget::text::caption("TEMPERATURE"))
-                                            .push(widget::text::body(temperature_graph)),
+                                            .push(widget::text::caption("TEMPERATURE (°C)"))
+                                            .push(widget::text::body(temperature_graph))
+                                            .push(
+                                                widget::Row::new()
+                                                    .width(cosmic::iced::Length::Fill)
+                                                    .push(widget::text::caption(format_graph_axis_start(self.settings.graph_timespan_minutes)))
+                                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                                    .push(widget::text::caption("Now")),
+                                            ),
                                     ),
                                 ),
                         );
