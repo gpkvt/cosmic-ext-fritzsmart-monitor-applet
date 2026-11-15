@@ -16,6 +16,8 @@ use std::time::{Duration, Instant};
 
 static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
     LazyLock::new(|| widget::Id::new("fritz-power-monitor-autosize-main"));
+static DRAG_SCROLL_ID: LazyLock<widget::Id> =
+    LazyLock::new(|| widget::Id::new("fritz-power-monitor-drag-scroll"));
 
 const TOTAL_POWER_DRAG_ID: &str = "__TOTAL_POWER__";
 
@@ -30,8 +32,11 @@ pub struct AppModel {
     expanded_settings_sections: HashSet<&'static str>,
     settings: FritzSettings,
     devices: Vec<FritzDevice>,
+    devices_loaded: bool,
+    devices_loading: bool,
     selected_ains: Vec<String>,
     dragging_device_ain: Option<String>,
+    drag_scroll_direction: i8,
     drag_target_ain: Option<String>,
     drag_target_since: Option<Instant>,
     drag_original_ains: Option<Vec<String>>,
@@ -46,6 +51,9 @@ pub struct AppModel {
     refresh_started_at: Option<Instant>,
     weather: Option<WeatherData>,
     weather_attribution_expanded: bool,
+    quick_options_expanded: bool,
+    quick_refresh_interval: u32,
+    quick_graph_timespan: u16,
     next_weather_refresh_at: Option<Instant>,
     pending_power_changes: HashSet<String>,
     pending_power_targets: HashMap<String, bool>,
@@ -68,6 +76,7 @@ pub enum Message {
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
+    PanelPaddingChanged(u8),
     PanelAverageTemperatureChanged(bool),
     GraphTimespanChanged(u16),
     RefreshIntervalChanged(u32),
@@ -77,12 +86,19 @@ pub enum Message {
     ToggleDeviceInput(String, bool),
     StartDeviceDrag(String),
     DragOverDevice(String),
+    DragPointerMoved(f32),
+    DragPointerLeft,
     EndDeviceDrag,
     ToggleTemperatureAlert(String, bool),
     TemperatureAlertHighChanged(String, i16),
     TemperatureAlertLowChanged(String, i16),
     WeatherUpdated(Result<WeatherData, String>),
     ToggleWeatherAttribution,
+    ToggleQuickOptions,
+    QuickRefreshIntervalPreview(u32),
+    CommitQuickRefreshInterval,
+    QuickGraphTimespanPreview(u16),
+    CommitQuickGraphTimespan,
     WeatherEnabledChanged(bool),
     OpenWeatherMapApiKeyChanged(String),
     WeatherLocationChanged(String),
@@ -207,6 +223,45 @@ fn graph_history_window(minutes: u16) -> Duration {
 
 fn max_history_samples(window: Duration) -> usize {
     (window.as_secs() / 60) as usize + 1
+}
+
+fn quick_slider_snap_position(position: f32) -> f32 {
+    let position = position.clamp(0.0, 4.0);
+    let anchor = position.round();
+    if (position - anchor).abs() <= 0.08 {
+        anchor
+    } else {
+        position
+    }
+}
+
+fn quick_slider_value(position: f32, anchors: [f32; 5]) -> f32 {
+    let position = quick_slider_snap_position(position);
+    let segment = (position.floor() as usize).min(3);
+    let fraction = position - segment as f32;
+    anchors[segment] + (anchors[segment + 1] - anchors[segment]) * fraction
+}
+
+fn quick_slider_position(value: f32, anchors: [f32; 5]) -> f32 {
+    let value = value.clamp(anchors[0], anchors[4]);
+    let segment = (0..4)
+        .find(|index| value <= anchors[index + 1])
+        .unwrap_or(3);
+    let span = anchors[segment + 1] - anchors[segment];
+    segment as f32 + (value - anchors[segment]) / span
+}
+
+fn quick_slider_anchor_labels(labels: [&'static str; 5]) -> cosmic::Element<'static, Message> {
+    let mut row = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
+        .spacing(0);
+    for label in labels {
+        let label: cosmic::Element<'static, Message> = widget::container(widget::text(label))
+            .width(cosmic::iced::Length::Fill)
+            .into();
+        row = row.push(label);
+    }
+    row.into()
 }
 
 fn format_countdown(seconds: u64) -> String {
@@ -374,25 +429,166 @@ fn move_sortable_entry(
                 == crate::fritz::normalize_ain_for_selection(dragged))
         {
             let device = ains.remove(index);
-            ains.push(device);
-            *total_power_first = false;
+            if *total_power_first {
+                ains.insert(0, device);
+            } else {
+                ains.push(device);
+            }
         }
     } else {
         move_selected_device_to_drop_target(ains, dragged, target);
     }
 }
 
+
+fn graph_panel(content: cosmic::Element<'static, Message>) -> cosmic::Element<'static, Message> {
+    widget::container(
+        widget::container(content)
+            .padding(8)
+            .width(cosmic::iced::Length::Fill)
+            .style(|theme| {
+                let cosmic = theme.cosmic();
+                cosmic::iced::widget::container::Style {
+                    background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
+                    border: cosmic::iced::Border {
+                        radius: 3.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }
+            }),
+    )
+    .padding(1)
+    .width(cosmic::iced::Length::Fill)
+    .style(|theme| {
+        let cosmic = theme.cosmic();
+        cosmic::iced::widget::container::Style {
+            background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+            border: cosmic::iced::Border {
+                radius: 3.0.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    })
+    .into()
+}
+
+fn total_power_overview(
+    readings: &[FritzReading],
+    settings: &FritzSettings,
+    history: &VecDeque<(Instant, i64)>,
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    position: usize,
+) -> Option<cosmic::Element<'static, Message>> {
+    let low = history.iter().map(|(_, value)| *value).min()?;
+    let high = history.iter().map(|(_, value)| *value).max()?;
+    let total_power = net_power_w(readings, &settings.input_ains);
+    let timespan = format_graph_timespan(settings.graph_timespan_minutes);
+    let axis_start = format_graph_axis_start(settings.graph_timespan_minutes);
+    let total_graph: cosmic::Element<'static, Message> = widget::Column::new()
+        .spacing(4)
+        .push(widget::text::caption("TOTAL POWER (W)"))
+        .push(widget::text::body(power_sparkline(history)))
+        .push(widget::Row::new()
+            .width(cosmic::iced::Length::Fill)
+            .push(widget::text::caption(axis_start.clone()))
+            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+            .push(widget::text::caption("Now")))
+        .into();
+
+    let mut input_graphs = widget::Column::new().spacing(8);
+    let mut has_input_graph = false;
+    for reading in readings.iter().filter(|reading| {
+        settings.input_ains.contains(
+            &crate::fritz::normalize_ain_for_selection(&reading.ain),
+        )
+    }) {
+        has_input_graph = true;
+        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
+        let graph = device_history.get(&key)
+            .map(|samples| numeric_sparkline(samples.iter().map(|(_, power, _)|
+                signed_device_power(*power, true) as f64)))
+            .unwrap_or_else(|| "Waiting for samples…".into());
+        input_graphs = input_graphs.push(
+            widget::Column::new()
+                .spacing(4)
+                .push(widget::text::caption(format!(
+                    "{} · {} W",
+                    reading.name,
+                    signed_device_power(reading.power_w, true),
+                )))
+                .push(widget::text::body(graph))
+                .push(widget::Row::new()
+                    .width(cosmic::iced::Length::Fill)
+                    .push(widget::text::caption(axis_start.clone()))
+                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                    .push(widget::text::caption("Now"))),
+        );
+    }
+    if !has_input_graph {
+        input_graphs = input_graphs.push(widget::text::caption("No input devices"));
+    }
+
+    let content = widget::Column::new()
+        .spacing(6)
+        .push(widget::text::body(format!("TOTAL POWER · LAST {timespan}")))
+        .push(widget::text::title2(format!("{total_power} W")))
+        .push(widget::text::caption(format!("Low  {low} W     High  {high} W")))
+        .push(
+            widget::Row::new()
+                .spacing(8)
+                .width(cosmic::iced::Length::Fill)
+                .align_y(cosmic::iced::Alignment::Start)
+                .push(graph_panel(total_graph))
+                .push(graph_panel(input_graphs.into())),
+        );
+    Some(
+        widget::container(content)
+            .padding(10)
+            .style(move |theme| {
+                let cosmic = theme.cosmic();
+                let base = cosmic::iced::Color::from(cosmic.background(false).base);
+                cosmic::iced::widget::container::Style {
+                    background: Some(device_background_color(base, position).into()),
+                    ..Default::default()
+                }
+            })
+            .into(),
+    )
+}
+
 fn settings_section_header<'a>(title: &'a str, expanded: bool, section: &'static str) -> cosmic::Element<'a, Message> {
+    // Use COSMIC's standard button treatment so section navigation follows
+    // the same interaction, focus and theme conventions as system settings.
+    let section_icon = match section {
+        "panel" => "preferences-desktop-display-symbolic",
+        "graph" => "view-statistics-symbolic",
+        "refresh" => "view-refresh-symbolic",
+        "weather" => "weather-clear-symbolic",
+        "connection" => "network-server-symbolic",
+        "device" => "computer-symbolic",
+        "diagnostics" => "dialog-information-symbolic",
+        _ => "preferences-system-symbolic",
+    };
+    let disclosure_icon = if expanded {
+        "go-down-symbolic"
+    } else {
+        "go-next-symbolic"
+    };
+
     widget::button::custom(
         widget::Row::new()
-            .spacing(8)
+            .spacing(10)
             .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::text(if expanded { "▾" } else { "▸" }).size(16))
-            .push(widget::text::body(title).width(cosmic::iced::Length::Fill)),
+            .push(widget::icon::from_name(section_icon).size(18))
+            .push(widget::text::body(title).width(cosmic::iced::Length::Fill))
+            .push(widget::icon::from_name(disclosure_icon).size(16)),
     )
     .on_press(Message::ToggleSettingsSection(section))
-    .padding([6, 8])
+    .padding([10, 12])
     .width(cosmic::iced::Length::Fill)
+    .class(cosmic::theme::Button::Standard)
     .into()
 }
 
@@ -401,7 +597,7 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
         .width(cosmic::iced::Length::Fill)
         .spacing(6)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::mouse_area(widget::text("⠿").size(20))
+        .push(widget::mouse_area(widget::text("⠿").font(cosmic::font::default()).size(20))
             .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string()))
             .on_release(Message::EndDeviceDrag))
         .push(widget::text::body("Total power (net)").width(cosmic::iced::Length::Fill))
@@ -420,6 +616,7 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
             })
     )
     .on_enter(Message::DragOverDevice(TOTAL_POWER_DRAG_ID.to_string()))
+    .on_release(Message::EndDeviceDrag)
     .into()
 }
 
@@ -453,7 +650,7 @@ fn icon_action_button<'a>(
     // icon themes may not provide every symbolic name on every COSMIC setup.
     // Fixed dimensions keep both actions visible in the 320px popup.
     widget::button::custom(
-        widget::container(widget::text(glyph).size(20))
+        widget::container(widget::text(glyph).font(cosmic::font::default()).size(20))
             .center_x(36)
             .center_y(36),
     )
@@ -461,6 +658,7 @@ fn icon_action_button<'a>(
     .padding(0)
     .width(cosmic::iced::Length::Fixed(36.0))
     .height(cosmic::iced::Length::Fixed(36.0))
+    .class(cosmic::theme::Button::Icon)
     .name(accessible_name)
 }
 
@@ -501,10 +699,14 @@ fn action_button<'a>(
     widget::button::custom(
         widget::Row::new()
             .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
             .push(widget::icon::from_name(icon_name).size(16))
-            .push(widget::text::body(label)),
+            .push(widget::text::body(label).width(cosmic::iced::Length::Fill)),
     )
     .on_press(message)
+    .padding([10, 12])
+    .width(cosmic::iced::Length::Fill)
+    .class(cosmic::theme::Button::Standard)
 }
 
 impl AppModel {
@@ -617,26 +819,37 @@ impl cosmic::Application for AppModel {
         };
 
         let suggested = self.core.applet.suggested_size(true);
-        let (major_padding, minor_padding) = self.core.applet.suggested_padding(true);
-        let vertical_padding = if self.core.applet.is_horizontal() {
-            minor_padding
-        } else {
-            major_padding
-        };
-        let horizontal_padding = if self.core.applet.is_horizontal() {
-            major_padding
-        } else {
-            minor_padding
-        };
+        let panel_padding = u16::from(self.settings.panel_padding);
+        let vertical_padding = panel_padding;
+        let horizontal_padding = panel_padding;
 
         let content = widget::Row::new()
             .spacing(6)
             .align_y(cosmic::iced::Alignment::Center)
             .push(
-                widget::container(widget::icon::from_name(self.weather.as_ref().map(|weather| weather.icon_name()).unwrap_or("weather-clear-symbolic")).size(suggested.1.saturating_sub(2)))
-                    // Symbolic icons sit optically high beside text glyphs;
-                    // a small top inset aligns their visual centers.
-                    .padding([2, 0]),
+                widget::container({
+                    let solar_icon = widget::icon::from_name(
+                        self.weather.as_ref().map(|weather| weather.icon_name()).unwrap_or("weather-clear-symbolic"),
+                    ).size(suggested.1.saturating_sub(2));
+                    if input_power.is_some() {
+                        cosmic::iced::widget::Stack::new()
+                            .push(solar_icon)
+                            .push(
+                                widget::container(
+                                    widget::text("↓")
+                                        .font(cosmic::font::default())
+                                        .size(f32::from(suggested.1 / 2)),
+                                )
+                                .align_x(cosmic::iced::alignment::Horizontal::Right)
+                                .align_y(cosmic::iced::alignment::Vertical::Top)
+                                .padding([0, 1]),
+                            )
+                    } else {
+                        cosmic::iced::widget::Stack::new().push(solar_icon)
+                    }
+                })
+                // Overlay the input marker on the solar/weather icon's upper-right corner.
+                .padding([2, 0]),
             )
             .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)));
         let content = if let Some(input_power) = input_power {
@@ -697,13 +910,28 @@ impl cosmic::Application for AppModel {
                         .step(1.0),
                     )
                     .push(widget::text::caption("Adjusts the power and temperature text in the panel"))
+                    .push(widget::text::body(format!("Panel padding: {} px", self.settings.panel_padding)))
+                    .push(
+                        widget::slider(
+                            0.0..=16.0,
+                            f32::from(self.settings.panel_padding),
+                            |value| Message::PanelPaddingChanged(value.round() as u8),
+                        )
+                        .step(1.0),
+                    )
+                    .push(widget::text::caption("Controls the space around the panel contents"))
                     .push(widget::Row::new()
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::body("Show average temperature in panel")
-                            .width(cosmic::iced::Length::Fill))
-                        .push(widget::toggler(self.settings.panel_average_temperature)
-                            .on_toggle(Message::PanelAverageTemperatureChanged)))
-                    .push(widget::text::caption("Uses the mean temperature of all selected devices"))
+                        .push(widget::Column::new()
+                            .spacing(3)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::body("Average temperature"))
+                            .push(widget::text::caption("When enabled, the panel shows the mean temperature across all selected devices instead of a single device's temperature.")))
+                        .push(widget::container(
+                            widget::toggler(self.settings.panel_average_temperature)
+                                .on_toggle(Message::PanelAverageTemperatureChanged)
+                        )
+                        .padding([8, 10])) )
                     .push(widget::divider::horizontal::default())
             }
 
@@ -836,7 +1064,7 @@ impl cosmic::Application for AppModel {
                             .align_y(cosmic::iced::Alignment::Center);
                         if selected {
                             row = row.push(
-                                widget::mouse_area(widget::text("⠿").size(20))
+                                widget::mouse_area(widget::text("⠿").font(cosmic::font::default()).size(20))
                                     .on_press(Message::StartDeviceDrag(ain.clone()))
                                     .on_release(Message::EndDeviceDrag),
                             );
@@ -910,7 +1138,8 @@ impl cosmic::Application for AppModel {
                                     ..Default::default()
                                 }
                             })
-                        ).on_enter(Message::DragOverDevice(ain.clone())));
+                        ).on_enter(Message::DragOverDevice(ain.clone()))
+                            .on_release(Message::EndDeviceDrag));
                         if self.dragging_device_ain.is_some()
                             && self.drag_target_ain.as_deref().is_some_and(|target|
                                 crate::fritz::normalize_ain_for_selection(target)
@@ -922,7 +1151,7 @@ impl cosmic::Application for AppModel {
                             let gap_height = 18.0 * progress;
                             content = content.push(
                                 widget::container(
-                                    widget::text("Drop here").size(11)
+                                    widget::text("Drop here").font(cosmic::font::default()).size(11)
                                 )
                                 .height(cosmic::iced::Length::Fixed(gap_height))
                                 .width(cosmic::iced::Length::Fill)
@@ -1048,9 +1277,16 @@ impl cosmic::Application for AppModel {
                         "▸ Wikimedia Commons image credit"
                     };
                     content = content.push(
-                        widget::button::custom(widget::text::caption(label))
-                            .on_press(Message::ToggleWeatherAttribution)
-                            .padding([2, 0]),
+                        widget::button::custom(
+                            widget::Row::new()
+                                .spacing(8)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::icon::from_name("image-x-generic-symbolic").size(14))
+                                .push(widget::text::caption(label)),
+                        )
+                        .on_press(Message::ToggleWeatherAttribution)
+                        .padding([8, 10])
+                        .class(cosmic::theme::Button::Standard),
                     );
                     if self.weather_attribution_expanded {
                         content = content.push(widget::container(
@@ -1067,6 +1303,19 @@ impl cosmic::Application for AppModel {
             }
 
             if !self.readings.is_empty() {
+                if self.settings.total_power_first {
+                    if let Some(overview) = total_power_overview(
+                        &self.readings,
+                        &self.settings,
+                        &self.history,
+                        &self.device_history,
+                        0,
+                    ) {
+                        content = content
+                            .push(overview)
+                            .push(widget::divider::horizontal::default());
+                    }
+                }
                 content = content.push(widget::text::caption("SELECTED DEVICES"));
                 for (index, reading) in self.readings.iter().enumerate() {
                     let device_history = self.device_history.get(
@@ -1211,110 +1460,16 @@ impl cosmic::Application for AppModel {
                         }));
                 }
                 content = content.push(widget::divider::horizontal::default());
-                if let (Some(low), Some(high)) = (
-                    self.history.iter().map(|(_, value)| *value).min(),
-                    self.history.iter().map(|(_, value)| *value).max(),
-                ) {
-                    let total_power = net_power_w(&self.readings, &self.settings.input_ains);
-                    let total_graph = widget::Column::new()
-                        .spacing(4)
-                        .push(widget::text::caption("TOTAL POWER (W)"))
-                        .push(widget::text::body(power_sparkline(&self.history)))
-                        .push(widget::Row::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::caption(format_graph_axis_start(self.settings.graph_timespan_minutes)))
-                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(widget::text::caption("Now")));
-                    let mut input_graphs = widget::Column::new().spacing(8);
-                    let mut has_input_graph = false;
-                    for reading in self.readings.iter().filter(|reading|
-                        self.settings.input_ains.contains(
-                            &crate::fritz::normalize_ain_for_selection(&reading.ain),
-                        ))
-                    {
-                        has_input_graph = true;
-                        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                        let input_history = self.device_history.get(&key);
-                        let graph = input_history.map(|samples|
-                            numeric_sparkline(samples.iter().map(|(_, power, _)|
-                                signed_device_power(*power, true) as f64)))
-                            .unwrap_or_else(|| "Waiting for samples…".into());
-                        input_graphs = input_graphs.push(
-                            widget::Column::new()
-                                .spacing(4)
-                                .push(widget::text::caption(format!(
-                                    "{} · {} W",
-                                    reading.name,
-                                    signed_device_power(reading.power_w, true),
-                                )))
-                                .push(widget::text::body(graph)),
-                        );
+                if !self.settings.total_power_first {
+                    if let Some(overview) = total_power_overview(
+                        &self.readings,
+                        &self.settings,
+                        &self.history,
+                        &self.device_history,
+                        self.selected_ains.len(),
+                    ) {
+                        content = content.push(overview);
                     }
-                    if !has_input_graph {
-                        input_graphs = input_graphs.push(widget::text::caption("No input devices"));
-                    }
-                    let total_power_content = widget::Column::new()
-                        .spacing(6)
-                        .push(widget::text::body(format!(
-                            "TOTAL POWER · LAST {}",
-                            format_graph_timespan(self.settings.graph_timespan_minutes),
-                        )))
-                        .push(widget::text::title2(format!("{total_power} W")))
-                        .push(widget::text::caption(format!("Low  {low} W     High  {high} W")))
-                        .push(
-                            widget::Row::new()
-                                .spacing(8)
-                                .width(cosmic::iced::Length::Fill)
-                                .align_y(cosmic::iced::Alignment::Start)
-                                .push(
-                                    widget::container(total_graph)
-                                        .padding(8)
-                                        .width(cosmic::iced::Length::Fill)
-                                        .style(|theme| {
-                                            let cosmic = theme.cosmic();
-                                            cosmic::iced::widget::container::Style {
-                                                background: Some(
-                                                    cosmic::iced::Color::from(cosmic.background(false).base).into(),
-                                                ),
-                                                border: cosmic::iced::Border {
-                                                    radius: 3.0.into(),
-                                                    ..Default::default()
-                                                },
-                                                ..Default::default()
-                                            }
-                                        }),
-                                )
-                                .push(
-                                    widget::container(input_graphs)
-                                        .padding(8)
-                                        .width(cosmic::iced::Length::Fill)
-                                        .style(|theme| {
-                                            let cosmic = theme.cosmic();
-                                            cosmic::iced::widget::container::Style {
-                                                background: Some(
-                                                    cosmic::iced::Color::from(cosmic.background(false).base).into(),
-                                                ),
-                                                border: cosmic::iced::Border {
-                                                    radius: 3.0.into(),
-                                                    ..Default::default()
-                                                },
-                                                ..Default::default()
-                                            }
-                                        }),
-                                ),
-                        );
-                    content = content.push(
-                        widget::container(total_power_content)
-                            .padding(10)
-                            .style(move |theme| {
-                                let cosmic = theme.cosmic();
-                                let base = cosmic::iced::Color::from(cosmic.background(false).base);
-                                cosmic::iced::widget::container::Style {
-                                    background: Some(device_background_color(base, 0).into()),
-                                    ..Default::default()
-                                }
-                            }),
-                    );
                 }
             } else {
                 content = content.push(widget::text::body("Select one or more devices in Settings"));
@@ -1330,6 +1485,53 @@ impl cosmic::Application for AppModel {
                 content = content.push(widget::text::caption(format!("Updated at {updated}")));
             }
 
+            let quick_options_label = if self.quick_options_expanded {
+                "▾ Quick options"
+            } else {
+                "▸ Quick options"
+            };
+            content = content.push(
+                widget::button::custom(
+                    widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::icon::from_name("preferences-system-symbolic").size(14))
+                        .push(widget::text::body(quick_options_label)),
+                )
+                .on_press(Message::ToggleQuickOptions)
+                .padding([8, 10])
+                .class(cosmic::theme::Button::Standard),
+            );
+            if self.quick_options_expanded {
+                const REFRESH_ANCHORS: [f32; 5] = [30.0, 300.0, 900.0, 1800.0, 3600.0];
+                const GRAPH_ANCHORS: [f32; 5] = [5.0, 60.0, 360.0, 720.0, 1440.0];
+                content = content
+                    .push(widget::text::caption(format!(
+                        "Refresh · {}",
+                        format_countdown(u64::from(self.quick_refresh_interval))
+                    )))
+                    .push(widget::slider(
+                        0.0..=4.0,
+                        quick_slider_position(self.quick_refresh_interval as f32, REFRESH_ANCHORS),
+                        |position| Message::QuickRefreshIntervalPreview(
+                            quick_slider_value(position, REFRESH_ANCHORS).round() as u32
+                        ),
+                    ).step(0.01).on_release(Message::CommitQuickRefreshInterval))
+                    .push(quick_slider_anchor_labels(["30s", "5m", "15m", "30m", "60m"]))
+                    .push(widget::text::caption(format!(
+                        "Graph · {}",
+                        format_graph_timespan(self.quick_graph_timespan)
+                    )))
+                    .push(widget::slider(
+                        0.0..=4.0,
+                        quick_slider_position(f32::from(self.quick_graph_timespan), GRAPH_ANCHORS),
+                        |position| Message::QuickGraphTimespanPreview(
+                            quick_slider_value(position, GRAPH_ANCHORS).round() as u16
+                        ),
+                    ).step(0.01).on_release(Message::CommitQuickGraphTimespan))
+                    .push(quick_slider_anchor_labels(["5m", "1h", "6h", "12h", "24h"]));
+            }
+
             if let Some(error) = &self.error {
                 content = content.push(error_notice("CONNECTION ERROR", error));
             }
@@ -1337,11 +1539,8 @@ impl cosmic::Application for AppModel {
             content = content
                 .push(widget::divider::horizontal::default())
                 .push(
-                    widget::button::custom(
-                        widget::text::body("Settings").width(cosmic::iced::Length::Fill),
-                    )
-                    .on_press(Message::ToggleSettings)
-                    .width(cosmic::iced::Length::Fill),
+                    action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)
+                        .width(cosmic::iced::Length::Fill),
                 );
         }
 
@@ -1367,10 +1566,13 @@ impl cosmic::Application for AppModel {
         // This keeps the applet name and both actions visible while the device
         // cards and graphs scroll independently beneath it.
         let scrollable_content = widget::scrollable(content)
+            .id(DRAG_SCROLL_ID.clone())
             .width(cosmic::iced::Length::Fill)
             .height(cosmic::iced::Length::Fill);
 
         let scrollable_content = widget::mouse_area(scrollable_content)
+            .on_move(|position| Message::DragPointerMoved(position.y))
+            .on_exit(Message::DragPointerLeft)
             .on_release(Message::EndDeviceDrag);
 
         let popup_content = if self.settings_open {
@@ -1389,7 +1591,8 @@ impl cosmic::Application for AppModel {
                         self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("↻"),
                         if self.refresh_started_at.is_some() { "Refreshing readings" } else { "Refresh readings" },
                         Message::Refresh,
-                    )), 
+                    ))
+                    .push(action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
             )
             .padding([12, 16])
             .width(cosmic::iced::Length::Fill);
@@ -1438,6 +1641,15 @@ impl cosmic::Application for AppModel {
             Message::ClockTick => {
                 if self.settings_saved_until.is_some_and(|deadline| Instant::now() >= deadline) {
                     self.settings_saved_until = None;
+                }
+                if self.dragging_device_ain.is_some() && self.drag_scroll_direction != 0 {
+                    return cosmic::iced::widget::scrollable::scroll_by(
+                        DRAG_SCROLL_ID.clone(),
+                        cosmic::iced::widget::scrollable::AbsoluteOffset {
+                            x: 0.0,
+                            y: f32::from(self.drag_scroll_direction) * 14.0,
+                        },
+                    );
                 }
                 if self.settings.weather_enabled
                     && self.next_weather_refresh_at.is_none()
@@ -1565,6 +1777,42 @@ impl cosmic::Application for AppModel {
             Message::ToggleWeatherAttribution => {
                 self.weather_attribution_expanded = !self.weather_attribution_expanded;
             }
+            Message::ToggleQuickOptions => {
+                self.quick_options_expanded = !self.quick_options_expanded;
+                if self.quick_options_expanded {
+                    self.quick_refresh_interval = self.settings.refresh_interval_seconds;
+                    self.quick_graph_timespan = self.settings.graph_timespan_minutes;
+                }
+            }
+            Message::QuickRefreshIntervalPreview(value) => {
+                self.quick_refresh_interval = value.clamp(30, 3600);
+            }
+            Message::CommitQuickRefreshInterval => {
+                if self.settings.refresh_interval_seconds != self.quick_refresh_interval {
+                    self.settings.refresh_interval_seconds = self.quick_refresh_interval.clamp(30, 3600);
+                    if self.next_refresh_at.is_some() {
+                        self.next_refresh_at = Some(
+                            Instant::now() + Duration::from_secs(u64::from(self.settings.refresh_interval_seconds)),
+                        );
+                    }
+                    self.persist_settings();
+                }
+            }
+            Message::QuickGraphTimespanPreview(value) => {
+                self.quick_graph_timespan = value.clamp(5, 1440);
+            }
+            Message::CommitQuickGraphTimespan => {
+                if self.settings.graph_timespan_minutes != self.quick_graph_timespan {
+                    self.settings.graph_timespan_minutes = self.quick_graph_timespan.clamp(5, 1440);
+                    let now = Instant::now();
+                    let window = graph_history_window(self.settings.graph_timespan_minutes);
+                    self.history.retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
+                    for samples in self.device_history.values_mut() {
+                        samples.retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
+                    }
+                    self.persist_settings();
+                }
+            }
             Message::WeatherUpdated(result) => {
                 match result {
                     Ok(weather) => { self.weather = Some(weather); }
@@ -1601,8 +1849,18 @@ impl cosmic::Application for AppModel {
                 self.settings_status = None;
             }
             Message::ToggleSettingsSection(section) => {
-                if !self.expanded_settings_sections.remove(section) {
+                let expanded = if self.expanded_settings_sections.remove(section) {
+                    false
+                } else {
                     self.expanded_settings_sections.insert(section);
+                    true
+                };
+                if section == "device" && expanded && !self.devices_loaded && !self.devices_loading {
+                    self.devices_loading = true;
+                    let settings = self.settings.clone();
+                    self.settings_status = Some("Connecting and loading devices…".into());
+                    return Task::perform(discover_devices(settings), |result|
+                        cosmic::Action::App(Message::DevicesLoaded(result)));
                 }
             }
             Message::UrlChanged(value) => {
@@ -1629,6 +1887,10 @@ impl cosmic::Application for AppModel {
                 self.settings.panel_text_size = value.clamp(10, 24);
                 self.persist_settings();
             }
+            Message::PanelPaddingChanged(value) => {
+                self.settings.panel_padding = value.min(16);
+                self.persist_settings();
+            }
             Message::PanelAverageTemperatureChanged(value) => {
                 self.settings.panel_average_temperature = value;
                 self.persist_settings();
@@ -1653,11 +1915,18 @@ impl cosmic::Application for AppModel {
                 self.persist_settings();
             }
             Message::DiscoverDevices => {
+                if self.devices_loading {
+                    return Task::none();
+                }
+                self.devices_loading = true;
                 let settings = self.settings.clone();
                 self.settings_status = Some("Connecting and loading devices…".into());
                 return Task::perform(discover_devices(settings), |result| cosmic::Action::App(Message::DevicesLoaded(result)));
             }
-            Message::DevicesLoaded(result) => match result {
+            Message::DevicesLoaded(result) => {
+                self.devices_loading = false;
+                self.devices_loaded = result.is_ok();
+                match result {
                 Ok(devices) => {
                     self.devices = devices;
                     if !self.settings.input_defaults_initialized {
@@ -1674,7 +1943,8 @@ impl cosmic::Application for AppModel {
                     self.settings_status = Some(format!("Found {} compatible power-meter device(s)", self.devices.len()));
                 }
                 Err(error) => self.settings_status = Some(format!("Connection failed: {error}")),
-            },
+                }
+            }
             Message::ToggleDevice(ain, selected) => {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
                 self.selected_ains.retain(|existing|
@@ -1705,6 +1975,7 @@ impl cosmic::Application for AppModel {
                     self.dragging_device_ain = Some(ain);
                     self.drag_target_ain = None;
                     self.drag_target_since = None;
+                    self.drag_scroll_direction = 0;
                     self.drag_original_ains = Some(self.selected_ains.clone());
                     self.drag_original_total_power_first = Some(self.settings.total_power_first);
                 }
@@ -1733,7 +2004,22 @@ impl cosmic::Application for AppModel {
                     }
                 }
             }
+            Message::DragPointerMoved(y) => {
+                if self.dragging_device_ain.is_some() {
+                    self.drag_scroll_direction = if y < 48.0 {
+                        -1
+                    } else if y > 500.0 {
+                        1
+                    } else {
+                        0
+                    };
+                }
+            }
+            Message::DragPointerLeft => {
+                self.drag_scroll_direction = 0;
+            }
             Message::EndDeviceDrag => {
+                self.drag_scroll_direction = 0;
                 if self.dragging_device_ain.take().is_some() {
                     let previous_ains = self.drag_original_ains.take().unwrap_or_default();
                     let previous_total_power_first =
@@ -1804,6 +2090,28 @@ mod history_tests {
     use super::*;
 
     #[test]
+    fn quick_setting_sliders_snap_to_anchor_points() {
+        for anchor in 0..=4 {
+            assert_eq!(quick_slider_snap_position(anchor as f32 + 0.04), anchor as f32);
+        }
+        assert!((quick_slider_snap_position(1.2) - 1.2).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn quick_setting_slider_maps_anchor_values_to_aligned_positions() {
+        let refresh = [30.0, 300.0, 900.0, 1800.0, 3600.0];
+        let graph = [5.0, 60.0, 360.0, 720.0, 1440.0];
+        for (position, value) in refresh.into_iter().enumerate() {
+            assert!((quick_slider_position(value, refresh) - position as f32).abs() < 0.001);
+            assert!((quick_slider_value(position as f32, refresh) - value).abs() < 0.001);
+        }
+        for (position, value) in graph.into_iter().enumerate() {
+            assert!((quick_slider_position(value, graph) - position as f32).abs() < 0.001);
+            assert!((quick_slider_value(position as f32, graph) - value).abs() < 0.001);
+        }
+    }
+
+    #[test]
     fn missing_device_notifications_only_fire_on_new_missing_transitions() {
         let mut previous = HashSet::new();
         let missing = vec![
@@ -1869,6 +2177,12 @@ mod history_tests {
         move_sortable_entry(&mut ains, &mut total_first, "111111111111", TOTAL_POWER_DRAG_ID);
         assert!(!total_first);
         assert_eq!(ains, vec!["222222222222", "111111111111"]);
+
+        move_sortable_entry(&mut ains, &mut total_first, TOTAL_POWER_DRAG_ID, "222222222222");
+        assert!(total_first);
+        move_sortable_entry(&mut ains, &mut total_first, "111111111111", TOTAL_POWER_DRAG_ID);
+        assert!(total_first);
+        assert_eq!(ains, vec!["111111111111", "222222222222"]);
     }
 
     #[test]
