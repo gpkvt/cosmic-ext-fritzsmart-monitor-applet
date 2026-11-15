@@ -906,10 +906,21 @@ fn icon_action_button<'a>(
     accessible_name: &'static str,
     message: Message,
 ) -> widget::Button<'a, Message> {
-    // Use the same symbolic refresh icon in every part of the applet.
-    // Other compact actions (such as Settings) retain their text glyphs.
+    // Keep the refresh symbol consistent and rotate its arrow while loading.
     let glyph = glyph.into();
-    let icon: cosmic::Element<'a, Message> = if glyph == "view-refresh-symbolic" {
+    let icon: cosmic::Element<'a, Message> = if let Some(angle) = glyph.strip_prefix("refresh-rotating-") {
+        let svg = format!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g transform="rotate({angle} 12 12)" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9a7 7 0 0 1 11.55-2.6L20 12M4 12l2.85 5.6A7 7 0 0 0 18.4 15"/></g></svg>"#
+        );
+        widget::container(
+            widget::svg(widget::svg::Handle::from_memory(svg.into_bytes()))
+                .width(16)
+                .height(16),
+        )
+        .center_x(36)
+        .center_y(36)
+        .into()
+    } else if glyph == "view-refresh-symbolic" {
         widget::container(widget::icon::from_name("view-refresh-symbolic").size(16))
             .center_x(36)
             .center_y(36)
@@ -1004,10 +1015,9 @@ impl AppModel {
     }
 }
 
-fn refresh_spinner_frame(started_at: Instant) -> &'static str {
-    const FRAMES: [&str; 4] = ["↻", "⟳", "↻", "⟲"];
-    let frame = (started_at.elapsed().as_millis() / 100) as usize % FRAMES.len();
-    FRAMES[frame]
+fn refresh_spinner_frame(started_at: Instant) -> String {
+    let angle = (started_at.elapsed().as_millis() * 360 / 900) % 360;
+    format!("refresh-rotating-{angle}")
 }
 
 fn clock_ticks(interval_duration: Duration) -> impl futures::Stream<Item = Message> {
@@ -2210,7 +2220,7 @@ impl cosmic::Application for AppModel {
                             .unwrap_or_default()
                     ))
                     .push(icon_action_button(
-                        self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("view-refresh-symbolic"),
+                        self.refresh_started_at.map(refresh_spinner_frame).unwrap_or_else(|| "view-refresh-symbolic".to_string()),
                         if self.refresh_started_at.is_some() { "Refreshing readings" } else { "Reload now" },
                         Message::Refresh,
                     ))
