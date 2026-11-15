@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#17191d">
+  <meta name="description" content="FRITZ!Power Monitor is a COSMIC panel applet for live FRITZ!Box power, temperature and weather monitoring.">
+  <title>FRITZ!Power Monitor · COSMIC Desktop</title>
+  <style>
+    :root{color-scheme:dark;--bg:#111318;--surface:#1b1e25;--surface-2:#242832;--text:#f4f5f7;--muted:#a9afbb;--accent:#8bd5ca;--line:#343945;--radius:22px}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 80% 0%,#26333a 0,transparent 38rem),var(--bg);color:var(--text);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
+    a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}.wrap{width:min(1080px,calc(100% - 40px));margin:auto}
+    header{display:flex;align-items:center;justify-content:space-between;padding:26px 0;border-bottom:1px solid var(--line)}.brand{display:flex;gap:12px;align-items:center;font-weight:700;letter-spacing:.01em}.brand-mark{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:var(--surface-2);font-size:22px}nav{display:flex;gap:24px;font-size:14px;color:var(--muted)}
+    .hero{padding:92px 0 76px;display:grid;grid-template-columns:1.2fr .8fr;gap:50px;align-items:center}.eyebrow{color:var(--accent);font-size:12px;font-weight:750;letter-spacing:.16em;text-transform:uppercase}.hero h1{font-size:clamp(42px,6vw,72px);line-height:1.04;letter-spacing:-.055em;margin:16px 0 22px}.hero p{font-size:19px;color:var(--muted);max-width:620px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}.button{display:inline-flex;align-items:center;gap:9px;padding:12px 18px;border-radius:999px;background:var(--accent);color:#10201e;font-weight:750}.button.secondary{background:var(--surface-2);color:var(--text);border:1px solid var(--line)}
+    .preview{padding:18px;background:linear-gradient(145deg,#2b333d,#171b22);border:1px solid #46515d;border-radius:28px;box-shadow:0 28px 80px #0008;transform:rotate(1deg)}.panel{display:flex;align-items:center;gap:13px;padding:12px 16px;border-radius:15px;background:#101319;font-weight:700}.sun{color:#f4c76b;font-size:22px}.panel small{color:var(--muted);font-weight:500}.preview-card{margin-top:13px;padding:17px;border-radius:17px;background:#202630;border:1px solid #3a424e}.preview-title{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;letter-spacing:.08em}.watts{font-size:38px;font-weight:750;letter-spacing:-.04em;margin:5px 0 12px}.device{padding:12px 0;border-top:1px solid #3a424e;display:flex;justify-content:space-between}.device span:last-child{color:var(--accent)}
+    section{padding:58px 0;border-top:1px solid var(--line)}h2{font-size:clamp(28px,4vw,42px);line-height:1.15;letter-spacing:-.035em;margin:10px 0 14px} .lead{color:var(--muted);max-width:680px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:28px}.feature,.step{padding:23px;border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(150deg,var(--surface),#171a20)}.feature .icon{font-size:24px}.feature h3{margin:12px 0 6px}.feature p,.step p{color:var(--muted);margin:0}.install{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:25px}.code{overflow:auto;padding:20px;border-radius:16px;background:#0b0d11;border:1px solid var(--line);color:#d8e2e7;font:14px/1.8 ui-monospace,SFMono-Regular,Consolas,monospace}.note{padding:18px 20px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 14px 14px 0;color:var(--muted)}footer{padding:34px 0 48px;color:var(--muted);font-size:14px;display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}
+    @media(max-width:760px){nav{gap:12px}.hero{grid-template-columns:1fr;padding:60px 0}.preview{max-width:520px}.grid{grid-template-columns:1fr}.install{grid-template-columns:1fr}}@media(max-width:480px){.wrap{width:min(100% - 28px,1080px)}header{align-items:flex-start;gap:16px}nav{flex-wrap:wrap;justify-content:flex-end}.hero h1{font-size:46px}}
+    @media(prefers-color-scheme:light){:root{color-scheme:light;--bg:#f4f5f7;--surface:#fff;--surface-2:#e9edf1;--text:#20242b;--muted:#5d6672;--accent:#087f73;--line:#d7dce2}.hero{background:transparent}.preview{background:linear-gradient(145deg,#e5edf0,#cbd8dd);border-color:#bac8cf;box-shadow:0 24px 70px #2233}.panel{background:#fff;color:#20242b}.preview-card{background:#f8fafb;border-color:#d2dbe0}.device{border-color:#d2dbe0}.code{background:#20242b;color:#e7edf0}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="brand" href="#top"><span class="brand-mark">⚡</span><span>FRITZ!Power Monitor</span></a>
+      <nav aria-label="Main navigation"><a href="#features">Features</a><a href="#install">Install</a><a href="#configuration">Configuration</a><a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet">GitHub ↗</a></nav>
+    </header>
+    <main id="top">
+      <div class="hero">
+        <div>
+          <div class="eyebrow">A COSMIC Desktop panel applet</div>
+          <h1>Your home’s power.<br>At a glance.</h1>
+          <p>Monitor live power consumption, device temperatures and local weather from your FRITZ!Box — right from the COSMIC panel.</p>
+          <div class="actions"><a class="button" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet">View on GitHub ↗</a><a class="button secondary" href="#install">Installation guide ↓</a></div>
+        </div>
+        <div class="preview" aria-label="Illustrative applet preview">
+          <div class="panel"><span class="sun">☀</span><span>14°</span><span>⚡</span><span>842 W</span><small>⌂</small></div>
+          <div class="preview-card"><div class="preview-title"><span>LIVE POWER</span><span>3 DEVICES</span></div><div class="watts">842 W</div><div class="device"><span>Living room</span><span>126 W</span></div><div class="device"><span>Solar inverter</span><span>−968 W</span></div><div class="device"><span>Office</span><span>14 W</span></div></div>
+        </div>
+      </div>
+      <section id="features">
+        <div class="eyebrow">Made for COSMIC</div><h2>Useful detail, without the clutter.</h2><p class="lead">A compact panel readout opens into a focused popup with per-device details. The interface follows the active COSMIC theme and keeps device rows compact and independently expandable.</p>
+        <div class="grid">
+          <article class="feature"><div class="icon">⚡</div><h3>Live power</h3><p>See current watts, net power and input power from selected FRITZ! smart-home devices.</p></article>
+          <article class="feature"><div class="icon">🌡</div><h3>Temperature</h3><p>Track device temperatures, optional averages and configurable high/low alerts.</p></article>
+          <article class="feature"><div class="icon">☀</div><h3>Local weather</h3><p>Show current OpenWeatherMap conditions and temperature in the panel, with a detailed weather summary in the popup.</p></article>
+          <article class="feature"><div class="icon">▥</div><h3>History graphs</h3><p>Inspect rolling power and temperature history for each device and combined net power.</p></article>
+          <article class="feature"><div class="icon">☷</div><h3>Device controls</h3><p>Choose and reorder devices, control supported switches, and expand only the details you need.</p></article>
+          <article class="feature"><div class="icon">◐</div><h3>Native appearance</h3><p>Theme-aware COSMIC controls, typography and surfaces keep the applet at home on your desktop.</p></article>
+        </div>
+      </section>
+      <section id="install">
+        <div class="eyebrow">Get started</div><h2>Build and install</h2><p class="lead">You need a COSMIC desktop session, Rust, GNU Make, and a FRITZ!Box with Smart Home devices exposing power and temperature measurements.</p>
+        <div class="install">
+          <div><h3>From a checkout</h3><pre class="code">git clone https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet.git
+cd cosmic-ext-fritzsmart-monitor-applet
+make install</pre></div>
+          <div><h3>After installation</h3><p class="note">Open COSMIC Settings, choose the panel applet list, and add <strong>FRITZ!Power Monitor</strong>. If it does not appear immediately, reopen Settings or log out and back in.</p><p><a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases">Browse releases ↗</a></p></div>
+        </div>
+      </section>
+      <section id="configuration">
+        <div class="eyebrow">First run</div><h2>Connect your FRITZ!Box</h2>
+        <div class="grid">
+          <article class="step"><h3>01 · Connection</h3><p>Open Settings in the applet. Enter the FRITZ!Box URL and a user account permitted to access Smart Home data.</p></article>
+          <article class="step"><h3>02 · Devices</h3><p>Load devices, select the ones to monitor, and reorder them. Move Total power to the top to show combined net watts.</p></article>
+          <article class="step"><h3>03 · Weather (optional)</h3><p>Enable current weather, enter an OpenWeatherMap API key and a city or latitude/longitude. Weather refreshes independently.</p></article>
+        </div>
+        <p class="note" style="margin-top:22px">Credentials and the OpenWeatherMap API key are stored in the owner-only configuration file at <code>~/.config/fritz_solar.cfg</code>. Keep this file private. Weather is optional and does not interrupt FRITZ!Box readings if unavailable.</p>
+      </section>
+    </main>
+    <footer><span>FRITZ!Power Monitor · Open source under the MIT License</span><span><a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet">Source code</a> · <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues">Report an issue</a></span></footer>
+  </div>
+</body>
+</html>
