@@ -6,7 +6,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 
 ## Features
 
-- Displays current power in watts and temperature in the COSMIC panel, with a configurable text size, optional average FRITZ!Box device temperature, the current OpenWeatherMap temperature when weather is enabled, and a separate input-power figure accompanied by a dedicated solar-panel SVG icon when Total power is shown.
+- Displays current power in watts and temperature data in the COSMIC panel, with a configurable text size, optional average FRITZ!Box device temperature, the current OpenWeatherMap temperature when weather is enabled, and a separate input-power figure accompanied by a dedicated solar-panel SVG icon when Total power is shown.
 - Settings open on a simple category index (Panel, Graph history, Automatic refresh, Weather, Connection, Devices and Diagnostics). Each category opens its own focused detail view with a consistent back action, keeping unrelated controls out of the way.
 - Device rows are rendered as a compact, gap-free list inspired by COSMIC Settings’ Add Applet list; each device can still be expanded independently. The popup uses a dedicated live-power summary with prominent net or selected-device wattage, optional input power and temperature metrics, and a device count. Weather, total-power and device content use consistent rounded, theme-aware cards.
 - Device cards separate the device identity and live state from prominent power/temperature metric tiles, the power switch and side-by-side history graphs. Total power keeps the net and input graphs side by side in a matching overview card. The popup is 440 px wide and each history sparkline is resampled to 12 columns so the graphs make better use of that space.
@@ -38,7 +38,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 
 ## Build and install
 
-Build and install the applet into your user account. `make install` first runs `git pull --ff-only` to update the checked-out branch without creating a merge commit, then builds and installs it. Run it from a Git checkout with a configured upstream. Development builds display the package version with a trailing `+` (for example, `0.2.3-dev+`):
+Build and install the applet into your user account. `make install` first runs `git pull --ff-only` to update the checked-out branch without creating a merge commit, then builds and installs it. Development builds display the numeric package version without a development suffix (for example, `0.2.3`); release builds use the version supplied by the release tag:
 
 ```sh
 make install
@@ -89,7 +89,9 @@ devices and the **Total power (net)** entry in the same list. Move Total power
 to the top to display the combined net wattage in the panel without a
 temperature value; move it to the bottom to restore the first selected device's
 power and temperature. This position is saved independently of the FRITZ!Box
-device selection. The list reorders live as you drag over targets, with an animated insertion preview; release the mouse button to finish and save the new order. Enable **Input (subtract from total)**
+device selection. The list reorders live as you drag over targets, with an
+animated insertion preview; release the mouse button to finish and save the
+new order. Enable **Input (subtract from total)**
 for devices that measure consumption rather than generation; their wattage is
 subtracted from the combined net-power reading and their individual signed
 history is shown in the total-power card. This role is saved per device.
@@ -104,36 +106,3 @@ history from 5 minutes to 24 hours in 5-minute increments under Settings; the
 combined power history uses the same timespan. Graph sparklines are evenly
 downsampled to a fixed number of columns so long history windows remain within
 their cards.
-
-Credentials are stored in `~/.config/fritz_solar.cfg` with owner-only
-permissions. TLS certificate validation is enabled by default. For a FRITZ!Box
-using a self-signed certificate, provide its PEM certificate in the optional
-**Trusted CA certificate** field. The certificate is added as an additional
-trust anchor; normal certificate-chain and hostname validation remain enabled.
-For example, extract the local router certificate with `openssl s_client` and
-store it in a user-readable file such as `~/.config/fritzbox-ca.pem`, then set
-that path in the applet. Use a URL hostname included in the certificate's SAN
-(e.g. `https://fritz.box/`) and ensure it resolves to the local router.
-
-Enable **Use current weather icon** and enter an OpenWeatherMap API key plus a city name or `latitude,longitude` to show the current weather condition icon and OpenWeatherMap temperature in the panel, plus a detailed weather summary as the first entry in the popup. The summary includes feels-like temperature, humidity, wind speed and direction, pressure, cloud cover, visibility, sunrise and sunset (shown in local time). The background photograph is an illustrative Commons image matching the weather type, not a live camera image of the configured location. Weather updates independently every 5–60 minutes (default 10 minutes); failed requests do not affect FRITZ!Box readings. The API key is stored in the owner-only configuration file.
-
-The **Allow invalid TLS certificates** option remains available only for
-compatibility and disables certificate verification; leave it off when using a
-trusted certificate. Existing simple `KEY=VALUE` configuration files remain
-readable; the applet manages the configuration file.
-
-## Current scope and limitations
-
-The popup keeps rolling, in-memory total-power and per-device histories using
-the configured 5-minute to 24-hour graph timespan (one sample per minute). It
-displays net-power low/high values, separate wattage and temperature
-sparklines for each selected device, and an individual signed power graph for
-each device marked as an input.
-History is collected only while the applet is running and is not persisted across
-restarts. It does not provide historical production from before startup, daily
-yield, forecasts, or inverter-specific statistics. The FRITZ!Box device must
-expose both `powermeter/power` and `temperature/celsius` in its device XML.
-
-This initial PR is an implementation baseline. It still needs a successful
-build and runtime validation on a COSMIC desktop and against the target
-FRITZ!Box model/FRITZ!OS version before being considered a release.
