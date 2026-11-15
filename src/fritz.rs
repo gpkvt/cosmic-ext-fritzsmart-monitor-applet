@@ -1,7 +1,7 @@
 use md5::{Digest, Md5};
 use reqwest::Client;
 use roxmltree::{Document, Node};
-use std::{collections::HashMap, env, fs, io::Write, time::{Duration, Instant}};
+use std::{collections::{HashMap, HashSet}, env, fs, io::Write, time::{Duration, Instant}};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FritzReading {
@@ -49,6 +49,7 @@ pub struct FritzSettings {
     pub graph_timespan_minutes: u16,
     pub refresh_interval_seconds: u32,
     pub temperature_alerts: HashMap<String, TemperatureAlertThresholds>,
+    pub input_ains: HashSet<String>,
     pub weather_enabled: bool,
     pub openweathermap_api_key: String,
     pub weather_location: String,
@@ -69,6 +70,7 @@ impl Default for FritzSettings {
             graph_timespan_minutes: 15,
             refresh_interval_seconds: 60,
             temperature_alerts: HashMap::new(),
+            input_ains: HashSet::new(),
             weather_enabled: false,
             openweathermap_api_key: String::new(),
             weather_location: String::new(),
@@ -139,6 +141,8 @@ impl FritzSettings {
             graph_timespan_minutes: parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")),
             refresh_interval_seconds: parse_refresh_interval_seconds(&get("REFRESH_INTERVAL_SECONDS")),
             temperature_alerts: parse_temperature_alerts(&get("TEMPERATURE_ALERTS")),
+            input_ains: get("INPUT_AINS").split(',')
+                .map(normalize_ain_for_selection).filter(|ain| !ain.is_empty()).collect(),
             weather_enabled: get("WEATHER_ENABLED").eq_ignore_ascii_case("true"),
             openweathermap_api_key: get("OPENWEATHERMAP_API_KEY"),
             weather_location: get("WEATHER_LOCATION"),
@@ -169,14 +173,19 @@ impl FritzSettings {
             .collect();
         temperature_alerts.sort_unstable();
         let temperature_alerts = temperature_alerts.join(";");
+        let mut input_ains: Vec<String> = self.input_ains.iter()
+            .map(|ain| normalize_ain_for_selection(ain))
+            .filter(|ain| !ain.is_empty()).collect();
+        input_ains.sort_unstable();
+        let input_ains = input_ains.join(",");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\n",
             self.url, self.username, self.password, first_ain, selected_ains,
             if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path,
             self.panel_text_size.clamp(10, 24), self.graph_timespan_minutes.clamp(5, 1440),
             self.refresh_interval_seconds.clamp(30, 3600), temperature_alerts,
             if self.weather_enabled { "true" } else { "false" }, self.openweathermap_api_key,
-            self.weather_location, self.weather_refresh_interval_minutes.clamp(5, 60)
+            self.weather_location, self.weather_refresh_interval_minutes.clamp(5, 60), input_ains
         );
         #[cfg(unix)]
         let mut file = {
