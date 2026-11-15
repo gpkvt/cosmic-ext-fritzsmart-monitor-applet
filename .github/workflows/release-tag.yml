@@ -5,6 +5,16 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      bump_type:
+        description: Semantic version increment
+        type: choice
+        required: true
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
@@ -21,6 +31,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
+
       - name: Bump package version
         if: github.event_name == 'workflow_dispatch'
         env:
@@ -32,104 +43,33 @@ jobs:
             exit 1
           fi
 
-          python3 - <<'PY'
+          new_version="$(python3 - <<'PY'
           import os
-          import re
           from pathlib import Path
 
-          cargo_path = Path("Cargo.toml")
-          cargo = cargo_path.read_text()
-          match = re.search(r'(?ms)^\\[package\\]\\s+(.*?)(?=^\\[|\\Z)', cargo)
-          if not match:
-              raise SystemExit("Could not find [package] in Cargo.toml")
-          version_match = re.search(r'^version\\s*=\\s*"([0-9]+)\\.([0-9]+)\\.([0-9]+)"\\s*        uses: actions/github-script@v7
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const { execFileSync } = require('node:child_process');
-            const fs = require('node:fs');
-            const cargo = fs.readFileSync('Cargo.toml', 'utf8');
-            const version = cargo.match(/^version = "([^"]+)"/m)?.[1];
-            if (!version) throw new Error('Could not read Cargo.toml package version');
+          path = Path("Cargo.toml")
+          lines = path.read_text().splitlines()
+          in_package = False
+          version_line = None
+          for index, line in enumerate(lines):
+              if line.strip() == "[package]":
+                  in_package = True
+                  continue
+              if line.startswith("["):
+                  in_package = False
+              if in_package and line.startswith("version = "):
+                  version_line = index
+                  break
 
-            const tag = `v${version}`;
-            const history = execFileSync('git', [
-              'log', '--first-parent', '-G', `^version = "${version}"`,
-              '--format=%H', '--', 'Cargo.toml'
-            ], { encoding: 'utf8' }).trim();
-            const releaseCommit = history.split('\n')[0];
-            if (!releaseCommit) throw new Error(`Could not find the commit that introduced ${version}`);
+          if version_line is None:
+              raise SystemExit("Could not find [package].version in Cargo.toml")
 
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            let existing;
-            try {
-              existing = await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
-            } catch (error) {
-              if (error.status !== 404) throw error;
-            }
+          current = lines[version_line].split('"')[1]
+          parts = current.split(".")
+          if len(parts) != 3 or not all(part.isdigit() for part in parts):
+              raise SystemExit(f"Expected stable MAJOR.MINOR.PATCH version, got {current!r}")
+          major, minor, patch = map(int, parts)
 
-            if (existing) {
-              let target = existing.data.object.sha;
-              if (existing.data.object.type === 'tag') {
-                const annotated = await github.rest.git.getTag({ owner, repo, tag_sha: target });
-                target = annotated.data.object.sha;
-              }
-              if (target === releaseCommit) {
-                core.info(`${tag} already points to the version bump commit.`);
-                return;
-              }
-              core.warning(`${tag} points to ${target}; repairing it to ${releaseCommit}.`);
-              // Update the existing ref directly; deleting it first is rejected
-              // by GitHub for some fine-grained PAT configurations.
-              const annotated = await github.rest.git.createTag({
-                owner,
-                repo,
-                tag,
-                message: `Release ${tag}`,
-                object: releaseCommit,
-                type: 'commit',
-                tagger: {
-                  name: 'gpkvt',
-                  email: 'git@21x9.org',
-                  date: new Date().toISOString()
-                }
-              });
-              await github.rest.git.updateRef({
-                owner,
-                repo,
-                ref: `tags/${tag}`,
-                sha: annotated.data.sha,
-                force: true
-              });
-              core.info(`Repaired ${tag} at ${releaseCommit}`);
-              return;
-            }
-
-            const annotated = await github.rest.git.createTag({
-              owner,
-              repo,
-              tag,
-              message: `Release ${tag}`,
-              object: releaseCommit,
-              type: 'commit',
-              tagger: {
-                name: 'gpkvt',
-                email: 'git@21x9.org',
-                date: new Date().toISOString()
-              }
-            });
-            await github.rest.git.createRef({
-              owner,
-              repo,
-              ref: `refs/tags/${tag}`,
-              sha: annotated.data.sha
-            });
-            core.info(`Created ${tag} at ${releaseCommit}`);, match.group(1), re.M)
-          if not version_match:
-              raise SystemExit("Package version must be a stable MAJOR.MINOR.PATCH version")
-
-          major, minor, patch = map(int, version_match.groups())
           bump = os.environ["BUMP_TYPE"]
           if bump == "major":
               major, minor, patch = major + 1, 0, 0
@@ -141,106 +81,17 @@ jobs:
               raise SystemExit(f"Unsupported bump type: {bump}")
 
           new_version = f"{major}.{minor}.{patch}"
-          start, end = match.span(1)
-          package = match.group(1)
-          package = re.sub(
-              r'(?m)^(version\\s*=\\s*")[^"]+("\\s*)        uses: actions/github-script@v7
-        with:
-          github-token: ${{ github.token }}
-          script: |
-            const { execFileSync } = require('node:child_process');
-            const fs = require('node:fs');
-            const cargo = fs.readFileSync('Cargo.toml', 'utf8');
-            const version = cargo.match(/^version = "([^"]+)"/m)?.[1];
-            if (!version) throw new Error('Could not read Cargo.toml package version');
-
-            const tag = `v${version}`;
-            const history = execFileSync('git', [
-              'log', '--first-parent', '-G', `^version = "${version}"`,
-              '--format=%H', '--', 'Cargo.toml'
-            ], { encoding: 'utf8' }).trim();
-            const releaseCommit = history.split('\n')[0];
-            if (!releaseCommit) throw new Error(`Could not find the commit that introduced ${version}`);
-
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            let existing;
-            try {
-              existing = await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
-            } catch (error) {
-              if (error.status !== 404) throw error;
-            }
-
-            if (existing) {
-              let target = existing.data.object.sha;
-              if (existing.data.object.type === 'tag') {
-                const annotated = await github.rest.git.getTag({ owner, repo, tag_sha: target });
-                target = annotated.data.object.sha;
-              }
-              if (target === releaseCommit) {
-                core.info(`${tag} already points to the version bump commit.`);
-                return;
-              }
-              core.warning(`${tag} points to ${target}; repairing it to ${releaseCommit}.`);
-              // Update the existing ref directly; deleting it first is rejected
-              // by GitHub for some fine-grained PAT configurations.
-              const annotated = await github.rest.git.createTag({
-                owner,
-                repo,
-                tag,
-                message: `Release ${tag}`,
-                object: releaseCommit,
-                type: 'commit',
-                tagger: {
-                  name: 'gpkvt',
-                  email: 'git@21x9.org',
-                  date: new Date().toISOString()
-                }
-              });
-              await github.rest.git.updateRef({
-                owner,
-                repo,
-                ref: `tags/${tag}`,
-                sha: annotated.data.sha,
-                force: true
-              });
-              core.info(`Repaired ${tag} at ${releaseCommit}`);
-              return;
-            }
-
-            const annotated = await github.rest.git.createTag({
-              owner,
-              repo,
-              tag,
-              message: `Release ${tag}`,
-              object: releaseCommit,
-              type: 'commit',
-              tagger: {
-                name: 'gpkvt',
-                email: 'git@21x9.org',
-                date: new Date().toISOString()
-              }
-            });
-            await github.rest.git.createRef({
-              owner,
-              repo,
-              ref: `refs/tags/${tag}`,
-              sha: annotated.data.sha
-            });
-            core.info(`Created ${tag} at ${releaseCommit}`);,
-              rf'\\g<1>{new_version}\\g<2>',
-              package,
-              count=1,
-          )
-          cargo_path.write_text(cargo[:start] + package + cargo[end:])
-          print(f"Bumped package version to {new_version}")
+          lines[version_line] = f'version = "{new_version}"'
+          path.write_text("\\n".join(lines) + "\\n")
+          print(new_version)
           PY
-
+          )"
+          echo "Bumping package version to ${new_version}"
           cargo update --workspace
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Cargo.toml Cargo.lock
-          git commit -m "chore(release): bump version to $(sed -n '/^\[package\]/,/^\[/s/^version = "\\([^"]*\\)"/\\1/p' Cargo.toml | head -n1)"
+          git commit -m "chore(release): bump version to ${new_version}"
           git push origin HEAD:main
 
       - name: Create or repair version tag
@@ -259,7 +110,7 @@ jobs:
               'log', '--first-parent', '-G', `^version = "${version}"`,
               '--format=%H', '--', 'Cargo.toml'
             ], { encoding: 'utf8' }).trim();
-            const releaseCommit = history.split('\n')[0];
+            const releaseCommit = history.split('\\n')[0];
             if (!releaseCommit) throw new Error(`Could not find the commit that introduced ${version}`);
 
             const owner = context.repo.owner;
@@ -282,8 +133,6 @@ jobs:
                 return;
               }
               core.warning(`${tag} points to ${target}; repairing it to ${releaseCommit}.`);
-              // Update the existing ref directly; deleting it first is rejected
-              // by GitHub for some fine-grained PAT configurations.
               const annotated = await github.rest.git.createTag({
                 owner,
                 repo,
