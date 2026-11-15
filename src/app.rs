@@ -418,7 +418,7 @@ fn graph_visual(
     };
     let baseline = HEIGHT - 2.0;
     let svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {HEIGHT}\"><title>{current_value:.1} {unit}</title><path d=\"M0 {baseline}H{WIDTH}\" stroke=\"#808080\" stroke-opacity=\"0.35\"/>{drawing}</svg>"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {HEIGHT}\" preserveAspectRatio=\"none\"><title>{current_value:.1} {unit}</title><path d=\"M0 {baseline}H{WIDTH}\" stroke=\"#808080\" stroke-opacity=\"0.35\"/>{drawing}</svg>"
     );
     widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
         svg.into_bytes(),
