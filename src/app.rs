@@ -2188,49 +2188,40 @@ impl cosmic::Application for AppModel {
                             );
                         }
                     }
-                    if inserted_specials.insert(TOTAL_POWER_DRAG_ID) {
+                    for entry in &self.settings.menu_order {
+                        if inserted_specials.contains(entry.as_str()) {
+                            continue;
+                        }
                         let position = self
                             .settings
                             .menu_order
                             .iter()
-                            .position(|entry| entry == TOTAL_POWER_DRAG_ID)
-                            .unwrap_or(self.selected_ains.len());
-                        content = content.push(total_power_sort_row(position + 1));
-                    }
-                    if inserted_specials.insert(POWER_DIFFERENCE_DRAG_ID) {
-                        let position = self
-                            .settings
-                            .menu_order
-                            .iter()
-                            .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID)
-                            .unwrap_or(self.selected_ains.len() + 1);
-                        content = content.push(power_difference_sort_row(position + 1));
-                    }
-                    if inserted_specials.insert(SUMMARY_DRAG_ID) {
-                        let position = self
-                            .settings
-                            .menu_order
-                            .iter()
-                            .position(|entry| entry == SUMMARY_DRAG_ID)
-                            .unwrap_or(self.selected_ains.len() + 2);
-                        content = content.push(special_menu_sort_row(
-                            SUMMARY_DRAG_ID,
-                            "Live power summary",
-                            position + 1,
-                        ));
-                    }
-                    if inserted_specials.insert(WEATHER_DRAG_ID) {
-                        let position = self
-                            .settings
-                            .menu_order
-                            .iter()
-                            .position(|entry| entry == WEATHER_DRAG_ID)
-                            .unwrap_or(self.selected_ains.len() + 3);
-                        content = content.push(special_menu_sort_row(
-                            WEATHER_DRAG_ID,
-                            "Weather",
-                            position + 1,
-                        ));
+                            .position(|candidate| candidate == entry)
+                            .unwrap_or_default()
+                            + 1;
+                        match entry.as_str() {
+                            TOTAL_POWER_DRAG_ID => {
+                                content = content.push(total_power_sort_row(position));
+                            }
+                            POWER_DIFFERENCE_DRAG_ID => {
+                                content = content.push(power_difference_sort_row(position));
+                            }
+                            SUMMARY_DRAG_ID => {
+                                content = content.push(special_menu_sort_row(
+                                    SUMMARY_DRAG_ID,
+                                    "Live power summary",
+                                    position,
+                                ));
+                            }
+                            WEATHER_DRAG_ID => {
+                                content = content.push(special_menu_sort_row(
+                                    WEATHER_DRAG_ID,
+                                    "Weather",
+                                    position,
+                                ));
+                            }
+                            _ => {}
+                        }
                     }
                     content = content.push(widget::text::caption(
                         "Drag the ⠿ handles to reorder the weather section, live power summary, power cards and selected devices. The order is saved automatically.",
