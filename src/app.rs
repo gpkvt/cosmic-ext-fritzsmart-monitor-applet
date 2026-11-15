@@ -414,6 +414,16 @@ fn rebuild_input_power_history(
     samples.into_iter().collect()
 }
 
+fn rebuild_power_difference_history(
+    output_history: &VecDeque<(Instant, i64)>,
+    input_history: &VecDeque<(Instant, i64)>,
+) -> VecDeque<(Instant, i64)> {
+    let input_by_time: HashMap<Instant, i64> = input_history.iter().copied().collect();
+    output_history.iter().filter_map(|(timestamp, output)| {
+        input_by_time.get(timestamp).map(|input| (*timestamp, output + input))
+    }).collect()
+}
+
 fn rebuild_output_power_history(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     input_ains: &HashSet<String>,
@@ -801,6 +811,50 @@ fn total_power_overview(
         }
         input_column = input_column.push(graph_panel(input_graphs.into()));
         power_columns = power_columns.push(input_column);
+
+        // Keep the output and input totals independent. The difference is a
+        // separate net metric, calculated by adding the signed input total.
+        let difference = total_power + input_power_w(readings, &settings.input_ains);
+        let difference_history = rebuild_power_difference_history(history, &input_history);
+        let mut difference_column = widget::Column::new()
+            .spacing(8)
+            .width(cosmic::iced::Length::Fill)
+            .push(metric_tile(
+                "POWER DIFFERENCE",
+                format!("{difference} W"),
+                if difference >= 0 { "go-up-symbolic" } else { "go-down-symbolic" },
+            ));
+        if let (Some(low), Some(high)) = (
+            difference_history.iter().map(|(_, value)| *value).min(),
+            difference_history.iter().map(|(_, value)| *value).max(),
+        ) {
+            difference_column = difference_column.push(
+                widget::Row::new()
+                    .spacing(8)
+                    .width(cosmic::iced::Length::Fill)
+                    .push(widget::container(range_metric_tile(
+                        "LOW", format!("{low} W"), "go-down-symbolic",
+                    )).width(cosmic::iced::Length::Fill))
+                    .push(widget::container(range_metric_tile(
+                        "HIGH", format!("{high} W"), "go-up-symbolic",
+                    )).width(cosmic::iced::Length::Fill)),
+            );
+        }
+        let difference_graph = widget::Column::new()
+            .spacing(4)
+            .push(widget::text::caption("POWER DIFFERENCE (W)"))
+            .push(graph_visual(
+                difference_history.iter().map(|(_, value)| *value as f64),
+                &settings.graph_style,
+                "W",
+            ))
+            .push(widget::Row::new()
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::caption(axis_start.clone()))
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(widget::text::caption("Now")));
+        difference_column = difference_column.push(graph_panel(difference_graph.into()));
+        power_columns = power_columns.push(difference_column);
     }
     let content = widget::Column::new()
         .spacing(10)
@@ -2952,6 +3006,32 @@ mod history_tests {
         assert_eq!(average_temperature_c(&readings, false), Some(110.0 / 3.0));
         assert_eq!(average_temperature_c(&readings, true), Some(20.0));
         assert_eq!(average_temperature_c(&readings[1..], true), None);
+    }
+
+    #[test]
+    fn power_difference_history_combines_output_and_signed_input() {
+        let now = Instant::now();
+        let later = now + Duration::from_secs(60);
+        let output = VecDeque::from([(now, 900), (later, 1_000)]);
+        let input = VecDeque::from([(now, -250), (later, -300)]);
+
+        assert_eq!(
+            rebuild_power_difference_history(&output, &input),
+            VecDeque::from([(now, 650), (later, 700)]),
+        );
+    }
+
+    #[test]
+    fn power_difference_history_ignores_unmatched_samples() {
+        let now = Instant::now();
+        let later = now + Duration::from_secs(60);
+        let output = VecDeque::from([(now, 900), (later, 1_000)]);
+        let input = VecDeque::from([(later, -300)]);
+
+        assert_eq!(
+            rebuild_power_difference_history(&output, &input),
+            VecDeque::from([(later, 700)]),
+        );
     }
 
     #[test]
