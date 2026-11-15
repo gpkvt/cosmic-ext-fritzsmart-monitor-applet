@@ -1,11 +1,12 @@
-use crate::fritz::{discover_devices, fetch_fritz_data, FritzDevice, FritzFetchResult, FritzReading, FritzSettings, TemperatureAlertThresholds};
-use crate::weather::{fetch_weather, fetch_weather_forecast, WeatherData, WeatherForecast};
+use crate::fritz::{
+    FritzDevice, FritzFetchResult, FritzReading, FritzSettings, TemperatureAlertThresholds,
+    discover_devices, fetch_fritz_data,
+};
+use crate::weather::{WeatherData, WeatherForecast, fetch_weather, fetch_weather_forecast};
 use cosmic::iced::{
-    futures,
+    Limits, Subscription, futures,
     platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
     window::Id,
-    Limits,
-    Subscription,
 };
 use cosmic::prelude::*;
 use cosmic::widget;
@@ -123,8 +124,6 @@ pub enum Message {
     WeatherRefreshIntervalChanged(u16),
 }
 
-
-
 fn device_matches_search(device: &FritzDevice, query: &str) -> bool {
     let query = query.trim();
     query.is_empty()
@@ -136,7 +135,10 @@ fn temperature_outside_limits(temperature: f64, thresholds: TemperatureAlertThre
     temperature > f64::from(thresholds.high_c) || temperature < f64::from(thresholds.low_c)
 }
 
-fn should_notify_temperature_alert(previously_outside: Option<bool>, currently_outside: bool) -> bool {
+fn should_notify_temperature_alert(
+    previously_outside: Option<bool>,
+    currently_outside: bool,
+) -> bool {
     previously_outside == Some(false) && currently_outside
 }
 
@@ -145,10 +147,12 @@ fn newly_missing_devices(
     missing_devices: &[(String, String)],
     suppressed_ains: &HashSet<String>,
 ) -> Vec<String> {
-    let current: HashSet<String> = missing_devices.iter()
+    let current: HashSet<String> = missing_devices
+        .iter()
         .map(|(ain, _)| crate::fritz::normalize_ain_for_selection(ain))
         .collect();
-    let newly_missing = missing_devices.iter()
+    let newly_missing = missing_devices
+        .iter()
         .filter(|(ain, _)| {
             let key = crate::fritz::normalize_ain_for_selection(ain);
             !previously_missing.contains(&key) && !suppressed_ains.contains(&key)
@@ -166,10 +170,14 @@ fn clear_confirmed_power_changes(
     pending_changes: &mut HashSet<String>,
     readings: &[FritzReading],
 ) {
-    let confirmed: Vec<String> = pending_targets.iter()
-        .filter(|(ain, requested)| readings.iter().any(|reading|
-            crate::fritz::normalize_ain_for_selection(&reading.ain) == ain.as_str()
-                && reading.power_state == Some(**requested)))
+    let confirmed: Vec<String> = pending_targets
+        .iter()
+        .filter(|(ain, requested)| {
+            readings.iter().any(|reading| {
+                crate::fritz::normalize_ain_for_selection(&reading.ain) == ain.as_str()
+                    && reading.power_state == Some(**requested)
+            })
+        })
         .map(|(ain, _)| ain.clone())
         .collect();
     for ain in confirmed {
@@ -184,7 +192,11 @@ fn notify_missing_devices(names: &[String]) {
     }
     let body = names.join("\n");
     let _ = notify_rust::Notification::new()
-        .summary(if names.len() == 1 { "FRITZ!Box device unavailable" } else { "FRITZ!Box devices unavailable" })
+        .summary(if names.len() == 1 {
+            "FRITZ!Box device unavailable"
+        } else {
+            "FRITZ!Box devices unavailable"
+        })
         .body(&body)
         .show();
 }
@@ -309,7 +321,8 @@ fn format_graph_timespan(minutes: u16) -> String {
         format!("{days} {}", if days == 1 { "day" } else { "days" })
     } else if minutes % 60 == 0 {
         let hours = minutes / 60;
-        format!("{hours} {}", if hours == 1 { "hour" } else { "hours" })    } else if minutes > 60 {
+        format!("{hours} {}", if hours == 1 { "hour" } else { "hours" })
+    } else if minutes > 60 {
         format!("{}h {}m", minutes / 60, minutes % 60)
     } else {
         format!("{minutes} minutes")
@@ -323,7 +336,10 @@ fn record_power_sample(
     window: Duration,
 ) {
     history.push_back((now, power_w));
-    while history.front().is_some_and(|(timestamp, _)| now.duration_since(*timestamp) > window) {
+    while history
+        .front()
+        .is_some_and(|(timestamp, _)| now.duration_since(*timestamp) > window)
+    {
         history.pop_front();
     }
     while history.len() > max_history_samples(window) {
@@ -332,7 +348,8 @@ fn record_power_sample(
 }
 
 fn solar_input_ains(devices: &[FritzDevice]) -> HashSet<String> {
-    devices.iter()
+    devices
+        .iter()
         .filter(|device| device.name.to_lowercase().contains("solar"))
         .map(|device| crate::fritz::normalize_ain_for_selection(&device.ain))
         .filter(|ain| !ain.is_empty())
@@ -344,15 +361,20 @@ fn signed_device_power(power_w: i64, is_input: bool) -> i64 {
 }
 
 fn output_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
-    readings.iter()
-        .filter(|reading| !input_ains.contains(
-            &crate::fritz::normalize_ain_for_selection(&reading.ain),
-        ))
+    readings
+        .iter()
+        .filter(|reading| {
+            !input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+        })
         .map(|reading| reading.power_w)
         .sum()
 }
 
-fn graph_visual(values: impl Iterator<Item = f64>, style: &str, unit: &str) -> cosmic::Element<'static, Message> {
+fn graph_visual(
+    values: impl Iterator<Item = f64>,
+    style: &str,
+    unit: &str,
+) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
     let current_value = values.last().copied().unwrap_or(0.0);
     const COUNT: usize = 24;
@@ -363,14 +385,19 @@ fn graph_visual(values: impl Iterator<Item = f64>, style: &str, unit: &str) -> c
     let minimum = values.iter().copied().reduce(f64::min).unwrap_or(0.0);
     let maximum = values.iter().copied().reduce(f64::max).unwrap_or(minimum);
     let range = (maximum - minimum).max(1.0);
-    let samples: Vec<f64> = if values.len() == 1 { vec![values[0]; COUNT] } else {
-        (0..COUNT).map(|i| {
-            let p = i as f64 * (values.len()-1) as f64 / (COUNT-1) as f64;
-            let l = p.floor() as usize; let r = (l+1).min(values.len()-1);
-            values[l] + (values[r]-values[l])*(p-l as f64)
-        }).collect()
+    let samples: Vec<f64> = if values.len() == 1 {
+        vec![values[0]; COUNT]
+    } else {
+        (0..COUNT)
+            .map(|i| {
+                let p = i as f64 * (values.len() - 1) as f64 / (COUNT - 1) as f64;
+                let l = p.floor() as usize;
+                let r = (l + 1).min(values.len() - 1);
+                values[l] + (values[r] - values[l]) * (p - l as f64)
+            })
+            .collect()
     };
-    let y = |v: f64| HEIGHT - 4.0 - ((v-minimum)/range)*(HEIGHT-8.0);
+    let y = |v: f64| HEIGHT - 4.0 - ((v - minimum) / range) * (HEIGHT - 8.0);
     let drawing = if style == "bar" {
         let slot = WIDTH / COUNT as f64;
         samples.iter().enumerate().map(|(i,v)| {
@@ -379,28 +406,42 @@ fn graph_visual(values: impl Iterator<Item = f64>, style: &str, unit: &str) -> c
                 i as f64*slot+1.0, top, slot-2.0, (HEIGHT-4.0-top).max(1.0))
         }).collect::<String>()
     } else {
-        let points=samples.iter().enumerate().map(|(i,v)|
-            format!("{:.2},{:.2}",i as f64*WIDTH/(COUNT-1) as f64,y(*v))
-        ).collect::<Vec<_>>().join(" ");
-        format!("<polyline points=\"{points}\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>")
+        let points = samples
+            .iter()
+            .enumerate()
+            .map(|(i, v)| format!("{:.2},{:.2}", i as f64 * WIDTH / (COUNT - 1) as f64, y(*v)))
+            .collect::<Vec<_>>()
+            .join(" ");
+        format!(
+            "<polyline points=\"{points}\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
+        )
     };
-    let baseline=HEIGHT-2.0;
-    let svg=format!("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {HEIGHT}\"><title>{current_value:.1} {unit}</title><path d=\"M0 {baseline}H{WIDTH}\" stroke=\"#808080\" stroke-opacity=\"0.35\"/>{drawing}</svg>");
-    widget::svg(cosmic::iced::widget::svg::Handle::from_memory(svg.into_bytes()))
-        .width(cosmic::iced::Length::Fill).height(56).into()
+    let baseline = HEIGHT - 2.0;
+    let svg = format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {HEIGHT}\"><title>{current_value:.1} {unit}</title><path d=\"M0 {baseline}H{WIDTH}\" stroke=\"#808080\" stroke-opacity=\"0.35\"/>{drawing}</svg>"
+    );
+    widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
+        svg.into_bytes(),
+    ))
+    .width(cosmic::iced::Length::Fill)
+    .height(56)
+    .into()
 }
 
-
 fn input_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
-    readings.iter().filter(|reading| {
-        input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
-    }).map(|reading| signed_device_power(reading.power_w, true)).sum()
+    readings
+        .iter()
+        .filter(|reading| {
+            input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+        })
+        .map(|reading| signed_device_power(reading.power_w, true))
+        .sum()
 }
 
 fn average_temperature_c(readings: &[FritzReading], exclude_solar: bool) -> Option<f64> {
-    let temperatures = readings.iter().filter(|reading| {
-        !exclude_solar || !reading.name.to_lowercase().contains("solar")
-    });
+    let temperatures = readings
+        .iter()
+        .filter(|reading| !exclude_solar || !reading.name.to_lowercase().contains("solar"));
     let (sum, count) = temperatures.fold((0.0, 0usize), |(sum, count), reading| {
         (sum + reading.temperature_c, count + 1)
     });
@@ -427,9 +468,14 @@ fn rebuild_power_difference_history(
     input_history: &VecDeque<(Instant, i64)>,
 ) -> VecDeque<(Instant, i64)> {
     let input_by_time: HashMap<Instant, i64> = input_history.iter().copied().collect();
-    output_history.iter().filter_map(|(timestamp, output)| {
-        input_by_time.get(timestamp).map(|input| (*timestamp, output + input))
-    }).collect()
+    output_history
+        .iter()
+        .filter_map(|(timestamp, output)| {
+            input_by_time
+                .get(timestamp)
+                .map(|input| (*timestamp, output + input))
+        })
+        .collect()
 }
 
 fn rebuild_output_power_history(
@@ -447,7 +493,6 @@ fn rebuild_output_power_history(
     samples.into_iter().collect()
 }
 
-
 fn record_device_sample(
     history: &mut HashMap<String, VecDeque<(Instant, i64, f64)>>,
     reading: &FritzReading,
@@ -458,8 +503,10 @@ fn record_device_sample(
         .entry(crate::fritz::normalize_ain_for_selection(&reading.ain))
         .or_default();
     samples.push_back((now, reading.power_w, reading.temperature_c));
-    while samples.front().is_some_and(|(timestamp, _, _)|
-        now.duration_since(*timestamp) > window) {
+    while samples
+        .front()
+        .is_some_and(|(timestamp, _, _)| now.duration_since(*timestamp) > window)
+    {
         samples.pop_front();
     }
     while samples.len() > max_history_samples(window) {
@@ -477,8 +524,12 @@ fn move_menu_entry(order: &mut Vec<String>, dragged: &str, target: &str) {
     };
     let dragged = normalize(dragged);
     let target = normalize(target);
-    let Some(from) = order.iter().position(|entry| normalize(entry) == dragged) else { return; };
-    let Some(to) = order.iter().position(|entry| normalize(entry) == target) else { return; };
+    let Some(from) = order.iter().position(|entry| normalize(entry) == dragged) else {
+        return;
+    };
+    let Some(to) = order.iter().position(|entry| normalize(entry) == target) else {
+        return;
+    };
     if from != to {
         let entry = order.remove(from);
         order.insert(to, entry);
@@ -494,17 +545,19 @@ fn move_sortable_entry(
     target: &str,
 ) {
     if dragged == TOTAL_POWER_DRAG_ID {
-        if target != TOTAL_POWER_DRAG_ID && ains.iter().any(|ain|
-            crate::fritz::normalize_ain_for_selection(ain)
-                == crate::fritz::normalize_ain_for_selection(target))
+        if target != TOTAL_POWER_DRAG_ID
+            && ains.iter().any(|ain| {
+                crate::fritz::normalize_ain_for_selection(ain)
+                    == crate::fritz::normalize_ain_for_selection(target)
+            })
         {
             *total_power_first = true;
         }
     } else if target == TOTAL_POWER_DRAG_ID {
-        if let Some(index) = ains.iter().position(|ain|
+        if let Some(index) = ains.iter().position(|ain| {
             crate::fritz::normalize_ain_for_selection(ain)
-                == crate::fritz::normalize_ain_for_selection(dragged))
-        {
+                == crate::fritz::normalize_ain_for_selection(dragged)
+        }) {
             let device = ains.remove(index);
             ains.push(device);
             *total_power_first = false;
@@ -514,7 +567,6 @@ fn move_sortable_entry(
     }
 }
 
-
 fn graph_panel(content: cosmic::Element<'static, Message>) -> cosmic::Element<'static, Message> {
     widget::container(
         widget::container(content)
@@ -523,7 +575,9 @@ fn graph_panel(content: cosmic::Element<'static, Message>) -> cosmic::Element<'s
             .style(|theme| {
                 let cosmic = theme.cosmic();
                 cosmic::iced::widget::container::Style {
-                    background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
+                    background: Some(
+                        cosmic::iced::Color::from(cosmic.background(false).base).into(),
+                    ),
                     border: cosmic::iced::Border {
                         radius: 8.0.into(),
                         ..Default::default()
@@ -537,7 +591,9 @@ fn graph_panel(content: cosmic::Element<'static, Message>) -> cosmic::Element<'s
     .style(|theme| {
         let cosmic = theme.cosmic();
         cosmic::iced::widget::container::Style {
-            background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+            background: Some(
+                cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
+            ),
             border: cosmic::iced::Border {
                 radius: 8.0.into(),
                 ..Default::default()
@@ -558,7 +614,9 @@ fn surface_card<'a>(
         .style(|theme| {
             let cosmic = theme.cosmic();
             cosmic::iced::widget::container::Style {
-                background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                background: Some(
+                    cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
+                ),
                 border: cosmic::iced::Border {
                     radius: 12.0.into(),
                     ..Default::default()
@@ -570,7 +628,8 @@ fn surface_card<'a>(
 }
 
 fn keep_value_unit_together(value: String) -> String {
-    value.rsplit_once(' ')
+    value
+        .rsplit_once(' ')
         .map(|(number, unit)| format!("{number}\u{00a0}{unit}"))
         .unwrap_or(value)
 }
@@ -634,8 +693,13 @@ fn device_metric_tile<'a>(
         .style(move |theme| {
             let cosmic = theme.cosmic();
             cosmic::iced::widget::container::Style {
-                background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
-                border: cosmic::iced::Border { radius, ..Default::default() },
+                background: Some(
+                    cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
+                ),
+                border: cosmic::iced::Border {
+                    radius,
+                    ..Default::default()
+                },
                 ..Default::default()
             }
         })
@@ -650,13 +714,16 @@ fn range_metric_tile<'a>(
     let content = widget::Column::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
-        .push(widget::Row::new()
-            .spacing(6)
-            .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::icon::from_name(icon).size(14))
-            .push(widget::text::caption(label)))
+        .push(
+            widget::Row::new()
+                .spacing(6)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(widget::icon::from_name(icon).size(14))
+                .push(widget::text::caption(label)),
+        )
         .push(widget::text::title2(keep_value_unit_together(value)));
-    surface_card(content.into(), 12)}
+    surface_card(content.into(), 12)
+}
 
 fn displayed_power_w(
     readings: &[FritzReading],
@@ -667,10 +734,14 @@ fn displayed_power_w(
     if total_power_first {
         (!readings.is_empty()).then(|| output_power_w(readings, input_ains))
     } else {
-        selected_ains.first()
-            .and_then(|selected| readings.iter().find(|reading|
-                crate::fritz::normalize_ain_for_selection(&reading.ain)
-                    == crate::fritz::normalize_ain_for_selection(selected)))
+        selected_ains
+            .first()
+            .and_then(|selected| {
+                readings.iter().find(|reading| {
+                    crate::fritz::normalize_ain_for_selection(&reading.ain)
+                        == crate::fritz::normalize_ain_for_selection(selected)
+                })
+            })
             .or_else(|| readings.first())
             .map(|reading| reading.power_w)
     }
@@ -682,7 +753,11 @@ fn live_power_summary(
     input_power: Option<String>,
     temperature: Option<String>,
 ) -> cosmic::Element<'static, Message> {
-    let title = if is_net { "TOTAL POWER OUTPUT" } else { "CURRENT POWER" };
+    let title = if is_net {
+        "TOTAL POWER OUTPUT"
+    } else {
+        "CURRENT POWER"
+    };
     // Keep the heading on its own full-width row so the power and
     // temperature values share the same baseline beneath it.
     let heading = widget::Row::new()
@@ -741,20 +816,26 @@ fn total_power_overview(
     let total_graph: cosmic::Element<'static, Message> = widget::Column::new()
         .spacing(4)
         .push(widget::text::caption("TOTAL POWER OUTPUT (W)"))
-        .push(graph_visual(history.iter().map(|(_, value)| *value as f64), &settings.graph_style, "W"))
-        .push(widget::Row::new()
-            .width(cosmic::iced::Length::Fill)
-            .push(widget::text::caption(axis_start.clone()))
-            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-            .push(widget::text::caption("Now")))
+        .push(graph_visual(
+            history.iter().map(|(_, value)| *value as f64),
+            &settings.graph_style,
+            "W",
+        ))
+        .push(
+            widget::Row::new()
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::caption(axis_start.clone()))
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(widget::text::caption("Now")),
+        )
         .into();
 
     let mut input_graphs = widget::Column::new().spacing(8);
     let mut has_input_graph = false;
     for reading in readings.iter().filter(|reading| {
-        settings.input_ains.contains(
-            &crate::fritz::normalize_ain_for_selection(&reading.ain),
-        )
+        settings
+            .input_ains
+            .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
     }) {
         has_input_graph = true;
         let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
@@ -766,12 +847,22 @@ fn total_power_overview(
                     reading.name,
                     signed_device_power(reading.power_w, true),
                 )))
-                .push(graph_visual(device_history.get(&key).into_iter().flat_map(|samples| samples.iter().map(|(_, power, _)| signed_device_power(*power, true) as f64)), &settings.graph_style, "W"))
-                .push(widget::Row::new()
-                    .width(cosmic::iced::Length::Fill)
-                    .push(widget::text::caption(axis_start.clone()))
-                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                    .push(widget::text::caption("Now"))),
+                .push(graph_visual(
+                    device_history.get(&key).into_iter().flat_map(|samples| {
+                        samples
+                            .iter()
+                            .map(|(_, power, _)| signed_device_power(*power, true) as f64)
+                    }),
+                    &settings.graph_style,
+                    "W",
+                ))
+                .push(
+                    widget::Row::new()
+                        .width(cosmic::iced::Length::Fill)
+                        .push(widget::text::caption(axis_start.clone()))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(widget::text::caption("Now")),
+                ),
         );
     }
     if !has_input_graph {
@@ -779,9 +870,9 @@ fn total_power_overview(
     }
 
     let has_input_readings = readings.iter().any(|reading| {
-        settings.input_ains.contains(
-            &crate::fritz::normalize_ain_for_selection(&reading.ain),
-        )
+        settings
+            .input_ains
+            .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
     });
     let output_column = widget::Column::new()
         .spacing(8)
@@ -795,16 +886,22 @@ fn total_power_overview(
             widget::Row::new()
                 .spacing(8)
                 .width(cosmic::iced::Length::Fill)
-                .push(widget::container(range_metric_tile(
-                    "LOW",
-                    format!("{output_low} W"),
-                    "go-down-symbolic",
-                )).width(cosmic::iced::Length::Fill))
-                .push(widget::container(range_metric_tile(
-                    "HIGH",
-                    format!("{output_high} W"),
-                    "go-up-symbolic",
-                )).width(cosmic::iced::Length::Fill)),
+                .push(
+                    widget::container(range_metric_tile(
+                        "LOW",
+                        format!("{output_low} W"),
+                        "go-down-symbolic",
+                    ))
+                    .width(cosmic::iced::Length::Fill),
+                )
+                .push(
+                    widget::container(range_metric_tile(
+                        "HIGH",
+                        format!("{output_high} W"),
+                        "go-up-symbolic",
+                    ))
+                    .width(cosmic::iced::Length::Fill),
+                ),
         )
         .push(graph_panel(total_graph));
     let mut power_columns = widget::Column::new()
@@ -825,29 +922,30 @@ fn total_power_overview(
                 widget::Row::new()
                     .spacing(8)
                     .width(cosmic::iced::Length::Fill)
-                    .push(widget::container(range_metric_tile(
-                        "LOW",
-                        format!("{low} W"),
-                        "go-down-symbolic",
-                    )).width(cosmic::iced::Length::Fill))
-                    .push(widget::container(range_metric_tile(
-                        "HIGH",
-                        format!("{high} W"),
-                        "go-up-symbolic",
-                    )).width(cosmic::iced::Length::Fill)),
+                    .push(
+                        widget::container(range_metric_tile(
+                            "LOW",
+                            format!("{low} W"),
+                            "go-down-symbolic",
+                        ))
+                        .width(cosmic::iced::Length::Fill),
+                    )
+                    .push(
+                        widget::container(range_metric_tile(
+                            "HIGH",
+                            format!("{high} W"),
+                            "go-up-symbolic",
+                        ))
+                        .width(cosmic::iced::Length::Fill),
+                    ),
             );
         }
         input_column = input_column.push(graph_panel(input_graphs.into()));
         power_columns = power_columns.push(input_column);
-
-
     }
-    let content = widget::Column::new()
-        .spacing(10)
-        .push(power_columns);
+    let content = widget::Column::new().spacing(10).push(power_columns);
     Some(surface_card(content.into(), 14))
 }
-
 
 fn power_difference_overview(
     readings: &[FritzReading],
@@ -856,10 +954,14 @@ fn power_difference_overview(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
 ) -> Option<cosmic::Element<'static, Message>> {
     let input_history = rebuild_input_power_history(device_history, &settings.input_ains);
-    let has_input_readings = readings.iter().any(|reading| settings.input_ains.contains(
-        &crate::fritz::normalize_ain_for_selection(&reading.ain),
-    ));
-    if !has_input_readings { return None; }
+    let has_input_readings = readings.iter().any(|reading| {
+        settings
+            .input_ains
+            .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+    });
+    if !has_input_readings {
+        return None;
+    }
     let total_power = output_power_w(readings, &settings.input_ains);
     let input_power = input_power_w(readings, &settings.input_ains);
     // Input readings are signed negative values; adding them gives the net difference.
@@ -871,19 +973,37 @@ fn power_difference_overview(
         .push(metric_tile(
             "POWER DIFFERENCE",
             format!("{difference} W"),
-            if difference >= 0 { "go-up-symbolic" } else { "go-down-symbolic" },
+            if difference >= 0 {
+                "go-up-symbolic"
+            } else {
+                "go-down-symbolic"
+            },
         ));
     if let (Some(low), Some(high)) = (
         difference_history.iter().map(|(_, value)| *value).min(),
         difference_history.iter().map(|(_, value)| *value).max(),
     ) {
-        column = column.push(widget::Row::new()
-            .spacing(8)
-            .width(cosmic::iced::Length::Fill)
-            .push(widget::container(range_metric_tile("LOW", format!("{low} W"), "go-down-symbolic"))
-                .width(cosmic::iced::Length::Fill))
-            .push(widget::container(range_metric_tile("HIGH", format!("{high} W"), "go-up-symbolic"))
-                .width(cosmic::iced::Length::Fill)));
+        column = column.push(
+            widget::Row::new()
+                .spacing(8)
+                .width(cosmic::iced::Length::Fill)
+                .push(
+                    widget::container(range_metric_tile(
+                        "LOW",
+                        format!("{low} W"),
+                        "go-down-symbolic",
+                    ))
+                    .width(cosmic::iced::Length::Fill),
+                )
+                .push(
+                    widget::container(range_metric_tile(
+                        "HIGH",
+                        format!("{high} W"),
+                        "go-up-symbolic",
+                    ))
+                    .width(cosmic::iced::Length::Fill),
+                ),
+        );
     }
     let graph = widget::Column::new()
         .spacing(4)
@@ -893,21 +1013,30 @@ fn power_difference_overview(
             &settings.graph_style,
             "W",
         ))
-        .push(widget::Row::new()
-            .width(cosmic::iced::Length::Fill)
-            .push(widget::text::caption(format_graph_axis_start(settings.graph_timespan_minutes)))
-            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-            .push(widget::text::caption("Now")));
+        .push(
+            widget::Row::new()
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::caption(format_graph_axis_start(
+                    settings.graph_timespan_minutes,
+                )))
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(widget::text::caption("Now")),
+        );
     column = column.push(graph_panel(graph.into()));
     Some(surface_card(column.into(), 14))
 }
 
-
 fn settings_section_details(section: &'static str) -> (&'static str, &'static str) {
     match section {
         "panel" => ("Panel", "Appearance and live readings in the panel"),
-        "graph" => ("Graph history", "Choose how much power history is displayed"),
-        "refresh" => ("Automatic refresh", "Control how often device readings update"),
+        "graph" => (
+            "Graph history",
+            "Choose how much power history is displayed",
+        ),
+        "refresh" => (
+            "Automatic refresh",
+            "Control how often device readings update",
+        ),
         "weather" => ("Weather", "Show local weather alongside power readings"),
         "connection" => ("Connection", "FRITZ!Box address and security settings"),
         "device" => ("Devices", "Select, order and configure monitored devices"),
@@ -916,12 +1045,24 @@ fn settings_section_details(section: &'static str) -> (&'static str, &'static st
     }
 }
 
-fn settings_section_header<'a>(title: &'a str, section: &'static str) -> cosmic::Element<'a, Message> {
+fn settings_section_header<'a>(
+    title: &'a str,
+    section: &'static str,
+) -> cosmic::Element<'a, Message> {
     let (section_icon, description) = match section {
-        "panel" => ("preferences-desktop-display-symbolic", "Panel appearance and readings"),
-        "graph" => ("utilities-system-monitor-symbolic", "History shown in power graphs"),
+        "panel" => (
+            "preferences-desktop-display-symbolic",
+            "Panel appearance and readings",
+        ),
+        "graph" => (
+            "utilities-system-monitor-symbolic",
+            "History shown in power graphs",
+        ),
         "refresh" => ("view-refresh-symbolic", "How often readings are updated"),
-        "weather" => ("weather-clear-symbolic", "Current conditions and background"),
+        "weather" => (
+            "weather-clear-symbolic",
+            "Current conditions and background",
+        ),
         "connection" => ("network-server-symbolic", "FRITZ!Box access and security"),
         "device" => ("computer-symbolic", "Choose, order and configure devices"),
         "diagnostics" => ("dialog-information-symbolic", "Connection and save status"),
@@ -931,13 +1072,18 @@ fn settings_section_header<'a>(title: &'a str, section: &'static str) -> cosmic:
         widget::Row::new()
             .spacing(12)
             .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::container(widget::icon::from_name(section_icon).size(20))
-                .center_x(32).center_y(36))
-            .push(widget::Column::new()
-                .spacing(3)
-                .width(cosmic::iced::Length::Fill)
-                .push(widget::text::body(title))
-                .push(widget::text::caption(description)))
+            .push(
+                widget::container(widget::icon::from_name(section_icon).size(20))
+                    .center_x(32)
+                    .center_y(36),
+            )
+            .push(
+                widget::Column::new()
+                    .spacing(3)
+                    .width(cosmic::iced::Length::Fill)
+                    .push(widget::text::body(title))
+                    .push(widget::text::caption(description)),
+            )
             .push(widget::icon::from_name("go-next-symbolic").size(16)),
     )
     .on_press(Message::ToggleSettingsSection(section))
@@ -953,9 +1099,11 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
         .width(cosmic::iced::Length::Fill)
         .spacing(6)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::mouse_area(widget::text("⠿").size(20))
-            .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string()))
-            .on_release(Message::EndDeviceDrag))
+        .push(
+            widget::mouse_area(widget::text("⠿").size(20))
+                .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string()))
+                .on_release(Message::EndDeviceDrag),
+        )
         .push(widget::text::body("Total power output").width(cosmic::iced::Length::Fill))
         .push(widget::text::caption(format!("#{position}")));
     widget::mouse_area(
@@ -969,7 +1117,7 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
                     background: Some(device_background_color(base, 0).into()),
                     ..Default::default()
                 }
-            })
+            }),
     )
     .on_enter(Message::DragOverDevice(TOTAL_POWER_DRAG_ID.to_string()))
     .on_release(Message::EndDeviceDrag)
@@ -981,9 +1129,13 @@ fn power_difference_sort_row(position: usize) -> cosmic::Element<'static, Messag
         .width(cosmic::iced::Length::Fill)
         .spacing(6)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::mouse_area(widget::text("⠿").size(20))
-            .on_press(Message::StartDeviceDrag(POWER_DIFFERENCE_DRAG_ID.to_string()))
-            .on_release(Message::EndDeviceDrag))
+        .push(
+            widget::mouse_area(widget::text("⠿").size(20))
+                .on_press(Message::StartDeviceDrag(
+                    POWER_DIFFERENCE_DRAG_ID.to_string(),
+                ))
+                .on_release(Message::EndDeviceDrag),
+        )
         .push(widget::text::body("Power difference").width(cosmic::iced::Length::Fill))
         .push(widget::text::caption(format!("#{position}")));
     widget::mouse_area(
@@ -997,23 +1149,33 @@ fn power_difference_sort_row(position: usize) -> cosmic::Element<'static, Messag
                     background: Some(device_background_color(base, 0).into()),
                     ..Default::default()
                 }
-            })
+            }),
     )
-    .on_enter(Message::DragOverDevice(POWER_DIFFERENCE_DRAG_ID.to_string()))
+    .on_enter(Message::DragOverDevice(
+        POWER_DIFFERENCE_DRAG_ID.to_string(),
+    ))
     .on_release(Message::EndDeviceDrag)
     .into()
 }
 
 #[cfg(test)]
-fn move_selected_device_to_drop_target(ains: &mut Vec<String>, dragged_ain: &str, target_ain: &str) {
+fn move_selected_device_to_drop_target(
+    ains: &mut Vec<String>,
+    dragged_ain: &str,
+    target_ain: &str,
+) {
     let dragged = crate::fritz::normalize_ain_for_selection(dragged_ain);
     let target = crate::fritz::normalize_ain_for_selection(target_ain);
-    let Some(from) = ains.iter().position(|ain|
-        crate::fritz::normalize_ain_for_selection(ain) == dragged) else {
+    let Some(from) = ains
+        .iter()
+        .position(|ain| crate::fritz::normalize_ain_for_selection(ain) == dragged)
+    else {
         return;
     };
-    let Some(target_index) = ains.iter().position(|ain|
-        crate::fritz::normalize_ain_for_selection(ain) == target) else {
+    let Some(target_index) = ains
+        .iter()
+        .position(|ain| crate::fritz::normalize_ain_for_selection(ain) == target)
+    else {
         return;
     };
     if from == target_index {
@@ -1033,7 +1195,9 @@ fn icon_action_button<'a>(
 ) -> widget::Button<'a, Message> {
     // Keep the refresh symbol consistent and rotate its arrow while loading.
     let glyph = glyph.into();
-    let icon: cosmic::Element<'a, Message> = if let Some(angle) = glyph.strip_prefix("refresh-rotating-") {
+    let icon: cosmic::Element<'a, Message> = if let Some(angle) =
+        glyph.strip_prefix("refresh-rotating-")
+    {
         let svg = format!(
             r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g transform="rotate({angle} 12 12)" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.6 9a7 7 0 0 1 11.55-2.6L20 12M4 12l2.85 5.6A7 7 0 0 0 18.4 15"/></g></svg>"#
         );
@@ -1057,14 +1221,13 @@ fn icon_action_button<'a>(
             .into()
     };
     widget::button::custom(icon)
-    .on_press(message)
-    .padding(0)
-    .width(cosmic::iced::Length::Fixed(36.0))
-    .height(cosmic::iced::Length::Fixed(36.0))
-    .class(cosmic::theme::Button::Icon)
-    .name(accessible_name)
+        .on_press(message)
+        .padding(0)
+        .width(cosmic::iced::Length::Fixed(36.0))
+        .height(cosmic::iced::Length::Fixed(36.0))
+        .class(cosmic::theme::Button::Icon)
+        .name(accessible_name)
 }
-
 
 fn countdown_action_button(seconds: u64) -> widget::Button<'static, Message> {
     widget::button::custom(
@@ -1084,13 +1247,16 @@ fn error_notice<'a>(title: &'static str, message: &'a str) -> cosmic::Element<'a
     widget::container(
         widget::Column::new()
             .spacing(5)
-            .push(widget::Row::new()
-                .spacing(8)
-                .align_y(cosmic::iced::Alignment::Center)
-                .push(widget::icon::from_name("dialog-warning-symbolic").size(18))
-                .push(widget::text::body(title)))
-            .push(widget::selectable_text::selectable_text(message)
-                .width(cosmic::iced::Length::Fill))
+            .push(
+                widget::Row::new()
+                    .spacing(8)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::icon::from_name("dialog-warning-symbolic").size(18))
+                    .push(widget::text::body(title)),
+            )
+            .push(
+                widget::selectable_text::selectable_text(message).width(cosmic::iced::Length::Fill),
+            ),
     )
     .width(cosmic::iced::Length::Fill)
     .padding(12)
@@ -1102,7 +1268,8 @@ fn error_notice<'a>(title: &'static str, message: &'a str) -> cosmic::Element<'a
     .into()
 }
 
-fn is_error_status(status: &str) -> bool {    status.starts_with("Could not save settings:")
+fn is_error_status(status: &str) -> bool {
+    status.starts_with("Could not save settings:")
         || status.starts_with("Weather unavailable:")
         || status.starts_with("Connection failed:")
 }
@@ -1179,15 +1346,29 @@ impl cosmic::Application for AppModel {
     type Message = Message;
     const APP_ID: &'static str = "com.gpkvt.FritzPowerMonitor";
 
-    fn core(&self) -> &cosmic::Core { &self.core }
+    fn core(&self) -> &cosmic::Core {
+        &self.core
+    }
 
-    fn core_mut(&mut self) -> &mut cosmic::Core { &mut self.core }
+    fn core_mut(&mut self) -> &mut cosmic::Core {
+        &mut self.core
+    }
 
-    fn init(core: cosmic::Core, _flags: Self::Flags) -> (Self, Task<cosmic::Action<Self::Message>>) {
+    fn init(
+        core: cosmic::Core,
+        _flags: Self::Flags,
+    ) -> (Self, Task<cosmic::Action<Self::Message>>) {
         let settings = FritzSettings::load().unwrap_or_default();
         (
-            Self { core, settings, refresh_started_at: Some(Instant::now()), ..Default::default() },
-            Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result))),
+            Self {
+                core,
+                settings,
+                refresh_started_at: Some(Instant::now()),
+                ..Default::default()
+            },
+            Task::perform(fetch_fritz_data(), |result| {
+                cosmic::Action::App(Message::Updated(result))
+            }),
         )
     }
 
@@ -1208,35 +1389,58 @@ impl cosmic::Application for AppModel {
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
-        let primary_reading = self.selected_ains.first()
-            .and_then(|selected| self.readings.iter().find(|reading|
-                crate::fritz::normalize_ain_for_selection(&reading.ain)
-                    == crate::fritz::normalize_ain_for_selection(selected)))
+        let primary_reading = self
+            .selected_ains
+            .first()
+            .and_then(|selected| {
+                self.readings.iter().find(|reading| {
+                    crate::fritz::normalize_ain_for_selection(&reading.ain)
+                        == crate::fritz::normalize_ain_for_selection(selected)
+                })
+            })
             .or_else(|| self.readings.first());
         let power = if self.settings.total_power_first {
             if self.readings.is_empty() {
                 "-- W".to_string()
             } else {
-                format!("{} W", output_power_w(&self.readings, &self.settings.input_ains))
+                format!(
+                    "{} W",
+                    output_power_w(&self.readings, &self.settings.input_ains)
+                )
             }
         } else {
-            primary_reading.map(|reading| format!("{} W", reading.power_w))
+            primary_reading
+                .map(|reading| format!("{} W", reading.power_w))
                 .unwrap_or_else(|| "-- W".to_string())
         };
         let temperature = if self.settings.panel_average_temperature {
-            Some(average_temperature_c(&self.readings, self.settings.panel_exclude_solar_temperature)
+            Some(
+                average_temperature_c(
+                    &self.readings,
+                    self.settings.panel_exclude_solar_temperature,
+                )
                 .map(|value| format!("{value:.1} °C"))
-                .unwrap_or_else(|| "-- °C".to_string()))
+                .unwrap_or_else(|| "-- °C".to_string()),
+            )
         } else if self.settings.total_power_first {
             None
         } else {
-            Some(primary_reading.map(|reading| format!("{:.1} °C", reading.temperature_c))
-                .unwrap_or_else(|| "-- °C".to_string()))
+            Some(
+                primary_reading
+                    .map(|reading| format!("{:.1} °C", reading.temperature_c))
+                    .unwrap_or_else(|| "-- °C".to_string()),
+            )
         };
-        let input_power = if self.settings.total_power_first && self.readings.iter().any(|reading|
-            self.settings.input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
-        ) {
-            Some(format!("{} W", input_power_w(&self.readings, &self.settings.input_ains)))
+        let input_power = if self.settings.total_power_first
+            && self.readings.iter().any(|reading| {
+                self.settings
+                    .input_ains
+                    .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+            }) {
+            Some(format!(
+                "{} W",
+                input_power_w(&self.readings, &self.settings.input_ains)
+            ))
         } else {
             None
         };
@@ -1252,15 +1456,21 @@ impl cosmic::Application for AppModel {
             .push(
                 widget::container({
                     let solar_icon = widget::icon::from_name(
-                        self.weather.as_ref().map(|weather| weather.icon_name()).unwrap_or("weather-clear-symbolic"),
-                    ).size(suggested.1.saturating_sub(2));
+                        self.weather
+                            .as_ref()
+                            .map(|weather| weather.icon_name())
+                            .unwrap_or("weather-clear-symbolic"),
+                    )
+                    .size(suggested.1.saturating_sub(2));
                     cosmic::iced::widget::Stack::new().push(solar_icon)
                 })
                 .padding(3)
                 .style(|theme| {
                     let cosmic = theme.cosmic();
                     cosmic::iced::widget::container::Style {
-                        background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                        background: Some(
+                            cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
+                        ),
                         border: cosmic::iced::Border {
                             radius: 8.0.into(),
                             ..Default::default()
@@ -1272,9 +1482,16 @@ impl cosmic::Application for AppModel {
         let content = if self.settings.weather_enabled {
             if let Some(weather) = &self.weather {
                 content
-                    .push(widget::icon::from_name("thermometer-symbolic").size(self.settings.panel_text_size.into()))
-                    .push(self.core.applet.text(format!("{:.0}°", weather.temperature_c))
-                        .size(f32::from(self.settings.panel_text_size)))
+                    .push(
+                        widget::icon::from_name("thermometer-symbolic")
+                            .size(self.settings.panel_text_size.into()),
+                    )
+                    .push(
+                        self.core
+                            .applet
+                            .text(format!("{:.0}°", weather.temperature_c))
+                            .size(f32::from(self.settings.panel_text_size)),
+                    )
             } else {
                 content
             }
@@ -1283,24 +1500,36 @@ impl cosmic::Application for AppModel {
         };
         let content = if self.error.is_none() {
             content
-                .push(widget::icon::from_name("electricity-symbolic").size(self.settings.panel_text_size.into()))
-                .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)))
+                .push(
+                    widget::icon::from_name("electricity-symbolic")
+                        .size(self.settings.panel_text_size.into()),
+                )
+                .push(
+                    self.core
+                        .applet
+                        .text(power)
+                        .size(f32::from(self.settings.panel_text_size)),
+                )
         } else {
             content
         };
         let content = if self.error.is_none() {
             if let Some(input_power) = input_power {
-            let icon_size = f32::from(self.settings.panel_text_size.clamp(12, 20));
-            let solar_panel = cosmic::iced::widget::svg(
-                cosmic::iced::widget::svg::Handle::from_memory(
-                    include_bytes!("../data/solar-panel.svg").to_vec(),
-                ),
-            )
-            .width(icon_size)
-            .height(icon_size);
+                let icon_size = f32::from(self.settings.panel_text_size.clamp(12, 20));
+                let solar_panel =
+                    cosmic::iced::widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
+                        include_bytes!("../data/solar-panel.svg").to_vec(),
+                    ))
+                    .width(icon_size)
+                    .height(icon_size);
                 content
                     .push(widget::container(solar_panel).padding([0, 0, 0, 4]))
-                    .push(self.core.applet.text(input_power).size(f32::from(self.settings.panel_text_size)))
+                    .push(
+                        self.core
+                            .applet
+                            .text(input_power)
+                            .size(f32::from(self.settings.panel_text_size)),
+                    )
             } else {
                 content
             }
@@ -1310,8 +1539,16 @@ impl cosmic::Application for AppModel {
         let content = if self.error.is_none() {
             if let Some(temperature) = temperature {
                 content
-                    .push(widget::icon::from_name("thermometer-symbolic").size(self.settings.panel_text_size.into()))
-                    .push(self.core.applet.text(temperature).size(f32::from(self.settings.panel_text_size)))
+                    .push(
+                        widget::icon::from_name("thermometer-symbolic")
+                            .size(self.settings.panel_text_size.into()),
+                    )
+                    .push(
+                        self.core
+                            .applet
+                            .text(temperature)
+                            .size(f32::from(self.settings.panel_text_size)),
+                    )
             } else {
                 content
             }
@@ -1322,21 +1559,34 @@ impl cosmic::Application for AppModel {
         // detailed error remains available in the applet menu.
         let content = if self.error.is_some() {
             content
-                .push(widget::icon::from_name("dialog-warning-symbolic")
-                    .size(self.settings.panel_text_size.into()))
-                .push(widget::container(
-                    self.core.applet.text("Connection error")
-                        .size(f32::from(self.settings.panel_text_size)),
-                ).padding([0, 0, 0, 4]))
+                .push(
+                    widget::icon::from_name("dialog-warning-symbolic")
+                        .size(self.settings.panel_text_size.into()),
+                )
+                .push(
+                    widget::container(
+                        self.core
+                            .applet
+                            .text("Connection error")
+                            .size(f32::from(self.settings.panel_text_size)),
+                    )
+                    .padding([0, 0, 0, 4]),
+                )
         } else {
             content
         };
         let content = if self.weather_error.is_some() {
             content
-                .push(widget::icon::from_name("weather-severe-alert-symbolic")
-                    .size(self.settings.panel_text_size.into()))
-                .push(self.core.applet.text("Weather unavailable")
-                    .size(f32::from(self.settings.panel_text_size)))
+                .push(
+                    widget::icon::from_name("weather-severe-alert-symbolic")
+                        .size(self.settings.panel_text_size.into()),
+                )
+                .push(
+                    self.core
+                        .applet
+                        .text("Weather unavailable")
+                        .size(f32::from(self.settings.panel_text_size)),
+                )
         } else {
             content
         };
@@ -1346,9 +1596,9 @@ impl cosmic::Application for AppModel {
         let button = widget::button::custom(content)
             .on_press(Message::TogglePopup)
             .padding([vertical_padding, horizontal_padding])
-            .height(cosmic::iced::Length::Fixed(
-                f32::from((suggested.1 + 2 * vertical_padding).max(40)),
-            ))
+            .height(cosmic::iced::Length::Fixed(f32::from(
+                (suggested.1 + 2 * vertical_padding).max(40),
+            )))
             .class(cosmic::theme::Button::AppletIcon);
 
         let refresh_button = widget::button::custom(
@@ -1359,9 +1609,9 @@ impl cosmic::Application for AppModel {
         .on_press(Message::Refresh)
         .padding(0)
         .width(cosmic::iced::Length::Fixed(32.0))
-        .height(cosmic::iced::Length::Fixed(
-            f32::from((suggested.1 + 2 * vertical_padding).max(40)),
-        ))
+        .height(cosmic::iced::Length::Fixed(f32::from(
+            (suggested.1 + 2 * vertical_padding).max(40),
+        )))
         .class(cosmic::theme::Button::AppletIcon)
         .name("Refresh now");
 
@@ -1436,7 +1686,15 @@ impl cosmic::Application for AppModel {
                     .push(settings_heading)
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::caption("GENERAL"));
-                for (title, section) in [("Panel", "panel"), ("Graph history", "graph"), ("Automatic refresh", "refresh"), ("Weather", "weather"), ("Connection", "connection"), ("Devices", "device"), ("Diagnostics", "diagnostics")] {
+                for (title, section) in [
+                    ("Panel", "panel"),
+                    ("Graph history", "graph"),
+                    ("Automatic refresh", "refresh"),
+                    ("Weather", "weather"),
+                    ("Connection", "connection"),
+                    ("Devices", "device"),
+                    ("Diagnostics", "diagnostics"),
+                ] {
                     content = content.push(settings_section_header(title, section));
                 }
             }
@@ -1500,22 +1758,48 @@ impl cosmic::Application for AppModel {
             if self.active_settings_section == Some("graph") {
                 content = content
                     .push(widget::text::caption("GRAPH STYLE"))
-                    .push(widget::Row::new().spacing(8)
-                        .push(widget::button::text(if self.settings.graph_style == "line" { "✓ Line" } else { "Line" })
-                            .on_press(Message::GraphStyleChanged("line".into())))
-                        .push(widget::button::text(if self.settings.graph_style == "bar" { "✓ Bar" } else { "Bar" })
-                            .on_press(Message::GraphStyleChanged("bar".into()))))
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .push(
+                                widget::button::text(if self.settings.graph_style == "line" {
+                                    "✓ Line"
+                                } else {
+                                    "Line"
+                                })
+                                .on_press(Message::GraphStyleChanged("line".into())),
+                            )
+                            .push(
+                                widget::button::text(if self.settings.graph_style == "bar" {
+                                    "✓ Bar"
+                                } else {
+                                    "Bar"
+                                })
+                                .on_press(Message::GraphStyleChanged("bar".into())),
+                            ),
+                    )
                     .push(widget::divider::horizontal::default())
-                    .push(widget::text::caption(format!("GRAPH HISTORY: {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
-                    .push(widget::slider(5.0..=1440.0, f32::from(self.settings.graph_timespan_minutes),
-                        |value| Message::GraphTimespanChanged(value.round() as u16)).step(5.0))
-                    .push(widget::text::caption("5 minutes to 24 hours; samples are collected once per refresh"))
+                    .push(widget::text::caption(format!(
+                        "GRAPH HISTORY: {}",
+                        format_graph_timespan(self.settings.graph_timespan_minutes)
+                    )))
+                    .push(
+                        widget::slider(
+                            5.0..=1440.0,
+                            f32::from(self.settings.graph_timespan_minutes),
+                            |value| Message::GraphTimespanChanged(value.round() as u16),
+                        )
+                        .step(5.0),
+                    )
+                    .push(widget::text::caption(
+                        "5 minutes to 24 hours; samples are collected once per refresh",
+                    ))
                     .push(widget::divider::horizontal::default())
             }
 
             if self.active_settings_section == Some("refresh") {
-    content = content
-        .push(widget::text::caption(format!(
+                content = content
+                    .push(widget::text::caption(format!(
                         "AUTOMATIC REFRESH: {}",
                         format_countdown(u64::from(self.settings.refresh_interval_seconds))
                     )))
@@ -1568,12 +1852,19 @@ impl cosmic::Application for AppModel {
                         widget::secure_input("Password", &self.settings.password, None, true)
                             .on_input(Message::PasswordChanged),
                     )
-                    .push(widget::text::body("Trusted CA certificate (PEM file, optional)"))
+                    .push(widget::text::body(
+                        "Trusted CA certificate (PEM file, optional)",
+                    ))
                     .push(
-                        widget::text_input("/home/user/.config/fritzbox-ca.pem", &self.settings.ca_cert_path)
-                            .on_input(Message::CaCertPathChanged),
+                        widget::text_input(
+                            "/home/user/.config/fritzbox-ca.pem",
+                            &self.settings.ca_cert_path,
+                        )
+                        .on_input(Message::CaCertPathChanged),
                     )
-                    .push(widget::text::caption("Leave empty to use the system certificate store"))
+                    .push(widget::text::caption(
+                        "Leave empty to use the system certificate store",
+                    ))
                     .push(
                         widget::Row::new()
                             .width(cosmic::iced::Length::Fill)
@@ -1591,45 +1882,80 @@ impl cosmic::Application for AppModel {
             }
 
             if self.active_settings_section == Some("device") {
-                content = content
-                    .push(action_button("view-refresh-symbolic", "Load devices", Message::DiscoverDevices));
-    
+                content = content.push(action_button(
+                    "view-refresh-symbolic",
+                    "Load devices",
+                    Message::DiscoverDevices,
+                ));
+
                 if !self.devices.is_empty() {
                     content = content
                         .push(widget::text::body("Select and order power-meter devices"))
-                        .push(widget::text_input("Search devices by name or AIN", &self.device_search)
-                            .on_input(Message::DeviceSearchChanged));
+                        .push(
+                            widget::text_input(
+                                "Search devices by name or AIN",
+                                &self.device_search,
+                            )
+                            .on_input(Message::DeviceSearchChanged),
+                        );
                     let mut inserted_specials = HashSet::new();
-                    let mut ordered_devices: Vec<&FritzDevice> = self.selected_ains.iter()
-                        .filter_map(|ain| self.devices.iter().find(|device|
-                            crate::fritz::normalize_ain_for_selection(&device.ain)
-                                == crate::fritz::normalize_ain_for_selection(ain)))
+                    let mut ordered_devices: Vec<&FritzDevice> = self
+                        .selected_ains
+                        .iter()
+                        .filter_map(|ain| {
+                            self.devices.iter().find(|device| {
+                                crate::fritz::normalize_ain_for_selection(&device.ain)
+                                    == crate::fritz::normalize_ain_for_selection(ain)
+                            })
+                        })
                         .collect();
-                    ordered_devices.extend(self.devices.iter().filter(|device|
-                        !self.selected_ains.iter().any(|ain|
+                    ordered_devices.extend(self.devices.iter().filter(|device| {
+                        !self.selected_ains.iter().any(|ain| {
                             crate::fritz::normalize_ain_for_selection(ain)
-                                == crate::fritz::normalize_ain_for_selection(&device.ain))));
-                    ordered_devices.retain(|device| device_matches_search(device, &self.device_search));
+                                == crate::fritz::normalize_ain_for_selection(&device.ain)
+                        })
+                    }));
+                    ordered_devices
+                        .retain(|device| device_matches_search(device, &self.device_search));
                     if ordered_devices.is_empty() {
-                        content = content.push(widget::text::caption("No devices match your search"));
+                        content =
+                            content.push(widget::text::caption("No devices match your search"));
                     }
                     for (row_index, device) in ordered_devices.iter().enumerate() {
-                        let selected_index = self.selected_ains.iter().position(|ain|
+                        let selected_index = self.selected_ains.iter().position(|ain| {
                             crate::fritz::normalize_ain_for_selection(ain)
-                                == crate::fritz::normalize_ain_for_selection(&device.ain));
+                                == crate::fritz::normalize_ain_for_selection(&device.ain)
+                        });
                         if let Some(_) = selected_index {
                             let device_key = crate::fritz::normalize_ain_for_selection(&device.ain);
-                            let device_position = self.settings.menu_order.iter()
-                                .position(|entry| entry == &device_key).unwrap_or(usize::MAX);
-                            let total_position = self.settings.menu_order.iter()
-                                .position(|entry| entry == TOTAL_POWER_DRAG_ID).unwrap_or(usize::MAX);
-                            let difference_position = self.settings.menu_order.iter()
-                                .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID).unwrap_or(usize::MAX);
-                            if total_position <= device_position && inserted_specials.insert(TOTAL_POWER_DRAG_ID) {
+                            let device_position = self
+                                .settings
+                                .menu_order
+                                .iter()
+                                .position(|entry| entry == &device_key)
+                                .unwrap_or(usize::MAX);
+                            let total_position = self
+                                .settings
+                                .menu_order
+                                .iter()
+                                .position(|entry| entry == TOTAL_POWER_DRAG_ID)
+                                .unwrap_or(usize::MAX);
+                            let difference_position = self
+                                .settings
+                                .menu_order
+                                .iter()
+                                .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID)
+                                .unwrap_or(usize::MAX);
+                            if total_position <= device_position
+                                && inserted_specials.insert(TOTAL_POWER_DRAG_ID)
+                            {
                                 content = content.push(total_power_sort_row(total_position + 1));
                             }
-                            if difference_position <= device_position && inserted_specials.insert(POWER_DIFFERENCE_DRAG_ID) {
-                                content = content.push(power_difference_sort_row(difference_position + 1));
+                            if difference_position <= device_position
+                                && inserted_specials.insert(POWER_DIFFERENCE_DRAG_ID)
+                            {
+                                content = content
+                                    .push(power_difference_sort_row(difference_position + 1));
                             }
                         }
                         let selected = selected_index.is_some();
@@ -1644,104 +1970,151 @@ impl cosmic::Application for AppModel {
                                     .on_release(Message::EndDeviceDrag),
                             );
                         }
-                        row = row.push(widget::checkbox(selected)
+                        row = row.push(
+                            widget::checkbox(selected)
                                 .label(device.name.clone())
                                 .on_toggle({
                                     let ain = ain.clone();
                                     move |checked| Message::ToggleDevice(ain.clone(), checked)
-                                }));
+                                }),
+                        );
                         if selected_index.is_some() {
-                            let position = self.settings.menu_order.iter()
-                                .position(|entry| entry == &crate::fritz::normalize_ain_for_selection(&ain))
+                            let position = self
+                                .settings
+                                .menu_order
+                                .iter()
+                                .position(|entry| {
+                                    entry == &crate::fritz::normalize_ain_for_selection(&ain)
+                                })
                                 .unwrap_or_else(|| selected_index.unwrap_or_default());
                             row = row.push(widget::text::caption(format!("#{}", position + 1)));
                         }
                         let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
-                        let alert_thresholds = self.settings.temperature_alerts.get(&normalized_ain).copied();
+                        let alert_thresholds = self
+                            .settings
+                            .temperature_alerts
+                            .get(&normalized_ain)
+                            .copied();
                         let is_input = self.settings.input_ains.contains(&normalized_ain);
                         let mut device_row = widget::Column::new()
                             .spacing(6)
                             .push(row)
-                            .push(widget::Row::new()
-                                .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::text::caption("Input device (separate total)"))
-                                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                .push(widget::toggler(is_input)
-                                    .on_toggle({
+                            .push(
+                                widget::Row::new()
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(widget::text::caption("Input device (separate total)"))
+                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                    .push(widget::toggler(is_input).on_toggle({
                                         let ain = ain.clone();
-                                        move |enabled| Message::ToggleDeviceInput(ain.clone(), enabled)
-                                    })))
-                            .push(widget::Row::new()
-                                .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::text::caption("Temperature alerts"))
-                                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                .push(widget::toggler(alert_thresholds.is_some())
-                                    .on_toggle({
+                                        move |enabled| {
+                                            Message::ToggleDeviceInput(ain.clone(), enabled)
+                                        }
+                                    })),
+                            )
+                            .push(
+                                widget::Row::new()
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(widget::text::caption("Temperature alerts"))
+                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                    .push(widget::toggler(alert_thresholds.is_some()).on_toggle({
                                         let ain = ain.clone();
-                                        move |enabled| Message::ToggleTemperatureAlert(ain.clone(), enabled)
-                                    })));
+                                        move |enabled| {
+                                            Message::ToggleTemperatureAlert(ain.clone(), enabled)
+                                        }
+                                    })),
+                            );
                         if let Some(thresholds) = alert_thresholds {
                             device_row = device_row
-                                .push(widget::text::caption(format!("Upper limit: {} °C", thresholds.high_c)))
-                                .push(widget::slider(
-                                    0.0..=40.0,
-                                    f32::from(thresholds.high_c),
-                                    {
+                                .push(widget::text::caption(format!(
+                                    "Upper limit: {} °C",
+                                    thresholds.high_c
+                                )))
+                                .push(
+                                    widget::slider(0.0..=40.0, f32::from(thresholds.high_c), {
                                         let ain = ain.clone();
-                                        move |value| Message::TemperatureAlertHighChanged(ain.clone(), value.round() as i16)
-                                    },
-                                ).step(1.0))
-                                .push(widget::text::caption(format!("Lower limit: {} °C", thresholds.low_c)))
-                                .push(widget::slider(
-                                    -10.0..=0.0,
-                                    f32::from(thresholds.low_c),
-                                    {
+                                        move |value| {
+                                            Message::TemperatureAlertHighChanged(
+                                                ain.clone(),
+                                                value.round() as i16,
+                                            )
+                                        }
+                                    })
+                                    .step(1.0),
+                                )
+                                .push(widget::text::caption(format!(
+                                    "Lower limit: {} °C",
+                                    thresholds.low_c
+                                )))
+                                .push(
+                                    widget::slider(-10.0..=0.0, f32::from(thresholds.low_c), {
                                         let ain = ain.clone();
-                                        move |value| Message::TemperatureAlertLowChanged(ain.clone(), value.round() as i16)
-                                    },
-                                ).step(1.0))
-                                .push(widget::text::caption("Notify above the upper limit or below the lower limit"));
+                                        move |value| {
+                                            Message::TemperatureAlertLowChanged(
+                                                ain.clone(),
+                                                value.round() as i16,
+                                            )
+                                        }
+                                    })
+                                    .step(1.0),
+                                )
+                                .push(widget::text::caption(
+                                    "Notify above the upper limit or below the lower limit",
+                                ));
                         }
-                        content = content.push(widget::mouse_area(
-                            widget::container(device_row)
-                            .padding(8)
-                            .style(move |theme| {
-                                let cosmic = theme.cosmic();
-                                let base = cosmic::iced::Color::from(cosmic.background(false).base);
-                                cosmic::iced::widget::container::Style {
-                                    background: Some(device_background_color(base, row_index).into()),
-                                    ..Default::default()
-                                }
-                            })
-                        ).on_enter(Message::DragOverDevice(ain.clone()))
-                            .on_release(Message::EndDeviceDrag));
+                        content = content.push(
+                            widget::mouse_area(widget::container(device_row).padding(8).style(
+                                move |theme| {
+                                    let cosmic = theme.cosmic();
+                                    let base =
+                                        cosmic::iced::Color::from(cosmic.background(false).base);
+                                    cosmic::iced::widget::container::Style {
+                                        background: Some(
+                                            device_background_color(base, row_index).into(),
+                                        ),
+                                        ..Default::default()
+                                    }
+                                },
+                            ))
+                            .on_enter(Message::DragOverDevice(ain.clone()))
+                            .on_release(Message::EndDeviceDrag),
+                        );
                         if self.dragging_device_ain.is_some()
-                            && self.drag_target_ain.as_deref().is_some_and(|target|
+                            && self.drag_target_ain.as_deref().is_some_and(|target| {
                                 crate::fritz::normalize_ain_for_selection(target)
-                                    == crate::fritz::normalize_ain_for_selection(&ain))
+                                    == crate::fritz::normalize_ain_for_selection(&ain)
+                            })
                         {
-                            let progress = self.drag_target_since
-                                .map(|started| (started.elapsed().as_secs_f32() / 0.18).clamp(0.0, 1.0))
+                            let progress = self
+                                .drag_target_since
+                                .map(|started| {
+                                    (started.elapsed().as_secs_f32() / 0.18).clamp(0.0, 1.0)
+                                })
                                 .unwrap_or(1.0);
                             let gap_height = 18.0 * progress;
                             content = content.push(
-                                widget::container(
-                                    widget::text("Drop here").size(11)
-                                )
-                                .height(cosmic::iced::Length::Fixed(gap_height))
-                                .width(cosmic::iced::Length::Fill)
-                                .padding([0, 8])
+                                widget::container(widget::text("Drop here").size(11))
+                                    .height(cosmic::iced::Length::Fixed(gap_height))
+                                    .width(cosmic::iced::Length::Fill)
+                                    .padding([0, 8]),
                             );
                         }
                     }
                     if inserted_specials.insert(TOTAL_POWER_DRAG_ID) {
-                        let position = self.settings.menu_order.iter()
-                            .position(|entry| entry == TOTAL_POWER_DRAG_ID).unwrap_or(self.selected_ains.len());
+                        let position = self
+                            .settings
+                            .menu_order
+                            .iter()
+                            .position(|entry| entry == TOTAL_POWER_DRAG_ID)
+                            .unwrap_or(self.selected_ains.len());
                         content = content.push(total_power_sort_row(position + 1));
                     }
                     if inserted_specials.insert(POWER_DIFFERENCE_DRAG_ID) {
-                        let position = self.settings.menu_order.iter()
-                            .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID).unwrap_or(self.selected_ains.len() + 1);
+                        let position = self
+                            .settings
+                            .menu_order
+                            .iter()
+                            .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID)
+                            .unwrap_or(self.selected_ains.len() + 1);
                         content = content.push(power_difference_sort_row(position + 1));
                     }
                     content = content.push(widget::text::caption("Drag the ⠿ handles to reorder devices, Total power output with Total power input grouped alongside it, and Power difference. The order is saved automatically."));
@@ -1769,42 +2142,63 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption("DIAGNOSTICS"))
                     .push(widget::text::title3("HTTPS / TLS"))
                     .push(widget::text::body(tls_status))
-                    .push(widget::text::caption(format!("Endpoint: {}", if endpoint.is_empty() { "Not configured" } else { endpoint })));
+                    .push(widget::text::caption(format!(
+                        "Endpoint: {}",
+                        if endpoint.is_empty() {
+                            "Not configured"
+                        } else {
+                            endpoint
+                        }
+                    )));
                 let requests = crate::fritz::http_request_diagnostics();
                 let request_countdown = if self.refresh_started_at.is_some() {
                     "Request in progress…".to_string()
                 } else {
                     self.next_refresh_at
-                        .map(|deadline| format!(
-                            "Next request in {}",
-                            format_countdown(deadline.saturating_duration_since(Instant::now()).as_secs())
-                        ))
+                        .map(|deadline| {
+                            format!(
+                                "Next request in {}",
+                                format_countdown(
+                                    deadline.saturating_duration_since(Instant::now()).as_secs()
+                                )
+                            )
+                        })
                         .unwrap_or_else(|| "Waiting for next request".to_string())
                 };
                 let refresh_indicator = if self.refresh_started_at.is_some() {
                     icon_action_button(
-                        self.refresh_started_at.map(refresh_spinner_frame).unwrap_or_else(|| "◴".to_string()),
+                        self.refresh_started_at
+                            .map(refresh_spinner_frame)
+                            .unwrap_or_else(|| "◴".to_string()),
                         "Request in progress",
                         Message::Refresh,
                     )
-                } else if let Some(remaining) = self.next_refresh_at.map(|deadline|
-                    deadline.saturating_duration_since(Instant::now())
-                ).filter(|remaining| !remaining.is_zero() && *remaining < Duration::from_secs(10)) {
+                } else if let Some(remaining) = self
+                    .next_refresh_at
+                    .map(|deadline| deadline.saturating_duration_since(Instant::now()))
+                    .filter(|remaining| {
+                        !remaining.is_zero() && *remaining < Duration::from_secs(10)
+                    })
+                {
                     countdown_action_button(remaining.as_secs().saturating_add(1))
                 } else {
                     icon_action_button("view-refresh-symbolic", "Reload now", Message::Refresh)
                 };
-                content = content.push(
-                    widget::Row::new()
-                        .spacing(8)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::title3(format!("HTTP requests ({})", requests.len()))
-                            .width(cosmic::iced::Length::Fill))
-                        .push(widget::text::caption(request_countdown))
-                        .push(refresh_indicator)
-                ).push(widget::text::caption(
-                    "Most recent responses · query parameters and session IDs are omitted"
-                ));
+                content = content
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::text::title3(format!("HTTP requests ({})", requests.len()))
+                                    .width(cosmic::iced::Length::Fill),
+                            )
+                            .push(widget::text::caption(request_countdown))
+                            .push(refresh_indicator),
+                    )
+                    .push(widget::text::caption(
+                        "Most recent responses · query parameters and session IDs are omitted",
+                    ));
                 if requests.is_empty() {
                     content = content.push(widget::text::caption("No HTTP responses recorded yet"));
                 } else {
@@ -1821,22 +2215,25 @@ impl cosmic::Application for AppModel {
                             widget::container(
                                 widget::text(log_line)
                                     .font(cosmic::iced::Font::MONOSPACE)
-                                    .size(12)
+                                    .size(12),
                             )
                             .width(cosmic::iced::Length::Fill)
                             .padding([5, 8])
-                            .style(|_| cosmic::iced::widget::container::Style {
-                                background: Some(cosmic::iced::Color::from_rgb(0.10, 0.11, 0.12).into()),
-                                border: cosmic::iced::Border {
-                                    radius: 3.0.into(),
+                            .style(|_| {
+                                cosmic::iced::widget::container::Style {
+                                    background: Some(
+                                        cosmic::iced::Color::from_rgb(0.10, 0.11, 0.12).into(),
+                                    ),
+                                    border: cosmic::iced::Border {
+                                        radius: 3.0.into(),
+                                        ..Default::default()
+                                    },
                                     ..Default::default()
-                                },
-                                ..Default::default()
-                            })
+                                }
+                            }),
                         );
                     }
                 }
-
 
                 if let Some(error) = &self.weather_error {
                     content = content.push(error_notice("WEATHER UNAVAILABLE", error));
@@ -1850,7 +2247,10 @@ impl cosmic::Application for AppModel {
                         } else {
                             "CONNECTION FAILED"
                         };
-                        let message = status.split_once(':').map(|(_, message)| message.trim()).unwrap_or(status);
+                        let message = status
+                            .split_once(':')
+                            .map(|(_, message)| message.trim())
+                            .unwrap_or(status);
                         content = content.push(error_notice(title, message));
                     } else {
                         content = content.push(
@@ -1861,131 +2261,199 @@ impl cosmic::Application for AppModel {
                 } else {
                     content = content.push(widget::text::caption("No status messages yet"));
                 }
-    
-                content = content
-                    .push(widget::divider::horizontal::default());
+
+                content = content.push(widget::divider::horizontal::default());
             }
-            if self.settings_saved_until.is_some_and(|deadline| Instant::now() < deadline) {
+            if self
+                .settings_saved_until
+                .is_some_and(|deadline| Instant::now() < deadline)
+            {
                 content = content.push(widget::text::caption("✓ Saved"));
             }
         } else {
             if let Some(weather) = &self.weather {
-                let wind_direction = weather.wind_direction_degrees
+                let wind_direction = weather
+                    .wind_direction_degrees
                     .map(|degrees| format!("{degrees}°"))
                     .unwrap_or_else(|| "—".into());
                 let sunrise = chrono::DateTime::from_timestamp(weather.sunrise_unix, 0)
-                    .map(|time| time.with_timezone(&chrono::Local).format("%H:%M").to_string())
+                    .map(|time| {
+                        time.with_timezone(&chrono::Local)
+                            .format("%H:%M")
+                            .to_string()
+                    })
                     .unwrap_or_else(|| "—".into());
                 let sunset = chrono::DateTime::from_timestamp(weather.sunset_unix, 0)
-                    .map(|time| time.with_timezone(&chrono::Local).format("%H:%M").to_string())
+                    .map(|time| {
+                        time.with_timezone(&chrono::Local)
+                            .format("%H:%M")
+                            .to_string()
+                    })
                     .unwrap_or_else(|| "—".into());
                 let weather_details = widget::Column::new()
                     .spacing(6)
-                    .push(widget::Row::new()
-                        .spacing(10)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::icon::from_name(weather.icon_name()).size(36))                        .push(widget::Column::new()
-                            .spacing(2)
-                            .push(widget::text::body(weather.description.clone()))
-                            .push(widget::text::caption(format!("Feels like {:.1} °C", weather.feels_like_c)))))
-                    .push(widget::Row::new().spacing(8)
-                        .push(widget::text::body(format!("Humidity  {}%", weather.humidity_percent)))
-                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                        .push(widget::text::body(format!("Clouds  {}%", weather.cloudiness_percent))))
-                    .push(widget::Row::new().spacing(8)
-                        .push(widget::Column::new().spacing(8)
-                            .push(widget::text::body("Wind speed"))
-                            .push(widget::text::body(format!("{:.1} m/s", weather.wind_speed_mps)))
-                            .push(widget::text::body("Direction"))
-                            .push(widget::text::body(wind_direction)))
-                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                        .push(widget::Column::new().spacing(8)
-                            .push(widget::text::body("Pressure"))
-                            .push(widget::text::body(format!("{} hPa", weather.pressure_hpa)))))
-                    .push(widget::Row::new().spacing(8)
-                        .push(widget::text::body(format!("Visibility  {:.1} km", f64::from(weather.visibility_m) / 1000.0)))
-                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                        .push(widget::text::body(format!("Sunrise  {sunrise}"))))
-                    .push(widget::text::body(format!("Sunset  {sunset}")));
-                let weather_card: cosmic::Element<'_, Message> = if let Some(image_bytes) = &weather.background_image {
-                    let photo = widget::image::Image::new(
-                        widget::image::Handle::from_bytes(image_bytes.clone()),
+                    .push(
+                        widget::Row::new()
+                            .spacing(10)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::icon::from_name(weather.icon_name()).size(36))
+                            .push(
+                                widget::Column::new()
+                                    .spacing(2)
+                                    .push(widget::text::body(weather.description.clone()))
+                                    .push(widget::text::caption(format!(
+                                        "Feels like {:.1} °C",
+                                        weather.feels_like_c
+                                    ))),
+                            ),
                     )
-                    .width(cosmic::iced::Length::Fill)
-                    .height(cosmic::iced::Length::Fixed(210.0))
-                    .content_fit(cosmic::iced::ContentFit::Cover);
-                    let details = widget::container(weather_details)
-                        .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fill)
-                        .padding(10)
-                        .style(|_| cosmic::iced::widget::container::Style {
-                            background: Some(cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.58).into()),
-                            text_color: Some(cosmic::iced::Color::WHITE),
-                            ..Default::default()
-                        });
-                    let image_credit_button = widget::Column::new()
-                        .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fill)
-                        .push(widget::Space::new().height(cosmic::iced::Length::Fill))
-                        .push(
-                            widget::Row::new()
-                                .width(cosmic::iced::Length::Fill)
-                                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                .push(
-                                    widget::button::custom(
-                                        widget::icon::from_name("image-x-generic-symbolic").size(16),
-                                    )
-                                    .on_press(Message::OpenCommonsPage(
-                                        weather.image_attribution.as_ref()
-                                            .map(|credit| credit.page_url.clone())
-                                            .unwrap_or_default(),
-                                    ))
-                                    .padding(7)
-                                    .class(cosmic::theme::Button::Standard),
-                                ),
-                        )
-                        .padding(8);
-                    cosmic::iced::widget::Stack::new()
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .push(widget::text::body(format!(
+                                "Humidity  {}%",
+                                weather.humidity_percent
+                            )))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(widget::text::body(format!(
+                                "Clouds  {}%",
+                                weather.cloudiness_percent
+                            ))),
+                    )
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .push(
+                                widget::Column::new()
+                                    .spacing(8)
+                                    .push(widget::text::body("Wind speed"))
+                                    .push(widget::text::body(format!(
+                                        "{:.1} m/s",
+                                        weather.wind_speed_mps
+                                    )))
+                                    .push(widget::text::body("Direction"))
+                                    .push(widget::text::body(wind_direction)),
+                            )
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(
+                                widget::Column::new()
+                                    .spacing(8)
+                                    .push(widget::text::body("Pressure"))
+                                    .push(widget::text::body(format!(
+                                        "{} hPa",
+                                        weather.pressure_hpa
+                                    ))),
+                            ),
+                    )
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .push(widget::text::body(format!(
+                                "Visibility  {:.1} km",
+                                f64::from(weather.visibility_m) / 1000.0
+                            )))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(widget::text::body(format!("Sunrise  {sunrise}"))),
+                    )
+                    .push(widget::text::body(format!("Sunset  {sunset}")));
+                let weather_card: cosmic::Element<'_, Message> =
+                    if let Some(image_bytes) = &weather.background_image {
+                        let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
+                            image_bytes.clone(),
+                        ))
                         .width(cosmic::iced::Length::Fill)
                         .height(cosmic::iced::Length::Fixed(210.0))
-                        .push(photo)
-                        .push(details)
-                        .push(image_credit_button)
-                        .into()
-                } else {
-                    widget::container(weather_details).padding(10)
-                        .style(|theme| {
-                            let cosmic = theme.cosmic();
-                            cosmic::iced::widget::container::Style {
-                                background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                        .content_fit(cosmic::iced::ContentFit::Cover);
+                        let details = widget::container(weather_details)
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fill)
+                            .padding(10)
+                            .style(|_| cosmic::iced::widget::container::Style {
+                                background: Some(
+                                    cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.58).into(),
+                                ),
+                                text_color: Some(cosmic::iced::Color::WHITE),
                                 ..Default::default()
-                            }
-                        }).into()
-                };
+                            });
+                        let image_credit_button = widget::Column::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fill)
+                            .push(widget::Space::new().height(cosmic::iced::Length::Fill))
+                            .push(
+                                widget::Row::new()
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                    .push(
+                                        widget::button::custom(
+                                            widget::icon::from_name("image-x-generic-symbolic")
+                                                .size(16),
+                                        )
+                                        .on_press(Message::OpenCommonsPage(
+                                            weather
+                                                .image_attribution
+                                                .as_ref()
+                                                .map(|credit| credit.page_url.clone())
+                                                .unwrap_or_default(),
+                                        ))
+                                        .padding(7)
+                                        .class(cosmic::theme::Button::Standard),
+                                    ),
+                            )
+                            .padding(8);
+                        cosmic::iced::widget::Stack::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(210.0))
+                            .push(photo)
+                            .push(details)
+                            .push(image_credit_button)
+                            .into()
+                    } else {
+                        widget::container(weather_details)
+                            .padding(10)
+                            .style(|theme| {
+                                let cosmic = theme.cosmic();
+                                cosmic::iced::widget::container::Style {
+                                    background: Some(
+                                        cosmic::iced::Color::from(
+                                            cosmic.background(false).small_widget,
+                                        )
+                                        .into(),
+                                    ),
+                                    ..Default::default()
+                                }
+                            })
+                            .into()
+                    };
                 let weather_heading = widget::button::custom(
                     widget::Row::new()
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::icon::from_name(weather.icon_name()).size(20))
-                        .push(widget::Column::new()
-                            .spacing(1)
-                            .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::title3("Weather"))
-                            .push(widget::text::caption(weather.location_name.clone())))
-                        .push(widget::text::title2(format!("{:.0}°", weather.temperature_c)))
-                        .push(widget::icon::from_name(if self.weather_forecast_expanded {
-                            "go-down-symbolic"
-                        } else {
-                            "go-next-symbolic"
-                        }).size(16)),
+                        .push(
+                            widget::Column::new()
+                                .spacing(1)
+                                .width(cosmic::iced::Length::Fill)
+                                .push(widget::text::title3("Weather"))
+                                .push(widget::text::caption(weather.location_name.clone())),
+                        )
+                        .push(widget::text::title2(format!(
+                            "{:.0}°",
+                            weather.temperature_c
+                        )))
+                        .push(
+                            widget::icon::from_name(if self.weather_forecast_expanded {
+                                "go-down-symbolic"
+                            } else {
+                                "go-next-symbolic"
+                            })
+                            .size(16),
+                        ),
                 )
-                    .on_press(Message::ToggleWeatherForecast)
-                    .padding([4, 0])
-                    .width(cosmic::iced::Length::Fill)
-                    .class(cosmic::theme::Button::Text);
-                content = content
-                    .push(weather_heading)
-                    .push(weather_card);
+                .on_press(Message::ToggleWeatherForecast)
+                .padding([4, 0])
+                .width(cosmic::iced::Length::Fill)
+                .class(cosmic::theme::Button::Text);
+                content = content.push(weather_heading).push(weather_card);
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
                     let forecast_range_selector = widget::Row::new()
@@ -1996,7 +2464,10 @@ impl cosmic::Application for AppModel {
                                 widget::Row::new()
                                     .spacing(5)
                                     .align_y(cosmic::iced::Alignment::Center)
-                                    .push(widget::icon::from_name("x-office-calendar-symbolic").size(14))
+                                    .push(
+                                        widget::icon::from_name("x-office-calendar-symbolic")
+                                            .size(14),
+                                    )
                                     .push(widget::text::caption("7d")),
                             )
                             .on_press(Message::SelectWeatherForecast(7))
@@ -2012,7 +2483,10 @@ impl cosmic::Application for AppModel {
                                 widget::Row::new()
                                     .spacing(5)
                                     .align_y(cosmic::iced::Alignment::Center)
-                                    .push(widget::icon::from_name("x-office-calendar-symbolic").size(14))
+                                    .push(
+                                        widget::icon::from_name("x-office-calendar-symbolic")
+                                            .size(14),
+                                    )
                                     .push(widget::text::caption("14d")),
                             )
                             .on_press(Message::SelectWeatherForecast(14))
@@ -2025,12 +2499,16 @@ impl cosmic::Application for AppModel {
                         );
                     content = content
                         .push(widget::divider::horizontal::default())
-                        .push(widget::Row::new()
-                            .spacing(8)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::text::title3(format!("{forecast_days}-day forecast")))
-                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(forecast_range_selector))
+                        .push(
+                            widget::Row::new()
+                                .spacing(8)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::text::title3(format!(
+                                    "{forecast_days}-day forecast"
+                                )))
+                                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                .push(forecast_range_selector),
+                        )
                         .push(widget::text::caption("Forecast data by Open-Meteo"));
                     if self.weather_forecast_loading {
                         content = content.push(widget::text::caption("Loading forecast…"));
@@ -2040,31 +2518,49 @@ impl cosmic::Application for AppModel {
                     }
                     if let Some(forecast) = &self.weather_forecast {
                         for day in &forecast.days {
-                            let date_label = chrono::NaiveDate::parse_from_str(&day.date, "%Y-%m-%d")
-                                .map(|date| date.format("%a, %d %b").to_string())
-                                .unwrap_or_else(|_| day.date.clone());
+                            let date_label =
+                                chrono::NaiveDate::parse_from_str(&day.date, "%Y-%m-%d")
+                                    .map(|date| date.format("%a, %d %b").to_string())
+                                    .unwrap_or_else(|_| day.date.clone());
                             let day_row = widget::Row::new()
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::Column::new()
-                                    .spacing(2)
-                                    .width(cosmic::iced::Length::Fill)
-                                    .push(widget::text::body(date_label))
-                                    .push(widget::text::caption(day.description.clone())))
-                                .push(widget::Column::new()
-                                    .width(cosmic::iced::Length::Fixed(36.0))
-                                    .align_x(cosmic::iced::Alignment::Center)
-                                    .push(widget::icon::from_name(day.icon_name()).size(22)))
-                                .push(widget::Column::new()
-                                    .width(cosmic::iced::Length::Fixed(82.0))
-                                    .align_x(cosmic::iced::Alignment::End)
-                                    .push(widget::text::body(format!("{:.0}° / {:.0}°", day.max_temperature_c, day.min_temperature_c))))
-                                .push(widget::Column::new()
-                                    .width(cosmic::iced::Length::Fixed(76.0))
-                                    .spacing(2)
-                                    .align_x(cosmic::iced::Alignment::End)
-                                    .push(widget::text::caption(format!("{}% rain", day.precipitation_probability_percent)))
-                                    .push(widget::text::caption(format!("{:.0} km/h", day.wind_speed_kmh))));
+                                .push(
+                                    widget::Column::new()
+                                        .spacing(2)
+                                        .width(cosmic::iced::Length::Fill)
+                                        .push(widget::text::body(date_label))
+                                        .push(widget::text::caption(day.description.clone())),
+                                )
+                                .push(
+                                    widget::Column::new()
+                                        .width(cosmic::iced::Length::Fixed(36.0))
+                                        .align_x(cosmic::iced::Alignment::Center)
+                                        .push(widget::icon::from_name(day.icon_name()).size(22)),
+                                )
+                                .push(
+                                    widget::Column::new()
+                                        .width(cosmic::iced::Length::Fixed(82.0))
+                                        .align_x(cosmic::iced::Alignment::End)
+                                        .push(widget::text::body(format!(
+                                            "{:.0}° / {:.0}°",
+                                            day.max_temperature_c, day.min_temperature_c
+                                        ))),
+                                )
+                                .push(
+                                    widget::Column::new()
+                                        .width(cosmic::iced::Length::Fixed(76.0))
+                                        .spacing(2)
+                                        .align_x(cosmic::iced::Alignment::End)
+                                        .push(widget::text::caption(format!(
+                                            "{}% rain",
+                                            day.precipitation_probability_percent
+                                        )))
+                                        .push(widget::text::caption(format!(
+                                            "{:.0} km/h",
+                                            day.wind_speed_kmh
+                                        ))),
+                                );
                             content = content.push(day_row);
                         }
                     }
@@ -2084,36 +2580,57 @@ impl cosmic::Application for AppModel {
             }
 
             if self.error.is_none() && !self.readings.is_empty() {
-            if !self.readings.is_empty() {
-                let primary = self.selected_ains.first()
-                    .and_then(|selected| self.readings.iter().find(|reading|
-                        crate::fritz::normalize_ain_for_selection(&reading.ain)
-                            == crate::fritz::normalize_ain_for_selection(selected)))
-                    .or_else(|| self.readings.first());
-                let summary_power = displayed_power_w(
-                    &self.readings,
-                    &self.selected_ains,
-                    self.settings.total_power_first,
-                    &self.settings.input_ains,
-                ).map(|power| format!("{power} W"))
+                if !self.readings.is_empty() {
+                    let primary = self
+                        .selected_ains
+                        .first()
+                        .and_then(|selected| {
+                            self.readings.iter().find(|reading| {
+                                crate::fritz::normalize_ain_for_selection(&reading.ain)
+                                    == crate::fritz::normalize_ain_for_selection(selected)
+                            })
+                        })
+                        .or_else(|| self.readings.first());
+                    let summary_power = displayed_power_w(
+                        &self.readings,
+                        &self.selected_ains,
+                        self.settings.total_power_first,
+                        &self.settings.input_ains,
+                    )
+                    .map(|power| format!("{power} W"))
                     .unwrap_or_else(|| "-- W".into());
-                let summary_temperature = if self.settings.panel_average_temperature {
-                    average_temperature_c(&self.readings, self.settings.panel_exclude_solar_temperature).map(|value| format!("{value:.1} °C"))
-                } else if self.settings.total_power_first {
-                    None
-                } else {
-                    primary.map(|reading| format!("{:.1} °C", reading.temperature_c))
-                };
-                let summary_input = self.readings.iter().any(|reading|
-                    self.settings.input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain)))
-                    .then(|| format!("{} W", input_power_w(&self.readings, &self.settings.input_ains)));
-                content = content.push(live_power_summary(
-                    summary_power,
-                    self.settings.total_power_first,
-                    summary_input,
-                    summary_temperature,
-                ));
-            }
+                    let summary_temperature = if self.settings.panel_average_temperature {
+                        average_temperature_c(
+                            &self.readings,
+                            self.settings.panel_exclude_solar_temperature,
+                        )
+                        .map(|value| format!("{value:.1} °C"))
+                    } else if self.settings.total_power_first {
+                        None
+                    } else {
+                        primary.map(|reading| format!("{:.1} °C", reading.temperature_c))
+                    };
+                    let summary_input = self
+                        .readings
+                        .iter()
+                        .any(|reading| {
+                            self.settings
+                                .input_ains
+                                .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+                        })
+                        .then(|| {
+                            format!(
+                                "{} W",
+                                input_power_w(&self.readings, &self.settings.input_ains)
+                            )
+                        });
+                    content = content.push(live_power_summary(
+                        summary_power,
+                        self.settings.total_power_first,
+                        summary_input,
+                        summary_temperature,
+                    ));
+                }
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
                 for (index, reading) in self.readings.iter().enumerate() {
@@ -2121,30 +2638,63 @@ impl cosmic::Application for AppModel {
                     let is_expanded = self.collapsed_devices.contains(&device_key);
                     let device_corner_radius = device_corner_radius(index, self.readings.len());
                     let device_history = self.device_history.get(&device_key);
-                    let power_toggle: Option<cosmic::Element<'_, Message>> = reading.power_state.map(|is_on| {
-                        let ain = reading.ain.clone();
-                        let key = crate::fritz::normalize_ain_for_selection(&ain);
-                        if self.pending_power_changes.contains(&key) {
-                            widget::toggler(is_on).into()
-                        } else {
-                            widget::toggler(is_on)
-                                .on_toggle(move |requested| Message::SetDevicePower(ain.clone(), requested))
-                                .into()
-                        }
-                    });
+                    let power_toggle: Option<cosmic::Element<'_, Message>> =
+                        reading.power_state.map(|is_on| {
+                            let ain = reading.ain.clone();
+                            let key = crate::fritz::normalize_ain_for_selection(&ain);
+                            if self.pending_power_changes.contains(&key) {
+                                widget::toggler(is_on).into()
+                            } else {
+                                widget::toggler(is_on)
+                                    .on_toggle(move |requested| {
+                                        Message::SetDevicePower(ain.clone(), requested)
+                                    })
+                                    .into()
+                            }
+                        });
                     let device_heading = widget::button::custom(
                         widget::Row::new()
                             .spacing(12)
                             .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::container(widget::icon::from_name("computer-symbolic").size(20))
-                                .center_x(32).center_y(36))
-                            .push(widget::Column::new()
-                                .spacing(3)
-                                .width(cosmic::iced::Length::Fill)
-                                .push(widget::text::body(reading.name.clone()).class(cosmic::theme::Text::Accent))
-                                .push(widget::text::caption(if is_expanded { format!("LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes).to_uppercase()) } else { format!("{} W · {:.1} °C", reading.power_w, reading.temperature_c) })))
+                            .push(
+                                widget::container(
+                                    widget::icon::from_name("computer-symbolic").size(20),
+                                )
+                                .center_x(32)
+                                .center_y(36),
+                            )
+                            .push(
+                                widget::Column::new()
+                                    .spacing(3)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(
+                                        widget::text::body(reading.name.clone())
+                                            .class(cosmic::theme::Text::Accent),
+                                    )
+                                    .push(widget::text::caption(if is_expanded {
+                                        format!(
+                                            "LAST {}",
+                                            format_graph_timespan(
+                                                self.settings.graph_timespan_minutes
+                                            )
+                                            .to_uppercase()
+                                        )
+                                    } else {
+                                        format!(
+                                            "{} W · {:.1} °C",
+                                            reading.power_w, reading.temperature_c
+                                        )
+                                    })),
+                            )
                             .push_maybe(power_toggle)
-                            .push(widget::icon::from_name(if is_expanded { "go-down-symbolic" } else { "go-next-symbolic" }).size(16)),
+                            .push(
+                                widget::icon::from_name(if is_expanded {
+                                    "go-down-symbolic"
+                                } else {
+                                    "go-next-symbolic"
+                                })
+                                .size(16),
+                            ),
                     )
                     .on_press(Message::ToggleDeviceDetails(reading.ain.clone()))
                     .width(cosmic::iced::Length::Fill)
@@ -2153,51 +2703,133 @@ impl cosmic::Application for AppModel {
                     let metrics = widget::Row::new()
                         .spacing(8)
                         .width(cosmic::iced::Length::Fill)
-                        .push(device_metric_tile("POWER", format!("{} W", reading.power_w), "utilities-system-monitor-symbolic", device_corner_radius))
-                        .push(device_metric_tile("", format!("{:.1} °C", reading.temperature_c), "utilities-temperature-symbolic", device_corner_radius));
-                    let device_content = widget::Column::new()
-                        .spacing(10)
-                        .push(metrics)
-                        .push(
-                            widget::Row::new()
-                                .spacing(12)
-                                .width(cosmic::iced::Length::Fill)
-                                .push(
+                        .push(device_metric_tile(
+                            "POWER",
+                            format!("{} W", reading.power_w),
+                            "utilities-system-monitor-symbolic",
+                            device_corner_radius,
+                        ))
+                        .push(device_metric_tile(
+                            "",
+                            format!("{:.1} °C", reading.temperature_c),
+                            "utilities-temperature-symbolic",
+                            device_corner_radius,
+                        ));
+                    let device_content = widget::Column::new().spacing(10).push(metrics).push(
+                        widget::Row::new()
+                            .spacing(12)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(
+                                widget::container(
                                     widget::container(
-                                        widget::container(
-                                            widget::Column::new()
-                                                .spacing(4)
-                                                .width(cosmic::iced::Length::Fill)
-                                                .push(widget::text::caption("POWER (W)"))
-                                                .push(graph_visual(device_history.into_iter().flat_map(|samples| samples.iter().map(|(_, power, _)| *power as f64)), &self.settings.graph_style, "W"))
-                                                .push(
-                                                    widget::Row::new()
-                                                        .width(cosmic::iced::Length::Fill)
-                                                        .push(widget::text::caption(format_graph_axis_start(self.settings.graph_timespan_minutes)))
-                                                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                                        .push(widget::text::caption("Now")),
-                                                ),
-                                        )
-                                        .padding(8)
-                                        .width(cosmic::iced::Length::Fill)
-                                        .style(move |theme| {
-                                            let cosmic = theme.cosmic();
-                                            cosmic::iced::widget::container::Style {
-                                                background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
-                                                border: cosmic::iced::Border {
-                                                    radius: device_corner_radius,
-                                                    ..Default::default()
-                                                },
-                                                ..Default::default()
-                                            }
-                                        }),
+                                        widget::Column::new()
+                                            .spacing(4)
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::text::caption("POWER (W)"))
+                                            .push(graph_visual(
+                                                device_history.into_iter().flat_map(|samples| {
+                                                    samples
+                                                        .iter()
+                                                        .map(|(_, power, _)| *power as f64)
+                                                }),
+                                                &self.settings.graph_style,
+                                                "W",
+                                            ))
+                                            .push(
+                                                widget::Row::new()
+                                                    .width(cosmic::iced::Length::Fill)
+                                                    .push(widget::text::caption(
+                                                        format_graph_axis_start(
+                                                            self.settings.graph_timespan_minutes,
+                                                        ),
+                                                    ))
+                                                    .push(
+                                                        widget::Space::new()
+                                                            .width(cosmic::iced::Length::Fill),
+                                                    )
+                                                    .push(widget::text::caption("Now")),
+                                            ),
                                     )
-                                    .padding(1)
+                                    .padding(8)
                                     .width(cosmic::iced::Length::Fill)
                                     .style(move |theme| {
                                         let cosmic = theme.cosmic();
                                         cosmic::iced::widget::container::Style {
-                                            background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                                            background: Some(
+                                                cosmic::iced::Color::from(
+                                                    cosmic.background(false).base,
+                                                )
+                                                .into(),
+                                            ),
+                                            border: cosmic::iced::Border {
+                                                radius: device_corner_radius,
+                                                ..Default::default()
+                                            },
+                                            ..Default::default()
+                                        }
+                                    }),
+                                )
+                                .padding(1)
+                                .width(cosmic::iced::Length::Fill)
+                                .style(move |theme| {
+                                    let cosmic = theme.cosmic();
+                                    cosmic::iced::widget::container::Style {
+                                        background: Some(
+                                            cosmic::iced::Color::from(
+                                                cosmic.background(false).small_widget,
+                                            )
+                                            .into(),
+                                        ),
+                                        border: cosmic::iced::Border {
+                                            radius: device_corner_radius.into(),
+                                            ..Default::default()
+                                        },
+                                        ..Default::default()
+                                    }
+                                }),
+                            )
+                            .push(
+                                widget::container(
+                                    widget::container(
+                                        widget::Column::new()
+                                            .spacing(4)
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::text::caption("TEMPERATURE (°C)"))
+                                            .push(graph_visual(
+                                                device_history.into_iter().flat_map(|samples| {
+                                                    samples
+                                                        .iter()
+                                                        .map(|(_, _, temperature)| *temperature)
+                                                }),
+                                                &self.settings.graph_style,
+                                                "°C",
+                                            ))
+                                            .push(
+                                                widget::Row::new()
+                                                    .width(cosmic::iced::Length::Fill)
+                                                    .push(widget::text::caption(
+                                                        format_graph_axis_start(
+                                                            self.settings.graph_timespan_minutes,
+                                                        ),
+                                                    ))
+                                                    .push(
+                                                        widget::Space::new()
+                                                            .width(cosmic::iced::Length::Fill),
+                                                    )
+                                                    .push(widget::text::caption("Now")),
+                                            ),
+                                    )
+                                    .padding(8)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .style(move |theme| {
+                                        let cosmic = theme.cosmic();
+                                        cosmic::iced::widget::container::Style {
+                                            background: Some(
+                                                cosmic::iced::Color::from(
+                                                    cosmic.background(false).base,
+                                                )
+                                                .into(),
+                                            ),
                                             border: cosmic::iced::Border {
                                                 radius: device_corner_radius.into(),
                                                 ..Default::default()
@@ -2206,53 +2838,27 @@ impl cosmic::Application for AppModel {
                                         }
                                     }),
                                 )
-                                .push(
-                                    widget::container(
-                                        widget::container(
-                                            widget::Column::new()
-                                                .spacing(4)
-                                                .width(cosmic::iced::Length::Fill)
-                                                .push(widget::text::caption("TEMPERATURE (°C)"))
-                                                .push(graph_visual(device_history.into_iter().flat_map(|samples| samples.iter().map(|(_, _, temperature)| *temperature)), &self.settings.graph_style, "°C"))
-                                                .push(
-                                                    widget::Row::new()
-                                                        .width(cosmic::iced::Length::Fill)
-                                                        .push(widget::text::caption(format_graph_axis_start(self.settings.graph_timespan_minutes)))
-                                                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                                        .push(widget::text::caption("Now")),
-                                                ),
-                                        )
-                                        .padding(8)
-                                        .width(cosmic::iced::Length::Fill)
-                                        .style(move |theme| {
-                                            let cosmic = theme.cosmic();
-                                            cosmic::iced::widget::container::Style {
-                                                background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
-                                                border: cosmic::iced::Border {
-                                                    radius: device_corner_radius.into(),
-                                                    ..Default::default()
-                                                },
-                                                ..Default::default()
-                                            }
-                                        }),
-                                    )                                    .padding(1)
-                                    .width(cosmic::iced::Length::Fill)
-                                    .style(move |theme| {
-                                        let cosmic = theme.cosmic();
-                                        cosmic::iced::widget::container::Style {
-                                            background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
-                                            border: cosmic::iced::Border {
-                                                radius: device_corner_radius.into(),
-                                                ..Default::default()
-                                            },
+                                .padding(1)
+                                .width(cosmic::iced::Length::Fill)
+                                .style(move |theme| {
+                                    let cosmic = theme.cosmic();
+                                    cosmic::iced::widget::container::Style {
+                                        background: Some(
+                                            cosmic::iced::Color::from(
+                                                cosmic.background(false).small_widget,
+                                            )
+                                            .into(),
+                                        ),
+                                        border: cosmic::iced::Border {
+                                            radius: device_corner_radius.into(),
                                             ..Default::default()
-                                        }
-                                    }),
-                                ),
-                        );
-                    let mut card_column = widget::Column::new()
-                        .spacing(0)
-                        .push(device_heading);
+                                        },
+                                        ..Default::default()
+                                    }
+                                }),
+                            ),
+                    );
+                    let mut card_column = widget::Column::new().spacing(0).push(device_heading);
                     if is_expanded {
                         card_column = card_column
                             .push(widget::divider::horizontal::default())
@@ -2263,7 +2869,12 @@ impl cosmic::Application for AppModel {
                         .style(move |theme| {
                             let cosmic = theme.cosmic();
                             cosmic::iced::widget::container::Style {
-                                background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                                background: Some(
+                                    cosmic::iced::Color::from(
+                                        cosmic.background(false).small_widget,
+                                    )
+                                    .into(),
+                                ),
                                 border: cosmic::iced::Border {
                                     radius: device_corner_radius.into(),
                                     ..Default::default()
@@ -2274,17 +2885,28 @@ impl cosmic::Application for AppModel {
                     menu_cards.push((device_key, device_card.into()));
                 }
                 if let Some(overview) = total_power_overview(
-                    &self.readings, &self.settings, &self.history, &self.device_history,
+                    &self.readings,
+                    &self.settings,
+                    &self.history,
+                    &self.device_history,
                 ) {
                     menu_cards.push((TOTAL_POWER_DRAG_ID.to_string(), overview));
                 }
                 if let Some(difference) = power_difference_overview(
-                    &self.readings, &self.settings, &self.history, &self.device_history,
+                    &self.readings,
+                    &self.settings,
+                    &self.history,
+                    &self.device_history,
                 ) {
                     menu_cards.push((POWER_DIFFERENCE_DRAG_ID.to_string(), difference));
                 }
-                menu_cards.sort_by_key(|(id, _)| self.settings.menu_order.iter()
-                    .position(|entry| entry == id).unwrap_or(usize::MAX));
+                menu_cards.sort_by_key(|(id, _)| {
+                    self.settings
+                        .menu_order
+                        .iter()
+                        .position(|entry| entry == id)
+                        .unwrap_or(usize::MAX)
+                });
                 let mut device_cards = widget::Column::new().spacing(0);
                 for (index, (_, card)) in menu_cards.into_iter().enumerate() {
                     if index > 0 {
@@ -2297,7 +2919,10 @@ impl cosmic::Application for AppModel {
                     .style(|theme| {
                         let cosmic = theme.cosmic();
                         cosmic::iced::widget::container::Style {
-                            background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                            background: Some(
+                                cosmic::iced::Color::from(cosmic.background(false).small_widget)
+                                    .into(),
+                            ),
                             border: cosmic::iced::Border {
                                 radius: 0.0.into(),
                                 ..Default::default()
@@ -2307,29 +2932,34 @@ impl cosmic::Application for AppModel {
                     });
                 content = content.push(device_list);
             } else {
-                content = content.push(widget::text::body("Select one or more devices in Settings"));
+                content =
+                    content.push(widget::text::body("Select one or more devices in Settings"));
             }
 
-            let remaining = self.next_refresh_at
+            let remaining = self
+                .next_refresh_at
                 .map(|deadline| deadline.saturating_duration_since(Instant::now()));
             let countdown = remaining
                 .map(|duration| format_countdown(duration.as_secs()))
                 .unwrap_or_else(|| "Refreshing…".into());
-            let mut refresh_status = widget::Column::new()
-                .spacing(0)
-                .push(
-                    widget::Row::new()
-                        .width(cosmic::iced::Length::Fill)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::caption(format!("Next refresh in {countdown}")))
-                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                        .push(icon_action_button("⚙", "Quick settings", Message::ToggleQuickOptions)),
-                );
+            let mut refresh_status = widget::Column::new().spacing(0).push(
+                widget::Row::new()
+                    .width(cosmic::iced::Length::Fill)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::text::caption(format!(
+                        "Next refresh in {countdown}"
+                    )))
+                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                    .push(icon_action_button(
+                        "⚙",
+                        "Quick settings",
+                        Message::ToggleQuickOptions,
+                    )),
+            );
             if self.error.is_none() {
                 if let Some(updated) = &self.updated {
-                    refresh_status = refresh_status.push(
-                        widget::text::caption(format!("Updated at {updated}"))
-                    );
+                    refresh_status =
+                        refresh_status.push(widget::text::caption(format!("Updated at {updated}")));
                 }
             }
             content = content.push(refresh_status);
@@ -2341,25 +2971,45 @@ impl cosmic::Application for AppModel {
                         "Refresh · {}",
                         format_countdown(u64::from(self.quick_refresh_interval))
                     )))
-                    .push(widget::slider(
-                        0.0..=4.0,
-                        quick_slider_position(self.quick_refresh_interval as f32, REFRESH_ANCHORS),
-                        |position| Message::QuickRefreshIntervalPreview(
-                            quick_slider_value(position, REFRESH_ANCHORS).round() as u32
-                        ),
-                    ).step(0.01).on_release(Message::CommitQuickRefreshInterval))
-                    .push(quick_slider_anchor_labels(["30s", "5m", "15m", "30m", "60m"]))
+                    .push(
+                        widget::slider(
+                            0.0..=4.0,
+                            quick_slider_position(
+                                self.quick_refresh_interval as f32,
+                                REFRESH_ANCHORS,
+                            ),
+                            |position| {
+                                Message::QuickRefreshIntervalPreview(
+                                    quick_slider_value(position, REFRESH_ANCHORS).round() as u32,
+                                )
+                            },
+                        )
+                        .step(0.01)
+                        .on_release(Message::CommitQuickRefreshInterval),
+                    )
+                    .push(quick_slider_anchor_labels([
+                        "30s", "5m", "15m", "30m", "60m",
+                    ]))
                     .push(widget::text::caption(format!(
                         "Graph · {}",
                         format_graph_timespan(self.quick_graph_timespan)
                     )))
-                    .push(widget::slider(
-                        0.0..=4.0,
-                        quick_slider_position(f32::from(self.quick_graph_timespan), GRAPH_ANCHORS),
-                        |position| Message::QuickGraphTimespanPreview(
-                            quick_slider_value(position, GRAPH_ANCHORS).round() as u16
-                        ),
-                    ).step(0.01).on_release(Message::CommitQuickGraphTimespan))
+                    .push(
+                        widget::slider(
+                            0.0..=4.0,
+                            quick_slider_position(
+                                f32::from(self.quick_graph_timespan),
+                                GRAPH_ANCHORS,
+                            ),
+                            |position| {
+                                Message::QuickGraphTimespanPreview(
+                                    quick_slider_value(position, GRAPH_ANCHORS).round() as u16,
+                                )
+                            },
+                        )
+                        .step(0.01)
+                        .on_release(Message::CommitQuickGraphTimespan),
+                    )
                     .push(quick_slider_anchor_labels(["5m", "1h", "6h", "12h", "24h"]));
             }
 
@@ -2367,18 +3017,23 @@ impl cosmic::Application for AppModel {
                 content = content.push(error_notice("CONNECTION ERROR", error));
             }
 
-            content = content
-                .push(widget::divider::horizontal::default())
-                .push(
-                    action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)
-                        .width(cosmic::iced::Length::Fill),
-                );
+            content = content.push(widget::divider::horizontal::default()).push(
+                action_button(
+                    "preferences-system-symbolic",
+                    "Settings",
+                    Message::ToggleSettings,
+                )
+                .width(cosmic::iced::Length::Fill),
+            );
         }
 
         content = content.push(
-            widget::container(widget::text::caption(format!("FRITZ!Power Monitor · v{}", env!("APP_VERSION"))))
-                .width(cosmic::iced::Length::Fill)
-                .center_x(cosmic::iced::Length::Fill),
+            widget::container(widget::text::caption(format!(
+                "FRITZ!Power Monitor · v{}",
+                env!("APP_VERSION")
+            )))
+            .width(cosmic::iced::Length::Fill)
+            .center_x(cosmic::iced::Length::Fill),
         );
 
         // Give the popup content an opaque base so it remains readable even
@@ -2386,14 +3041,14 @@ impl cosmic::Application for AppModel {
         let content = widget::container(content)
             .width(cosmic::iced::Length::Fill)
             .style(|theme| {
-            let cosmic = theme.cosmic();
-            cosmic::iced::widget::container::Style {
-                background: Some(
-                    cosmic::iced::Color::from(cosmic.background(false).base).into(),
-                ),
-                ..Default::default()
-            }
-        });
+                let cosmic = theme.cosmic();
+                cosmic::iced::widget::container::Style {
+                    background: Some(
+                        cosmic::iced::Color::from(cosmic.background(false).base).into(),
+                    ),
+                    ..Default::default()
+                }
+            });
 
         // Only the main-menu title bar stays outside the scrollable area.
         // This keeps the applet name and both actions visible while the device
@@ -2418,19 +3073,29 @@ impl cosmic::Application for AppModel {
                 widget::Row::new()
                     .spacing(8)
                     .align_y(cosmic::iced::Alignment::Center)
-                    .push(widget::container(widget::icon::from_name("utilities-system-monitor-symbolic").size(20))
-                        .center_x(36).center_y(36))
-                    .push(widget::text::body("FRITZ!Power Monitor")
-                        .width(cosmic::iced::Length::Fill))
+                    .push(
+                        widget::container(
+                            widget::icon::from_name("utilities-system-monitor-symbolic").size(20),
+                        )
+                        .center_x(36)
+                        .center_y(36),
+                    )
+                    .push(
+                        widget::text::body("FRITZ!Power Monitor").width(cosmic::iced::Length::Fill),
+                    )
                     .push(if self.refresh_started_at.is_some() {
                         icon_action_button(
-                            self.refresh_started_at.map(refresh_spinner_frame).unwrap_or_else(|| "view-refresh-symbolic".to_string()),
+                            self.refresh_started_at
+                                .map(refresh_spinner_frame)
+                                .unwrap_or_else(|| "view-refresh-symbolic".to_string()),
                             "Refreshing readings",
                             Message::Refresh,
                         )
-                    } else if let Some(remaining) = self.next_refresh_at.map(|deadline|
-                        deadline.saturating_duration_since(Instant::now())
-                    ).filter(|remaining| *remaining < Duration::from_secs(10)) {
+                    } else if let Some(remaining) = self
+                        .next_refresh_at
+                        .map(|deadline| deadline.saturating_duration_since(Instant::now()))
+                        .filter(|remaining| *remaining < Duration::from_secs(10))
+                    {
                         countdown_action_button(remaining.as_secs())
                     } else {
                         icon_action_button("view-refresh-symbolic", "Reload now", Message::Refresh)
@@ -2451,7 +3116,8 @@ impl cosmic::Application for AppModel {
         // Keep the popup within a practical height. The main-menu title bar
         // remains fixed while the menu body scrolls; settings retain their
         // existing fully scrollable layout.
-        self.core.applet
+        self.core
+            .applet
             .popup_container(
                 widget::container(popup_content)
                     .width(cosmic::iced::Length::Fixed(440.0))
@@ -2479,10 +3145,15 @@ impl cosmic::Application for AppModel {
                 }
                 self.refresh_started_at = Some(Instant::now());
                 self.next_refresh_at = None;
-                return Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result)));
+                return Task::perform(fetch_fritz_data(), |result| {
+                    cosmic::Action::App(Message::Updated(result))
+                });
             }
             Message::ClockTick => {
-                if self.settings_saved_until.is_some_and(|deadline| Instant::now() >= deadline) {
+                if self
+                    .settings_saved_until
+                    .is_some_and(|deadline| Instant::now() >= deadline)
+                {
                     self.settings_saved_until = None;
                 }
                 if self.dragging_device_ain.is_some() && self.drag_scroll_direction != 0 {
@@ -2502,18 +3173,26 @@ impl cosmic::Application for AppModel {
                     self.next_weather_refresh_at = Some(Instant::now() + Duration::from_secs(1));
                 }
                 if self.settings.weather_enabled
-                    && self.next_weather_refresh_at.is_some_and(|deadline| Instant::now() >= deadline)
+                    && self
+                        .next_weather_refresh_at
+                        .is_some_and(|deadline| Instant::now() >= deadline)
                 {
                     self.next_weather_refresh_at = None;
                     let api_key = self.settings.openweathermap_api_key.clone();
                     let location = self.settings.weather_location.clone();
-                    return Task::perform(fetch_weather(api_key, location), move |result|
-                        cosmic::Action::App(Message::WeatherUpdated(result)));
+                    return Task::perform(fetch_weather(api_key, location), move |result| {
+                        cosmic::Action::App(Message::WeatherUpdated(result))
+                    });
                 }
-                if self.next_refresh_at.is_some_and(|deadline| Instant::now() >= deadline) {
+                if self
+                    .next_refresh_at
+                    .is_some_and(|deadline| Instant::now() >= deadline)
+                {
                     self.refresh_started_at = Some(Instant::now());
                     self.next_refresh_at = None;
-                    return Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result)));
+                    return Task::perform(fetch_fritz_data(), |result| {
+                        cosmic::Action::App(Message::Updated(result))
+                    });
                 }
             }
             Message::SetDevicePower(ain, on) => {
@@ -2521,19 +3200,19 @@ impl cosmic::Application for AppModel {
                 if key.is_empty() || self.pending_power_changes.contains(&key) {
                     return Task::none();
                 }
-                if !self.readings.iter().any(|reading|
+                if !self.readings.iter().any(|reading| {
                     crate::fritz::normalize_ain_for_selection(&reading.ain) == key
-                        && reading.power_state.is_some())
-                {
+                        && reading.power_state.is_some()
+                }) {
                     return Task::none();
                 }
                 self.pending_power_changes.insert(key.clone());
                 self.pending_power_targets.insert(key, on);
                 return Task::perform(
                     crate::fritz::set_device_power(ain.clone(), on),
-                    move |result| cosmic::Action::App(
-                        Message::PowerCommandFinished(ain, on, result),
-                    ),
+                    move |result| {
+                        cosmic::Action::App(Message::PowerCommandFinished(ain, on, result))
+                    },
                 );
             }
             Message::PowerCommandFinished(ain, on, result) => {
@@ -2545,17 +3224,23 @@ impl cosmic::Application for AppModel {
                         self.error = None;
                         self.refresh_started_at = Some(Instant::now());
                         self.next_refresh_at = None;
-                        return Task::perform(fetch_fritz_data(), |result|
-                            cosmic::Action::App(Message::Updated(result)));
+                        return Task::perform(fetch_fritz_data(), |result| {
+                            cosmic::Action::App(Message::Updated(result))
+                        });
                     }
                     Err(error) => {
                         self.pending_power_changes.remove(&key);
                         self.pending_power_targets.remove(&key);
-                        let device_name = self.readings.iter().find(|reading|
-                            crate::fritz::normalize_ain_for_selection(&reading.ain)
-                                == crate::fritz::normalize_ain_for_selection(&ain))
+                        let device_name = self
+                            .readings
+                            .iter()
+                            .find(|reading| {
+                                crate::fritz::normalize_ain_for_selection(&reading.ain)
+                                    == crate::fritz::normalize_ain_for_selection(&ain)
+                            })
                             .map(|reading| reading.name.as_str())
-                            .unwrap_or("device");                        self.error = Some(format!(
+                            .unwrap_or("device");
+                        self.error = Some(format!(
                             "Could not turn {} {device_name}: {error}",
                             if on { "on" } else { "off" },
                         ));
@@ -2565,59 +3250,84 @@ impl cosmic::Application for AppModel {
             Message::Updated(result) => {
                 self.refresh_started_at = None;
                 match result {
-                Ok(result) => {
-                    let newly_missing = newly_missing_devices(
-                        &mut self.missing_device_ains,
-                        &result.missing_devices,
-                        &self.pending_power_changes,
-                    );
-                    notify_missing_devices(&newly_missing);
-                    let readings = result.readings;
-                    clear_confirmed_power_changes(
-                        &mut self.pending_power_targets,
-                        &mut self.pending_power_changes,
-                        &readings,
-                    );
-                    if readings.is_empty() {
-                        self.error = Some("No selected devices returned usable readings".into());
-                    } else {
-                    let total_power = output_power_w(&readings, &self.settings.input_ains);
-                    let now = Instant::now();
-                    let history_window = graph_history_window(self.settings.graph_timespan_minutes);
-                    record_power_sample(&mut self.history, total_power, now, history_window);
-                    for reading in &readings {
-                        record_device_sample(&mut self.device_history, reading, now, history_window);
-                        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                        if let Some(thresholds) = self.settings.temperature_alerts.get(&key).copied() {
-                            let outside_limits = temperature_outside_limits(reading.temperature_c, thresholds);
-                            if should_notify_temperature_alert(
-                                self.temperature_alert_state.get(&key).copied(),
-                                outside_limits,
-                            ) {
-                                notify_temperature_alert(&reading.name, reading.temperature_c, thresholds);
-                            }
-                            // First observation establishes a baseline without
-                            // notifying if a device starts outside its limits.
-                            self.temperature_alert_state.insert(key, outside_limits);
+                    Ok(result) => {
+                        let newly_missing = newly_missing_devices(
+                            &mut self.missing_device_ains,
+                            &result.missing_devices,
+                            &self.pending_power_changes,
+                        );
+                        notify_missing_devices(&newly_missing);
+                        let readings = result.readings;
+                        clear_confirmed_power_changes(
+                            &mut self.pending_power_targets,
+                            &mut self.pending_power_changes,
+                            &readings,
+                        );
+                        if readings.is_empty() {
+                            self.error =
+                                Some("No selected devices returned usable readings".into());
                         } else {
-                            self.temperature_alert_state.remove(&key);
+                            let total_power = output_power_w(&readings, &self.settings.input_ains);
+                            let now = Instant::now();
+                            let history_window =
+                                graph_history_window(self.settings.graph_timespan_minutes);
+                            record_power_sample(
+                                &mut self.history,
+                                total_power,
+                                now,
+                                history_window,
+                            );
+                            for reading in &readings {
+                                record_device_sample(
+                                    &mut self.device_history,
+                                    reading,
+                                    now,
+                                    history_window,
+                                );
+                                let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
+                                if let Some(thresholds) =
+                                    self.settings.temperature_alerts.get(&key).copied()
+                                {
+                                    let outside_limits = temperature_outside_limits(
+                                        reading.temperature_c,
+                                        thresholds,
+                                    );
+                                    if should_notify_temperature_alert(
+                                        self.temperature_alert_state.get(&key).copied(),
+                                        outside_limits,
+                                    ) {
+                                        notify_temperature_alert(
+                                            &reading.name,
+                                            reading.temperature_c,
+                                            thresholds,
+                                        );
+                                    }
+                                    // First observation establishes a baseline without
+                                    // notifying if a device starts outside its limits.
+                                    self.temperature_alert_state.insert(key, outside_limits);
+                                } else {
+                                    self.temperature_alert_state.remove(&key);
+                                }
+                            }
+                            self.readings = readings;
+                            self.error = None;
+                            self.updated =
+                                Some(chrono::Local::now().format("%H:%M:%S").to_string());
                         }
                     }
-                    self.readings = readings;
-                    self.error = None;
-                    self.updated = Some(chrono::Local::now().format("%H:%M:%S").to_string());
+                    Err(error) => {
+                        // Do not continue presenting the last known switch state as live.
+                        for reading in &mut self.readings {
+                            reading.power_state = None;
+                        }
+                        self.error = Some(error);
                     }
-                }
-                Err(error) => {
-                    // Do not continue presenting the last known switch state as live.
-                    for reading in &mut self.readings {
-                        reading.power_state = None;
-                    }
-                    self.error = Some(error);
-                },
                 }
                 self.next_refresh_at = Some(
-                    Instant::now() + Duration::from_secs(u64::from(self.settings.refresh_interval_seconds.clamp(30, 3600))),
+                    Instant::now()
+                        + Duration::from_secs(u64::from(
+                            self.settings.refresh_interval_seconds.clamp(30, 3600),
+                        )),
                 );
             }
             Message::ToggleWeatherForecast => {
@@ -2631,8 +3341,9 @@ impl cosmic::Application for AppModel {
                     let location = self.settings.weather_location.clone();
                     let days = self.weather_forecast_days.unwrap_or(7);
                     self.weather_forecast_days = Some(days);
-                    return Task::perform(fetch_weather_forecast(location, days), move |result|
-                        cosmic::Action::App(Message::WeatherForecastUpdated(days, result)));
+                    return Task::perform(fetch_weather_forecast(location, days), move |result| {
+                        cosmic::Action::App(Message::WeatherForecastUpdated(days, result))
+                    });
                 }
             }
             Message::SelectWeatherForecast(requested_days) => {
@@ -2645,8 +3356,9 @@ impl cosmic::Application for AppModel {
                     self.weather_forecast_error = None;
                     self.weather_forecast_loading = true;
                     let location = self.settings.weather_location.clone();
-                    return Task::perform(fetch_weather_forecast(location, days), move |result|
-                        cosmic::Action::App(Message::WeatherForecastUpdated(days, result)));
+                    return Task::perform(fetch_weather_forecast(location, days), move |result| {
+                        cosmic::Action::App(Message::WeatherForecastUpdated(days, result))
+                    });
                 }
             }
             Message::WeatherForecastUpdated(days, result) => {
@@ -2687,10 +3399,14 @@ impl cosmic::Application for AppModel {
             }
             Message::CommitQuickRefreshInterval => {
                 if self.settings.refresh_interval_seconds != self.quick_refresh_interval {
-                    self.settings.refresh_interval_seconds = self.quick_refresh_interval.clamp(30, 3600);
+                    self.settings.refresh_interval_seconds =
+                        self.quick_refresh_interval.clamp(30, 3600);
                     if self.next_refresh_at.is_some() {
                         self.next_refresh_at = Some(
-                            Instant::now() + Duration::from_secs(u64::from(self.settings.refresh_interval_seconds)),
+                            Instant::now()
+                                + Duration::from_secs(u64::from(
+                                    self.settings.refresh_interval_seconds,
+                                )),
                         );
                     }
                     self.persist_settings();
@@ -2704,9 +3420,11 @@ impl cosmic::Application for AppModel {
                     self.settings.graph_timespan_minutes = self.quick_graph_timespan.clamp(5, 1440);
                     let now = Instant::now();
                     let window = graph_history_window(self.settings.graph_timespan_minutes);
-                    self.history.retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
+                    self.history
+                        .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
                     for samples in self.device_history.values_mut() {
-                        samples.retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
+                        samples
+                            .retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
                     }
                     self.persist_settings();
                 }
@@ -2722,8 +3440,14 @@ impl cosmic::Application for AppModel {
                     }
                 }
                 if self.settings.weather_enabled {
-                    self.next_weather_refresh_at = Some(Instant::now() + Duration::from_secs(
-                        u64::from(self.settings.weather_refresh_interval_minutes.clamp(5, 60)) * 60));
+                    self.next_weather_refresh_at = Some(
+                        Instant::now()
+                            + Duration::from_secs(
+                                u64::from(
+                                    self.settings.weather_refresh_interval_minutes.clamp(5, 60),
+                                ) * 60,
+                            ),
+                    );
                 }
             }
             Message::WeatherEnabledChanged(enabled) => {
@@ -2770,8 +3494,9 @@ impl cosmic::Application for AppModel {
                     self.devices_loading = true;
                     let settings = self.settings.clone();
                     self.settings_status = Some("Connecting and loading devices…".into());
-                    return Task::perform(discover_devices(settings), |result|
-                        cosmic::Action::App(Message::DevicesLoaded(result)));
+                    return Task::perform(discover_devices(settings), |result| {
+                        cosmic::Action::App(Message::DevicesLoaded(result))
+                    });
                 }
             }
             Message::BackToSettingsCategories => {
@@ -2821,21 +3546,29 @@ impl cosmic::Application for AppModel {
                 self.settings.graph_timespan_minutes = value.clamp(5, 1440);
                 let now = Instant::now();
                 let window = graph_history_window(self.settings.graph_timespan_minutes);
-                self.history.retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
+                self.history
+                    .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
                 for samples in self.device_history.values_mut() {
                     samples.retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
                 }
                 self.persist_settings();
             }
             Message::GraphStyleChanged(value) => {
-                self.settings.graph_style = if value == "bar" { "bar".into() } else { "line".into() };
+                self.settings.graph_style = if value == "bar" {
+                    "bar".into()
+                } else {
+                    "line".into()
+                };
                 self.persist_settings();
             }
             Message::RefreshIntervalChanged(value) => {
                 self.settings.refresh_interval_seconds = value.clamp(30, 3600);
                 if self.next_refresh_at.is_some() {
                     self.next_refresh_at = Some(
-                        Instant::now() + Duration::from_secs(u64::from(self.settings.refresh_interval_seconds)),
+                        Instant::now()
+                            + Duration::from_secs(u64::from(
+                                self.settings.refresh_interval_seconds,
+                            )),
                     );
                 }
                 self.persist_settings();
@@ -2847,7 +3580,9 @@ impl cosmic::Application for AppModel {
                 self.devices_loading = true;
                 let settings = self.settings.clone();
                 self.settings_status = Some("Connecting and loading devices…".into());
-                return Task::perform(discover_devices(settings), |result| cosmic::Action::App(Message::DevicesLoaded(result)));
+                return Task::perform(discover_devices(settings), |result| {
+                    cosmic::Action::App(Message::DevicesLoaded(result))
+                });
             }
             Message::DeviceSearchChanged(value) => {
                 self.device_search = value;
@@ -2856,41 +3591,65 @@ impl cosmic::Application for AppModel {
                 self.devices_loading = false;
                 self.devices_loaded = result.is_ok();
                 match result {
-                Ok(devices) => {
-                    self.devices = devices;
-                    if !self.settings.input_defaults_initialized {
-                        self.settings.input_ains.extend(solar_input_ains(&self.devices));
-                        self.settings.input_defaults_initialized = true;
-                        self.persist_settings();
+                    Ok(devices) => {
+                        self.devices = devices;
+                        if !self.settings.input_defaults_initialized {
+                            self.settings
+                                .input_ains
+                                .extend(solar_input_ains(&self.devices));
+                            self.settings.input_defaults_initialized = true;
+                            self.persist_settings();
+                        }
+                        self.selected_ains = if self.settings.ains.is_empty() {
+                            if self.settings.ain.trim().is_empty() {
+                                Vec::new()
+                            } else {
+                                vec![self.settings.ain.clone()]
+                            }
+                        } else {
+                            self.settings.ains.clone()
+                        };
+                        self.selected_ains.retain(|selected| {
+                            self.devices.iter().any(|device| {
+                                crate::fritz::normalize_ain_for_selection(selected)
+                                    == crate::fritz::normalize_ain_for_selection(&device.ain)
+                            })
+                        });
+                        self.settings_status = Some(format!(
+                            "Found {} compatible power-meter device(s)",
+                            self.devices.len()
+                        ));
                     }
-                    self.selected_ains = if self.settings.ains.is_empty() {
-                        if self.settings.ain.trim().is_empty() { Vec::new() } else { vec![self.settings.ain.clone()] }
-                    } else { self.settings.ains.clone() };
-                    self.selected_ains.retain(|selected| self.devices.iter().any(|device|
-                        crate::fritz::normalize_ain_for_selection(selected)
-                            == crate::fritz::normalize_ain_for_selection(&device.ain)));
-                    self.settings_status = Some(format!("Found {} compatible power-meter device(s)", self.devices.len()));
-                }
-                Err(error) => self.settings_status = Some(format!("Connection failed: {error}")),
+                    Err(error) => {
+                        self.settings_status = Some(format!("Connection failed: {error}"))
+                    }
                 }
             }
             Message::ToggleDevice(ain, selected) => {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
-                self.selected_ains.retain(|existing|
-                    crate::fritz::normalize_ain_for_selection(existing) != normalized);
+                self.selected_ains.retain(|existing| {
+                    crate::fritz::normalize_ain_for_selection(existing) != normalized
+                });
                 if selected {
                     self.selected_ains.push(ain);
-                    if !self.settings.menu_order.iter().any(|entry|
-                        crate::fritz::normalize_ain_for_selection(entry) == normalized)
+                    if !self
+                        .settings
+                        .menu_order
+                        .iter()
+                        .any(|entry| crate::fritz::normalize_ain_for_selection(entry) == normalized)
                     {
-                        let insert_at = self.settings.menu_order.iter()
+                        let insert_at = self
+                            .settings
+                            .menu_order
+                            .iter()
                             .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID)
                             .unwrap_or(self.settings.menu_order.len());
                         self.settings.menu_order.insert(insert_at, normalized);
                     }
                 } else {
-                    self.settings.menu_order.retain(|entry|
-                        crate::fritz::normalize_ain_for_selection(entry) != normalized);
+                    self.settings.menu_order.retain(|entry| {
+                        crate::fritz::normalize_ain_for_selection(entry) != normalized
+                    });
                 }
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
@@ -2904,15 +3663,18 @@ impl cosmic::Application for AppModel {
                     self.settings.input_ains.remove(&key);
                 }
                 self.persist_settings();
-                self.history = rebuild_output_power_history(
-                    &self.device_history,
-                    &self.settings.input_ains,
-                ).into_iter().collect();
+                self.history =
+                    rebuild_output_power_history(&self.device_history, &self.settings.input_ains)
+                        .into_iter()
+                        .collect();
             }
             Message::StartDeviceDrag(ain) => {
-                if ain == TOTAL_POWER_DRAG_ID || ain == POWER_DIFFERENCE_DRAG_ID || self.selected_ains.iter().any(|selected|
-                    crate::fritz::normalize_ain_for_selection(selected)
-                        == crate::fritz::normalize_ain_for_selection(&ain))
+                if ain == TOTAL_POWER_DRAG_ID
+                    || ain == POWER_DIFFERENCE_DRAG_ID
+                    || self.selected_ains.iter().any(|selected| {
+                        crate::fritz::normalize_ain_for_selection(selected)
+                            == crate::fritz::normalize_ain_for_selection(&ain)
+                    })
                 {
                     self.dragging_device_ain = Some(ain);
                     self.drag_target_ain = None;
@@ -2927,19 +3689,24 @@ impl cosmic::Application for AppModel {
                 if let Some(dragged_ain) = self.dragging_device_ain.as_deref() {
                     let target_is_valid = target_ain == TOTAL_POWER_DRAG_ID
                         || target_ain == POWER_DIFFERENCE_DRAG_ID
-                        || self.selected_ains.iter().any(|selected|
+                        || self.selected_ains.iter().any(|selected| {
                             crate::fritz::normalize_ain_for_selection(selected)
-                                == crate::fritz::normalize_ain_for_selection(&target_ain));
-                    let same_target = self.drag_target_ain.as_deref().is_some_and(|current|
+                                == crate::fritz::normalize_ain_for_selection(&target_ain)
+                        });
+                    let same_target = self.drag_target_ain.as_deref().is_some_and(|current| {
                         current == target_ain
                             || crate::fritz::normalize_ain_for_selection(current)
-                                == crate::fritz::normalize_ain_for_selection(&target_ain));
+                                == crate::fritz::normalize_ain_for_selection(&target_ain)
+                    });
                     if target_is_valid && dragged_ain != target_ain && !same_target {
                         // Move the dragged entry as soon as a new row is entered.
                         // The insertion preview then animates at the live position.
                         move_menu_entry(&mut self.settings.menu_order, dragged_ain, &target_ain);
-                        self.settings.total_power_first =
-                            self.settings.menu_order.first().is_some_and(|entry| entry == TOTAL_POWER_DRAG_ID);
+                        self.settings.total_power_first = self
+                            .settings
+                            .menu_order
+                            .first()
+                            .is_some_and(|entry| entry == TOTAL_POWER_DRAG_ID);
                         self.drag_target_ain = Some(target_ain);
                         self.drag_target_since = Some(Instant::now());
                     }
@@ -2963,19 +3730,31 @@ impl cosmic::Application for AppModel {
                 self.drag_scroll_direction = 0;
                 if self.dragging_device_ain.take().is_some() {
                     let previous_ains = self.drag_original_ains.take().unwrap_or_default();
-                    let previous_total_power_first =
-                        self.drag_original_total_power_first.take().unwrap_or(self.settings.total_power_first);
-                    let previous_menu_order = self.drag_original_menu_order.take().unwrap_or_default();
+                    let previous_total_power_first = self
+                        .drag_original_total_power_first
+                        .take()
+                        .unwrap_or(self.settings.total_power_first);
+                    let previous_menu_order =
+                        self.drag_original_menu_order.take().unwrap_or_default();
                     self.drag_target_ain = None;
                     self.drag_target_since = None;
                     if self.selected_ains != previous_ains
                         || self.settings.total_power_first != previous_total_power_first
                         || self.settings.menu_order != previous_menu_order
                     {
-                        let ordered_devices: Vec<String> = self.settings.menu_order.iter()
-                            .filter(|entry| entry.as_str() != TOTAL_POWER_DRAG_ID && entry.as_str() != POWER_DIFFERENCE_DRAG_ID)
-                            .cloned().collect();
-                        if !ordered_devices.is_empty() { self.selected_ains = ordered_devices; }
+                        let ordered_devices: Vec<String> = self
+                            .settings
+                            .menu_order
+                            .iter()
+                            .filter(|entry| {
+                                entry.as_str() != TOTAL_POWER_DRAG_ID
+                                    && entry.as_str() != POWER_DIFFERENCE_DRAG_ID
+                            })
+                            .cloned()
+                            .collect();
+                        if !ordered_devices.is_empty() {
+                            self.selected_ains = ordered_devices;
+                        }
                         self.settings.ains = self.selected_ains.clone();
                         self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
                         self.persist_settings();
@@ -2994,12 +3773,20 @@ impl cosmic::Application for AppModel {
             }
             Message::TemperatureAlertHighChanged(ain, high_c) => {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
-                self.settings.temperature_alerts.entry(key).or_default().high_c = high_c.clamp(0, 40);
+                self.settings
+                    .temperature_alerts
+                    .entry(key)
+                    .or_default()
+                    .high_c = high_c.clamp(0, 40);
                 self.persist_settings();
             }
             Message::TemperatureAlertLowChanged(ain, low_c) => {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
-                self.settings.temperature_alerts.entry(key).or_default().low_c = low_c.clamp(-10, 0);
+                self.settings
+                    .temperature_alerts
+                    .entry(key)
+                    .or_default()
+                    .low_c = low_c.clamp(-10, 0);
                 self.persist_settings();
             }
             Message::TogglePopup => {
@@ -3012,7 +3799,10 @@ impl cosmic::Application for AppModel {
                         self.popup = None;
                         return Task::none();
                     };
-                    let mut settings = self.core.applet.get_popup_settings(main_window_id, id, None, None, None);
+                    let mut settings =
+                        self.core
+                            .applet
+                            .get_popup_settings(main_window_id, id, None, None, None);
                     settings.positioner.size_limits = Limits::NONE
                         .max_width(320.0)
                         .min_width(320.0)
@@ -3021,15 +3811,21 @@ impl cosmic::Application for AppModel {
                 };
             }
             Message::PopupClosed(id) => {
-                if self.popup == Some(id) { self.popup = None; }
+                if self.popup == Some(id) {
+                    self.popup = None;
+                }
             }
         }
         Task::none()
     }
 
-    fn on_close_requested(&self, id: Id) -> Option<Message> { Some(Message::PopupClosed(id)) }
+    fn on_close_requested(&self, id: Id) -> Option<Message> {
+        Some(Message::PopupClosed(id))
+    }
 
-    fn style(&self) -> Option<cosmic::iced::theme::Style> { Some(cosmic::applet::style()) }
+    fn style(&self) -> Option<cosmic::iced::theme::Style> {
+        Some(cosmic::applet::style())
+    }
 }
 
 #[cfg(test)]
@@ -3039,26 +3835,76 @@ mod history_tests {
     #[test]
     fn device_rows_only_round_the_outer_list_corners() {
         let first = device_corner_radius(0, 3);
-        assert_eq!((first.top_left, first.top_right, first.bottom_right, first.bottom_left), (8.0, 8.0, 0.0, 0.0));
+        assert_eq!(
+            (
+                first.top_left,
+                first.top_right,
+                first.bottom_right,
+                first.bottom_left
+            ),
+            (8.0, 8.0, 0.0, 0.0)
+        );
         let middle = device_corner_radius(1, 3);
-        assert_eq!((middle.top_left, middle.top_right, middle.bottom_right, middle.bottom_left), (0.0, 0.0, 0.0, 0.0));
+        assert_eq!(
+            (
+                middle.top_left,
+                middle.top_right,
+                middle.bottom_right,
+                middle.bottom_left
+            ),
+            (0.0, 0.0, 0.0, 0.0)
+        );
         let last = device_corner_radius(2, 3);
-        assert_eq!((last.top_left, last.top_right, last.bottom_right, last.bottom_left), (0.0, 0.0, 8.0, 8.0));
+        assert_eq!(
+            (
+                last.top_left,
+                last.top_right,
+                last.bottom_right,
+                last.bottom_left
+            ),
+            (0.0, 0.0, 8.0, 8.0)
+        );
         let single = device_corner_radius(0, 1);
-        assert_eq!((single.top_left, single.top_right, single.bottom_right, single.bottom_left), (8.0, 8.0, 8.0, 8.0));
+        assert_eq!(
+            (
+                single.top_left,
+                single.top_right,
+                single.bottom_right,
+                single.bottom_left
+            ),
+            (8.0, 8.0, 8.0, 8.0)
+        );
     }
 
     #[test]
     fn displayed_power_uses_selected_device_or_output_total_by_layout_mode() {
         let readings = vec![
-            FritzReading { ain: "111111".into(), name: "First".into(), power_w: 800, temperature_c: 20.0, power_state: None },
-            FritzReading { ain: "222222".into(), name: "Solar input".into(), power_w: 250, temperature_c: 21.0, power_state: None },
+            FritzReading {
+                ain: "111111".into(),
+                name: "First".into(),
+                power_w: 800,
+                temperature_c: 20.0,
+                power_state: None,
+            },
+            FritzReading {
+                ain: "222222".into(),
+                name: "Solar input".into(),
+                power_w: 250,
+                temperature_c: 21.0,
+                power_state: None,
+            },
         ];
         let selected = vec!["222222".to_string(), "111111".to_string()];
         let inputs = HashSet::from(["222222".to_string()]);
 
-        assert_eq!(displayed_power_w(&readings, &selected, false, &inputs), Some(250));
-        assert_eq!(displayed_power_w(&readings, &selected, true, &inputs), Some(800));
+        assert_eq!(
+            displayed_power_w(&readings, &selected, false, &inputs),
+            Some(250)
+        );
+        assert_eq!(
+            displayed_power_w(&readings, &selected, true, &inputs),
+            Some(800)
+        );
         assert_eq!(displayed_power_w(&[], &selected, true, &inputs), None);
         assert_eq!(displayed_power_w(&[], &selected, false, &inputs), None);
     }
@@ -3066,7 +3912,10 @@ mod history_tests {
     #[test]
     fn quick_setting_sliders_snap_to_anchor_points() {
         for anchor in 0..=4 {
-            assert_eq!(quick_slider_snap_position(anchor as f32 + 0.04), anchor as f32);
+            assert_eq!(
+                quick_slider_snap_position(anchor as f32 + 0.04),
+                anchor as f32
+            );
         }
         assert!((quick_slider_snap_position(1.2) - 1.2).abs() < f32::EPSILON);
     }
@@ -3088,16 +3937,18 @@ mod history_tests {
     #[test]
     fn missing_device_notifications_only_fire_on_new_missing_transitions() {
         let mut previous = HashSet::new();
-        let missing = vec![
-            ("12:34-56".to_string(), "Solar inverter".to_string()),
-        ];
-        assert_eq!(newly_missing_devices(&mut previous, &missing, &HashSet::new()), vec!["Solar inverter"]);
+        let missing = vec![("12:34-56".to_string(), "Solar inverter".to_string())];
+        assert_eq!(
+            newly_missing_devices(&mut previous, &missing, &HashSet::new()),
+            vec!["Solar inverter"]
+        );
         assert!(newly_missing_devices(&mut previous, &missing, &HashSet::new()).is_empty());
         assert!(newly_missing_devices(&mut previous, &[], &HashSet::new()).is_empty());
-        assert_eq!(newly_missing_devices(&mut previous, &missing, &HashSet::new()), vec!["Solar inverter"]);
+        assert_eq!(
+            newly_missing_devices(&mut previous, &missing, &HashSet::new()),
+            vec!["Solar inverter"]
+        );
     }
-
-
 
     #[test]
     fn missing_notifications_are_suppressed_during_intentional_power_changes() {
@@ -3143,7 +3994,11 @@ mod history_tests {
 
     #[test]
     fn dragging_selected_devices_reorders_them_and_ignores_unknown_targets() {
-        let mut ains = vec!["111111111111".into(), "222222222222".into(), "333333333333".into()];
+        let mut ains = vec![
+            "111111111111".into(),
+            "222222222222".into(),
+            "333333333333".into(),
+        ];
         move_selected_device_to_drop_target(&mut ains, "111111111111", "333333333333");
         assert_eq!(ains, vec!["222222222222", "333333333333", "111111111111"]);
         move_selected_device_to_drop_target(&mut ains, "333333333333", "222222222222");
@@ -3157,17 +4012,37 @@ mod history_tests {
         let mut ains = vec!["111111111111".into(), "222222222222".into()];
         let mut total_first = false;
 
-        move_sortable_entry(&mut ains, &mut total_first, TOTAL_POWER_DRAG_ID, "111111111111");
+        move_sortable_entry(
+            &mut ains,
+            &mut total_first,
+            TOTAL_POWER_DRAG_ID,
+            "111111111111",
+        );
         assert!(total_first);
         assert_eq!(ains, vec!["111111111111", "222222222222"]);
 
-        move_sortable_entry(&mut ains, &mut total_first, "111111111111", TOTAL_POWER_DRAG_ID);
+        move_sortable_entry(
+            &mut ains,
+            &mut total_first,
+            "111111111111",
+            TOTAL_POWER_DRAG_ID,
+        );
         assert!(!total_first);
         assert_eq!(ains, vec!["222222222222", "111111111111"]);
 
-        move_sortable_entry(&mut ains, &mut total_first, TOTAL_POWER_DRAG_ID, "222222222222");
+        move_sortable_entry(
+            &mut ains,
+            &mut total_first,
+            TOTAL_POWER_DRAG_ID,
+            "222222222222",
+        );
         assert!(total_first);
-        move_sortable_entry(&mut ains, &mut total_first, "111111111111", TOTAL_POWER_DRAG_ID);
+        move_sortable_entry(
+            &mut ains,
+            &mut total_first,
+            "111111111111",
+            TOTAL_POWER_DRAG_ID,
+        );
         assert!(!total_first);
         assert_eq!(ains, vec!["222222222222", "111111111111"]);
     }
@@ -3177,9 +4052,19 @@ mod history_tests {
         let mut ains = vec!["111111111111".into()];
         let mut total_first = false;
 
-        move_sortable_entry(&mut ains, &mut total_first, TOTAL_POWER_DRAG_ID, "unselected");
+        move_sortable_entry(
+            &mut ains,
+            &mut total_first,
+            TOTAL_POWER_DRAG_ID,
+            "unselected",
+        );
         assert!(!total_first);
-        move_sortable_entry(&mut ains, &mut total_first, "unselected", TOTAL_POWER_DRAG_ID);
+        move_sortable_entry(
+            &mut ains,
+            &mut total_first,
+            "unselected",
+            TOTAL_POWER_DRAG_ID,
+        );
         assert!(!total_first);
         assert_eq!(ains, vec!["111111111111"]);
     }
@@ -3187,9 +4072,27 @@ mod history_tests {
     #[test]
     fn input_power_totals_include_only_input_devices_and_keep_the_negative_sign() {
         let readings = vec![
-            FritzReading { ain: "111111".into(), name: "Load".into(), power_w: 400, temperature_c: 20.0, power_state: None },
-            FritzReading { ain: "222222".into(), name: "Solar".into(), power_w: 250, temperature_c: 21.0, power_state: None },
-            FritzReading { ain: "333333".into(), name: "Solar battery".into(), power_w: 100, temperature_c: 22.0, power_state: None },
+            FritzReading {
+                ain: "111111".into(),
+                name: "Load".into(),
+                power_w: 400,
+                temperature_c: 20.0,
+                power_state: None,
+            },
+            FritzReading {
+                ain: "222222".into(),
+                name: "Solar".into(),
+                power_w: 250,
+                temperature_c: 21.0,
+                power_state: None,
+            },
+            FritzReading {
+                ain: "333333".into(),
+                name: "Solar battery".into(),
+                power_w: 100,
+                temperature_c: 22.0,
+                power_state: None,
+            },
         ];
         let inputs = HashSet::from(["222222".to_string(), "333333".to_string()]);
         assert_eq!(input_power_w(&readings, &inputs), -350);
@@ -3206,8 +4109,20 @@ mod history_tests {
     #[test]
     fn average_temperature_uses_all_available_selected_readings() {
         let readings = vec![
-            FritzReading { ain: "111111".into(), name: "First".into(), power_w: 100, temperature_c: 20.0, power_state: None },
-            FritzReading { ain: "222222".into(), name: "Second".into(), power_w: 200, temperature_c: 24.0, power_state: None },
+            FritzReading {
+                ain: "111111".into(),
+                name: "First".into(),
+                power_w: 100,
+                temperature_c: 20.0,
+                power_state: None,
+            },
+            FritzReading {
+                ain: "222222".into(),
+                name: "Second".into(),
+                power_w: 200,
+                temperature_c: 24.0,
+                power_state: None,
+            },
         ];
         assert_eq!(average_temperature_c(&readings, false), Some(22.0));
         assert_eq!(average_temperature_c(&readings, true), Some(22.0));
@@ -3217,9 +4132,27 @@ mod history_tests {
     #[test]
     fn average_temperature_can_exclude_solar_named_devices_case_insensitively() {
         let readings = vec![
-            FritzReading { ain: "111111".into(), name: "Living room".into(), power_w: 100, temperature_c: 20.0, power_state: None },
-            FritzReading { ain: "222222".into(), name: "Solar inverter".into(), power_w: 200, temperature_c: 40.0, power_state: None },
-            FritzReading { ain: "333333".into(), name: "ROOF SOLAR METER".into(), power_w: 300, temperature_c: 50.0, power_state: None },
+            FritzReading {
+                ain: "111111".into(),
+                name: "Living room".into(),
+                power_w: 100,
+                temperature_c: 20.0,
+                power_state: None,
+            },
+            FritzReading {
+                ain: "222222".into(),
+                name: "Solar inverter".into(),
+                power_w: 200,
+                temperature_c: 40.0,
+                power_state: None,
+            },
+            FritzReading {
+                ain: "333333".into(),
+                name: "ROOF SOLAR METER".into(),
+                power_w: 300,
+                temperature_c: 50.0,
+                power_state: None,
+            },
         ];
         assert_eq!(average_temperature_c(&readings, false), Some(110.0 / 3.0));
         assert_eq!(average_temperature_c(&readings, true), Some(20.0));
@@ -3267,13 +4200,23 @@ mod history_tests {
     #[test]
     fn solar_named_devices_are_default_inputs_case_insensitively() {
         let devices = vec![
-            FritzDevice { name: "Solar inverter".into(), ain: "12:34-56".into() },
-            FritzDevice { name: "ROOF SOLAR METER".into(), ain: "222222".into() },            FritzDevice { name: "Battery inverter".into(), ain: "333333".into() },
+            FritzDevice {
+                name: "Solar inverter".into(),
+                ain: "12:34-56".into(),
+            },
+            FritzDevice {
+                name: "ROOF SOLAR METER".into(),
+                ain: "222222".into(),
+            },
+            FritzDevice {
+                name: "Battery inverter".into(),
+                ain: "333333".into(),
+            },
         ];
-        assert_eq!(solar_input_ains(&devices), HashSet::from([
-            "123456".to_string(),
-            "222222".to_string(),
-        ]));
+        assert_eq!(
+            solar_input_ains(&devices),
+            HashSet::from(["123456".to_string(), "222222".to_string(),])
+        );
     }
 
     #[test]
@@ -3357,7 +4300,9 @@ mod history_tests {
     fn error_statuses_are_distinguished_from_progress_messages() {
         assert!(is_error_status("Connection failed: timeout"));
         assert!(is_error_status("Weather unavailable: offline"));
-        assert!(is_error_status("Could not save settings: permission denied"));
+        assert!(is_error_status(
+            "Could not save settings: permission denied"
+        ));
         assert!(!is_error_status("Connecting and loading devices…"));
         assert!(!is_error_status("Found 2 compatible power-meter device(s)"));
     }
@@ -3425,7 +4370,10 @@ mod history_tests {
 
             clear_confirmed_power_changes(&mut pending_targets, &mut pending_changes, &readings);
 
-            assert_eq!(pending_targets.contains_key("123456"), should_remain_pending);
+            assert_eq!(
+                pending_targets.contains_key("123456"),
+                should_remain_pending
+            );
             assert_eq!(pending_changes.contains("123456"), should_remain_pending);
         }
     }
@@ -3436,11 +4384,17 @@ mod history_tests {
 
         move_menu_entry(&mut order, "a", "c");
 
-        assert_eq!(order, vec!["b".to_string(), "c".to_string(), "a".to_string()]);
+        assert_eq!(
+            order,
+            vec!["b".to_string(), "c".to_string(), "a".to_string()]
+        );
 
         move_menu_entry(&mut order, "a", "b");
 
-        assert_eq!(order, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+        assert_eq!(
+            order,
+            vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        );
     }
 
     #[test]
@@ -3453,20 +4407,25 @@ mod history_tests {
         ];
 
         move_menu_entry(&mut order, POWER_DIFFERENCE_DRAG_ID, "a");
-        assert_eq!(order, vec![
-            TOTAL_POWER_DRAG_ID.to_string(),
-            POWER_DIFFERENCE_DRAG_ID.to_string(),
-            "a".to_string(),
-            "b".to_string(),
-        ]);
+        assert_eq!(
+            order,
+            vec![
+                TOTAL_POWER_DRAG_ID.to_string(),
+                POWER_DIFFERENCE_DRAG_ID.to_string(),
+                "a".to_string(),
+                "b".to_string(),
+            ]
+        );
 
         move_menu_entry(&mut order, "b", TOTAL_POWER_DRAG_ID);
-        assert_eq!(order, vec![
-            "b".to_string(),
-            TOTAL_POWER_DRAG_ID.to_string(),
-            POWER_DIFFERENCE_DRAG_ID.to_string(),
-            "a".to_string(),
-        ]);
+        assert_eq!(
+            order,
+            vec![
+                "b".to_string(),
+                TOTAL_POWER_DRAG_ID.to_string(),
+                POWER_DIFFERENCE_DRAG_ID.to_string(),
+                "a".to_string(),
+            ]
+        );
     }
-
 }
