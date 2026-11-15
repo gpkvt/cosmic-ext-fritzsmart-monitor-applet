@@ -1138,7 +1138,7 @@ fn settings_section_header<'a>(
 fn sortable_menu_card<'a>(
     id: String,
     card: cosmic::Element<'a, Message>,
-    is_dragging: bool,
+    _is_dragging: bool,
 ) -> cosmic::Element<'a, Message> {
     // The pinned libcosmic Iced API does not expose a stack/opacity widget.
     // Keep the original card intact while the drag handle and drop indicators
