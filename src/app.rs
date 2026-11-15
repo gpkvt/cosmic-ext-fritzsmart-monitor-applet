@@ -10,7 +10,7 @@ use cosmic::iced::{
 use cosmic::prelude::*;
 use cosmic::widget;
 use futures::SinkExt;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
@@ -43,6 +43,7 @@ pub struct AppModel {
     weather_attribution_expanded: bool,
     next_weather_refresh_at: Option<Instant>,
     pending_power_changes: HashSet<String>,
+    pending_power_targets: HashMap<String, bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +67,7 @@ pub enum Message {
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
     ToggleDevice(String, bool),
+    ToggleDeviceInput(String, bool),
     StartDeviceDrag(String),
     DragOverDevice(String),
     EndDeviceDrag,
@@ -109,6 +111,23 @@ fn newly_missing_devices(
     // a transient transition does not trigger a delayed duplicate notification.
     *previously_missing = current;
     newly_missing
+}
+
+fn clear_confirmed_power_changes(
+    pending_targets: &mut HashMap<String, bool>,
+    pending_changes: &mut HashSet<String>,
+    readings: &[FritzReading],
+) {
+    let confirmed: Vec<String> = pending_targets.iter()
+        .filter(|(ain, requested)| readings.iter().any(|reading|
+            crate::fritz::normalize_ain_for_selection(&reading.ain) == ain.as_str()
+                && reading.power_state == Some(**requested)))
+        .map(|(ain, _)| ain.clone())
+        .collect();
+    for ain in confirmed {
+        pending_targets.remove(&ain);
+        pending_changes.remove(&ain);
+    }
 }
 
 fn notify_missing_devices(names: &[String]) {
@@ -226,8 +245,41 @@ fn record_power_sample(
     }
 }
 
+fn solar_input_ains(devices: &[FritzDevice]) -> HashSet<String> {
+    devices.iter()
+        .filter(|device| device.name.to_lowercase().contains("solar"))
+        .map(|device| crate::fritz::normalize_ain_for_selection(&device.ain))
+        .filter(|ain| !ain.is_empty())
+        .collect()
+}
+
+fn signed_device_power(power_w: i64, is_input: bool) -> i64 {
+    if is_input { -power_w.abs() } else { power_w }
+}
+
+fn net_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
+    readings.iter().map(|reading| {
+        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
+        signed_device_power(reading.power_w, input_ains.contains(&key))
+    }).sum()
+}
+
 fn power_sparkline(history: &VecDeque<(Instant, i64)>) -> String {
     numeric_sparkline(history.iter().map(|(_, value)| *value as f64))
+}
+
+fn rebuild_net_power_history(
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    input_ains: &HashSet<String>,
+) -> VecDeque<(Instant, i64)> {
+    let mut samples = BTreeMap::<Instant, i64>::new();
+    for (ain, history) in device_history {
+        let is_input = input_ains.contains(ain);
+        for (timestamp, power_w, _) in history {
+            *samples.entry(*timestamp).or_default() += signed_device_power(*power_w, is_input);
+        }
+    }
+    samples.into_iter().collect()
 }
 
 fn numeric_sparkline(values: impl Iterator<Item = f64>) -> String {
@@ -647,9 +699,19 @@ impl cosmic::Application for AppModel {
                     }
                     let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
                     let alert_thresholds = self.settings.temperature_alerts.get(&normalized_ain).copied();
+                    let is_input = self.settings.input_ains.contains(&normalized_ain);
                     let mut device_row = widget::Column::new()
                         .spacing(6)
                         .push(row)
+                        .push(widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::text::caption("Input (subtract from total)"))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(widget::toggler(is_input)
+                                .on_toggle({
+                                    let ain = ain.clone();
+                                    move |enabled| Message::ToggleDeviceInput(ain.clone(), enabled)
+                                })))
                         .push(widget::Row::new()
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::text::caption("Temperature alerts"))
@@ -857,22 +919,21 @@ impl cosmic::Application for AppModel {
                         let ain = reading.ain.clone();
                         let key = crate::fritz::normalize_ain_for_selection(&ain);
                         let pending = self.pending_power_changes.contains(&key);
-                        let action: cosmic::Element<'_, Message> = if pending {
-                            widget::text::caption("Switching…").into()
+                        let toggle: cosmic::Element<'_, Message> = if pending {
+                            widget::toggler(is_on).into()
                         } else {
-                            widget::button::custom(widget::text::body(
-                                if is_on { "Turn off" } else { "Turn on" },
-                            ))
-                            .on_press(Message::SetDevicePower(ain, !is_on))
-                            .into()
+                            widget::toggler(is_on)
+                                .on_toggle(move |requested| Message::SetDevicePower(ain.clone(), requested))
+                                .into()
                         };
                         widget::Row::new()
                             .spacing(8)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::text::caption("POWER"))
-                            .push(widget::text::body(if is_on { "● ON" } else { "○ OFF" }))
+                            .push(widget::text::body(if is_on { "ON" } else { "OFF" }))
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(action)
+                            .push_maybe(if pending { Some(widget::text::caption("Updating…")) } else { None })
+                            .push(toggle)
                             .into()
                     });
                     let device_content = widget::Column::new()
@@ -908,6 +969,10 @@ impl cosmic::Application for AppModel {
                                             let cosmic = theme.cosmic();
                                             cosmic::iced::widget::container::Style {
                                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
+                                                border: cosmic::iced::Border {
+                                                    radius: 3.0.into(),
+                                                    ..Default::default()
+                                                },
                                                 ..Default::default()
                                             }
                                         }),
@@ -918,6 +983,10 @@ impl cosmic::Application for AppModel {
                                         let cosmic = theme.cosmic();
                                         cosmic::iced::widget::container::Style {
                                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                                            border: cosmic::iced::Border {
+                                                radius: 3.0.into(),
+                                                ..Default::default()
+                                            },
                                             ..Default::default()
                                         }
                                     }),
@@ -944,6 +1013,10 @@ impl cosmic::Application for AppModel {
                                             let cosmic = theme.cosmic();
                                             cosmic::iced::widget::container::Style {
                                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
+                                                border: cosmic::iced::Border {
+                                                    radius: 3.0.into(),
+                                                    ..Default::default()
+                                                },
                                                 ..Default::default()
                                             }
                                         }),
@@ -954,6 +1027,10 @@ impl cosmic::Application for AppModel {
                                         let cosmic = theme.cosmic();
                                         cosmic::iced::widget::container::Style {
                                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                                            border: cosmic::iced::Border {
+                                                radius: 3.0.into(),
+                                                ..Default::default()
+                                            },
                                             ..Default::default()
                                         }
                                     }),
@@ -975,9 +1052,84 @@ impl cosmic::Application for AppModel {
                     self.history.iter().map(|(_, value)| *value).min(),
                     self.history.iter().map(|(_, value)| *value).max(),
                 ) {
-                    content = content.push(widget::text::caption(format!("TOTAL POWER · LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
-                        .push(widget::text::body(format!("Low  {low} W     High  {high} W")))
-                        .push(widget::text::title2(power_sparkline(&self.history)));
+                    let total_power = net_power_w(&self.readings, &self.settings.input_ains);
+                    let mut total_power_content = widget::Column::new()
+                        .spacing(6)
+                        .push(widget::text::body(format!(
+                            "TOTAL POWER · LAST {}",
+                            format_graph_timespan(self.settings.graph_timespan_minutes),
+                        )))
+                        .push(widget::text::title2(format!("{total_power} W")))
+                        .push(widget::text::caption(format!("Low  {low} W     High  {high} W")))
+                        .push(
+                            widget::container(widget::text::body(power_sparkline(&self.history)))
+                                .padding(8)
+                                .width(cosmic::iced::Length::Fill)
+                                .style(|theme| {
+                                    let cosmic = theme.cosmic();
+                                    cosmic::iced::widget::container::Style {
+                                        background: Some(
+                                            cosmic::iced::Color::from(cosmic.background(false).base).into(),
+                                        ),
+                                        border: cosmic::iced::Border {
+                                            radius: 3.0.into(),
+                                            ..Default::default()
+                                        },
+                                        ..Default::default()
+                                    }
+                                }),
+                        );
+                    for reading in self.readings.iter().filter(|reading|
+                        self.settings.input_ains.contains(
+                            &crate::fritz::normalize_ain_for_selection(&reading.ain),
+                        ))
+                    {
+                        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
+                        let input_history = self.device_history.get(&key);
+                        let graph = input_history.map(|samples|
+                            numeric_sparkline(samples.iter().map(|(_, power, _)|
+                                signed_device_power(*power, true) as f64)))
+                            .unwrap_or_else(|| "Waiting for samples…".into());
+                        total_power_content = total_power_content.push(
+                            widget::Column::new()
+                                .spacing(4)
+                                .push(widget::text::caption(format!(
+                                    "INPUT · {} · {} W",
+                                    reading.name,
+                                    signed_device_power(reading.power_w, true),
+                                )))
+                                .push(
+                                    widget::container(widget::text::body(graph))
+                                        .padding(8)
+                                        .width(cosmic::iced::Length::Fill)
+                                        .style(|theme| {
+                                            let cosmic = theme.cosmic();
+                                            cosmic::iced::widget::container::Style {
+                                                background: Some(
+                                                    cosmic::iced::Color::from(cosmic.background(false).base).into(),
+                                                ),
+                                                border: cosmic::iced::Border {
+                                                    radius: 3.0.into(),
+                                                    ..Default::default()
+                                                },
+                                                ..Default::default()
+                                            }
+                                        }),
+                                ),
+                        );
+                    }
+                    content = content.push(
+                        widget::container(total_power_content)
+                            .padding(10)
+                            .style(move |theme| {
+                                let cosmic = theme.cosmic();
+                                let base = cosmic::iced::Color::from(cosmic.background(false).base);
+                                cosmic::iced::widget::container::Style {
+                                    background: Some(device_background_color(base, 0).into()),
+                                    ..Default::default()
+                                }
+                            }),
+                    );
                 }
             } else {
                 content = content.push(widget::text::body("Select one or more devices in Settings"));
@@ -1135,7 +1287,8 @@ impl cosmic::Application for AppModel {
                 {
                     return Task::none();
                 }
-                self.pending_power_changes.insert(key);
+                self.pending_power_changes.insert(key.clone());
+                self.pending_power_targets.insert(key, on);
                 return Task::perform(
                     crate::fritz::set_device_power(ain.clone(), on),
                     move |result| cosmic::Action::App(
@@ -1147,14 +1300,8 @@ impl cosmic::Application for AppModel {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
                 match result {
                     Ok(()) => {
-                        // The FRITZ!Box has now reported the requested state;
-                        // update the UI only after that confirmation.
-                        for reading in &mut self.readings {
-                            if crate::fritz::normalize_ain_for_selection(&reading.ain) == key {
-                                reading.power_state = Some(on);
-                            }
-                        }
-                        self.pending_power_changes.remove(&key);
+                        // Keep the control pending until a subsequent full refresh
+                        // supplies the confirmed state and fresh meter readings.
                         self.error = None;
                         self.refresh_started_at = Some(Instant::now());
                         self.next_refresh_at = None;
@@ -1163,6 +1310,7 @@ impl cosmic::Application for AppModel {
                     }
                     Err(error) => {
                         self.pending_power_changes.remove(&key);
+                        self.pending_power_targets.remove(&key);
                         let device_name = self.readings.iter().find(|reading|
                             crate::fritz::normalize_ain_for_selection(&reading.ain)
                                 == crate::fritz::normalize_ain_for_selection(&ain))
@@ -1186,10 +1334,15 @@ impl cosmic::Application for AppModel {
                     );
                     notify_missing_devices(&newly_missing);
                     let readings = result.readings;
+                    clear_confirmed_power_changes(
+                        &mut self.pending_power_targets,
+                        &mut self.pending_power_changes,
+                        &readings,
+                    );
                     if readings.is_empty() {
                         self.error = Some("No selected devices returned usable readings".into());
                     } else {
-                    let total_power = readings.iter().map(|reading| reading.power_w).sum();
+                    let total_power = net_power_w(&readings, &self.settings.input_ains);
                     let now = Instant::now();
                     let history_window = graph_history_window(self.settings.graph_timespan_minutes);
                     record_power_sample(&mut self.history, total_power, now, history_window);
@@ -1313,6 +1466,11 @@ impl cosmic::Application for AppModel {
             Message::DevicesLoaded(result) => match result {
                 Ok(devices) => {
                     self.devices = devices;
+                    if !self.settings.input_defaults_initialized {
+                        self.settings.input_ains.extend(solar_input_ains(&self.devices));
+                        self.settings.input_defaults_initialized = true;
+                        self.persist_settings();
+                    }
                     self.selected_ains = if self.settings.ains.is_empty() {
                         if self.settings.ain.trim().is_empty() { Vec::new() } else { vec![self.settings.ain.clone()] }
                     } else { self.settings.ains.clone() };
@@ -1331,6 +1489,19 @@ impl cosmic::Application for AppModel {
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
                 self.persist_settings();
+            }
+            Message::ToggleDeviceInput(ain, enabled) => {
+                let key = crate::fritz::normalize_ain_for_selection(&ain);
+                if enabled {
+                    self.settings.input_ains.insert(key);
+                } else {
+                    self.settings.input_ains.remove(&key);
+                }
+                self.persist_settings();
+                self.history = rebuild_net_power_history(
+                    &self.device_history,
+                    &self.settings.input_ains,
+                ).into_iter().collect();
             }
             Message::StartDeviceDrag(ain) => {
                 if self.selected_ains.iter().any(|selected|
@@ -1476,6 +1647,56 @@ mod history_tests {
         assert_eq!(ains, vec!["333333333333", "222222222222", "111111111111"]);
         move_selected_device_to_drop_target(&mut ains, "missing", "222222222222");
         assert_eq!(ains, vec!["333333333333", "222222222222", "111111111111"]);
+    }
+
+    #[test]
+    fn changing_input_roles_recalculates_net_history() {
+        let now = Instant::now();
+        let device_history = HashMap::from([
+            ("111111".to_string(), VecDeque::from([(now, 900, 20.0)])),
+            ("222222".to_string(), VecDeque::from([(now, 250, 21.0)])),
+        ]);
+        let inputs = HashSet::from(["222222".to_string()]);
+        let history = rebuild_net_power_history(&device_history, &inputs);
+        assert_eq!(history, VecDeque::from([(now, 650)]));
+    }
+
+    #[test]
+    fn solar_named_devices_are_default_inputs_case_insensitively() {
+        let devices = vec![
+            FritzDevice { name: "Solar inverter".into(), ain: "12:34-56".into() },
+            FritzDevice { name: "ROOF SOLAR METER".into(), ain: "222222".into() },
+            FritzDevice { name: "Battery inverter".into(), ain: "333333".into() },
+        ];
+        assert_eq!(solar_input_ains(&devices), HashSet::from([
+            "123456".to_string(),
+            "222222".to_string(),
+        ]));
+    }
+
+    #[test]
+    fn input_devices_are_subtracted_from_net_power() {
+        let readings = vec![
+            FritzReading {
+                ain: "11:11 11".into(),
+                name: "Generation".into(),
+                power_w: 900,
+                temperature_c: 20.0,
+                power_state: None,
+            },
+            FritzReading {
+                ain: "22:22 22".into(),
+                name: "Consumption".into(),
+                power_w: 250,
+                temperature_c: 21.0,
+                power_state: None,
+            },
+        ];
+        let inputs = HashSet::from(["222222".to_string()]);
+        assert_eq!(signed_device_power(250, true), -250);
+        assert_eq!(signed_device_power(250, false), 250);
+        assert_eq!(net_power_w(&readings, &inputs), 650);
+        assert_eq!(net_power_w(&readings, &HashSet::new()), 1150);
     }
 
     #[test]
@@ -1626,4 +1847,30 @@ mod history_tests {
         assert_eq!(sparse.chars().next(), Some('▁'));
         assert_eq!(sparse.chars().last(), Some('█'));
     }
+    #[test]
+    fn power_toggle_stays_pending_until_fresh_reading_confirms_requested_state() {
+        for (requested, reported, should_remain_pending) in [
+            (true, Some(false), true),
+            (false, Some(true), true),
+            (true, Some(true), false),
+            (false, Some(false), false),
+            (true, None, true),
+        ] {
+            let mut pending_targets = HashMap::from([("123456".to_string(), requested)]);
+            let mut pending_changes = HashSet::from(["123456".to_string()]);
+            let readings = vec![FritzReading {
+                ain: "12:34-56".into(),
+                name: "Test switch".into(),
+                power_w: 100,
+                temperature_c: 20.0,
+                power_state: reported,
+            }];
+
+            clear_confirmed_power_changes(&mut pending_targets, &mut pending_changes, &readings);
+
+            assert_eq!(pending_targets.contains_key("123456"), should_remain_pending);
+            assert_eq!(pending_changes.contains("123456"), should_remain_pending);
+        }
+    }
+
 }
