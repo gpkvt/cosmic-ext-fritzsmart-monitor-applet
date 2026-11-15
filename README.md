@@ -71,11 +71,17 @@ cargo build --release
 ```
 
 GitHub Actions formats the Rust sources, runs the test suite, checks compilation, builds the optimized binary and validates installation on pull requests and pushes to `main`. Pushing
-a version tag such as `v0.1.5` builds a Linux x86_64 release archive containing
-the applet binary, desktop entry, icon, README and license, and publishes the
-archive with a SHA-256 checksum on the GitHub Releases page. The release
-workflow also builds a sandboxed Flatpak bundle for the COSMIC applet and
-attaches it with a SHA-256 checksum. The Flatpak uses the Freedesktop 24.08
+a version tag such as `v0.2.4` builds Linux x86_64 release packages and
+publishes them on the GitHub Releases page:
+
+- A Debian `.deb` package with runtime dependencies detected from the built
+  executable and the COSMIC applet desktop entry and icon.
+- A self-contained AppImage with its shared-library dependencies bundled.
+- A portable `.tar.gz` archive containing the applet binary, desktop entry,
+  icon, README and license.
+- A sandboxed Flatpak bundle for the COSMIC applet.
+
+The release workflow attaches SHA-256 checksums for the packages. The Flatpak uses the Freedesktop 24.08
 runtime, the Rust SDK extension, Wayland access, network access for the
 FRITZ!Box/OpenWeatherMap requests, and desktop-notification permission.
 
