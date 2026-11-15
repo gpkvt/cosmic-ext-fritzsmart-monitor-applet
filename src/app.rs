@@ -1240,7 +1240,7 @@ impl cosmic::Application for AppModel {
                             text_color: Some(cosmic::iced::Color::WHITE),
                             ..Default::default()
                         });
-                    cosmic::iced::widget::Stack::new()
+                    cosmic::iced::cosmic::iced::widget::Stack::new()
                         .width(cosmic::iced::Length::Fill)
                         .height(cosmic::iced::Length::Fixed(210.0))
                         .push(photo)
