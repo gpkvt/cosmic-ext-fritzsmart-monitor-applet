@@ -39,6 +39,7 @@ pub struct AppModel {
     next_refresh_at: Option<Instant>,
     refresh_started_at: Option<Instant>,
     weather: Option<WeatherData>,
+    weather_attribution_expanded: bool,
     next_weather_refresh_at: Option<Instant>,
     pending_power_changes: HashSet<String>,
 }
@@ -71,6 +72,7 @@ pub enum Message {
     TemperatureAlertHighChanged(String, i16),
     TemperatureAlertLowChanged(String, i16),
     WeatherUpdated(Result<WeatherData, String>),
+    ToggleWeatherAttribution,
     WeatherEnabledChanged(bool),
     OpenWeatherMapApiKeyChanged(String),
     WeatherLocationChanged(String),
@@ -780,9 +782,25 @@ impl cosmic::Application for AppModel {
                 };
                 content = content
                     .push(widget::text::caption("WEATHER"))
-                    .push(weather_card)
-                    .push_maybe(weather.image_attribution.as_ref().map(|credit| widget::text::caption(credit.clone())))
-                    .push(widget::divider::horizontal::default());
+                    .push(weather_card);
+                if let Some(credit) = weather.image_attribution.as_ref() {
+                    let label = if self.weather_attribution_expanded {
+                        "▾ Wikimedia Commons image credit"
+                    } else {
+                        "▸ Wikimedia Commons image credit"
+                    };
+                    content = content.push(
+                        widget::button::custom(widget::text::caption(label))
+                            .on_press(Message::ToggleWeatherAttribution)
+                            .padding([2, 0]),
+                    );
+                    if self.weather_attribution_expanded {
+                        content = content.push(widget::container(
+                            widget::text::caption(credit.clone())
+                        ).padding([0, 8]));
+                    }
+                }
+                content = content.push(widget::divider::horizontal::default());
             } else if self.settings.weather_enabled {
                 content = content
                     .push(widget::text::caption("WEATHER"))
@@ -1154,6 +1172,9 @@ impl cosmic::Application for AppModel {
                 self.next_refresh_at = Some(
                     Instant::now() + Duration::from_secs(u64::from(self.settings.refresh_interval_seconds.clamp(30, 3600))),
                 );
+            }
+            Message::ToggleWeatherAttribution => {
+                self.weather_attribution_expanded = !self.weather_attribution_expanded;
             }
             Message::WeatherUpdated(result) => {
                 match result {
