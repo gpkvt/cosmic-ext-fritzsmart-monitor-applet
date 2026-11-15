@@ -40,7 +40,8 @@ pub struct AppModel {
     refresh_started_at: Option<Instant>,
     weather: Option<WeatherData>,
     next_weather_refresh_at: Option<Instant>,
-    pending_power_changes: HashSet<String>,}
+    pending_power_changes: HashSet<String>,
+}
 
 #[derive(Debug, Clone)]
 pub enum Message {
