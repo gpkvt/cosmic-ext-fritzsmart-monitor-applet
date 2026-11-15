@@ -2808,7 +2808,20 @@ impl cosmic::Application for AppModel {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
                 self.selected_ains.retain(|existing|
                     crate::fritz::normalize_ain_for_selection(existing) != normalized);
-                if selected { self.selected_ains.push(ain); }
+                if selected {
+                    self.selected_ains.push(ain);
+                    if !self.settings.menu_order.iter().any(|entry|
+                        crate::fritz::normalize_ain_for_selection(entry) == normalized)
+                    {
+                        let insert_at = self.settings.menu_order.iter()
+                            .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID)
+                            .unwrap_or(self.settings.menu_order.len());
+                        self.settings.menu_order.insert(insert_at, normalized);
+                    }
+                } else {
+                    self.settings.menu_order.retain(|entry|
+                        crate::fritz::normalize_ain_for_selection(entry) != normalized);
+                }
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
                 self.persist_settings();
