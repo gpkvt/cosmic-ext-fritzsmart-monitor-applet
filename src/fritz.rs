@@ -413,6 +413,8 @@ mod tests {
         assert_eq!(alerts.get("12345678"), Some(&55));
         assert_eq!(alerts.get("222222222222"), Some(&75));
         assert_eq!(alerts.len(), 2);
+        assert_eq!(parse_temperature_alerts("123:10").get("123"), Some(&30));
+        assert_eq!(parse_temperature_alerts("123:120").get("123"), Some(&100));
         assert!(FritzSettings::default().temperature_alerts.is_empty());
     }
 
