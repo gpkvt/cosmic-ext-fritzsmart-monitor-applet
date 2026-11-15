@@ -10,6 +10,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 - Settings and popup device rows use distinct muted background tints. Each selected device has separate configurable-timespan wattage and temperature sparklines in the popup, plus combined power history.
 - The main menu has a sticky title bar with icon-only Refresh and Settings actions; both use accessible labels and tooltips. The menu content scrolls independently beneath the title bar. The main menu and settings are vertically scrollable when their content exceeds the popup height.
 - The first selected device supplies both power and temperature values shown in the panel. Selected devices can be reordered in Settings.
+- The main popup shows live on/off state and power controls for selected devices that expose FRITZ!Box switching support. Commands use the authenticated Smart Home API and trigger an immediate reading refresh; non-switchable devices have no power toggle.
 - In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy; every setting is saved immediately when changed.
 - Optional per-device temperature alerts for readings above the upper limit or below the lower limit. Defaults are 40 °C and −10 °C; the upper limit is configurable from 0–40 °C and the lower limit from −10–0 °C. Desktop notifications fire when a device crosses out of the safe range and re-arm when it returns.
 - Optional per-router PEM CA certificate trust without disabling hostname verification.
