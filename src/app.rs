@@ -1494,7 +1494,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::body(format!("Wind  {:.1} m/s{}", weather.wind_speed_mps, wind_direction)))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                         .push(widget::Column::new().spacing(2)
-                            .push(widget::text::caption("Pressure"))
+                            .push(widget::text::body("Pressure"))
                             .push(widget::text::body(format!("{} hPa", weather.pressure_hpa)))))
                     .push(widget::Row::new().spacing(8)
                         .push(widget::text::body(format!("Visibility  {:.1} km", f64::from(weather.visibility_m) / 1000.0)))
