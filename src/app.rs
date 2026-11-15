@@ -28,6 +28,7 @@ pub struct AppModel {
     settings: FritzSettings,
     devices: Vec<FritzDevice>,
     selected_ains: Vec<String>,
+    dragging_device_ain: Option<String>,
     settings_status: Option<String>,
     settings_saved_until: Option<Instant>,
     history: VecDeque<(Instant, i64)>,
@@ -57,7 +58,9 @@ pub enum Message {
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
     ToggleDevice(String, bool),
-    MoveDevice(String, bool),
+    StartDeviceDrag(String),
+    DragOverDevice(String),
+    EndDeviceDrag,
     ToggleTemperatureAlert(String, bool),
     TemperatureAlertHighChanged(String, i16),
     TemperatureAlertLowChanged(String, i16),
@@ -241,17 +244,33 @@ fn record_device_sample(
     }
 }
 
-fn move_selected_device(ains: &mut [String], ain: &str, move_up: bool) {
-    let normalized = crate::fritz::normalize_ain_for_selection(ain);
-    let Some(index) = ains.iter().position(|selected|
-        crate::fritz::normalize_ain_for_selection(selected) == normalized) else {
+fn move_selected_device_to_drop_target(ains: &mut Vec<String>, dragged_ain: &str, target_ain: &str) {
+    let dragged = crate::fritz::normalize_ain_for_selection(dragged_ain);
+    let target = crate::fritz::normalize_ain_for_selection(target_ain);
+    let Some(from) = ains.iter().position(|ain|
+        crate::fritz::normalize_ain_for_selection(ain) == dragged) else {
         return;
     };
-    if move_up && index > 0 {
-        ains.swap(index, index - 1);
-    } else if !move_up && index + 1 < ains.len() {
-        ains.swap(index, index + 1);
+    let Some(target_index) = ains.iter().position(|ain|
+        crate::fritz::normalize_ain_for_selection(ain) == target) else {
+        return;
+    };
+    if from == target_index {
+        return;
     }
+
+    let device = ains.remove(from);
+    let adjusted_target = if from < target_index {
+        target_index
+    } else {
+        target_index
+    };
+    let insert_at = if from < target_index {
+        adjusted_target
+    } else {
+        adjusted_target
+    };
+    ains.insert(insert_at, device);
 }
 
 fn icon_action_button<'a>(
@@ -521,8 +540,14 @@ impl cosmic::Application for AppModel {
                     let ain = device.ain.clone();
                     let mut row = widget::Row::new()
                         .spacing(6)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::checkbox(selected)
+                        .align_y(cosmic::iced::Alignment::Center);
+                    if selected {
+                        row = row.push(
+                            widget::mouse_area(widget::text("⠿").size(20))
+                                .on_press(Message::StartDeviceDrag(ain.clone())),
+                        );
+                    }
+                    row = row.push(widget::checkbox(selected)
                             .label(device.name.clone())
                             .on_toggle({
                                 let ain = ain.clone();
@@ -530,12 +555,6 @@ impl cosmic::Application for AppModel {
                             }));
                     if let Some(index) = selected_index {
                         row = row.push(widget::text::caption(format!("#{}", index + 1)));
-                        if index > 0 {
-                            row = row.push(action_button("go-up-symbolic", "Up", Message::MoveDevice(ain.clone(), true)));
-                        }
-                        if index + 1 < self.selected_ains.len() {
-                            row = row.push(action_button("go-down-symbolic", "Down", Message::MoveDevice(ain.clone(), false)));
-                        }
                     }
                     let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
                     let alert_thresholds = self.settings.temperature_alerts.get(&normalized_ain).copied();
@@ -573,7 +592,8 @@ impl cosmic::Application for AppModel {
                             ).step(1.0))
                             .push(widget::text::caption("Notify above the upper limit or below the lower limit"));
                     }
-                    content = content.push(widget::container(device_row)
+                    content = content.push(widget::mouse_area(
+                        widget::container(device_row)
                         .padding(8)
                         .style(move |theme| {
                             let cosmic = theme.cosmic();
@@ -582,9 +602,10 @@ impl cosmic::Application for AppModel {
                                 background: Some(device_background_color(base, row_index).into()),
                                 ..Default::default()
                             }
-                        }));
+                        })
+                    ).on_enter(Message::DragOverDevice(ain.clone())));
                 }
-                content = content.push(widget::text::caption("Use Up and Down to set the order. The first selected device supplies the panel readings. Temperature alerts notify once when a device crosses its configured threshold."));
+                content = content.push(widget::text::caption("Drag the ⠿ handle to reorder selected devices. The first selected device supplies the panel readings. Temperature alerts notify once when a device crosses its configured threshold."));
             }
 
             content = content
@@ -784,6 +805,9 @@ impl cosmic::Application for AppModel {
         let scrollable_content = widget::scrollable(content)
             .width(cosmic::iced::Length::Fill)
             .height(cosmic::iced::Length::Fill);
+
+        let scrollable_content = widget::mouse_area(scrollable_content)
+            .on_release(Message::EndDeviceDrag);
 
         let popup_content = if self.settings_open {
             widget::Column::new()
@@ -1005,11 +1029,29 @@ impl cosmic::Application for AppModel {
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
                 self.persist_settings();
             }
-            Message::MoveDevice(ain, move_up) => {
-                move_selected_device(&mut self.selected_ains, &ain, move_up);
-                self.settings.ains = self.selected_ains.clone();
-                self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
-                self.persist_settings();
+            Message::StartDeviceDrag(ain) => {
+                if self.selected_ains.iter().any(|selected|
+                    crate::fritz::normalize_ain_for_selection(selected)
+                        == crate::fritz::normalize_ain_for_selection(&ain))
+                {
+                    self.dragging_device_ain = Some(ain);
+                }
+            }
+            Message::DragOverDevice(target_ain) => {
+                if let Some(dragged_ain) = self.dragging_device_ain.as_deref() {
+                    move_selected_device_to_drop_target(
+                        &mut self.selected_ains,
+                        dragged_ain,
+                        &target_ain,
+                    );
+                }
+            }
+            Message::EndDeviceDrag => {
+                if self.dragging_device_ain.take().is_some() {
+                    self.settings.ains = self.selected_ains.clone();
+                    self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
+                    self.persist_settings();
+                }
             }
             Message::ToggleTemperatureAlert(ain, enabled) => {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
@@ -1085,16 +1127,14 @@ mod history_tests {
     }
 
     #[test]
-    fn moving_selected_devices_preserves_order_and_boundaries() {
+    fn dragging_selected_devices_reorders_them_and_ignores_unknown_targets() {
         let mut ains = vec!["111111111111".into(), "222222222222".into(), "333333333333".into()];
-        move_selected_device(&mut ains, "2222 2222 2222", true);
-        assert_eq!(ains, vec!["222222222222", "111111111111", "333333333333"]);
-        move_selected_device(&mut ains, "222222222222", true);
-        assert_eq!(ains, vec!["222222222222", "111111111111", "333333333333"]);
-        move_selected_device(&mut ains, "222222222222", false);
-        assert_eq!(ains, vec!["111111111111", "222222222222", "333333333333"]);
-        move_selected_device(&mut ains, "missing", false);
-        assert_eq!(ains, vec!["111111111111", "222222222222", "333333333333"]);
+        move_selected_device_to_drop_target(&mut ains, "111111111111", "333333333333");
+        assert_eq!(ains, vec!["222222222222", "333333333333", "111111111111"]);
+        move_selected_device_to_drop_target(&mut ains, "333333333333", "222222222222");
+        assert_eq!(ains, vec!["333333333333", "222222222222", "111111111111"]);
+        move_selected_device_to_drop_target(&mut ains, "missing", "222222222222");
+        assert_eq!(ains, vec!["333333333333", "222222222222", "111111111111"]);
     }
 
     #[test]
