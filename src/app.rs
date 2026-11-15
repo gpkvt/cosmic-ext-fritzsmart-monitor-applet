@@ -179,26 +179,35 @@ fn power_sparkline(history: &VecDeque<(Instant, i64)>) -> String {
 
 fn numeric_sparkline(values: impl Iterator<Item = f64>) -> String {
     const LEVELS: [&str; 8] = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
-    const MAX_GRAPH_COLUMNS: usize = 12;
+    const GRAPH_COLUMNS: usize = 12;
     let values: Vec<f64> = values.collect();
-    // Keep sparklines bounded so long history windows cannot force graph
-    // content outside the fixed-width cards in the applet popup.
-    let values: Vec<f64> = if values.len() > MAX_GRAPH_COLUMNS {
-        let last = values.len() - 1;
-        (0..MAX_GRAPH_COLUMNS)
-            .map(|index| values[index * last / (MAX_GRAPH_COLUMNS - 1)])
-            .collect()
-    } else {
-        values
-    };
     let Some(minimum) = values.iter().copied().reduce(f64::min) else {
         return "Waiting for samples…".into();
     };
     let maximum = values.iter().copied().reduce(f64::max).unwrap_or(minimum);
+
+    // Resample across the full graph width so sparse or newly started
+    // histories do not leave most of the framed graph empty.
+    let samples: Vec<f64> = if values.len() == 1 {
+        vec![values[0]; GRAPH_COLUMNS]
+    } else {
+        let last = values.len() - 1;
+        (0..GRAPH_COLUMNS)
+            .map(|column| {
+                let position = column as f64 * last as f64 / (GRAPH_COLUMNS - 1) as f64;
+                let left = position.floor() as usize;
+                let right = (left + 1).min(last);
+                let fraction = position - left as f64;
+                values[left] + (values[right] - values[left]) * fraction
+            })
+            .collect()
+    };
+
     if (maximum - minimum).abs() < f64::EPSILON {
-        return LEVELS[3].repeat(values.len());
+        return LEVELS[3].repeat(GRAPH_COLUMNS);
     }
-    values.iter().map(|value| {
+
+    samples.iter().map(|value| {
         let position = ((*value - minimum) / (maximum - minimum) * 7.0).round() as usize;
         LEVELS[position.min(7)]
     }).collect::<Vec<_>>().concat()
@@ -1041,7 +1050,7 @@ mod history_tests {
     fn sparkline_handles_constant_and_changing_values() {
         let now = Instant::now();
         let constant = VecDeque::from([(now, 42), (now, 42)]);
-        assert_eq!(power_sparkline(&constant), "▄▄");
+        assert_eq!(power_sparkline(&constant), "▄▄▄▄▄▄▄▄▄▄▄▄");
         let changing = VecDeque::from([(now, 10), (now, 20)]);
         assert_eq!(power_sparkline(&changing), "▁█");
     }
@@ -1049,7 +1058,7 @@ mod history_tests {
     #[test]
     fn numeric_sparkline_handles_temperature_values() {
         assert_eq!(numeric_sparkline([20.0, 21.0, 22.0].into_iter()), "▁▅█");
-        assert_eq!(numeric_sparkline([21.5, 21.5].into_iter()), "▄▄");
+        assert_eq!(numeric_sparkline([21.5, 21.5].into_iter()), "▄▄▄▄▄▄▄▄▄▄▄▄");
     }
 
     #[test]
@@ -1058,5 +1067,17 @@ mod history_tests {
         assert_eq!(graph.chars().count(), 12);
         assert_eq!(graph.chars().next(), Some('▁'));
         assert_eq!(graph.chars().last(), Some('█'));
+    }
+
+    #[test]
+    fn numeric_sparkline_fills_width_with_sparse_history() {
+        let single = numeric_sparkline([42.0].into_iter());
+        assert_eq!(single.chars().count(), 12);
+        assert_eq!(single, "▄▄▄▄▄▄▄▄▄▄▄▄");
+
+        let sparse = numeric_sparkline([10.0, 20.0].into_iter());
+        assert_eq!(sparse.chars().count(), 12);
+        assert_eq!(sparse.chars().next(), Some('▁'));
+        assert_eq!(sparse.chars().last(), Some('█'));
     }
 }
