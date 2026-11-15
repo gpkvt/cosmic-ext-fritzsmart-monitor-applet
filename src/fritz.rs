@@ -111,9 +111,11 @@ impl FritzSettings {
         let temporary = parent.join(format!(".fritz_solar.cfg.{}.tmp", std::process::id()));
         let selected_ains = if self.ains.is_empty() { self.ain.clone() } else { self.ains.join(",") };
         let first_ain = self.ains.first().map(String::as_str).unwrap_or(&self.ain);
-        let temperature_alerts = self.temperature_alerts.iter()
+        let mut temperature_alerts: Vec<String> = self.temperature_alerts.iter()
             .map(|(ain, threshold)| format!("{}:{}", normalize_ain_for_selection(ain), (*threshold).clamp(30, 100)))
-            .collect::<Vec<_>>().join(";");
+            .collect();
+        temperature_alerts.sort_unstable();
+        let temperature_alerts = temperature_alerts.join(";");
         let contents = format!(
             "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\nTEMPERATURE_ALERTS={}\n",
             self.url, self.username, self.password, first_ain, selected_ains,
