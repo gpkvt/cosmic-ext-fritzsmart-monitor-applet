@@ -21,9 +21,8 @@ permissions:
 
 jobs:
   tag-release:
-    # The manual run handles its own version-bump push. Skip the duplicate
-    # push-triggered run for that commit; ordinary main pushes still tag.
-    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release): bump version to ') }}
+    # Manual runs and pushes to main are supported; feature branches are ignored.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out main history
@@ -99,6 +98,11 @@ jobs:
         with:
           github-token: ${{ github.token }}
           script: |
+            if (context.eventName === 'push' && context.payload.head_commit?.message?.startsWith('chore(release): bump version to ')) {
+              core.info('The manual release run already created this version tag; skipping duplicate push run.');
+              return;
+            }
+
             const { execFileSync } = require('node:child_process');
             const fs = require('node:fs');
             const cargo = fs.readFileSync('Cargo.toml', 'utf8');
