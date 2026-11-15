@@ -671,7 +671,7 @@ fn total_power_overview(
 fn settings_section_header<'a>(title: &'a str, expanded: bool, section: &'static str) -> cosmic::Element<'a, Message> {
     let (section_icon, description) = match section {
         "panel" => ("preferences-desktop-display-symbolic", "Panel appearance and readings"),
-        "graph" => ("view-statistics-symbolic", "History shown in power graphs"),
+        "graph" => ("utilities-system-monitor-symbolic", "History shown in power graphs"),
         "refresh" => ("view-refresh-symbolic", "How often readings are updated"),
         "weather" => ("weather-clear-symbolic", "Current conditions and background"),
         "connection" => ("network-server-symbolic", "FRITZ!Box access and security"),
