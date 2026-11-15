@@ -1541,7 +1541,7 @@ impl cosmic::Application for AppModel {
                         .width(cosmic::iced::Length::Fill)
                         .push(widget::text::title3("Weather"))
                         .push(widget::text::caption(weather.location_name.clone())))
-                    .push(widget::text::caption(format!("{:.0}°", weather.temperature_c)));
+                    .push(widget::text::title2(format!("{:.0}°", weather.temperature_c)));
                 content = content
                     .push(weather_heading)
                     .push(weather_card);
