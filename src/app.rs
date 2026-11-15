@@ -1531,13 +1531,6 @@ impl cosmic::Application for AppModel {
                     content = content.push(widget::text::caption("No HTTP responses recorded yet"));
                 } else {
                     for request in requests.iter().rev() {
-                        let status_color = if (200..300).contains(&request.status) {
-                            cosmic::iced::Color::from_rgb(0.55, 0.82, 0.58)
-                        } else if request.status >= 400 {
-                            cosmic::iced::Color::from_rgb(0.95, 0.48, 0.45)
-                        } else {
-                            cosmic::iced::Color::from_rgb(0.88, 0.76, 0.48)
-                        };
                         let log_line = format!(
                             "{}  {} {}  {} {}",
                             request.timestamp,
@@ -1551,7 +1544,6 @@ impl cosmic::Application for AppModel {
                                 widget::text(log_line)
                                     .font(cosmic::iced::Font::MONOSPACE)
                                     .size(12)
-                                    .color(status_color)
                             )
                             .width(cosmic::iced::Length::Fill)
                             .padding([5, 8])
