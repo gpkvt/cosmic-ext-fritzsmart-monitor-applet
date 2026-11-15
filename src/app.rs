@@ -1,4 +1,5 @@
 use crate::fritz::{discover_devices, fetch_fritz_data, FritzDevice, FritzReading, FritzSettings, TemperatureAlertThresholds};
+use crate::weather::{fetch_weather, WeatherData};
 use cosmic::iced::{
     futures,
     platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
@@ -32,6 +33,8 @@ pub struct AppModel {
     device_history: HashMap<String, VecDeque<(Instant, i64, f64)>>,
     temperature_alert_state: HashMap<String, bool>,
     next_refresh_at: Option<Instant>,
+    weather: Option<WeatherData>,
+    next_weather_refresh_at: Option<Instant>,
 }
 
 #[derive(Debug, Clone)]
@@ -57,6 +60,11 @@ pub enum Message {
     ToggleTemperatureAlert(String, bool),
     TemperatureAlertHighChanged(String, i16),
     TemperatureAlertLowChanged(String, i16),
+    WeatherUpdated(Result<WeatherData, String>),
+    WeatherEnabledChanged(bool),
+    OpenWeatherMapApiKeyChanged(String),
+    WeatherLocationChanged(String),
+    WeatherRefreshIntervalChanged(u16),
 }
 
 
@@ -344,7 +352,7 @@ impl cosmic::Application for AppModel {
             .spacing(6)
             .align_y(cosmic::iced::Alignment::Center)
             .push(
-                widget::container(widget::icon::from_name("weather-clear-symbolic").size(suggested.1.saturating_sub(2)))
+                widget::container(widget::icon::from_name(self.weather.as_ref().map(|weather| weather.icon_name()).unwrap_or("weather-clear-symbolic")).size(suggested.1.saturating_sub(2)))
                     // Symbolic icons sit optically high beside text glyphs;
                     // a small top inset aligns their visual centers.
                     .padding([2, 0]),
@@ -425,6 +433,23 @@ impl cosmic::Application for AppModel {
                     .step(30.0),
                 )
                 .push(widget::text::caption("30 seconds to 1 hour"))
+                .push(widget::divider::horizontal::default())
+                .push(widget::text::caption("WEATHER"))
+                .push(widget::Row::new()
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::text::body("Use current weather icon"))
+                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                    .push(widget::toggler(self.settings.weather_enabled).on_toggle(Message::WeatherEnabledChanged)))
+                .push(widget::text::body("OpenWeatherMap API key"))
+                .push(widget::secure_input("API key", &self.settings.openweathermap_api_key, None, true)
+                    .on_input(Message::OpenWeatherMapApiKeyChanged))
+                .push(widget::text::body("Location (city or latitude,longitude)"))
+                .push(widget::text_input("e.g. Amsterdam or 52.37,4.90", &self.settings.weather_location)
+                    .on_input(Message::WeatherLocationChanged))
+                .push(widget::text::caption(format!("Weather refresh: {} minutes", self.settings.weather_refresh_interval_minutes)))
+                .push(widget::slider(5.0..=60.0, f32::from(self.settings.weather_refresh_interval_minutes),
+                    |value| Message::WeatherRefreshIntervalChanged(value.round() as u16)).step(5.0))
+                .push(widget::text::caption("Independent of FRITZ!Box refresh; default 10 minutes"))
                 .push(widget::divider::horizontal::default())
                 .push(widget::text::caption("CONNECTION"))
                 .push(widget::text::body("FRITZ!Box URL"))
@@ -687,6 +712,9 @@ impl cosmic::Application for AppModel {
                 content = content.push(widget::text::body("Select one or more devices in Settings"));
             }
 
+            if let Some(weather) = &self.weather {
+                content = content.push(widget::text::caption(format!("WEATHER · {} · {:.1} °C", weather.description, weather.temperature_c)));
+            }
             let remaining = self.next_refresh_at
                 .map(|deadline| deadline.saturating_duration_since(Instant::now()));
             let countdown = remaining
@@ -790,6 +818,23 @@ impl cosmic::Application for AppModel {
                 return Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result)));
             }
             Message::ClockTick => {
+                if self.settings.weather_enabled
+                    && self.next_weather_refresh_at.is_none()
+                    && !self.settings.openweathermap_api_key.trim().is_empty()
+                    && !self.settings.weather_location.trim().is_empty()
+                {
+                    self.next_weather_refresh_at = Some(Instant::now() + Duration::from_secs(1));
+                }
+                if self.settings.weather_enabled
+                    && self.next_weather_refresh_at.is_some_and(|deadline| Instant::now() >= deadline)
+                {
+                    self.next_weather_refresh_at = None;
+                    let api_key = self.settings.openweathermap_api_key.clone();
+                    let location = self.settings.weather_location.clone();
+                    let interval = self.settings.weather_refresh_interval_minutes;
+                    return Task::perform(fetch_weather(api_key, location), move |result|
+                        cosmic::Action::App(Message::WeatherUpdated(result)));
+                }
                 if self.next_refresh_at.is_some_and(|deadline| Instant::now() >= deadline) {
                     self.next_refresh_at = None;
                     return Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result)));
@@ -831,6 +876,37 @@ impl cosmic::Application for AppModel {
                 self.next_refresh_at = Some(
                     Instant::now() + Duration::from_secs(u64::from(self.settings.refresh_interval_seconds.clamp(30, 3600))),
                 );
+            }
+            Message::WeatherUpdated(result) => {
+                match result {
+                    Ok(weather) => { self.weather = Some(weather); }
+                    Err(error) => { self.settings_status = Some(format!("Weather unavailable: {error}")); }
+                }
+                if self.settings.weather_enabled {
+                    self.next_weather_refresh_at = Some(Instant::now() + Duration::from_secs(
+                        u64::from(self.settings.weather_refresh_interval_minutes.clamp(5, 60)) * 60));
+                }
+            }
+            Message::WeatherEnabledChanged(enabled) => {
+                self.settings.weather_enabled = enabled;
+                self.next_weather_refresh_at = None;
+                if !enabled { self.weather = None; }
+                self.persist_settings();
+            }
+            Message::OpenWeatherMapApiKeyChanged(value) => {
+                self.settings.openweathermap_api_key = value;
+                self.next_weather_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::WeatherLocationChanged(value) => {
+                self.settings.weather_location = value;
+                self.next_weather_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::WeatherRefreshIntervalChanged(value) => {
+                self.settings.weather_refresh_interval_minutes = value.clamp(5, 60);
+                self.next_weather_refresh_at = None;
+                self.persist_settings();
             }
             Message::ToggleSettings => {
                 self.settings_open = !self.settings_open;
