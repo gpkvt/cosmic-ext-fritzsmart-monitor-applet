@@ -573,16 +573,12 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
         return Err(format!("FRITZ!Box rejected the power command: {}", body.trim()));
     }
 
-    let key = normalize_ain_for_selection(&ain);
     let deadline = Instant::now() + Duration::from_secs(30);
     let mut last_error = None;
     while Instant::now() < deadline {
-        match fetch_device_list_xml(&client, base, &sid).await {
-            Ok(_) => match fetch_switch_state(&client, base, &sid, &ain).await {
-                Ok(Some(state)) if state == on => return Ok(()),
-                Ok(_) => {},
-                Err(error) => last_error = Some(error),
-            },
+        match fetch_switch_state(&client, base, &sid, &ain).await {
+            Ok(Some(state)) if state == on => return Ok(()),
+            Ok(_) => {},
             Err(error) => last_error = Some(error),
         }
         tokio::time::sleep(Duration::from_secs(2)).await;
