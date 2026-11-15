@@ -5,6 +5,7 @@ use std::{collections::{HashMap, HashSet, VecDeque}, env, fs, io::Write, sync::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HttpRequestDiagnostic {
+    pub timestamp: String,
     pub method: &'static str,
     pub path: String,
     pub status: u16,
@@ -21,6 +22,7 @@ pub fn http_request_diagnostics() -> Vec<HttpRequestDiagnostic> {
 fn record_http_response(url: &reqwest::Url, status: reqwest::StatusCode) {
     if let Ok(mut log) = HTTP_REQUEST_LOG.lock() {
         log.push_back(HttpRequestDiagnostic {
+            timestamp: chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
             method: "GET",
             path: url.path().to_string(),
             status: status.as_u16(),
