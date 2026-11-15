@@ -1136,7 +1136,32 @@ fn settings_section_header<'a>(
 fn sortable_menu_card<'a>(
     id: String,
     card: cosmic::Element<'a, Message>,
+    is_dragging: bool,
 ) -> cosmic::Element<'a, Message> {
+    let card = if is_dragging {
+        // Iced has no general-purpose opacity wrapper for arbitrary widgets.
+        // A half-alpha surface overlay composites the whole card at 50% opacity.
+        let opacity_overlay = widget::container(widget::text(""))
+            .width(cosmic::iced::Length::Fill)
+            .height(cosmic::iced::Length::Fill)
+            .style(|theme| {
+                let surface = cosmic::iced::Color::from(theme.cosmic().background(false).base);
+                cosmic::iced::widget::container::Style {
+                    background: Some(
+                        cosmic::iced::Color {
+                            a: 0.5,
+                            ..surface
+                        }
+                        .into(),
+                    ),
+                    ..Default::default()
+                }
+            });
+        widget::stack([card, opacity_overlay.into()]).into()
+    } else {
+        card
+    };
+
     let drag_handle = widget::mouse_area(
         widget::container(widget::text("⠿").size(24)).padding([10, 10]),
     )
@@ -3089,7 +3114,9 @@ impl cosmic::Application for AppModel {
                     if index > 0 {
                         device_cards = device_cards.push(widget::divider::horizontal::default());
                     }
-                    device_cards = device_cards.push(sortable_menu_card(id, card));
+                    let is_dragging = self.dragging_device_ain.as_deref() == Some(id.as_str());
+                    device_cards =
+                        device_cards.push(sortable_menu_card(id, card, is_dragging));
                 }
                 let device_list = widget::container(device_cards)
                     .width(cosmic::iced::Length::Fill)
@@ -3114,9 +3141,11 @@ impl cosmic::Application for AppModel {
             }
 
             if let Some(weather_card) = weather_menu_card.take() {
+                let is_dragging = self.dragging_device_ain.as_deref() == Some(WEATHER_DRAG_ID);
                 content = content.push(sortable_menu_card(
                     WEATHER_DRAG_ID.to_string(),
                     weather_card,
+                    is_dragging,
                 ));
             }
 
