@@ -1667,29 +1667,17 @@ impl cosmic::Application for AppModel {
                     let temperature_graph = device_history.map(|samples|
                         numeric_sparkline(samples.iter().map(|(_, _, temperature)| *temperature)))
                         .unwrap_or_else(|| "Waiting for samples…".into());
-                    let power_control: Option<cosmic::Element<'_, Message>> = reading.power_state.map(|is_on| {
+                    let power_toggle: Option<cosmic::Element<'_, Message>> = reading.power_state.map(|is_on| {
                         let ain = reading.ain.clone();
                         let key = crate::fritz::normalize_ain_for_selection(&ain);
-                        let pending = self.pending_power_changes.contains(&key);
-                        let toggle: cosmic::Element<'_, Message> = if pending {
+                        if self.pending_power_changes.contains(&key) {
                             widget::toggler(is_on).into()
                         } else {
                             widget::toggler(is_on)
                                 .on_toggle(move |requested| Message::SetDevicePower(ain.clone(), requested))
                                 .into()
-                        };
-                        widget::Row::new()
-                            .spacing(8)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::text::caption("POWER"))
-                            .push(widget::text::body(if is_on { "ON" } else { "OFF" }))
-                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push_maybe(if pending { Some(widget::text::caption("Updating…")) } else { None })
-                            .push(toggle)
-                            .into()
+                        }
                     });
-                    let state_label = reading.power_state.map(|on| if on { "ON" } else { "OFF" })
-                        .unwrap_or("UNKNOWN");
                     let device_heading = widget::button::custom(
                         widget::Row::new()
                             .spacing(12)
@@ -1700,8 +1688,8 @@ impl cosmic::Application for AppModel {
                                 .spacing(3)
                                 .width(cosmic::iced::Length::Fill)
                                 .push(widget::text::body(reading.name.clone()).class(cosmic::theme::Text::Accent))
-                                .push(widget::text::caption(format!("{} · {} W · {:.1} °C", state_label, reading.power_w, reading.temperature_c))))
-                            .push(widget::text::caption(format!("#{}", index + 1)))
+                                .push(widget::text::caption(format!("{} W · {:.1} °C", reading.power_w, reading.temperature_c))))
+                            .push_maybe(power_toggle)
                             .push(widget::icon::from_name(if is_expanded { "go-down-symbolic" } else { "go-next-symbolic" }).size(16)),
                     )
                     .on_press(Message::ToggleDeviceDetails(reading.ain.clone()))
@@ -1716,7 +1704,6 @@ impl cosmic::Application for AppModel {
                     let device_content = widget::Column::new()
                         .spacing(10)
                         .push(metrics)
-                        .push_maybe(power_control)
                         .push(
                             widget::Row::new()
                                 .spacing(12)
