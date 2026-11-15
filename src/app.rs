@@ -824,20 +824,24 @@ impl cosmic::Application for AppModel {
                     let solar_icon = widget::icon::from_name(
                         self.weather.as_ref().map(|weather| weather.icon_name()).unwrap_or("weather-clear-symbolic"),
                     ).size(suggested.1.saturating_sub(2));
-                    let mut icon_row = widget::Row::new()
-                        .spacing(0)
-                        .align_y(cosmic::iced::Alignment::Start)
-                        .push(solar_icon);
                     if input_power.is_some() {
-                        icon_row = icon_row.push(
-                            widget::text("↓")
-                                .font(cosmic::font::default())
-                                .size(f32::from(suggested.1 / 2)),
-                        );
+                        cosmic::iced::widget::Stack::new()
+                            .push(solar_icon)
+                            .push(
+                                widget::container(
+                                    widget::text("↓")
+                                        .font(cosmic::font::default())
+                                        .size(f32::from(suggested.1 / 2)),
+                                )
+                                .align_x(cosmic::iced::alignment::Horizontal::Right)
+                                .align_y(cosmic::iced::alignment::Vertical::Top)
+                                .padding([0, 1]),
+                            )
+                    } else {
+                        cosmic::iced::widget::Stack::new().push(solar_icon)
                     }
-                    icon_row
                 })
-                // Keep the input marker compact beside the solar/weather icon.
+                // Overlay the input marker on the solar/weather icon's upper-right corner.
                 .padding([2, 0]),
             )
             .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)));
