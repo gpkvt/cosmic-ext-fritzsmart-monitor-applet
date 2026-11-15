@@ -1609,6 +1609,8 @@ impl cosmic::Application for AppModel {
             }
             Message::EndDeviceDrag => {
                 if let Some(dragged_ain) = self.dragging_device_ain.take() {
+                    let previous_ains = self.selected_ains.clone();
+                    let previous_total_power_first = self.settings.total_power_first;
                     if let Some(target_ain) = self.drag_target_ain.take() {
                         move_sortable_entry(
                             &mut self.selected_ains,
@@ -1618,9 +1620,13 @@ impl cosmic::Application for AppModel {
                         );
                     }
                     self.drag_target_since = None;
-                    self.settings.ains = self.selected_ains.clone();
-                    self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
-                    self.persist_settings();
+                    if self.selected_ains != previous_ains
+                        || self.settings.total_power_first != previous_total_power_first
+                    {
+                        self.settings.ains = self.selected_ains.clone();
+                        self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
+                        self.persist_settings();
+                    }
                 }
             }
             Message::ToggleTemperatureAlert(ain, enabled) => {
