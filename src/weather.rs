@@ -16,6 +16,8 @@ pub struct WeatherData {
     pub sunrise_unix: i64,
     pub sunset_unix: i64,
     pub location_name: String,
+    pub background_image: Option<Vec<u8>>,
+    pub image_attribution: Option<String>,
 }
 
 impl WeatherData {
@@ -80,6 +82,9 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
     let sunrise_unix = payload["sys"]["sunrise"].as_i64().unwrap_or(0);
     let sunset_unix = payload["sys"]["sunset"].as_i64().unwrap_or(0);
     let location_name = payload["name"].as_str().unwrap_or(location).to_string();
+    // Commons photos are selected by the observed condition. Image failures are
+    // deliberately non-fatal: weather readings remain available without a photo.
+    let (background_image, image_attribution) = fetch_commons_background(&client, icon_code).await;
     Ok(WeatherData {
         icon_code: icon_code.to_string(),
         description,
@@ -94,7 +99,62 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
         sunrise_unix,
         sunset_unix,
         location_name,
+        background_image,
+        image_attribution,
     })
+}
+
+fn commons_search_term(icon_code: &str) -> &'static str {
+    match icon_code.get(..2).unwrap_or("") {
+        "01" => "clear sunny sky",
+        "02" | "03" | "04" => "cloudy sky",
+        "09" | "10" => "rain clouds",
+        "11" => "thunderstorm clouds",
+        "13" => "snowfall",
+        "50" => "fog landscape",
+        _ => "weather sky",
+    }
+}
+
+async fn fetch_commons_background(client: &Client, icon_code: &str) -> (Option<Vec<u8>>, Option<String>) {
+    let search = commons_search_term(icon_code);
+    let response = client.get("https://commons.wikimedia.org/w/api.php")
+        .query(&[
+            ("action", "query"), ("generator", "search"),
+            ("gsrsearch", search), ("gsrnamespace", "6"), ("gsrlimit", "1"),
+            ("prop", "imageinfo"), ("iiprop", "url|extmetadata"),
+            ("iiurlwidth", "1000"), ("format", "json"),
+        ])
+        .send().await.ok()?.json::<serde_json::Value>().await.ok();
+    let Some(response) = response else { return (None, None); };
+    let Some(page) = response["query"]["pages"].as_object().and_then(|pages| pages.values().next()) else {
+        return (None, None);
+    };
+    let info = &page["imageinfo"][0];
+    let Some(image_url) = info["thumburl"].as_str() else { return (None, None); };
+    let image = client.get(image_url).send().await.ok()?.bytes().await.ok();
+    let Some(image) = image else { return (None, None); };
+    // Keep attribution visible in the popup and link users to the Commons file page.
+    let artist = info["extmetadata"]["Artist"]["value"].as_str().unwrap_or("Unknown author");
+    let license = info["extmetadata"]["LicenseShortName"]["value"].as_str().unwrap_or("See file page");
+    let title = page["title"].as_str().unwrap_or("Wikimedia Commons photograph");
+    let page_url = info["descriptionurl"].as_str().unwrap_or("https://commons.wikimedia.org/");
+    let attribution = format!("{} · {} · {} · {}", title, strip_html(artist), license, page_url);
+    (Some(image.to_vec()), Some(attribution))
+}
+
+fn strip_html(value: &str) -> String {
+    let mut output = String::with_capacity(value.len());
+    let mut inside_tag = false;
+    for character in value.chars() {
+        match character {
+            '<' => inside_tag = true,
+            '>' => inside_tag = false,
+            _ if !inside_tag => output.push(character),
+            _ => {},
+        }
+    }
+    output.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn parse_coordinates(location: &str) -> Option<(f64, f64)> {
@@ -136,6 +196,15 @@ mod tests {
             };
             assert_eq!(weather.icon_name(), expected);
         }
+    }
+
+    #[test]
+    fn commons_photo_search_matches_current_weather_condition() {
+        assert_eq!(commons_search_term("01d"), "clear sunny sky");
+        assert_eq!(commons_search_term("10n"), "rain clouds");
+        assert_eq!(commons_search_term("11d"), "thunderstorm clouds");
+        assert_eq!(commons_search_term("13n"), "snowfall");
+        assert_eq!(commons_search_term("50d"), "fog landscape");
     }
 
     #[test]
