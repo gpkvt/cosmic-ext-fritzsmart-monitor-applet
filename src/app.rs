@@ -977,7 +977,20 @@ impl cosmic::Application for AppModel {
                         ..Default::default()
                     }
                 }),
-            )
+            );
+        let content = if self.settings.weather_enabled {
+            if let Some(weather) = &self.weather {
+                content
+                    .push(widget::icon::from_name("thermometer-symbolic").size(self.settings.panel_text_size.into()))
+                    .push(self.core.applet.text(format!("{:.0}°", weather.temperature_c))
+                        .size(f32::from(self.settings.panel_text_size)))
+            } else {
+                content
+            }
+        } else {
+            content
+        };
+        let content = content
             .push(widget::icon::from_name("electricity-symbolic").size(self.settings.panel_text_size.into()))
             .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)));
         let content = if let Some(input_power) = input_power {
@@ -1564,6 +1577,7 @@ impl cosmic::Application for AppModel {
                             .push(widget::text::caption("Live power and temperature readings")))
                         .push(widget::text::caption(format!("{}", self.readings.len())))
                 );
+                let mut device_cards = widget::Column::new().spacing(0);
                 for (index, reading) in self.readings.iter().enumerate() {
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                     let is_expanded = self.expanded_devices.contains(&device_key);
@@ -1738,9 +1752,11 @@ impl cosmic::Application for AppModel {
                             ..Default::default()
                         }
                     });
-                    content = content.push(device_card);
+                    device_cards = device_cards.push(device_card);
                 }
-                content = content.push(widget::divider::horizontal::default());
+                content = content
+                    .push(device_cards)
+                    .push(widget::divider::horizontal::default());
                 if !self.settings.total_power_first {
                     if let Some(overview) = total_power_overview(
                         &self.readings,
