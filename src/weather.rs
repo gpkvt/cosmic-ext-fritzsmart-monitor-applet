@@ -158,13 +158,19 @@ async fn fetch_commons_background(client: &Client, icon_code: &str) -> (Option<V
         title: title.to_string(),
         artist: strip_html(artist),
         license: license.to_string(),
-        page_url: if page_url.starts_with("https://commons.wikimedia.org/wiki/File:") {
-            page_url.to_string()
-        } else {
-            "https://commons.wikimedia.org/".to_string()
-        },
+        page_url: commons_file_page_url(page_url),
     };
     (Some(image), Some(attribution))
+}
+
+fn commons_file_page_url(value: &str) -> String {
+    if value.starts_with("https://commons.wikimedia.org/wiki/File:")
+        && !value.chars().any(char::is_control)
+    {
+        value.to_string()
+    } else {
+        "https://commons.wikimedia.org/".to_string()
+    }
 }
 
 fn blur_background_image(bytes: Vec<u8>) -> Option<Vec<u8>> {
@@ -209,11 +215,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn commons_attribution_uses_only_a_real_commons_file_page() {
-        let valid = "https://commons.wikimedia.org/wiki/File:Example.jpg";
-        assert!(valid.starts_with("https://commons.wikimedia.org/wiki/File:"));
-        let invalid = "https://example.com/image.jpg";
-        assert!(!invalid.starts_with("https://commons.wikimedia.org/wiki/File:"));
+    fn commons_attribution_links_only_to_commons_file_pages() {
+        assert_eq!(
+            commons_file_page_url("https://commons.wikimedia.org/wiki/File:Example.jpg"),
+            "https://commons.wikimedia.org/wiki/File:Example.jpg",
+        );
+        assert_eq!(
+            commons_file_page_url("https://example.com/image.jpg"),
+            "https://commons.wikimedia.org/",
+        );
+        assert_eq!(
+            commons_file_page_url("javascript:alert(1)"),
+            "https://commons.wikimedia.org/",
+        );
     }
 
     #[test]
