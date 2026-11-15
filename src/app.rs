@@ -1084,6 +1084,17 @@ impl cosmic::Application for AppModel {
         } else {
             content
         };
+        // Keep connection health visible even when the popup is closed. The
+        // detailed error remains available in the applet menu.
+        let content = if self.error.is_some() {
+            content
+                .push(widget::icon::from_name("dialog-warning-symbolic")
+                    .size(self.settings.panel_text_size.into()))
+                .push(self.core.applet.text("Connection error")
+                    .size(f32::from(self.settings.panel_text_size)))
+        } else {
+            content
+        };
 
         // Use a content-sized applet button: button_from_element() deliberately
         // fixes the width to an icon, while text_button() only accepts Text.
