@@ -723,29 +723,14 @@ fn total_power_overview(
             &crate::fritz::normalize_ain_for_selection(&reading.ain),
         )
     });
-    let output_tile = widget::container(metric_tile(
-        "TOTAL POWER OUTPUT",
-        format!("{total_power} W"),
-        "go-up-symbolic",
-    ))
-    .width(cosmic::iced::Length::Fill);
-    let mut power_tiles = widget::Row::new()
+    let output_column = widget::Column::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
-        .push(output_tile);
-    if has_input_readings {
-        power_tiles = power_tiles.push(
-            widget::container(metric_tile(
-                "TOTAL POWER INPUT",
-                format!("{} W", input_power_w(readings, &settings.input_ains)),
-                "go-down-symbolic",
-            ))
-            .width(cosmic::iced::Length::Fill),
-        );
-    }
-    let mut content = widget::Column::new()
-        .spacing(10)
-        .push(power_tiles)
+        .push(metric_tile(
+            "TOTAL POWER OUTPUT",
+            format!("{total_power} W"),
+            "go-up-symbolic",
+        ))
         .push(
             widget::Row::new()
                 .spacing(8)
@@ -760,10 +745,28 @@ fn total_power_overview(
                     format!("{high} W"),
                     "go-up-symbolic",
                 )).width(cosmic::iced::Length::Fill)),
-        );
-    content = content
-        .push(graph_panel(total_graph))
-        .push(graph_panel(input_graphs.into()));
+        )
+        .push(graph_panel(total_graph));
+    let mut power_columns = widget::Row::new()
+        .spacing(12)
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Start)
+        .push(output_column);
+    if has_input_readings {
+        let input_column = widget::Column::new()
+            .spacing(8)
+            .width(cosmic::iced::Length::Fill)
+            .push(metric_tile(
+                "TOTAL POWER INPUT",
+                format!("{} W", input_power_w(readings, &settings.input_ains)),
+                "go-down-symbolic",
+            ))
+            .push(graph_panel(input_graphs.into()));
+        power_columns = power_columns.push(input_column);
+    }
+    let content = widget::Column::new()
+        .spacing(10)
+        .push(power_columns);
     Some(surface_card(content.into(), 14))
 }
 
