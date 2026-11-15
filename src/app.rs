@@ -1607,7 +1607,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::Column::new()
                             .spacing(3)
                             .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::body(reading.name.clone()).class(cosmic::theme::Text::Color(cosmic::iced::Color::from_rgb(0.30, 0.78, 0.42))))
+                            .push(widget::text::body(reading.name.clone()).class(cosmic::theme::Text::Accent))
                             .push(widget::text::caption(format!("{} · LAST {}", state_label, format_graph_timespan(self.settings.graph_timespan_minutes)))))
                         .push(widget::text::caption(format!("#{}", index + 1)));
                     let metrics = widget::Row::new()
@@ -1617,7 +1617,6 @@ impl cosmic::Application for AppModel {
                         .push(metric_tile("TEMPERATURE", format!("{:.1} °C", reading.temperature_c), "thermometer-symbolic"));
                     let device_content = widget::Column::new()
                         .spacing(10)
-                        .push(device_heading)
                         .push(metrics)
                         .push_maybe(power_control)
                         .push(
@@ -1713,7 +1712,37 @@ impl cosmic::Application for AppModel {
                                     }),
                                 ),
                         );
-                    content = content.push(surface_card(device_content.into(), 12));
+                    let device_card = widget::container(
+                        widget::Column::new()
+                            .spacing(0)
+                            .push(
+                                widget::container(device_heading)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .padding([8, 12])
+                                    .style(|theme| {
+                                        let cosmic = theme.cosmic();
+                                        cosmic::iced::widget::container::Style {
+                                            background: Some(cosmic::iced::Color::from(cosmic.background(false).component).into()),
+                                            ..Default::default()
+                                        }
+                                    }),
+                            )
+                            .push(widget::divider::horizontal::default())
+                            .push(widget::container(device_content).padding(12)),
+                    )
+                    .width(cosmic::iced::Length::Fill)
+                    .style(|theme| {
+                        let cosmic = theme.cosmic();
+                        cosmic::iced::widget::container::Style {
+                            background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                            border: cosmic::iced::Border {
+                                radius: 12.0.into(),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        }
+                    });
+                    content = content.push(device_card);
                 }
                 content = content.push(widget::divider::horizontal::default());
                 if !self.settings.total_power_first {
