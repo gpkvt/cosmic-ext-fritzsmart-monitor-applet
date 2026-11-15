@@ -63,7 +63,7 @@ jobs:
         run: cargo build --release --locked
       - name: Build Debian and AppImage packages
         run: |
-          APP_VERSION=0.0.0 OUTPUT_DIR="$RUNNER_TEMP/packages" packaging/build-linux-packages.sh
+          APP_VERSION=0.0.0 OUTPUT_DIR="$RUNNER_TEMP/packages" bash packaging/build-linux-packages.sh
           test -s "$RUNNER_TEMP/packages/fritz-power-monitor_0.0.0_amd64.deb"
           test -x "$RUNNER_TEMP/packages/fritz-power-monitor-0.0.0-x86_64.AppImage"
           dpkg-deb --info "$RUNNER_TEMP/packages/fritz-power-monitor_0.0.0_amd64.deb"
