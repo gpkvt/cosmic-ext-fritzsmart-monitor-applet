@@ -3465,8 +3465,6 @@ mod history_tests {
             },
         ];
         let selected = vec!["222222".to_string(), "111111".to_string()];
-        let inputs = HashSet::from(["222222".to_string()]);
-
         assert_eq!(
             displayed_power_w(&readings, &selected),
             Some(250)
