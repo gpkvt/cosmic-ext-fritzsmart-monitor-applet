@@ -1816,6 +1816,7 @@ impl cosmic::Application for AppModel {
                         ));
                     }
                 }
+            }
 
             if self.active_settings_section == Some("diagnostics") {
                 let endpoint = self.settings.url.trim();
