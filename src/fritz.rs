@@ -9,6 +9,7 @@ pub struct FritzReading {
     pub name: String,
     pub power_w: i64,
     pub temperature_c: f64,
+    pub power_state: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -406,7 +407,19 @@ fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<
         let name = device.children().find(|child| child.has_tag_name("name")).and_then(|child| child.text())
             .filter(|name| !name.trim().is_empty()).or_else(|| device.attribute("name"))
             .unwrap_or("FRITZ!Box device").trim().to_string();
-        readings.push(FritzReading { ain: ain.to_string(), name, power_w: power_mw / 1000, temperature_c });
+        let power_state = child_text(device, "switch", "state")
+            .and_then(|state| match state.trim() {
+                "0" => Some(false),
+                "1" => Some(true),
+                _ => None,
+            });
+        readings.push(FritzReading {
+            ain: ain.to_string(),
+            name,
+            power_w: power_mw / 1000,
+            temperature_c,
+            power_state,
+        });
     }
     readings.sort_by_key(|reading| wanted.iter().position(|selected|
         selected == &normalize_ain_for_selection(&reading.ain)).unwrap_or(usize::MAX));
@@ -418,6 +431,46 @@ fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<
 fn parse_device_xml(xml: &str, ain: &str) -> Result<FritzReading, String> {
     parse_device_readings_xml(xml, &[ain.to_string()])?.into_iter().next()
         .ok_or_else(|| "Configured FRITZ!Box device was not found".to_string())
+}
+
+pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
+    let settings = FritzSettings::load()?;
+    validate_settings(&settings, true)?;
+    let selected_ains = if settings.ains.is_empty() {
+        vec![settings.ain.clone()]
+    } else {
+        settings.ains.clone()
+    };
+    let normalized_ain = normalize_ain_for_selection(&ain);
+    if normalized_ain.is_empty()
+        || !selected_ains.iter().any(|selected|
+            normalize_ain_for_selection(selected) == normalized_ain)
+    {
+        return Err("Refusing to control a device that is not selected".into());
+    }
+
+    let (client, sid) = authenticated_client(&settings).await?;
+    let base = settings.url.trim_end_matches('/');
+    let command = if on { "setswitchon" } else { "setswitchoff" };
+    let response = client
+        .get(format!("{base}/webservices/homeautoswitch.lua"))
+        .query(&[
+            ("sid", sid.as_str()),
+            ("switchcmd", command),
+            ("ain", ain.as_str()),
+        ])
+        .send()
+        .await
+        .map_err(|error| format!("FRITZ!Box power command failed: {error}"))?;
+    if !response.status().is_success() {
+        return Err(format!("FRITZ!Box power command failed: HTTP {}", response.status()));
+    }
+    let body = response.text().await
+        .map_err(|error| format!("Could not read FRITZ!Box power command response: {error}"))?;
+    if body.trim() != "1" {
+        return Err(format!("FRITZ!Box did not confirm the power command: {}", body.trim()));
+    }
+    Ok(())
 }
 
 pub async fn fetch_fritz_data() -> Result<Vec<FritzReading>, String> {
@@ -632,9 +685,34 @@ mod tests {
         assert_eq!(readings[0].name, "Battery inverter");
         assert_eq!(readings[0].power_w, 456);
         assert_eq!(readings[0].temperature_c, 19.8);
+        assert_eq!(readings[0].power_state, None);
         assert_eq!(readings[1].name, "Solar inverter");
         assert_eq!(readings[1].power_w, 123);
         assert_eq!(readings[1].temperature_c, 21.5);
+    }
+
+    #[test]
+    fn parses_switch_state_only_when_switchable() {
+        let xml = r#"<devicelist>
+            <device identifier="111111111111">
+                <name>Smart plug</name>
+                <powermeter><power>1000</power></powermeter>
+                <temperature><celsius>200</celsius></temperature>
+                <switch><state>1</state></switch>
+            </device>
+            <device identifier="222222222222">
+                <name>Unknown state</name>
+                <powermeter><power>0</power></powermeter>
+                <temperature><celsius>200</celsius></temperature>
+                <switch><state>2</state></switch>
+            </device>
+        </devicelist>"#;
+        let readings = parse_device_readings_xml(
+            xml,
+            &["111111111111".into(), "222222222222".into()],
+        ).unwrap();
+        assert_eq!(readings[0].power_state, Some(true));
+        assert_eq!(readings[1].power_state, None);
     }
 
     #[test]
