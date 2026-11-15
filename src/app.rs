@@ -1701,7 +1701,7 @@ impl cosmic::Application for AppModel {
                                 .spacing(3)
                                 .width(cosmic::iced::Length::Fill)
                                 .push(widget::text::body(reading.name.clone()).class(cosmic::theme::Text::Accent))
-                                .push(widget::text::caption(if is_expanded { "LAST 1 HOUR".into() } else { format!("{} W · {:.1} °C", reading.power_w, reading.temperature_c) })))
+                                .push(widget::text::caption(if is_expanded { format!("LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes).to_uppercase()) } else { format!("{} W · {:.1} °C", reading.power_w, reading.temperature_c) })))
                             .push_maybe(power_toggle)
                             .push(widget::icon::from_name(if is_expanded { "go-down-symbolic" } else { "go-next-symbolic" }).size(16)),
                     )
