@@ -703,16 +703,37 @@ impl cosmic::Application for AppModel {
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                         .push(widget::text::body(format!("Sunrise  {sunrise}"))))
                     .push(widget::text::body(format!("Sunset  {sunset}")));
-                content = content
-                    .push(widget::text::caption("WEATHER"))
-                    .push(widget::container(weather_details).padding(10)
+                let weather_card = if let Some(image_bytes) = &weather.background_image {
+                    let background = widget::image::Image::new(
+                        widget::image::Handle::from_bytes(image_bytes.clone()),
+                    )
+                    .width(cosmic::iced::Length::Fill)
+                    .height(cosmic::iced::Length::Fixed(210.0))
+                    .content_fit(cosmic::iced::ContentFit::Cover);
+                    let foreground = widget::container(weather_details)
+                        .width(cosmic::iced::Length::Fill)
+                        .height(cosmic::iced::Length::Fill)
+                        .padding(10)
+                        .style(|_| cosmic::iced::widget::container::Style {
+                            background: Some(cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.78).into()),
+                            text_color: Some(cosmic::iced::Color::WHITE),
+                            ..Default::default()
+                        });
+                    widget::Stack::new().push(background).push(foreground)
+                } else {
+                    widget::container(weather_details).padding(10)
                         .style(|theme| {
                             let cosmic = theme.cosmic();
                             cosmic::iced::widget::container::Style {
                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
                                 ..Default::default()
                             }
-                        }))
+                        })
+                };
+                content = content
+                    .push(widget::text::caption("WEATHER"))
+                    .push(weather_card)
+                    .push_maybe(weather.image_attribution.as_ref().map(|credit| widget::text::caption(credit.clone())))
                     .push(widget::divider::horizontal::default());
             } else if self.settings.weather_enabled {
                 content = content
