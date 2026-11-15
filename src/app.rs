@@ -249,7 +249,7 @@ fn icon_action_button<'a>(
     icon_name: &'static str,
     accessible_name: &'static str,
     message: Message,
-) -> widget::Button<'a, Message> {
+) -> impl Into<Element<'a, Message>> {
     // Use COSMIC's dedicated icon-button builder rather than wrapping an icon
     // in a generic custom button. This gives the controls a proper hit target,
     // standard button styling, and accessible names/tooltips.
