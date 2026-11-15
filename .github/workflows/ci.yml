@@ -10,12 +10,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   rust:
     name: Format, test, build and install
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -48,8 +52,6 @@ jobs:
           appstreamcli validate --no-net data/com.gpkvt.FritzPowerMonitor.metainfo.xml
       - name: Check Rust formatting
         run: cargo fmt --all -- --check
-      - name: Generate locked Cargo dependencies
-        run: cargo generate-lockfile
       - name: Prepare Flatpak Cargo sources
         run: |
           python3 -m venv .venv

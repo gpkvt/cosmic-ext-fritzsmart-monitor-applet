@@ -13,7 +13,7 @@ jobs:
     name: Build Linux release package
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -44,7 +44,6 @@ jobs:
       - name: Check Rust formatting and run tests
         run: |
           cargo fmt --all -- --check
-          cargo generate-lockfile
           cargo test --locked
       - name: Validate desktop entry and AppStream metadata
         run: |
