@@ -480,6 +480,31 @@ async fn fetch_device_list_xml(client: &Client, base: &str, sid: &str) -> Result
     read_xml_response(response, "FRITZ!Box device request failed").await
 }
 
+fn parse_switch_state_response(body: &str) -> Option<bool> {
+    match body.trim() {
+        "1" => Some(true),
+        "0" => Some(false),
+        _ => None,
+    }
+}
+
+async fn fetch_switch_state(
+    client: &Client,
+    base: &str,
+    sid: &str,
+    ain: &str,
+) -> Result<Option<bool>, String> {
+    let response = client.get(format!("{base}/webservices/homeautoswitch.lua"))
+        .query(&[
+            ("sid", sid),
+            ("switchcmd", "getswitchstate"),
+            ("ain", ain),
+        ])
+        .send().await.map_err(|error| format!("FRITZ!Box switch-state request failed: {error}"))?;
+    let body = read_xml_response(response, "FRITZ!Box switch-state request failed").await?;
+    Ok(parse_switch_state_response(&body))
+}
+
 fn parse_fetch_result_xml(xml: &str, selected_ains: &[String]) -> Result<FritzFetchResult, String> {
     let document = Document::parse(xml).map_err(|error| format!("Invalid device XML: {error}"))?;
     let mut readings = Vec::new();
@@ -516,7 +541,18 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     let (client, sid) = authenticated_client(&settings).await?;
     let base = settings.url.trim_end_matches('/');
     let devices_xml = fetch_device_list_xml(&client, base, &sid).await?;
-    parse_fetch_result_xml(&devices_xml, &selected_ains)
+    let mut result = parse_fetch_result_xml(&devices_xml, &selected_ains)?;
+
+    // Query the dedicated switch-state endpoint: power-meter XML can lag behind
+    // the actual actuator state on some FRITZ!Box devices.
+    let states = futures::future::join_all(result.readings.iter().map(|reading|
+        fetch_switch_state(&client, base, &sid, &reading.ain),
+    )).await;
+    for (reading, state) in result.readings.iter_mut().zip(states) {
+        reading.power_state = state.unwrap_or(None);
+    }
+
+    Ok(result)
 }
 
 pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
@@ -538,9 +574,8 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
     let mut last_error = None;
     while Instant::now() < deadline {
         match fetch_device_list_xml(&client, base, &sid).await {
-            Ok(xml) => match parse_device_readings_xml(&xml, std::slice::from_ref(&ain)) {
-                Ok(readings) if readings.iter().any(|reading|
-                    normalize_ain_for_selection(&reading.ain) == key && reading.power_state == Some(on)) => return Ok(()),
+            Ok(_) => match fetch_switch_state(&client, base, &sid, &ain).await {
+                Ok(Some(state)) if state == on => return Ok(()),
                 Ok(_) => {},
                 Err(error) => last_error = Some(error),
             },
@@ -770,6 +805,15 @@ mod tests {
         let xml = r#"<devicelist><device identifier="000000000000"/></devicelist>"#;
         assert!(parse_device_xml(xml, "123456789012").is_err());
     }
+    #[test]
+    fn parses_dedicated_switch_state_responses() {
+        assert_eq!(parse_switch_state_response("1"), Some(true));
+        assert_eq!(parse_switch_state_response("0"), Some(false));
+        assert_eq!(parse_switch_state_response(" inval\\n"), None);
+        assert_eq!(parse_switch_state_response(""), None);
+        assert_eq!(parse_switch_state_response("2"), None);
+    }
+
     #[test]
     fn parses_switch_power_state_when_available() {
         for (state, expected) in [("1", Some(true)), ("0", Some(false)), ("unknown", None)] {
