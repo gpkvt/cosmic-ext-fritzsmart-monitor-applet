@@ -55,6 +55,17 @@ jobs:
           cp -r src data flatpak-source/
       - name: Validate Flatpak manifest
         run: flatpak-builder --show-manifest com.gpkvt.FritzPowerMonitor.yml > /dev/null
+      - name: Install Flatpak build runtime
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user --noninteractive flathub \
+            org.freedesktop.Platform//26.08 \
+            org.freedesktop.Sdk//26.08 \
+            org.freedesktop.Sdk.Extension.rust-stable//26.08
+      - name: Build Flatpak application
+        run: |
+          flatpak-builder --user --force-clean --repo=flatpak-repo \
+            build-flatpak com.gpkvt.FritzPowerMonitor.yml
       - name: Run tests
         run: cargo test --locked
       - name: Check build
