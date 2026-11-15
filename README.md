@@ -16,7 +16,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 - Discovers compatible power-meter devices and lets the user select any combination with checkboxes.
 - Refreshes automatically on a configurable interval from 30 seconds to 1 hour (default 60 seconds), with a live countdown in the popup menu. Total and per-device graph samples are collected on each successful refresh.
 - Keeps the last successful reading visible when a later refresh fails.
-- Optional OpenWeatherMap integration replaces the panel sun icon with the current weather condition and shows a detailed weather summary at the top of the popup, including feels-like temperature, humidity, wind, pressure, cloud cover, visibility, sunrise and sunset. Configure the API key, city or `latitude,longitude`, and an independent 5–60 minute refresh interval (default 10 minutes).
+- Optional OpenWeatherMap integration replaces the panel sun icon with the current weather condition and shows a detailed weather summary at the top of the popup. The weather card uses a Wikimedia Commons photograph selected to match the reported condition, with a dark readability overlay and visible author/license/file attribution; photo lookup failures fall back to the normal themed card. Configure the API key, city or `latitude,longitude`, and an independent 5–60 minute refresh interval (default 10 minutes).
 - Uses FRITZ!Box challenge-response login and HTTPS certificate validation by
   default.
 
@@ -102,7 +102,7 @@ store it in a user-readable file such as `~/.config/fritzbox-ca.pem`, then set
 that path in the applet. Use a URL hostname included in the certificate's SAN
 (e.g. `https://fritz.box/`) and ensure it resolves to the local router.
 
-Enable **Use current weather icon** and enter an OpenWeatherMap API key plus a city name or `latitude,longitude` to show current conditions in the panel and a detailed weather summary as the first entry in the popup. The summary includes feels-like temperature, humidity, wind speed and direction, pressure, cloud cover, visibility, sunrise and sunset (shown in local time). Weather updates independently every 5–60 minutes (default 10 minutes); failed requests do not affect FRITZ!Box readings. The API key is stored in the owner-only configuration file.
+Enable **Use current weather icon** and enter an OpenWeatherMap API key plus a city name or `latitude,longitude` to show current conditions in the panel and a detailed weather summary as the first entry in the popup. The summary includes feels-like temperature, humidity, wind speed and direction, pressure, cloud cover, visibility, sunrise and sunset (shown in local time). The background photograph is an illustrative Commons image matching the weather type, not a live camera image of the configured location. Weather updates independently every 5–60 minutes (default 10 minutes); failed requests do not affect FRITZ!Box readings. The API key is stored in the owner-only configuration file.
 
 The **Allow invalid TLS certificates** option remains available only for
 compatibility and disables certificate verification; leave it off when using a
