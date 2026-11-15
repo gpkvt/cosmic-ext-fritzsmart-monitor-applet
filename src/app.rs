@@ -1140,23 +1140,10 @@ fn sortable_menu_card<'a>(
     card: cosmic::Element<'a, Message>,
     is_dragging: bool,
 ) -> cosmic::Element<'a, Message> {
-    let card = if is_dragging {
-        // Iced has no general-purpose opacity wrapper for arbitrary widgets.
-        // A half-alpha surface overlay composites the whole card at 50% opacity.
-        let opacity_overlay = widget::container(widget::text(""))
-            .width(cosmic::iced::Length::Fill)
-            .height(cosmic::iced::Length::Fill)
-            .style(|theme| {
-                let surface = cosmic::iced::Color::from(theme.cosmic().background(false).base);
-                cosmic::iced::widget::container::Style {
-                    background: Some(cosmic::iced::Color { a: 0.5, ..surface }.into()),
-                    ..Default::default()
-                }
-            });
-        widget::stack([card, opacity_overlay.into()]).into()
-    } else {
-        card
-    };
+    // The pinned libcosmic Iced API does not expose a stack/opacity widget.
+    // Keep the original card intact while the drag handle and drop indicators
+    // communicate the active drag state.
+    let card = card;
 
     let drag_handle =
         widget::mouse_area(widget::container(widget::text("⠿").size(24)).padding([10, 10]))
