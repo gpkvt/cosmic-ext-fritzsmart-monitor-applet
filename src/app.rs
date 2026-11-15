@@ -677,7 +677,6 @@ fn total_power_overview(
     let low = history.iter().map(|(_, value)| *value).min()?;
     let high = history.iter().map(|(_, value)| *value).max()?;
     let total_power = net_power_w(readings, &settings.input_ains);
-    let timespan = format_graph_timespan(settings.graph_timespan_minutes);
     let axis_start = format_graph_axis_start(settings.graph_timespan_minutes);
     let total_graph: cosmic::Element<'static, Message> = widget::Column::new()
         .spacing(4)
@@ -744,7 +743,7 @@ fn total_power_overview(
             .width(cosmic::iced::Length::Fill),
         );
     }
-    let content = widget::Column::new()
+    let mut content = widget::Column::new()
         .spacing(10)
         .push(power_tiles)
         .push(
