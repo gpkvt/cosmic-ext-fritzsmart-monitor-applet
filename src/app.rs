@@ -557,7 +557,7 @@ fn live_power_summary(
     let mut content = widget::Column::new()
         .spacing(10)
         .push(details)
-        .push(widget::text::title1(power));
+        .push(widget::text::title2(power));
     let mut supporting = widget::Row::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill);
@@ -936,7 +936,7 @@ impl cosmic::Application for AppModel {
         let horizontal_padding = panel_padding;
 
         let content = widget::Row::new()
-            .spacing(6)
+            .spacing(8)
             .align_y(cosmic::iced::Alignment::Center)
             .push(
                 widget::container({
@@ -961,7 +961,18 @@ impl cosmic::Application for AppModel {
                     }
                 })
                 // Overlay the input marker on the solar/weather icon's upper-right corner.
-                .padding([2, 0]),
+                .padding(5)
+                .style(|theme| {
+                    let cosmic = theme.cosmic();
+                    cosmic::iced::widget::container::Style {
+                        background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                        border: cosmic::iced::Border {
+                            radius: 8.0.into(),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    }
+                }),
             )
             .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)));
         let content = if let Some(input_power) = input_power {
@@ -1349,7 +1360,6 @@ impl cosmic::Application for AppModel {
                             .push(widget::text::title2(format!("{:.1} °C", weather.temperature_c)))
                             .push(widget::text::body(weather.description.clone()))
                             .push(widget::text::caption(format!("Feels like {:.1} °C", weather.feels_like_c)))))
-                    .push(widget::text::caption(weather.location_name.clone()))
                     .push(widget::Row::new().spacing(8)
                         .push(widget::text::body(format!("Humidity  {}%", weather.humidity_percent)))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
