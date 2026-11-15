@@ -549,6 +549,7 @@ fn move_menu_entry_at(order: &mut Vec<String>, dragged: &str, target: &str, afte
     order.insert(insertion_index.min(order.len()), entry);
 }
 
+#[cfg(test)]
 fn move_menu_entry(order: &mut Vec<String>, dragged: &str, target: &str) {
     let normalize = |entry: &str| {
         if entry == TOTAL_POWER_DRAG_ID
