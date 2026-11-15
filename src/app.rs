@@ -2490,7 +2490,9 @@ impl cosmic::Application for AppModel {
                     let device_content = widget::Column::new()
                         .spacing(10)
                         .width(cosmic::iced::Length::Fill)
-                        .push(metrics)
+                        // Keep the metric tiles inset, but let graph panels use
+                        // the full menu content width.
+                        .push(widget::container(metrics).padding([0, 12]))
                         .push(
                         widget::Column::new()
                             .spacing(8)
@@ -2526,7 +2528,7 @@ impl cosmic::Application for AppModel {
                                                     .push(widget::text::caption("Now")),
                                             ),
                                     )
-                                    .padding(8)
+                                    .padding([8, 0])
                                     .width(cosmic::iced::Length::Fill)
                                     .style(move |theme| {
                                         let cosmic = theme.cosmic();
