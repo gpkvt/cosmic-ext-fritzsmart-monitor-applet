@@ -785,9 +785,9 @@ impl cosmic::Application for AppModel {
             content
                 .push(
                     widget::container(
-                        // Use a font glyph instead of an optional icon-theme name:
-                        // the input indicator must remain visible on every COSMIC setup.
-                        widget::text("☀")
+                        // The downward arrow marks power flowing into the system;
+                        // use font glyphs so the indicator works with every icon theme.
+                        widget::text("☀↓")
                             .font(cosmic::font::default())
                             .size(f32::from(suggested.1.saturating_sub(2))),
                     )
