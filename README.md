@@ -11,7 +11,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 
 inputs; their wattage is subtracted from the net total and each input gets its own graph in the total-power card.
 - The main menu has a sticky title bar with icon-only Refresh and Settings actions; both use accessible labels and tooltips. The menu content scrolls independently beneath the title bar. The main menu and settings are vertically scrollable when their content exceeds the popup height.
-- The first selected device supplies both power and temperature values shown in the panel. Selected devices can be reordered in Settings.
+- The sortable Settings list includes a synthetic **Total power (net)** entry alongside devices. Move it to the top to show combined net watts in the panel (without a temperature value), or to the bottom to restore the first selected device's power and temperature. Its position is persisted independently from the FRITZ!Box device selection.
 - The main popup shows live on/off state and a native toggle switch for selected devices that expose FRITZ!Box switching support. The switch remains disabled while the command is verified against the FRITZ!Box and until refreshed power and temperature readings arrive; non-switchable devices have no power toggle.
 - In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy; every setting is saved immediately when changed.
 - Optional per-device temperature alerts for readings above the upper limit or below the lower limit. Defaults are 40 °C and −10 °C; the upper limit is configurable from 0–40 °C and the lower limit from −10–0 °C. Desktop notifications fire when a device crosses out of the safe range and re-arm when it returns.
@@ -82,8 +82,12 @@ list.
 Open the applet popup and choose **Settings**. Adjust **Panel text size** (10–24 pt) to change the power and temperature labels in the panel. The setting is saved with the rest of the applet configuration. Set **Automatic refresh** from 30 seconds to 1 hour; the main popup shows a live countdown to the next refresh. The default is 60 seconds. Enter the FRITZ!Box URL,
 username and password, then choose **Load devices**. The applet discovers
 devices that expose both power and temperature measurements. Check every
-device you want to monitor, then drag the grip (⠿) beside a selected device
-to change its position. An animated drop preview marks the target; the order is
+device you want to monitor, then use the grip (⠿) handles to reorder selected
+devices and the **Total power (net)** entry in the same list. Move Total power
+to the top to display the combined net wattage in the panel without a
+temperature value; move it to the bottom to restore the first selected device's
+power and temperature. This position is saved independently of the FRITZ!Box
+device selection. An animated drop preview marks device targets; ordering is
 changed and saved only when you release the drag. Enable **Input (subtract from total)**
 for devices that measure consumption rather than generation; their wattage is
 subtracted from the combined net-power reading and their individual signed
