@@ -563,18 +563,6 @@ impl cosmic::Application for AppModel {
                 .push(widget::text::caption("Settings are saved automatically as you change them."))
                 .push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings));
         } else {
-            content = content
-                .push(
-                    widget::Row::new()
-                        .spacing(8)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::title3("FRITZ!Power Monitor"))
-                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                        .push(icon_action_button("view-refresh-symbolic", "Refresh readings", Message::Refresh))
-                        .push(icon_action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
-                )
-                .push(widget::divider::horizontal::default());
-
             if !self.readings.is_empty() {
                 content = content.push(widget::text::caption("SELECTED DEVICES"));
                 for (index, reading) in self.readings.iter().enumerate() {
@@ -735,14 +723,56 @@ impl cosmic::Application for AppModel {
             }
         });
 
-        // Keep the popup within a practical height and make the full menu
-        // scrollable. The same wrapper is used for the main view and settings,
-        // so long device lists and diagnostics remain reachable on short screens.
+        // Only the main-menu title bar stays outside the scrollable area.
+        // This keeps the applet name and both actions visible while the device
+        // cards and graphs scroll independently beneath it.
+        let scrollable_content = widget::scrollable(content)
+            .width(cosmic::iced::Length::Fill)
+            .height(cosmic::iced::Length::Fill);
+
+        let popup_content = if self.settings_open {
+            widget::Column::new()
+                .width(cosmic::iced::Length::Fill)
+                .height(cosmic::iced::Length::Fill)
+                .push(scrollable_content)
+        } else {
+            let title_bar = widget::container(
+                widget::Row::new()
+                    .spacing(8)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::text::title3("FRITZ!Power Monitor"))
+                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                    .push(icon_action_button("view-refresh-symbolic", "Refresh readings", Message::Refresh))
+                    .push(icon_action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)),
+            )
+            .padding([12, 16])
+            .width(cosmic::iced::Length::Fill);
+
+            widget::Column::new()
+                .width(cosmic::iced::Length::Fill)
+                .height(cosmic::iced::Length::Fill)
+                .push(title_bar)
+                .push(widget::divider::horizontal::default())
+                .push(scrollable_content)
+        };
+
+        // Keep the popup within a practical height. The main-menu title bar
+        // remains fixed while the menu body scrolls; settings retain their
+        // existing fully scrollable layout.
         self.core.applet
             .popup_container(
-                widget::scrollable(content)
+                widget::container(popup_content)
                     .width(cosmic::iced::Length::Fill)
-                    .height(cosmic::iced::Length::Fill),
+                    .height(cosmic::iced::Length::Fill)
+                    .style(|theme| {
+                        let cosmic = theme.cosmic();
+                        cosmic::iced::widget::container::Style {
+                            background: Some(
+                                cosmic::iced::Color::from(cosmic.background(false).base).into(),
+                            ),
+                            ..Default::default()
+                        }
+                    }),
             )
             .max_height(600.0)
             .into()
