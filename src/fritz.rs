@@ -40,6 +40,7 @@ pub struct FritzSettings {
     pub ca_cert_path: String,
     pub panel_text_size: u8,
     pub graph_timespan_minutes: u16,
+    pub refresh_interval_seconds: u32,
     pub temperature_alerts: HashMap<String, TemperatureAlertThresholds>,
 }
 
@@ -55,6 +56,7 @@ impl Default for FritzSettings {
             ca_cert_path: String::new(),
             panel_text_size: 14,
             graph_timespan_minutes: 15,
+            refresh_interval_seconds: 60,
             temperature_alerts: HashMap::new(),
         }
     }
@@ -66,6 +68,10 @@ fn parse_panel_text_size(value: &str) -> u8 {
 
 fn parse_graph_timespan_minutes(value: &str) -> u16 {
     value.parse::<u16>().unwrap_or(15).clamp(5, 1440)
+}
+
+fn parse_refresh_interval_seconds(value: &str) -> u32 {
+    value.parse::<u32>().unwrap_or(60).clamp(30, 3600)
 }
 
 fn parse_temperature_alerts(value: &str) -> HashMap<String, TemperatureAlertThresholds> {
@@ -116,6 +122,7 @@ impl FritzSettings {
             ca_cert_path: get("CA_CERT_PATH"),
             panel_text_size: parse_panel_text_size(&get("PANEL_TEXT_SIZE")),
             graph_timespan_minutes: parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")),
+            refresh_interval_seconds: parse_refresh_interval_seconds(&get("REFRESH_INTERVAL_SECONDS")),
             temperature_alerts: parse_temperature_alerts(&get("TEMPERATURE_ALERTS")),
         };
         Ok(settings)
@@ -144,11 +151,11 @@ impl FritzSettings {
         temperature_alerts.sort_unstable();
         let temperature_alerts = temperature_alerts.join(";");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\nTEMPERATURE_ALERTS={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\n",
             self.url, self.username, self.password, first_ain, selected_ains,
             if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path,
             self.panel_text_size.clamp(10, 24), self.graph_timespan_minutes.clamp(5, 1440),
-            temperature_alerts
+            self.refresh_interval_seconds.clamp(30, 3600), temperature_alerts
         );
         #[cfg(unix)]
         let mut file = {
@@ -434,6 +441,16 @@ mod tests {
         assert_eq!(parse_graph_timespan_minutes("1"), 5);
         assert_eq!(parse_graph_timespan_minutes("60"), 60);
         assert_eq!(parse_graph_timespan_minutes("2000"), 1440);
+    }
+
+    #[test]
+    fn refresh_interval_defaults_and_is_clamped() {
+        assert_eq!(FritzSettings::default().refresh_interval_seconds, 60);
+        assert_eq!(parse_refresh_interval_seconds(""), 60);
+        assert_eq!(parse_refresh_interval_seconds("invalid"), 60);
+        assert_eq!(parse_refresh_interval_seconds("1"), 30);
+        assert_eq!(parse_refresh_interval_seconds("300"), 300);
+        assert_eq!(parse_refresh_interval_seconds("7200"), 3600);
     }
 
     #[test]
