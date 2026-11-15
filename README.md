@@ -73,7 +73,11 @@ cargo build --release
 GitHub Actions formats the Rust sources, runs the test suite, checks compilation, builds the optimized binary and validates installation on pull requests and pushes to `main`. Pushing
 a version tag such as `v0.1.5` builds a Linux x86_64 release archive containing
 the applet binary, desktop entry, icon, README and license, and publishes the
-archive with a SHA-256 checksum on the GitHub Releases page.
+archive with a SHA-256 checksum on the GitHub Releases page. The release
+workflow also builds a sandboxed Flatpak bundle for the COSMIC applet and
+attaches it with a SHA-256 checksum. The Flatpak uses the Freedesktop 24.08
+runtime, the Rust SDK extension, Wayland access, network access for the
+FRITZ!Box/OpenWeatherMap requests, and desktop-notification permission.
 
 After installing, reopen COSMIC Settings (or log out and back in if the
 applet list is not refreshed) and add **FRITZ!Power Monitor** from the panel applet
