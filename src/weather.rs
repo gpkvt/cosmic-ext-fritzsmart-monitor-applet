@@ -2,6 +2,14 @@ use reqwest::Client;
 use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct CommonsAttribution {
+    pub title: String,
+    pub artist: String,
+    pub license: String,
+    pub page_url: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct WeatherData {
     pub icon_code: String,
     pub description: String,
@@ -17,7 +25,7 @@ pub struct WeatherData {
     pub sunset_unix: i64,
     pub location_name: String,
     pub background_image: Option<Vec<u8>>,
-    pub image_attribution: Option<String>,
+    pub image_attribution: Option<CommonsAttribution>,
 }
 
 impl WeatherData {
@@ -117,7 +125,7 @@ fn commons_search_term(icon_code: &str) -> &'static str {
     }
 }
 
-async fn fetch_commons_background(client: &Client, icon_code: &str) -> (Option<Vec<u8>>, Option<String>) {
+async fn fetch_commons_background(client: &Client, icon_code: &str) -> (Option<Vec<u8>>, Option<CommonsAttribution>) {
     let search = commons_search_term(icon_code);
     let response = client.get("https://commons.wikimedia.org/w/api.php")
         .query(&[
@@ -146,8 +154,23 @@ async fn fetch_commons_background(client: &Client, icon_code: &str) -> (Option<V
     let license = info["extmetadata"]["LicenseShortName"]["value"].as_str().unwrap_or("See file page");
     let title = page["title"].as_str().unwrap_or("Wikimedia Commons photograph");
     let page_url = info["descriptionurl"].as_str().unwrap_or("https://commons.wikimedia.org/");
-    let attribution = format!("{} · {} · {} · {}", title, strip_html(artist), license, page_url);
+    let attribution = CommonsAttribution {
+        title: title.to_string(),
+        artist: strip_html(artist),
+        license: license.to_string(),
+        page_url: commons_file_page_url(page_url),
+    };
     (Some(image), Some(attribution))
+}
+
+fn commons_file_page_url(value: &str) -> String {
+    if value.starts_with("https://commons.wikimedia.org/wiki/File:")
+        && !value.chars().any(char::is_control)
+    {
+        value.to_string()
+    } else {
+        "https://commons.wikimedia.org/".to_string()
+    }
 }
 
 fn blur_background_image(bytes: Vec<u8>) -> Option<Vec<u8>> {
@@ -190,6 +213,22 @@ fn parse_coordinates(location: &str) -> Option<(f64, f64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn commons_attribution_links_only_to_commons_file_pages() {
+        assert_eq!(
+            commons_file_page_url("https://commons.wikimedia.org/wiki/File:Example.jpg"),
+            "https://commons.wikimedia.org/wiki/File:Example.jpg",
+        );
+        assert_eq!(
+            commons_file_page_url("https://example.com/image.jpg"),
+            "https://commons.wikimedia.org/",
+        );
+        assert_eq!(
+            commons_file_page_url("javascript:alert(1)"),
+            "https://commons.wikimedia.org/",
+        );
+    }
 
     #[test]
     fn maps_openweathermap_conditions_to_symbolic_icons() {
