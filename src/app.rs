@@ -1814,7 +1814,18 @@ impl cosmic::Application for AppModel {
                             .push(widget::container(device_content).padding(12));
                     }
                     let device_card = widget::container(card_column)
-                        .width(cosmic::iced::Length::Fill);
+                        .width(cosmic::iced::Length::Fill)
+                        .style(move |theme| {
+                            let cosmic = theme.cosmic();
+                            cosmic::iced::widget::container::Style {
+                                background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                                border: cosmic::iced::Border {
+                                    radius: device_corner_radius.into(),
+                                    ..Default::default()
+                                },
+                                ..Default::default()
+                            }
+                        });
                     device_cards = device_cards.push(device_card);
                 }
                 let device_list = widget::container(device_cards)
