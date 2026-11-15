@@ -10,6 +10,7 @@ use cosmic::prelude::*;
 use cosmic::widget;
 use futures::SinkExt;
 use std::collections::{HashMap, VecDeque};
+use std::process::Command;
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
@@ -30,6 +31,7 @@ pub struct AppModel {
     settings_status: Option<String>,
     history: VecDeque<(Instant, i64)>,
     device_history: HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    temperature_alert_state: HashMap<String, bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -50,10 +52,18 @@ pub enum Message {
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
     ToggleDevice(String, bool),
     MoveDevice(String, bool),
-    SaveSettings,
+    ToggleTemperatureAlert(String, bool),
+    TemperatureAlertThresholdChanged(String, u16),
 }
 
 
+
+fn notify_temperature_alert(name: &str, temperature: f64, threshold: u16) {
+    let summary = format!("High temperature: {name}");
+    let body = format!("{temperature:.1} °C (alert threshold: {threshold} °C)");
+    // A missing notification service must never interrupt data refreshes.
+    let _ = Command::new("notify-send").arg(summary).arg(body).spawn();
+}
 
 fn device_background_color(base: cosmic::iced::Color, index: usize) -> cosmic::iced::Color {
     // Distinct, muted hues make adjacent devices easy to tell apart while
@@ -389,7 +399,33 @@ impl cosmic::Application for AppModel {
                             row = row.push(action_button("go-down-symbolic", "Down", Message::MoveDevice(ain.clone(), false)));
                         }
                     }
-                    content = content.push(widget::container(row)
+                    let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
+                    let alert_threshold = self.settings.temperature_alerts.get(&normalized_ain).copied();
+                    let mut device_row = widget::Column::new()
+                        .spacing(6)
+                        .push(row)
+                        .push(widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::text::caption("High-temperature alert"))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(widget::toggler(alert_threshold.is_some())
+                                .on_toggle({
+                                    let ain = ain.clone();
+                                    move |enabled| Message::ToggleTemperatureAlert(ain.clone(), enabled)
+                                })));
+                    if let Some(threshold) = alert_threshold {
+                        device_row = device_row
+                            .push(widget::text::caption(format!("Notify at {} °C", threshold)))
+                            .push(widget::slider(
+                                30.0..=100.0,
+                                f32::from(threshold),
+                                {
+                                    let ain = ain.clone();
+                                    move |value| Message::TemperatureAlertThresholdChanged(ain.clone(), value.round() as u16)
+                                },
+                            ).step(1.0));
+                    }
+                    content = content.push(widget::container(device_row)
                         .padding(8)
                         .style(move |theme| {
                             let cosmic = theme.cosmic();
@@ -400,7 +436,7 @@ impl cosmic::Application for AppModel {
                             }
                         }));
                 }
-                content = content.push(widget::text::caption("Use Up and Down to set the order. The first selected device supplies the panel readings."));
+                content = content.push(widget::text::caption("Use Up and Down to set the order. The first selected device supplies the panel readings. Temperature alerts notify once when a device crosses its configured threshold."));
             }
 
             content = content
@@ -418,13 +454,8 @@ impl cosmic::Application for AppModel {
 
             content = content
                 .push(widget::divider::horizontal::default())
-                .push(
-                    widget::Row::new()
-                        .spacing(8)
-                        .push(action_button("document-save-symbolic", "Save settings", Message::SaveSettings))
-                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                        .push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings)),
-                );
+                .push(widget::text::caption("Settings are saved automatically as you change them."))
+                .push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings));
         } else {
             content = content
                 .push(widget::text::title3("FRITZ!Power Monitor"))
@@ -618,6 +649,18 @@ impl cosmic::Application for AppModel {
                     record_power_sample(&mut self.history, total_power, now, history_window);
                     for reading in &readings {
                         record_device_sample(&mut self.device_history, reading, now, history_window);
+                        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
+                        if let Some(threshold) = self.settings.temperature_alerts.get(&key).copied() {
+                            let above_threshold = reading.temperature_c >= f64::from(threshold);
+                            if self.temperature_alert_state.get(&key) == Some(&false) && above_threshold {
+                                notify_temperature_alert(&reading.name, reading.temperature_c, threshold);
+                            }
+                            // First observation establishes a baseline without
+                            // notifying for a device already above its limit.
+                            self.temperature_alert_state.insert(key, above_threshold);
+                        } else {
+                            self.temperature_alert_state.remove(&key);
+                        }
                     }
                     self.readings = readings;
                     self.error = None;
@@ -631,12 +674,30 @@ impl cosmic::Application for AppModel {
                 self.settings_open = !self.settings_open;
                 self.settings_status = None;
             }
-            Message::UrlChanged(value) => self.settings.url = value,
-            Message::UsernameChanged(value) => self.settings.username = value,
-            Message::PasswordChanged(value) => self.settings.password = value,
-            Message::AllowInvalidCertsChanged(value) => self.settings.allow_invalid_certs = value,
-            Message::CaCertPathChanged(value) => self.settings.ca_cert_path = value,
-            Message::PanelTextSizeChanged(value) => self.settings.panel_text_size = value.clamp(10, 24),
+            Message::UrlChanged(value) => {
+                self.settings.url = value;
+                self.persist_settings();
+            }
+            Message::UsernameChanged(value) => {
+                self.settings.username = value;
+                self.persist_settings();
+            }
+            Message::PasswordChanged(value) => {
+                self.settings.password = value;
+                self.persist_settings();
+            }
+            Message::AllowInvalidCertsChanged(value) => {
+                self.settings.allow_invalid_certs = value;
+                self.persist_settings();
+            }
+            Message::CaCertPathChanged(value) => {
+                self.settings.ca_cert_path = value;
+                self.persist_settings();
+            }
+            Message::PanelTextSizeChanged(value) => {
+                self.settings.panel_text_size = value.clamp(10, 24);
+                self.persist_settings();
+            }
             Message::GraphTimespanChanged(value) => {
                 self.settings.graph_timespan_minutes = value.clamp(5, 1440);
                 let now = Instant::now();
@@ -645,6 +706,7 @@ impl cosmic::Application for AppModel {
                 for samples in self.device_history.values_mut() {
                     samples.retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
                 }
+                self.persist_settings();
             }
             Message::DiscoverDevices => {
                 let settings = self.settings.clone();
@@ -671,19 +733,28 @@ impl cosmic::Application for AppModel {
                 if selected { self.selected_ains.push(ain); }
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
+                self.persist_settings();
             }
             Message::MoveDevice(ain, move_up) => {
                 move_selected_device(&mut self.selected_ains, &ain, move_up);
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
+                self.persist_settings();
             }
-            Message::SaveSettings => {
-                if let Err(error) = self.settings.save() {
-                    self.settings_status = Some(error);
+            Message::ToggleTemperatureAlert(ain, enabled) => {
+                let key = crate::fritz::normalize_ain_for_selection(&ain);
+                if enabled {
+                    self.settings.temperature_alerts.entry(key.clone()).or_insert(60);
                 } else {
-                    self.settings_status = Some("Settings saved".into());
-                    return Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result)));
+                    self.settings.temperature_alerts.remove(&key);
+                    self.temperature_alert_state.remove(&key);
                 }
+                self.persist_settings();
+            }
+            Message::TemperatureAlertThresholdChanged(ain, threshold) => {
+                let key = crate::fritz::normalize_ain_for_selection(&ain);
+                self.settings.temperature_alerts.insert(key, threshold.clamp(30, 100));
+                self.persist_settings();
             }
             Message::TogglePopup => {
                 return if let Some(id) = self.popup.take() {
@@ -708,6 +779,13 @@ impl cosmic::Application for AppModel {
             }
         }
         Task::none()
+    }
+
+    fn persist_settings(&mut self) {
+        self.settings_status = match self.settings.save() {
+            Ok(()) => Some("Settings saved automatically".into()),
+            Err(error) => Some(format!("Could not save settings: {error}")),
+        };
     }
 
     fn on_close_requested(&self, id: Id) -> Option<Message> { Some(Message::PopupClosed(id)) }
