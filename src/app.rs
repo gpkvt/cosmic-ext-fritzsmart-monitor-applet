@@ -647,7 +647,21 @@ fn total_power_overview(
                 .push(widget::text::title3("Total power"))
                 .push(widget::text::caption(format!("NET · LAST {timespan}"))))
             .push(widget::text::caption(format!("{} W", total_power))))
-        .push(widget::text::caption(format!("Low {low} W     ·     High {high} W")))
+        .push(
+            widget::Row::new()
+                .spacing(8)
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::container(metric_tile(
+                    "LOW",
+                    format!("{low} W"),
+                    "go-down-symbolic",
+                )).width(cosmic::iced::Length::Fill))
+                .push(widget::container(metric_tile(
+                    "HIGH",
+                    format!("{high} W"),
+                    "go-up-symbolic",
+                )).width(cosmic::iced::Length::Fill)),
+        )
         .push(
             widget::Row::new()
                 .spacing(8)
