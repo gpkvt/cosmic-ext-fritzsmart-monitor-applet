@@ -740,7 +740,15 @@ impl cosmic::Application for AppModel {
                     );
             }
 
-            content = content.push(widget::divider::horizontal::default());
+            content = content
+                .push(widget::divider::horizontal::default())
+                .push(
+                    widget::button::custom(
+                        widget::text::body("Settings").width(cosmic::iced::Length::Fill),
+                    )
+                    .on_press(Message::ToggleSettings)
+                    .width(cosmic::iced::Length::Fill),
+                );
         }
 
         content = content.push(
@@ -780,8 +788,7 @@ impl cosmic::Application for AppModel {
                     .align_y(cosmic::iced::Alignment::Center)
                     .push(widget::text::title3("FRITZ!Power Monitor"))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                    .push(icon_action_button("↻", "Refresh readings", Message::Refresh))
-                    .push(icon_action_button("⚙", "Settings", Message::ToggleSettings)),
+                    .push(icon_action_button("↻", "Refresh readings", Message::Refresh)),
             )
             .padding([12, 16])
             .width(cosmic::iced::Length::Fill);
