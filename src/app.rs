@@ -1847,7 +1847,7 @@ impl cosmic::Application for AppModel {
                     .align_y(cosmic::iced::Alignment::Center)
                     .push(widget::container(widget::icon::from_name("utilities-system-monitor-symbolic").size(20))
                         .center_x(36).center_y(36))
-                    .push(widget::text::title3("FRITZ!Power Monitor")
+                    .push(widget::text::title2("FRITZ!Power Monitor")
                         .width(cosmic::iced::Length::Fill))
                     .push(icon_action_button(
                         self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("↻"),
