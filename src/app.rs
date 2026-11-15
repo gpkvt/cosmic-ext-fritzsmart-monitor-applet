@@ -10,7 +10,7 @@ use cosmic::iced::{
 use cosmic::prelude::*;
 use cosmic::widget;
 use futures::SinkExt;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
@@ -258,6 +258,20 @@ fn net_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
 
 fn power_sparkline(history: &VecDeque<(Instant, i64)>) -> String {
     numeric_sparkline(history.iter().map(|(_, value)| *value as f64))
+}
+
+fn rebuild_net_power_history(
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    input_ains: &HashSet<String>,
+) -> VecDeque<(Instant, i64)> {
+    let mut samples = BTreeMap::<Instant, i64>::new();
+    for (ain, history) in device_history {
+        let is_input = input_ains.contains(ain);
+        for (timestamp, power_w, _) in history {
+            *samples.entry(*timestamp).or_default() += signed_device_power(*power_w, is_input);
+        }
+    }
+    samples.into_iter().collect()
 }
 
 fn numeric_sparkline(values: impl Iterator<Item = f64>) -> String {
@@ -1031,7 +1045,7 @@ impl cosmic::Application for AppModel {
                     self.history.iter().map(|(_, value)| *value).max(),
                 ) {
                     let total_power = net_power_w(&self.readings, &self.settings.input_ains);
-                    let total_power_content = widget::Column::new()
+                    let mut total_power_content = widget::Column::new()
                         .spacing(6)
                         .push(widget::text::body(format!(
                             "TOTAL POWER · LAST {}",
@@ -1057,6 +1071,44 @@ impl cosmic::Application for AppModel {
                                     }
                                 }),
                         );
+                    for reading in self.readings.iter().filter(|reading|
+                        self.settings.input_ains.contains(
+                            &crate::fritz::normalize_ain_for_selection(&reading.ain),
+                        ))
+                    {
+                        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
+                        let input_history = self.device_history.get(&key);
+                        let graph = input_history.map(|samples|
+                            numeric_sparkline(samples.iter().map(|(_, power, _)| -(*power as f64))))
+                            .unwrap_or_else(|| "Waiting for samples…".into());
+                        total_power_content = total_power_content.push(
+                            widget::Column::new()
+                                .spacing(4)
+                                .push(widget::text::caption(format!(
+                                    "INPUT · {} · {} W",
+                                    reading.name,
+                                    signed_device_power(reading.power_w, true),
+                                )))
+                                .push(
+                                    widget::container(widget::text::body(graph))
+                                        .padding(8)
+                                        .width(cosmic::iced::Length::Fill)
+                                        .style(|theme| {
+                                            let cosmic = theme.cosmic();
+                                            cosmic::iced::widget::container::Style {
+                                                background: Some(
+                                                    cosmic::iced::Color::from(cosmic.background(false).base).into(),
+                                                ),
+                                                border: cosmic::iced::Border {
+                                                    radius: 3.0.into(),
+                                                    ..Default::default()
+                                                },
+                                                ..Default::default()
+                                            }
+                                        }),
+                                ),
+                        );
+                    }
                     content = content.push(
                         widget::container(total_power_content)
                             .padding(10)
@@ -1432,10 +1484,10 @@ impl cosmic::Application for AppModel {
                     self.settings.input_ains.remove(&key);
                 }
                 self.persist_settings();
-                let total_power = net_power_w(&self.readings, &self.settings.input_ains);
-                if let Some((_, latest)) = self.history.back_mut() {
-                    *latest = total_power;
-                }
+                self.history = rebuild_net_power_history(
+                    &self.device_history,
+                    &self.settings.input_ains,
+                ).into_iter().collect();
             }
             Message::StartDeviceDrag(ain) => {
                 if self.selected_ains.iter().any(|selected|
@@ -1581,6 +1633,18 @@ mod history_tests {
         assert_eq!(ains, vec!["333333333333", "222222222222", "111111111111"]);
         move_selected_device_to_drop_target(&mut ains, "missing", "222222222222");
         assert_eq!(ains, vec!["333333333333", "222222222222", "111111111111"]);
+    }
+
+    #[test]
+    fn changing_input_roles_recalculates_net_history() {
+        let now = Instant::now();
+        let device_history = HashMap::from([
+            ("111111".to_string(), VecDeque::from([(now, 900, 20.0)])),
+            ("222222".to_string(), VecDeque::from([(now, 250, 21.0)])),
+        ]);
+        let inputs = HashSet::from(["222222".to_string()]);
+        let history = rebuild_net_power_history(&device_history, &inputs);
+        assert_eq!(history, VecDeque::from([(now, 650)]));
     }
 
     #[test]
