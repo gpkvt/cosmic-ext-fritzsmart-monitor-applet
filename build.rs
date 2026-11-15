@@ -8,11 +8,17 @@ fn main() {
     let prerelease = std::env::var("CARGO_PKG_VERSION_PRE")
         .expect("Cargo sets CARGO_PKG_VERSION_PRE");
 
-    let mut version = format!("{major}.{minor}.{patch}");
-    if !prerelease.is_empty() {
-        version.push('-');
-        version.push_str(&prerelease);
-    }
+    println!("cargo:rerun-if-env-changed=APP_RELEASE_VERSION");
+    let version = if let Ok(release_version) = std::env::var("APP_RELEASE_VERSION") {
+        release_version
+    } else {
+        let mut version = format!("{major}.{minor}.{patch}");
+        if !prerelease.is_empty() {
+            version.push('-');
+            version.push_str(&prerelease);
+        }
+        format!("{version}+")
+    };
 
-    println!("cargo:rustc-env=APP_VERSION={version}+");
+    println!("cargo:rustc-env=APP_VERSION={version}");
 }
