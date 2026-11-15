@@ -112,6 +112,23 @@ fn newly_missing_devices(
     newly_missing
 }
 
+fn clear_confirmed_power_changes(
+    pending_targets: &mut HashMap<String, bool>,
+    pending_changes: &mut HashSet<String>,
+    readings: &[FritzReading],
+) {
+    let confirmed: Vec<String> = pending_targets.iter()
+        .filter(|(ain, requested)| readings.iter().any(|reading|
+            crate::fritz::normalize_ain_for_selection(&reading.ain) == **ain
+                && reading.power_state == Some(**requested)))
+        .map(|(ain, _)| ain.clone())
+        .collect();
+    for ain in confirmed {
+        pending_targets.remove(&ain);
+        pending_changes.remove(&ain);
+    }
+}
+
 fn notify_missing_devices(names: &[String]) {
     if names.is_empty() {
         return;
@@ -1182,15 +1199,11 @@ impl cosmic::Application for AppModel {
                     );
                     notify_missing_devices(&newly_missing);
                     let readings = result.readings;
-                    for reading in &readings {
-                        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                        if self.pending_power_targets.get(&key)
-                            .is_some_and(|requested| reading.power_state == Some(*requested))
-                        {
-                            self.pending_power_targets.remove(&key);
-                            self.pending_power_changes.remove(&key);
-                        }
-                    }
+                    clear_confirmed_power_changes(
+                        &mut self.pending_power_targets,
+                        &mut self.pending_power_changes,
+                        &readings,
+                    );
                     if readings.is_empty() {
                         self.error = Some("No selected devices returned usable readings".into());
                     } else {
@@ -1631,4 +1644,30 @@ mod history_tests {
         assert_eq!(sparse.chars().next(), Some('▁'));
         assert_eq!(sparse.chars().last(), Some('█'));
     }
+    #[test]
+    fn power_toggle_stays_pending_until_fresh_reading_confirms_requested_state() {
+        for (requested, reported, should_remain_pending) in [
+            (true, Some(false), true),
+            (false, Some(true), true),
+            (true, Some(true), false),
+            (false, Some(false), false),
+            (true, None, true),
+        ] {
+            let mut pending_targets = HashMap::from([("123456".to_string(), requested)]);
+            let mut pending_changes = HashSet::from(["123456".to_string()]);
+            let readings = vec![FritzReading {
+                ain: "12:34-56".into(),
+                name: "Test switch".into(),
+                power_w: 100,
+                temperature_c: 20.0,
+                power_state: reported,
+            }];
+
+            clear_confirmed_power_changes(&mut pending_targets, &mut pending_changes, &readings);
+
+            assert_eq!(pending_targets.contains_key("123456"), should_remain_pending);
+            assert_eq!(pending_changes.contains("123456"), should_remain_pending);
+        }
+    }
+
 }
