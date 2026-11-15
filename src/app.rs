@@ -547,7 +547,7 @@ fn live_power_summary(
     device_count: usize,
 ) -> cosmic::Element<'static, Message> {
     let title = if is_net { "NET POWER" } else { "CURRENT POWER" };
-    let mut details = widget::Row::new()
+    let details = widget::Row::new()
         .spacing(8)
         .align_y(cosmic::iced::Alignment::Center)
         .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(18))
@@ -683,7 +683,7 @@ fn settings_section_header<'a>(title: &'a str, expanded: bool, section: &'static
         _ => ("preferences-system-symbolic", "Applet preferences"),
     };
     let disclosure_icon = if expanded { "go-down-symbolic" } else { "go-next-symbolic" };
-    widget::button::custom(
+    let section_button: cosmic::Element<'a, Message> = widget::button::custom(
         widget::Row::new()
             .spacing(12)
             .align_y(cosmic::iced::Alignment::Center)
@@ -700,7 +700,8 @@ fn settings_section_header<'a>(title: &'a str, expanded: bool, section: &'static
     .padding([8, 12])
     .width(cosmic::iced::Length::Fill)
     .class(cosmic::theme::Button::Standard)
-    .into()
+    .into();
+    surface_card(section_button, 2)
 }
 
 fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
@@ -1394,8 +1395,18 @@ impl cosmic::Application for AppModel {
                             }
                         }).into()
                 };
+                let weather_heading = widget::Row::new()
+                    .spacing(8)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::icon::from_name(weather.icon_name()).size(20))
+                    .push(widget::Column::new()
+                        .spacing(1)
+                        .width(cosmic::iced::Length::Fill)
+                        .push(widget::text::title3("Weather"))
+                        .push(widget::text::caption(weather.location_name.clone())))
+                    .push(widget::text::caption(format!("{:.0}°", weather.temperature_c)));
                 content = content
-                    .push(widget::text::title3("Weather"))
+                    .push(weather_heading)
                     .push(weather_card);
                 if let Some(credit) = weather.image_attribution.as_ref() {
                     let label = if self.weather_attribution_expanded {
