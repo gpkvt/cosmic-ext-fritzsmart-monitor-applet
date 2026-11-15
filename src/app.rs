@@ -767,7 +767,7 @@ impl cosmic::Application for AppModel {
                     if let Some(index) = selected_index {
                         row = row.push(widget::text::caption(format!(
                             "#{}",
-                            index + 1 + usize::from(self.settings.total_power_first),
+                            index + 1 + if self.settings.total_power_first { 1 } else { 0 },
                         )));
                     }
                     let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
