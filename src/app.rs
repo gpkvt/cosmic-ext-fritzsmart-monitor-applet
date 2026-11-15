@@ -1484,7 +1484,6 @@ impl cosmic::Application for AppModel {
                         .push(widget::icon::from_name(weather.icon_name()).size(36))
                         .push(widget::Column::new()
                             .spacing(2)
-                            .push(widget::text::title2(format!("{:.1} °C", weather.temperature_c)))
                             .push(widget::text::body(weather.description.clone()))
                             .push(widget::text::caption(format!("Feels like {:.1} °C", weather.feels_like_c)))))
                     .push(widget::Row::new().spacing(8)
@@ -1494,7 +1493,9 @@ impl cosmic::Application for AppModel {
                     .push(widget::Row::new().spacing(8)
                         .push(widget::text::body(format!("Wind  {:.1} m/s{}", weather.wind_speed_mps, wind_direction)))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                        .push(widget::text::body(format!("Pressure  {} hPa", weather.pressure_hpa))))
+                        .push(widget::Column::new().spacing(2)
+                            .push(widget::text::body("Pressure"))
+                            .push(widget::text::body(format!("{} hPa", weather.pressure_hpa)))))
                     .push(widget::Row::new().spacing(8)
                         .push(widget::text::body(format!("Visibility  {:.1} km", f64::from(weather.visibility_m) / 1000.0)))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
@@ -1541,7 +1542,7 @@ impl cosmic::Application for AppModel {
                         .width(cosmic::iced::Length::Fill)
                         .push(widget::text::title3("Weather"))
                         .push(widget::text::caption(weather.location_name.clone())))
-                    .push(widget::text::caption(format!("{:.0}°", weather.temperature_c)));
+                    .push(widget::text::title2(format!("{:.0}°", weather.temperature_c)));
                 content = content
                     .push(weather_heading)
                     .push(weather_card);
