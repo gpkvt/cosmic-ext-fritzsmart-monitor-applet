@@ -39,10 +39,10 @@ jobs:
       - name: Format Rust sources and run tests
         run: |
           cargo fmt --all
-          cargo test
           cargo generate-lockfile
+          cargo test --locked
       - name: Build optimized binary
-        run: APP_RELEASE_VERSION="${GITHUB_REF_NAME#v}" cargo build --release
+        run: APP_RELEASE_VERSION="${GITHUB_REF_NAME#v}" cargo build --release --locked
       - name: Prepare Flatpak Cargo sources
         run: |
           python3 -m venv .venv
