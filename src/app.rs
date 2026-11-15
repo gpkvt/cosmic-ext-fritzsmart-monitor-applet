@@ -781,25 +781,34 @@ impl cosmic::Application for AppModel {
             .spacing(6)
             .align_y(cosmic::iced::Alignment::Center)
             .push(
-                widget::container(widget::icon::from_name(self.weather.as_ref().map(|weather| weather.icon_name()).unwrap_or("weather-clear-symbolic")).size(suggested.1.saturating_sub(2)))
-                    // Symbolic icons sit optically high beside text glyphs;
-                    // a small top inset aligns their visual centers.
-                    .padding([2, 0]),
+                widget::container({
+                    let solar_icon = widget::icon::from_name(
+                        self.weather.as_ref().map(|weather| weather.icon_name()).unwrap_or("weather-clear-symbolic"),
+                    ).size(suggested.1.saturating_sub(2));
+                    if input_power.is_some() {
+                        widget::Stack::new()
+                            .push(solar_icon)
+                            .push(
+                                widget::container(
+                                    widget::text("↓")
+                                        .font(cosmic::font::default())
+                                        .size(f32::from(suggested.1 / 2)),
+                                )
+                                .align_x(cosmic::iced::alignment::Horizontal::Right)
+                                .align_y(cosmic::iced::alignment::Vertical::Top)
+                                .padding([0, 1]),
+                            )
+                    } else {
+                        widget::Stack::new().push(solar_icon)
+                    }
+                })
+                // Symbolic icons sit optically high beside text glyphs;
+                // the input badge overlaps the icon's upper-right corner.
+                .padding([2, 0]),
             )
             .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)));
         let content = if let Some(input_power) = input_power {
-            content
-                .push(
-                    widget::container(
-                        // The downward arrow marks power flowing into the system;
-                        // use font glyphs so the indicator works with every icon theme.
-                        widget::text("☀↓")
-                            .font(cosmic::font::default())
-                            .size(f32::from(suggested.1.saturating_sub(2))),
-                    )
-                    .padding([2, 0]),
-                )
-                .push(self.core.applet.text(input_power).size(f32::from(self.settings.panel_text_size)))
+            content.push(self.core.applet.text(input_power).size(f32::from(self.settings.panel_text_size)))
         } else {
             content
         };
