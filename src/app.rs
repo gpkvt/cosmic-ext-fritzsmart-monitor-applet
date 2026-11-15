@@ -449,7 +449,7 @@ impl cosmic::Application for AppModel {
                 .push(widget::text::caption(format!("Weather refresh: {} minutes", self.settings.weather_refresh_interval_minutes)))
                 .push(widget::slider(5.0..=60.0, f32::from(self.settings.weather_refresh_interval_minutes),
                     |value| Message::WeatherRefreshIntervalChanged(value.round() as u16)).step(5.0))
-                .push(widget::text::caption("Independent of FRITZ!Box refresh; default 10 minutes"))
+                .push(widget::text::caption("Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location."))
                 .push(widget::divider::horizontal::default())
                 .push(widget::text::caption("CONNECTION"))
                 .push(widget::text::body("FRITZ!Box URL"))
@@ -831,7 +831,6 @@ impl cosmic::Application for AppModel {
                     self.next_weather_refresh_at = None;
                     let api_key = self.settings.openweathermap_api_key.clone();
                     let location = self.settings.weather_location.clone();
-                    let interval = self.settings.weather_refresh_interval_minutes;
                     return Task::perform(fetch_weather(api_key, location), move |result|
                         cosmic::Action::App(Message::WeatherUpdated(result)));
                 }
