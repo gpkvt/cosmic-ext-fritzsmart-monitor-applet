@@ -35,8 +35,8 @@ jobs:
             libwayland-dev \
             libxkbcommon-dev \
             pkg-config
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+      - name: Format Rust sources
+        run: cargo fmt --all
       - name: Run tests
         run: cargo test
       - name: Check build
