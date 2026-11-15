@@ -719,7 +719,12 @@ fn total_power_overview(
         input_graphs = input_graphs.push(widget::text::caption("No input devices"));
     }
 
-    let content = widget::Column::new()
+    let has_input_readings = readings.iter().any(|reading| {
+        settings.input_ains.contains(
+            &crate::fritz::normalize_ain_for_selection(&reading.ain),
+        )
+    });
+    let mut content = widget::Column::new()
         .spacing(10)
         .push(widget::Row::new()
             .spacing(12)
@@ -746,7 +751,15 @@ fn total_power_overview(
                     format!("{high} W"),
                     "go-up-symbolic",
                 )).width(cosmic::iced::Length::Fill)),
-        )
+        );
+    if has_input_readings {
+        content = content.push(metric_tile(
+            "TOTAL INPUT",
+            format!("{} W", input_power_w(readings, &settings.input_ains)),
+            "go-down-symbolic",
+        ));
+    }
+    content = content
         .push(graph_panel(total_graph))
         .push(graph_panel(input_graphs.into()));
     Some(surface_card(content.into(), 14))
