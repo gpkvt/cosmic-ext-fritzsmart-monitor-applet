@@ -439,11 +439,8 @@ fn move_sortable_entry(
                 == crate::fritz::normalize_ain_for_selection(dragged))
         {
             let device = ains.remove(index);
-            if *total_power_first {
-                ains.insert(0, device);
-            } else {
-                ains.push(device);
-            }
+            ains.push(device);
+            *total_power_first = false;
         }
     } else {
         move_selected_device_to_drop_target(ains, dragged, target);
