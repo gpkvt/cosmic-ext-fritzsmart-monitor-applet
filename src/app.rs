@@ -949,8 +949,10 @@ impl cosmic::Application for AppModel {
 
         let suggested = self.core.applet.suggested_size(true);
         let panel_padding = u16::from(self.settings.panel_padding);
-        let vertical_padding = panel_padding;
-        let horizontal_padding = panel_padding;
+        // Keep a comfortable pointer/touch target even when panel padding is
+        // configured to its minimum.
+        let vertical_padding = panel_padding.max(8);
+        let horizontal_padding = panel_padding.max(10);
 
         let content = widget::Row::new()
             .spacing(8)
@@ -1006,7 +1008,7 @@ impl cosmic::Application for AppModel {
             .on_press_down(Message::TogglePopup)
             .padding([vertical_padding, horizontal_padding])
             .height(cosmic::iced::Length::Fixed(
-                f32::from(suggested.1 + 2 * vertical_padding),
+                f32::from((suggested.1 + 2 * vertical_padding).max(40)),
             ))
             .class(cosmic::theme::Button::AppletIcon);
 
