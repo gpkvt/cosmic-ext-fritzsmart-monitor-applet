@@ -415,6 +415,7 @@ fn graph_visual(
         .push(
             widget::Row::new()
                 .width(cosmic::iced::Length::Fill)
+                .push(widget::text::caption(format!("MIN {minimum:.1} {unit}")))
                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                 .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
         )
