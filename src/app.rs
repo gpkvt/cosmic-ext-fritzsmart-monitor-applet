@@ -521,14 +521,18 @@ fn metric_tile<'a>(
     value: impl Into<String>,
     icon: &'static str,
 ) -> cosmic::Element<'a, Message> {
+    let label = label.into();
+    let mut heading = widget::Row::new()
+        .spacing(6)
+        .align_y(cosmic::iced::Alignment::Start)
+        .push(widget::icon::from_name(icon).size(14));
+    if !label.is_empty() {
+        heading = heading.push(widget::text::caption(label));
+    }
     let content = widget::Row::new()
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Start)
-        .push(widget::Row::new()
-            .spacing(6)
-            .align_y(cosmic::iced::Alignment::Start)
-            .push(widget::icon::from_name(icon).size(14))
-            .push(widget::text::caption(label.into())))
+        .push(heading)
         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
         .push(widget::text::title3(keep_value_unit_together(value.into())));
     surface_card(content.into(), 10)
@@ -600,7 +604,7 @@ fn live_power_summary(
     }
     if let Some(temp) = temperature {
         has_supporting = true;
-        supporting = supporting.push(metric_tile("TEMPERATURE", temp, "thermometer-symbolic"));
+        supporting = supporting.push(metric_tile("", temp, "thermometer-symbolic"));
     }
 
     let mut content = widget::Row::new()
@@ -1660,7 +1664,7 @@ impl cosmic::Application for AppModel {
                         .spacing(8)
                         .width(cosmic::iced::Length::Fill)
                         .push(metric_tile("POWER", format!("{} W", reading.power_w), "utilities-system-monitor-symbolic"))
-                        .push(metric_tile("TEMPERATURE", format!("{:.1} °C", reading.temperature_c), "thermometer-symbolic"));
+                        .push(metric_tile("", format!("{:.1} °C", reading.temperature_c), "thermometer-symbolic"));
                     let device_content = widget::Column::new()
                         .spacing(10)
                         .push(metrics)
@@ -1721,7 +1725,11 @@ impl cosmic::Application for AppModel {
                                             widget::Column::new()
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
-                                                .push(widget::text::caption("TEMPERATURE (°C)"))
+                                                .push(widget::Row::new()
+                                                    .spacing(6)
+                                                    .align_y(cosmic::iced::Alignment::Center)
+                                                    .push(widget::icon::from_name("thermometer-symbolic").size(14))
+                                                    .push(widget::text::caption("(°C)")) )
                                                 .push(widget::text::body(temperature_graph)
                                                     .width(cosmic::iced::Length::Fill)
                                                     .align_x(cosmic::iced::Alignment::End))
