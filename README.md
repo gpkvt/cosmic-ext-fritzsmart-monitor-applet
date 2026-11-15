@@ -87,8 +87,7 @@ devices and the **Total power (net)** entry in the same list. Move Total power
 to the top to display the combined net wattage in the panel without a
 temperature value; move it to the bottom to restore the first selected device's
 power and temperature. This position is saved independently of the FRITZ!Box
-device selection. An animated drop preview marks device targets; ordering is
-changed and saved only when you release the drag. Enable **Input (subtract from total)**
+device selection. The list reorders live as you drag over targets, with an animated insertion preview; release the mouse button to finish and save the new order. Enable **Input (subtract from total)**
 for devices that measure consumption rather than generation; their wattage is
 subtracted from the combined net-power reading and their individual signed
 history is shown in the total-power card. This role is saved per device.
