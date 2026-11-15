@@ -2494,117 +2494,67 @@ impl cosmic::Application for AppModel {
                         // the full menu content width.
                         .push(widget::container(metrics).padding([0, 12]))
                         .push(
-                        widget::Column::new()
-                            .spacing(8)
-                            .width(cosmic::iced::Length::Fill)
-                            .push(
-                                widget::container(
-                                    widget::container(
-                                        widget::Column::new()
-                                            .spacing(4)
-                                            .width(cosmic::iced::Length::Fill)
-                                            .push(widget::text::caption("POWER (W)"))
-                                            .push(graph_visual(
-                                                device_history.into_iter().flat_map(|samples| {
-                                                    samples
-                                                        .iter()
-                                                        .map(|(_, power, _)| *power as f64)
-                                                }),
-                                                &self.settings.graph_style,
-                                                "W",
-                                            ))
-                                            .push(
-                                                widget::Row::new()
-                                                    .width(cosmic::iced::Length::Fill)
-                                                    .push(widget::text::caption(
-                                                        format_graph_axis_start(
-                                                            self.settings.graph_timespan_minutes,
-                                                        ),
-                                                    ))
-                                                    .push(
-                                                        widget::Space::new()
-                                                            .width(cosmic::iced::Length::Fill),
-                                                    )
-                                                    .push(widget::text::caption("Now")),
-                                            ),
-                                    )
-                                    .padding([8, 0])
-                                    .width(cosmic::iced::Length::Fill)
-                                    .style(move |theme| {
-                                        let cosmic = theme.cosmic();
-                                        cosmic::iced::widget::container::Style {
-                                            background: Some(
-                                                cosmic::iced::Color::from(
-                                                    cosmic.background(false).base,
-                                                )
-                                                .into(),
-                                            ),
-                                            border: cosmic::iced::Border {
-                                                radius: device_corner_radius,
-                                                ..Default::default()
-                                            },
-                                            ..Default::default()
-                                        }
-                                    }),
-                                )
-                                .padding(1)
+                            widget::Column::new()
+                                .spacing(8)
                                 .width(cosmic::iced::Length::Fill)
-                                .style(move |theme| {
-                                    let cosmic = theme.cosmic();
-                                    cosmic::iced::widget::container::Style {
-                                        background: Some(
-                                            cosmic::iced::Color::from(
-                                                cosmic.background(false).small_widget,
-                                            )
-                                            .into(),
-                                        ),
-                                        border: cosmic::iced::Border {
-                                            radius: device_corner_radius.into(),
-                                            ..Default::default()
-                                        },
-                                        ..Default::default()
-                                    }
-                                }),
-                            )
-                            .push(
-                                widget::container(
+                                .push(
                                     widget::container(
-                                        widget::Column::new()
-                                            .spacing(4)
-                                            .width(cosmic::iced::Length::Fill)
-                                            .push(widget::text::caption("TEMPERATURE (°C)"))
-                                            .push(graph_visual(
-                                                device_history.into_iter().flat_map(|samples| {
-                                                    samples
-                                                        .iter()
-                                                        .map(|(_, _, temperature)| *temperature)
-                                                }),
-                                                &self.settings.graph_style,
-                                                "°C",
-                                            ))
-                                            .push(
-                                                widget::Row::new()
-                                                    .width(cosmic::iced::Length::Fill)
-                                                    .push(widget::text::caption(
-                                                        format_graph_axis_start(
-                                                            self.settings.graph_timespan_minutes,
-                                                        ),
-                                                    ))
-                                                    .push(
-                                                        widget::Space::new()
-                                                            .width(cosmic::iced::Length::Fill),
+                                        widget::container(
+                                            widget::Column::new()
+                                                .spacing(4)
+                                                .width(cosmic::iced::Length::Fill)
+                                                .push(widget::text::caption("POWER (W)"))
+                                                .push(graph_visual(
+                                                    device_history.into_iter().flat_map(|samples| {
+                                                        samples
+                                                            .iter()
+                                                            .map(|(_, power, _)| *power as f64)
+                                                    }),
+                                                    &self.settings.graph_style,
+                                                    "W",
+                                                ))
+                                                .push(
+                                                    widget::Row::new()
+                                                        .width(cosmic::iced::Length::Fill)
+                                                        .push(widget::text::caption(
+                                                            format_graph_axis_start(
+                                                                self.settings.graph_timespan_minutes,
+                                                            ),
+                                                        ))
+                                                        .push(
+                                                            widget::Space::new()
+                                                                .width(cosmic::iced::Length::Fill),
+                                                        )
+                                                        .push(widget::text::caption("Now")),
+                                                ),
+                                        )
+                                        .padding([8, 0])
+                                        .width(cosmic::iced::Length::Fill)
+                                        .style(move |theme| {
+                                            let cosmic = theme.cosmic();
+                                            cosmic::iced::widget::container::Style {
+                                                background: Some(
+                                                    cosmic::iced::Color::from(
+                                                        cosmic.background(false).base,
                                                     )
-                                                    .push(widget::text::caption("Now")),
-                                            ),
+                                                    .into(),
+                                                ),
+                                                border: cosmic::iced::Border {
+                                                    radius: device_corner_radius,
+                                                    ..Default::default()
+                                                },
+                                                ..Default::default()
+                                            }
+                                        }),
                                     )
-                                    .padding([8, 0])
+                                    .padding(1)
                                     .width(cosmic::iced::Length::Fill)
                                     .style(move |theme| {
                                         let cosmic = theme.cosmic();
                                         cosmic::iced::widget::container::Style {
                                             background: Some(
                                                 cosmic::iced::Color::from(
-                                                    cosmic.background(false).base,
+                                                    cosmic.background(false).small_widget,
                                                 )
                                                 .into(),
                                             ),
@@ -2616,26 +2566,76 @@ impl cosmic::Application for AppModel {
                                         }
                                     }),
                                 )
-                                .padding(1)
-                                .width(cosmic::iced::Length::Fill)
-                                .style(move |theme| {
-                                    let cosmic = theme.cosmic();
-                                    cosmic::iced::widget::container::Style {
-                                        background: Some(
-                                            cosmic::iced::Color::from(
-                                                cosmic.background(false).small_widget,
-                                            )
-                                            .into(),
-                                        ),
-                                        border: cosmic::iced::Border {
-                                            radius: device_corner_radius.into(),
+                                .push(
+                                    widget::container(
+                                        widget::container(
+                                            widget::Column::new()
+                                                .spacing(4)
+                                                .width(cosmic::iced::Length::Fill)
+                                                .push(widget::text::caption("TEMPERATURE (°C)"))
+                                                .push(graph_visual(
+                                                    device_history.into_iter().flat_map(|samples| {
+                                                        samples
+                                                            .iter()
+                                                            .map(|(_, _, temperature)| *temperature)
+                                                    }),
+                                                    &self.settings.graph_style,
+                                                    "°C",
+                                                ))
+                                                .push(
+                                                    widget::Row::new()
+                                                        .width(cosmic::iced::Length::Fill)
+                                                        .push(widget::text::caption(
+                                                            format_graph_axis_start(
+                                                                self.settings.graph_timespan_minutes,
+                                                            ),
+                                                        ))
+                                                        .push(
+                                                            widget::Space::new()
+                                                                .width(cosmic::iced::Length::Fill),
+                                                        )
+                                                        .push(widget::text::caption("Now")),
+                                                ),
+                                        )
+                                        .padding([8, 0])
+                                        .width(cosmic::iced::Length::Fill)
+                                        .style(move |theme| {
+                                            let cosmic = theme.cosmic();
+                                            cosmic::iced::widget::container::Style {
+                                                background: Some(
+                                                    cosmic::iced::Color::from(
+                                                        cosmic.background(false).base,
+                                                    )
+                                                    .into(),
+                                                ),
+                                                border: cosmic::iced::Border {
+                                                    radius: device_corner_radius.into(),
+                                                    ..Default::default()
+                                                },
+                                                ..Default::default()
+                                            }
+                                        }),
+                                    )
+                                    .padding(1)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .style(move |theme| {
+                                        let cosmic = theme.cosmic();
+                                        cosmic::iced::widget::container::Style {
+                                            background: Some(
+                                                cosmic::iced::Color::from(
+                                                    cosmic.background(false).small_widget,
+                                                )
+                                                .into(),
+                                            ),
+                                            border: cosmic::iced::Border {
+                                                radius: device_corner_radius.into(),
+                                                ..Default::default()
+                                            },
                                             ..Default::default()
-                                        },
-                                        ..Default::default()
-                                    }
-                                }),
-                            ),
-                    );
+                                        }
+                                    }),
+                                ),
+                        );
                     let mut card_column = widget::Column::new().spacing(0).push(device_heading);
                     if is_expanded {
                         card_column = card_column
