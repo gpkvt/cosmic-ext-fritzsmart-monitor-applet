@@ -77,6 +77,7 @@ pub struct FritzSettings {
     pub allow_invalid_certs: bool,
     pub ca_cert_path: String,
     pub panel_text_size: u8,
+    pub panel_item_spacing: u8,
     pub panel_refresh_button: bool,
     pub panel_average_temperature: bool,
     pub panel_exclude_solar_temperature: bool,
@@ -104,6 +105,7 @@ impl Default for FritzSettings {
             allow_invalid_certs: false,
             ca_cert_path: String::new(),
             panel_text_size: 14,
+            panel_item_spacing: 3,
             panel_refresh_button: true,
             panel_average_temperature: false,
             panel_exclude_solar_temperature: false,
@@ -124,6 +126,10 @@ impl Default for FritzSettings {
 
 fn parse_panel_text_size(value: &str) -> u8 {
     value.parse::<u8>().unwrap_or(14).clamp(10, 24)
+}
+
+fn parse_panel_item_spacing(value: &str) -> u8 {
+    value.parse::<u8>().unwrap_or(3).clamp(0, 16)
 }
 
 fn parse_graph_timespan_minutes(value: &str) -> u16 {
@@ -188,6 +194,7 @@ impl FritzSettings {
             allow_invalid_certs: get("ALLOW_INVALID_CERTS").eq_ignore_ascii_case("true"),
             ca_cert_path: get("CA_CERT_PATH"),
             panel_text_size: parse_panel_text_size(&get("PANEL_TEXT_SIZE")),
+            panel_item_spacing: parse_panel_item_spacing(&get("PANEL_ITEM_SPACING")),
             panel_refresh_button: !values.contains_key("PANEL_REFRESH_BUTTON") || get("PANEL_REFRESH_BUTTON").eq_ignore_ascii_case("true"),
             panel_average_temperature: get("PANEL_AVERAGE_TEMPERATURE").eq_ignore_ascii_case("true"),
             panel_exclude_solar_temperature: get("PANEL_EXCLUDE_SOLAR_TEMPERATURE").eq_ignore_ascii_case("true"),
@@ -234,10 +241,11 @@ impl FritzSettings {
         input_ains.sort_unstable();
         let input_ains = input_ains.join(",");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nTOTAL_POWER_FIRST={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nTOTAL_POWER_FIRST={}\n",
             self.url, self.username, self.password, first_ain, selected_ains,
             if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path,
             self.panel_text_size.clamp(10, 24),
+            self.panel_item_spacing.clamp(0, 16),
             if self.panel_refresh_button { "true" } else { "false" },
             if self.panel_average_temperature { "true" } else { "false" },
             if self.panel_exclude_solar_temperature { "true" } else { "false" },
@@ -679,6 +687,17 @@ mod tests {
         assert_eq!(parse_panel_text_size("8"), 10);
         assert_eq!(parse_panel_text_size("18"), 18);
         assert_eq!(parse_panel_text_size("30"), 24);
+    }
+
+    #[test]
+    fn panel_item_spacing_defaults_and_is_clamped() {
+        assert_eq!(FritzSettings::default().panel_item_spacing, 3);
+        assert_eq!(parse_panel_item_spacing(""), 3);
+        assert_eq!(parse_panel_item_spacing("invalid"), 3);
+        assert_eq!(parse_panel_item_spacing("-1"), 3);
+        assert_eq!(parse_panel_item_spacing("0"), 0);
+        assert_eq!(parse_panel_item_spacing("12"), 12);
+        assert_eq!(parse_panel_item_spacing("20"), 16);
     }
 
     #[test]
