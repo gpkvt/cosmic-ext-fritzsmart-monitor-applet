@@ -159,7 +159,18 @@ fn power_sparkline(history: &VecDeque<(Instant, i64)>) -> String {
 
 fn numeric_sparkline(values: impl Iterator<Item = f64>) -> String {
     const LEVELS: [&str; 8] = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
+    const MAX_GRAPH_COLUMNS: usize = 12;
     let values: Vec<f64> = values.collect();
+    // Keep sparklines bounded so long history windows cannot force graph
+    // content outside the fixed-width cards in the applet popup.
+    let values: Vec<f64> = if values.len() > MAX_GRAPH_COLUMNS {
+        let last = values.len() - 1;
+        (0..MAX_GRAPH_COLUMNS)
+            .map(|index| values[index * last / (MAX_GRAPH_COLUMNS - 1)])
+            .collect()
+    } else {
+        values
+    };
     let Some(minimum) = values.iter().copied().reduce(f64::min) else {
         return "Waiting for samples…".into();
     };
@@ -958,5 +969,13 @@ mod history_tests {
     fn numeric_sparkline_handles_temperature_values() {
         assert_eq!(numeric_sparkline([20.0, 21.0, 22.0].into_iter()), "▁▅█");
         assert_eq!(numeric_sparkline([21.5, 21.5].into_iter()), "▄▄");
+    }
+
+    #[test]
+    fn numeric_sparkline_is_bounded_to_fit_graph_cards() {
+        let graph = numeric_sparkline((0..100).map(f64::from));
+        assert_eq!(graph.chars().count(), 12);
+        assert_eq!(graph.chars().next(), Some('▁'));
+        assert_eq!(graph.chars().last(), Some('█'));
     }
 }
