@@ -2129,4 +2129,32 @@ mod history_tests {
         }
     }
 
+    #[test]
+    fn live_drag_reorders_devices_as_targets_are_entered() {
+        let mut ains = vec!["a".into(), "b".into(), "c".into()];
+        let mut total_power_first = false;
+
+        move_sortable_entry(&mut ains, &mut total_power_first, "a", "c");
+
+        assert_eq!(ains, vec!["b", "c", "a"]);
+        assert!(!total_power_first);
+
+        move_sortable_entry(&mut ains, &mut total_power_first, "a", "b");
+
+        assert_eq!(ains, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn live_drag_moves_total_power_between_first_and_last_positions() {
+        let mut ains = vec!["a".into(), "b".into()];
+        let mut total_power_first = false;
+
+        move_sortable_entry(&mut ains, &mut total_power_first, TOTAL_POWER_DRAG_ID, "a");
+        assert!(total_power_first);
+
+        move_sortable_entry(&mut ains, &mut total_power_first, "a", TOTAL_POWER_DRAG_ID);
+        assert!(!total_power_first);
+        assert_eq!(ains, vec!["b", "a"]);
+    }
+
 }
