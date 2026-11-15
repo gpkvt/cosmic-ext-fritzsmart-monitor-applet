@@ -37,6 +37,7 @@ jobs:
             flatpak-builder \
             python3-venv \
             dpkg-dev \
+            desktop-file-utils \
             patchelf \
             file
       - name: Format Rust sources and run tests
@@ -62,7 +63,22 @@ jobs:
             "$package_dir/usr/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg"
           install -Dm0644 README.md "$package_dir/usr/share/doc/fritz-power-monitor/README.md"
           install -Dm0644 LICENSE "$package_dir/usr/share/doc/fritz-power-monitor/copyright"
+          mkdir -p debian
+          cat > debian/control <<'CONTROL'
+          Source: fritz-power-monitor
+          Section: utils
+          Priority: optional
+          Maintainer: FRITZ!Power Monitor contributors
+          Standards-Version: 4.6.2
+
+          Package: fritz-power-monitor
+          Architecture: amd64
+          Description: FRITZ!Box power monitor for the COSMIC desktop
+           COSMIC panel applet for monitoring FRITZ!Box smart-home power
+           generation, consumption and temperature readings.
+          CONTROL
           depends="$(dpkg-shlibdeps -O -e"$binary" | sed -n 's/^shlibs:Depends=//p')"
+          rm -rf debian
           test -n "$depends"
           mkdir -p "$package_dir/DEBIAN" dist
           cat > "$package_dir/DEBIAN/control" <<EOF
