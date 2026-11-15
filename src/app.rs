@@ -1306,18 +1306,25 @@ impl cosmic::Application for AppModel {
 
         // Keep a compact icon-to-value gap inside each item. The configured row
         // spacing is the only gap between items, including when it is set to zero.
-        let panel_item = |icon: cosmic::Element<'static, Message>,
+        let panel_item = |label: &'static str,
+                          icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>| {
-            let icon_slot = widget::container(icon)
-                .width(cosmic::iced::Length::Fixed(24.0))
-                .height(cosmic::iced::Length::Fixed(24.0))
-                .center_x(24)
-                .center_y(24);
-            widget::Row::new()
+            let mut item = widget::Row::new()
                 .spacing(4)
-                .align_y(cosmic::iced::Alignment::Center)
-                .push(icon_slot)
-                .push(value)
+                .align_y(cosmic::iced::Alignment::Center);
+            if let Some(icon) = icon {
+                let icon_slot = widget::container(icon)
+                    .width(cosmic::iced::Length::Fixed(24.0))
+                    .height(cosmic::iced::Length::Fixed(24.0))
+                    .center_x(24)
+                    .center_y(24);
+                item = item.push(icon_slot);
+            }
+            widget::tooltip(
+                item.push(value),
+                widget::text::caption(label),
+                cosmic::widget::tooltip::Position::Top,
+            )
         };
 
         let content = widget::Row::new()
@@ -1326,9 +1333,12 @@ impl cosmic::Application for AppModel {
         let content = if self.settings.weather_enabled {
             if let Some(weather) = &self.weather {
                 content.push(panel_item(
-                    widget::icon::from_name("thermometer-symbolic")
-                        .size(self.settings.panel_text_size.into())
-                        .into(),
+                    "Weather",
+                    Some(
+                        widget::icon::from_name(weather.icon_name())
+                            .size(self.settings.panel_text_size.into())
+                            .into(),
+                    ),
                     self.core
                         .applet
                         .text(format!("{:.0}°", weather.temperature_c))
@@ -1343,9 +1353,12 @@ impl cosmic::Application for AppModel {
         };
         let content = if self.error.is_none() {
             content.push(panel_item(
-                widget::icon::from_name("electricity-symbolic")
-                    .size(self.settings.panel_text_size.into())
-                    .into(),
+                "Power consumption",
+                Some(
+                    widget::icon::from_name("electricity-symbolic")
+                        .size(self.settings.panel_text_size.into())
+                        .into(),
+                ),
                 self.core
                     .applet
                     .text(power)
@@ -1357,15 +1370,9 @@ impl cosmic::Application for AppModel {
         };
         let content = if self.error.is_none() {
             if let Some(input_power) = input_power {
-                let icon_size = f32::from(self.settings.panel_text_size.clamp(12, 20));
-                let solar_panel =
-                    cosmic::iced::widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
-                        include_bytes!("../data/solar-panel.svg").to_vec(),
-                    ))
-                    .width(icon_size)
-                    .height(icon_size);
                 content.push(panel_item(
-                    solar_panel.into(),
+                    "Solar power",
+                    None,
                     self.core
                         .applet
                         .text(input_power)
@@ -1381,9 +1388,12 @@ impl cosmic::Application for AppModel {
         let content = if self.error.is_none() {
             if let Some(temperature) = temperature {
                 content.push(panel_item(
-                    widget::icon::from_name("thermometer-symbolic")
-                        .size(self.settings.panel_text_size.into())
-                        .into(),
+                    "Temperature",
+                    Some(
+                        widget::icon::from_name("thermometer-symbolic")
+                            .size(self.settings.panel_text_size.into())
+                            .into(),
+                    ),
                     self.core
                         .applet
                         .text(temperature)
@@ -1399,9 +1409,12 @@ impl cosmic::Application for AppModel {
         // Keep connection health visible even when the popup is closed.
         let content = if self.error.is_some() {
             content.push(panel_item(
-                widget::icon::from_name("dialog-warning-symbolic")
-                    .size(self.settings.panel_text_size.into())
-                    .into(),
+                "Connection error",
+                Some(
+                    widget::icon::from_name("dialog-warning-symbolic")
+                        .size(self.settings.panel_text_size.into())
+                        .into(),
+                ),
                 self.core
                     .applet
                     .text("Connection error")
@@ -1413,9 +1426,12 @@ impl cosmic::Application for AppModel {
         };
         let content = if self.weather_error.is_some() {
             content.push(panel_item(
-                widget::icon::from_name("weather-severe-alert-symbolic")
-                    .size(self.settings.panel_text_size.into())
-                    .into(),
+                "Weather unavailable",
+                Some(
+                    widget::icon::from_name("weather-severe-alert-symbolic")
+                        .size(self.settings.panel_text_size.into())
+                        .into(),
+                ),
                 self.core
                     .applet
                     .text("Weather unavailable")
