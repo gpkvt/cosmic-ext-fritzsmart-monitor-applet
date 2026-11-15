@@ -1203,7 +1203,19 @@ impl cosmic::Application for AppModel {
                                     widget::container(input_graphs)
                                         .padding(8)
                                         .width(cosmic::iced::Length::Fill)
-                                        .style(graph_background),
+                                        .style(|theme| {
+                                            let cosmic = theme.cosmic();
+                                            cosmic::iced::widget::container::Style {
+                                                background: Some(
+                                                    cosmic::iced::Color::from(cosmic.background(false).base).into(),
+                                                ),
+                                                border: cosmic::iced::Border {
+                                                    radius: 3.0.into(),
+                                                    ..Default::default()
+                                                },
+                                                ..Default::default()
+                                            }
+                                        }),
                                 ),
                         );
                     content = content.push(
