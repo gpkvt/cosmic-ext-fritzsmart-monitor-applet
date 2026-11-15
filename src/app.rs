@@ -1591,19 +1591,6 @@ impl cosmic::Application for AppModel {
                             .push(widget::divider::horizontal::default());
                     }
                 }
-                content = content.push(
-                    widget::Row::new()
-                        .spacing(12)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::container(widget::icon::from_name("computer-symbolic").size(20))
-                            .center_x(32).center_y(36))
-                        .push(widget::Column::new()
-                            .spacing(3)
-                            .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::body("Devices"))
-                            .push(widget::text::caption("Live power and temperature readings")))
-                        .push(widget::text::caption(format!("{}", self.readings.len())))
-                );
                 let mut device_cards = widget::Column::new().spacing(0);
                 for (index, reading) in self.readings.iter().enumerate() {
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
@@ -1773,8 +1760,11 @@ impl cosmic::Application for AppModel {
                             .push(widget::divider::horizontal::default())
                             .push(widget::container(device_content).padding(12));
                     }
-                    let top_radius = if index == 0 { 12.0 } else { 0.0 };
-                    let bottom_radius = if index + 1 == self.readings.len() { 12.0 } else { 0.0 };
+                    let (top_radius, bottom_radius) = if self.readings.len() > 1 {
+                        (0.0, 0.0)
+                    } else {
+                        (12.0, 12.0)
+                    };
                     let device_card = widget::container(card_column)
                         .width(cosmic::iced::Length::Fill)
                         .style(move |theme| {
