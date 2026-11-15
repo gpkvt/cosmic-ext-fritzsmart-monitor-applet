@@ -16,6 +16,8 @@ use std::time::{Duration, Instant};
 
 static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
     LazyLock::new(|| widget::Id::new("fritz-power-monitor-autosize-main"));
+static DRAG_SCROLL_ID: LazyLock<widget::Id> =
+    LazyLock::new(|| widget::Id::new("fritz-power-monitor-drag-scroll"));
 
 const TOTAL_POWER_DRAG_ID: &str = "__TOTAL_POWER__";
 
@@ -30,8 +32,11 @@ pub struct AppModel {
     expanded_settings_sections: HashSet<&'static str>,
     settings: FritzSettings,
     devices: Vec<FritzDevice>,
+    devices_loaded: bool,
+    devices_loading: bool,
     selected_ains: Vec<String>,
     dragging_device_ain: Option<String>,
+    drag_scroll_direction: i8,
     drag_target_ain: Option<String>,
     drag_target_since: Option<Instant>,
     drag_original_ains: Option<Vec<String>>,
@@ -77,6 +82,8 @@ pub enum Message {
     ToggleDeviceInput(String, bool),
     StartDeviceDrag(String),
     DragOverDevice(String),
+    DragPointerMoved(f32),
+    DragPointerLeft,
     EndDeviceDrag,
     ToggleTemperatureAlert(String, bool),
     TemperatureAlertHighChanged(String, i16),
@@ -374,8 +381,11 @@ fn move_sortable_entry(
                 == crate::fritz::normalize_ain_for_selection(dragged))
         {
             let device = ains.remove(index);
-            ains.push(device);
-            *total_power_first = false;
+            if *total_power_first {
+                ains.insert(0, device);
+            } else {
+                ains.push(device);
+            }
         }
     } else {
         move_selected_device_to_drop_target(ains, dragged, target);
@@ -1377,10 +1387,13 @@ impl cosmic::Application for AppModel {
         // This keeps the applet name and both actions visible while the device
         // cards and graphs scroll independently beneath it.
         let scrollable_content = widget::scrollable(content)
+            .id(DRAG_SCROLL_ID.clone())
             .width(cosmic::iced::Length::Fill)
             .height(cosmic::iced::Length::Fill);
 
         let scrollable_content = widget::mouse_area(scrollable_content)
+            .on_move(|position| Message::DragPointerMoved(position.y))
+            .on_exit(Message::DragPointerLeft)
             .on_release(Message::EndDeviceDrag);
 
         let popup_content = if self.settings_open {
@@ -1448,6 +1461,15 @@ impl cosmic::Application for AppModel {
             Message::ClockTick => {
                 if self.settings_saved_until.is_some_and(|deadline| Instant::now() >= deadline) {
                     self.settings_saved_until = None;
+                }
+                if self.dragging_device_ain.is_some() && self.drag_scroll_direction != 0 {
+                    return cosmic::iced::widget::scrollable::scroll_by(
+                        DRAG_SCROLL_ID.clone(),
+                        cosmic::iced::widget::scrollable::AbsoluteOffset {
+                            x: 0.0,
+                            y: f32::from(self.drag_scroll_direction) * 14.0,
+                        },
+                    );
                 }
                 if self.settings.weather_enabled
                     && self.next_weather_refresh_at.is_none()
@@ -1611,8 +1633,18 @@ impl cosmic::Application for AppModel {
                 self.settings_status = None;
             }
             Message::ToggleSettingsSection(section) => {
-                if !self.expanded_settings_sections.remove(section) {
+                let expanded = if self.expanded_settings_sections.remove(section) {
+                    false
+                } else {
                     self.expanded_settings_sections.insert(section);
+                    true
+                };
+                if section == "device" && expanded && !self.devices_loaded && !self.devices_loading {
+                    self.devices_loading = true;
+                    let settings = self.settings.clone();
+                    self.settings_status = Some("Connecting and loading devices…".into());
+                    return Task::perform(discover_devices(settings), |result|
+                        cosmic::Action::App(Message::DevicesLoaded(result)));
                 }
             }
             Message::UrlChanged(value) => {
@@ -1663,11 +1695,18 @@ impl cosmic::Application for AppModel {
                 self.persist_settings();
             }
             Message::DiscoverDevices => {
+                if self.devices_loading {
+                    return Task::none();
+                }
+                self.devices_loading = true;
                 let settings = self.settings.clone();
                 self.settings_status = Some("Connecting and loading devices…".into());
                 return Task::perform(discover_devices(settings), |result| cosmic::Action::App(Message::DevicesLoaded(result)));
             }
-            Message::DevicesLoaded(result) => match result {
+            Message::DevicesLoaded(result) => {
+                self.devices_loading = false;
+                self.devices_loaded = result.is_ok();
+                match result {
                 Ok(devices) => {
                     self.devices = devices;
                     if !self.settings.input_defaults_initialized {
@@ -1684,7 +1723,8 @@ impl cosmic::Application for AppModel {
                     self.settings_status = Some(format!("Found {} compatible power-meter device(s)", self.devices.len()));
                 }
                 Err(error) => self.settings_status = Some(format!("Connection failed: {error}")),
-            },
+                }
+            }
             Message::ToggleDevice(ain, selected) => {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
                 self.selected_ains.retain(|existing|
@@ -1715,6 +1755,7 @@ impl cosmic::Application for AppModel {
                     self.dragging_device_ain = Some(ain);
                     self.drag_target_ain = None;
                     self.drag_target_since = None;
+                    self.drag_scroll_direction = 0;
                     self.drag_original_ains = Some(self.selected_ains.clone());
                     self.drag_original_total_power_first = Some(self.settings.total_power_first);
                 }
@@ -1743,7 +1784,22 @@ impl cosmic::Application for AppModel {
                     }
                 }
             }
+            Message::DragPointerMoved(y) => {
+                if self.dragging_device_ain.is_some() {
+                    self.drag_scroll_direction = if y < 48.0 {
+                        -1
+                    } else if y > 500.0 {
+                        1
+                    } else {
+                        0
+                    };
+                }
+            }
+            Message::DragPointerLeft => {
+                self.drag_scroll_direction = 0;
+            }
             Message::EndDeviceDrag => {
+                self.drag_scroll_direction = 0;
                 if self.dragging_device_ain.take().is_some() {
                     let previous_ains = self.drag_original_ains.take().unwrap_or_default();
                     let previous_total_power_first =
@@ -1879,6 +1935,12 @@ mod history_tests {
         move_sortable_entry(&mut ains, &mut total_first, "111111111111", TOTAL_POWER_DRAG_ID);
         assert!(!total_first);
         assert_eq!(ains, vec!["222222222222", "111111111111"]);
+
+        move_sortable_entry(&mut ains, &mut total_first, TOTAL_POWER_DRAG_ID, "222222222222");
+        assert!(total_first);
+        move_sortable_entry(&mut ains, &mut total_first, "111111111111", TOTAL_POWER_DRAG_ID);
+        assert!(total_first);
+        assert_eq!(ains, vec!["111111111111", "222222222222"]);
     }
 
     #[test]
