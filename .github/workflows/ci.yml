@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: Format, test, build and install
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            desktop-file-utils \
+            libdbus-1-dev \
+            libdisplay-info-dev \
+            libgbm-dev \
+            libinput-dev \
+            libseat-dev \
+            libsystemd-dev \
+            libudev-dev \
+            libvulkan-dev \
+            libwayland-dev \
+            libxkbcommon-dev \
+            pkg-config
+      - name: Format Rust sources
+        run: cargo fmt --all
+      - name: Run tests
+        run: cargo test
+      - name: Check build
+        run: cargo check
+      - name: Build optimized binary
+        run: cargo build --release
+      - name: Test user-local installation
+        run: |
+          prefix="$RUNNER_TEMP/fritz-power-monitor-install"
+          make install PREFIX="$prefix" UPDATE=0
+          desktop_file="$prefix/share/applications/com.gpkvt.FritzPowerMonitor.desktop"
+          desktop-file-validate "$desktop_file"
+          test -x "$prefix/bin/fritz-power-monitor"
+          icon_file="$prefix/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg"
+          test -s "$icon_file"
+          grep -Fx "Icon=com.gpkvt.FritzPowerMonitor" "$desktop_file"
+          grep -Fx "Exec=$prefix/bin/fritz-power-monitor" "$desktop_file"
+          grep -Fx "X-CosmicApplet=true" "$desktop_file"
+          grep -Fx "X-CosmicShrinkable=true" "$desktop_file"
+          grep -Fx "X-HostWaylandDisplay=true" "$desktop_file"
+          grep -Fx "X-CosmicHoverPopup=Auto" "$desktop_file"
+          make uninstall PREFIX="$prefix"
+          test ! -e "$prefix/bin/fritz-power-monitor"
+          test ! -e "$desktop_file"
+          test ! -e "$icon_file"
