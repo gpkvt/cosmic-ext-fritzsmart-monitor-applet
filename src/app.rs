@@ -1,4 +1,4 @@
-use crate::fritz::{discover_devices, fetch_fritz_data, FritzDevice, FritzReading, FritzSettings};
+use crate::fritz::{discover_devices, fetch_fritz_data, FritzDevice, FritzReading, FritzSettings, TemperatureAlertThresholds};
 use cosmic::iced::{
     futures,
     platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
@@ -52,18 +52,28 @@ pub enum Message {
     ToggleDevice(String, bool),
     MoveDevice(String, bool),
     ToggleTemperatureAlert(String, bool),
-    TemperatureAlertThresholdChanged(String, u16),
+    TemperatureAlertHighChanged(String, i16),
+    TemperatureAlertLowChanged(String, i16),
 }
 
 
 
-fn should_notify_temperature_alert(previously_above: Option<bool>, currently_above: bool) -> bool {
-    previously_above == Some(false) && currently_above
+fn should_notify_temperature_alert(previously_outside: Option<bool>, currently_outside: bool) -> bool {
+    previously_outside == Some(false) && currently_outside
 }
 
-fn notify_temperature_alert(name: &str, temperature: f64, threshold: u16) {
-    let summary = format!("High temperature: {name}");
-    let body = format!("{temperature:.1} °C (alert threshold: {threshold} °C)");
+fn notify_temperature_alert(name: &str, temperature: f64, thresholds: TemperatureAlertThresholds) {
+    let (summary, body) = if temperature > f64::from(thresholds.high_c) {
+        (
+            format!("High temperature: {name}"),
+            format!("{temperature:.1} °C (maximum: {} °C)", thresholds.high_c),
+        )
+    } else {
+        (
+            format!("Low temperature: {name}"),
+            format!("{temperature:.1} °C (minimum: {} °C)", thresholds.low_c),
+        )
+    };
     // A missing notification service must never interrupt data refreshes.
     let _ = notify_rust::Notification::new()
         .summary(&summary)
@@ -415,30 +425,40 @@ impl cosmic::Application for AppModel {
                         }
                     }
                     let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
-                    let alert_threshold = self.settings.temperature_alerts.get(&normalized_ain).copied();
+                    let alert_thresholds = self.settings.temperature_alerts.get(&normalized_ain).copied();
                     let mut device_row = widget::Column::new()
                         .spacing(6)
                         .push(row)
                         .push(widget::Row::new()
                             .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::text::caption("High-temperature alert"))
+                            .push(widget::text::caption("Temperature alerts"))
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(widget::toggler(alert_threshold.is_some())
+                            .push(widget::toggler(alert_thresholds.is_some())
                                 .on_toggle({
                                     let ain = ain.clone();
                                     move |enabled| Message::ToggleTemperatureAlert(ain.clone(), enabled)
                                 })));
-                    if let Some(threshold) = alert_threshold {
+                    if let Some(thresholds) = alert_thresholds {
                         device_row = device_row
-                            .push(widget::text::caption(format!("Notify at {} °C", threshold)))
+                            .push(widget::text::caption(format!("Upper limit: {} °C", thresholds.high_c)))
                             .push(widget::slider(
-                                30.0..=100.0,
-                                f32::from(threshold),
+                                0.0..=40.0,
+                                f32::from(thresholds.high_c),
                                 {
                                     let ain = ain.clone();
-                                    move |value| Message::TemperatureAlertThresholdChanged(ain.clone(), value.round() as u16)
+                                    move |value| Message::TemperatureAlertHighChanged(ain.clone(), value.round() as i16)
                                 },
-                            ).step(1.0));
+                            ).step(1.0))
+                            .push(widget::text::caption(format!("Lower limit: {} °C", thresholds.low_c)))
+                            .push(widget::slider(
+                                -10.0..=0.0,
+                                f32::from(thresholds.low_c),
+                                {
+                                    let ain = ain.clone();
+                                    move |value| Message::TemperatureAlertLowChanged(ain.clone(), value.round() as i16)
+                                },
+                            ).step(1.0))
+                            .push(widget::text::caption("Notify above the upper limit or below the lower limit"));
                     }
                     content = content.push(widget::container(device_row)
                         .padding(8)
@@ -665,17 +685,18 @@ impl cosmic::Application for AppModel {
                     for reading in &readings {
                         record_device_sample(&mut self.device_history, reading, now, history_window);
                         let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                        if let Some(threshold) = self.settings.temperature_alerts.get(&key).copied() {
-                            let above_threshold = reading.temperature_c >= f64::from(threshold);
+                        if let Some(thresholds) = self.settings.temperature_alerts.get(&key).copied() {
+                            let outside_limits = reading.temperature_c > f64::from(thresholds.high_c)
+                                || reading.temperature_c < f64::from(thresholds.low_c);
                             if should_notify_temperature_alert(
                                 self.temperature_alert_state.get(&key).copied(),
-                                above_threshold,
+                                outside_limits,
                             ) {
-                                notify_temperature_alert(&reading.name, reading.temperature_c, threshold);
+                                notify_temperature_alert(&reading.name, reading.temperature_c, thresholds);
                             }
                             // First observation establishes a baseline without
-                            // notifying for a device already above its limit.
-                            self.temperature_alert_state.insert(key, above_threshold);
+                            // notifying if a device starts outside its limits.
+                            self.temperature_alert_state.insert(key, outside_limits);
                         } else {
                             self.temperature_alert_state.remove(&key);
                         }
@@ -762,16 +783,21 @@ impl cosmic::Application for AppModel {
             Message::ToggleTemperatureAlert(ain, enabled) => {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
                 if enabled {
-                    self.settings.temperature_alerts.entry(key.clone()).or_insert(60);
+                    self.settings.temperature_alerts.entry(key).or_default();
                 } else {
                     self.settings.temperature_alerts.remove(&key);
                     self.temperature_alert_state.remove(&key);
                 }
                 self.persist_settings();
             }
-            Message::TemperatureAlertThresholdChanged(ain, threshold) => {
+            Message::TemperatureAlertHighChanged(ain, high_c) => {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
-                self.settings.temperature_alerts.insert(key, threshold.clamp(30, 100));
+                self.settings.temperature_alerts.entry(key).or_default().high_c = high_c.clamp(0, 40);
+                self.persist_settings();
+            }
+            Message::TemperatureAlertLowChanged(ain, low_c) => {
+                let key = crate::fritz::normalize_ain_for_selection(&ain);
+                self.settings.temperature_alerts.entry(key).or_default().low_c = low_c.clamp(-10, 0);
                 self.persist_settings();
             }
             Message::TogglePopup => {
