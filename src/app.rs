@@ -3390,30 +3390,41 @@ mod history_tests {
 
     #[test]
     fn live_drag_reorders_devices_as_targets_are_entered() {
-        let mut ains = vec!["a".into(), "b".into(), "c".into()];
-        let mut total_power_first = false;
+        let mut order = vec!["a".into(), "b".into(), "c".into()];
 
-        move_sortable_entry(&mut ains, &mut total_power_first, "a", "c");
+        move_sortable_entry(&mut order, "a", "c");
 
-        assert_eq!(ains, vec!["b", "c", "a"]);
-        assert!(!total_power_first);
+        assert_eq!(order, vec!["b", "c", "a"]);
 
-        move_sortable_entry(&mut ains, &mut total_power_first, "a", "b");
+        move_sortable_entry(&mut order, "a", "b");
 
-        assert_eq!(ains, vec!["a", "b", "c"]);
+        assert_eq!(order, vec!["a", "b", "c"]);
     }
 
     #[test]
-    fn live_drag_moves_total_power_between_first_and_last_positions() {
-        let mut ains = vec!["a".into(), "b".into()];
-        let mut total_power_first = false;
+    fn live_drag_reorders_both_power_cards_with_devices() {
+        let mut order = vec![
+            TOTAL_POWER_DRAG_ID.into(),
+            "a".into(),
+            "b".into(),
+            POWER_DIFFERENCE_DRAG_ID.into(),
+        ];
 
-        move_sortable_entry(&mut ains, &mut total_power_first, TOTAL_POWER_DRAG_ID, "a");
-        assert!(total_power_first);
+        move_sortable_entry(&mut order, POWER_DIFFERENCE_DRAG_ID, "a");
+        assert_eq!(order, vec![
+            TOTAL_POWER_DRAG_ID,
+            POWER_DIFFERENCE_DRAG_ID,
+            "a",
+            "b",
+        ]);
 
-        move_sortable_entry(&mut ains, &mut total_power_first, "a", TOTAL_POWER_DRAG_ID);
-        assert!(!total_power_first);
-        assert_eq!(ains, vec!["b", "a"]);
+        move_sortable_entry(&mut order, "b", TOTAL_POWER_DRAG_ID);
+        assert_eq!(order, vec![
+            "b",
+            TOTAL_POWER_DRAG_ID,
+            POWER_DIFFERENCE_DRAG_ID,
+            "a",
+        ]);
     }
 
 }
