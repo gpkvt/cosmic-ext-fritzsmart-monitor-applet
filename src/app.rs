@@ -260,17 +260,9 @@ fn move_selected_device_to_drop_target(ains: &mut Vec<String>, dragged_ain: &str
     }
 
     let device = ains.remove(from);
-    let adjusted_target = if from < target_index {
-        target_index
-    } else {
-        target_index
-    };
-    let insert_at = if from < target_index {
-        adjusted_target
-    } else {
-        adjusted_target
-    };
-    ains.insert(insert_at, device);
+    // Inserting at the target's original index places the dragged device
+    // after a target it crossed downward, or before one it crossed upward.
+    ains.insert(target_index, device);
 }
 
 fn icon_action_button<'a>(
