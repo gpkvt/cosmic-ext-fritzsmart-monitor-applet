@@ -53,7 +53,7 @@ pub struct AppModel {
     weather: Option<WeatherData>,
     weather_attribution_expanded: bool,
     quick_options_expanded: bool,
-    devices_expanded: bool,
+    expanded_devices: HashSet<String>,
     quick_refresh_interval: u32,
     quick_graph_timespan: u16,
     next_weather_refresh_at: Option<Instant>,
@@ -100,7 +100,7 @@ pub enum Message {
     ToggleWeatherAttribution,
     OpenCommonsPage(String),
     ToggleQuickOptions,
-    ToggleDevices,
+    ToggleDeviceDetails(String),
     QuickRefreshIntervalPreview(u32),
     CommitQuickRefreshInterval,
     QuickGraphTimespanPreview(u16),
@@ -1552,35 +1552,22 @@ impl cosmic::Application for AppModel {
                     }
                 }
                 content = content.push(
-                    widget::button::custom(
-                        widget::Row::new()
-                            .spacing(12)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::container(widget::icon::from_name("computer-symbolic").size(20))
-                                .center_x(32).center_y(36))
-                            .push(widget::Column::new()
-                                .spacing(3)
-                                .width(cosmic::iced::Length::Fill)
-                                .push(widget::text::body("Devices"))
-                                .push(widget::text::caption("Live power and temperature readings")))
-                            .push(widget::Column::new()
-                                .align_x(cosmic::iced::Alignment::End)
-                                .spacing(2)
-                                .push(widget::text::caption(format!("{}", self.readings.len())))
-                                .push(widget::icon::from_name(
-                                    if self.devices_expanded { "go-down-symbolic" } else { "go-next-symbolic" }
-                                ).size(16))),
-                    )
-                    .on_press(Message::ToggleDevices)
-                    .padding([8, 10])
-                    .width(cosmic::iced::Length::Fill)
-                    .class(cosmic::theme::Button::Standard),
+                    widget::Row::new()
+                        .spacing(12)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::container(widget::icon::from_name("computer-symbolic").size(20))
+                            .center_x(32).center_y(36))
+                        .push(widget::Column::new()
+                            .spacing(3)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::body("Devices"))
+                            .push(widget::text::caption("Live power and temperature readings")))
+                        .push(widget::text::caption(format!("{}", self.readings.len())))
                 );
-                if self.devices_expanded {
                 for (index, reading) in self.readings.iter().enumerate() {
-                    let device_history = self.device_history.get(
-                        &crate::fritz::normalize_ain_for_selection(&reading.ain),
-                    );
+                    let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
+                    let is_expanded = self.expanded_devices.contains(&device_key);
+                    let device_history = self.device_history.get(&device_key);
                     let power_graph = device_history.map(|samples|
                         numeric_sparkline(samples.iter().map(|(_, power, _)| *power as f64)))
                         .unwrap_or_else(|| "Waiting for samples…".into());
@@ -1610,17 +1597,24 @@ impl cosmic::Application for AppModel {
                     });
                     let state_label = reading.power_state.map(|on| if on { "ON" } else { "OFF" })
                         .unwrap_or("MONITORING");
-                    let device_heading = widget::Row::new()
-                        .spacing(12)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::container(widget::icon::from_name("computer-symbolic").size(20))
-                            .center_x(32).center_y(36))
-                        .push(widget::Column::new()
-                            .spacing(3)
-                            .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::body(reading.name.clone()).class(cosmic::theme::Text::Accent))
-                            .push(widget::text::caption(format!("{} · LAST {}", state_label, format_graph_timespan(self.settings.graph_timespan_minutes)))))
-                        .push(widget::text::caption(format!("#{}", index + 1)));
+                    let device_heading = widget::button::custom(
+                        widget::Row::new()
+                            .spacing(12)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::container(widget::icon::from_name("computer-symbolic").size(20))
+                                .center_x(32).center_y(36))
+                            .push(widget::Column::new()
+                                .spacing(3)
+                                .width(cosmic::iced::Length::Fill)
+                                .push(widget::text::body(reading.name.clone()).class(cosmic::theme::Text::Accent))
+                                .push(widget::text::caption(format!("{} · LAST {}", state_label, format_graph_timespan(self.settings.graph_timespan_minutes)))))
+                            .push(widget::text::caption(format!("#{}", index + 1)))
+                            .push(widget::icon::from_name(if is_expanded { "go-down-symbolic" } else { "go-next-symbolic" }).size(16)),
+                    )
+                    .on_press(Message::ToggleDeviceDetails(reading.ain.clone()))
+                    .width(cosmic::iced::Length::Fill)
+                    .padding([8, 12])
+                    .class(cosmic::theme::Button::Standard);
                     let metrics = widget::Row::new()
                         .spacing(8)
                         .width(cosmic::iced::Length::Fill)
@@ -1723,24 +1717,15 @@ impl cosmic::Application for AppModel {
                                     }),
                                 ),
                         );
-                    let device_card = widget::container(
-                        widget::Column::new()
-                            .spacing(0)
-                            .push(
-                                widget::container(device_heading)
-                                    .width(cosmic::iced::Length::Fill)
-                                    .padding([8, 12])
-                                    .style(|theme| {
-                                        let cosmic = theme.cosmic();
-                                        cosmic::iced::widget::container::Style {
-                                            background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
-                                            ..Default::default()
-                                        }
-                                    }),
-                            )
+                    let mut card_column = widget::Column::new()
+                        .spacing(0)
+                        .push(device_heading);
+                    if is_expanded {
+                        card_column = card_column
                             .push(widget::divider::horizontal::default())
-                            .push(widget::container(device_content).padding(12)),
-                    )
+                            .push(widget::container(device_content).padding(12));
+                    }
+                    let device_card = widget::container(card_column)
                     .width(cosmic::iced::Length::Fill)
                     .style(|theme| {
                         let cosmic = theme.cosmic();
@@ -1754,7 +1739,6 @@ impl cosmic::Application for AppModel {
                         }
                     });
                     content = content.push(device_card);
-                }
                 }
                 content = content.push(widget::divider::horizontal::default());
                 if !self.settings.total_power_first {
@@ -2071,8 +2055,11 @@ impl cosmic::Application for AppModel {
                     let _ = std::process::Command::new("xdg-open").arg(url).spawn();
                 }
             }
-            Message::ToggleDevices => {
-                self.devices_expanded = !self.devices_expanded;
+            Message::ToggleDeviceDetails(ain) => {
+                let key = crate::fritz::normalize_ain_for_selection(&ain);
+                if !self.expanded_devices.remove(&key) {
+                    self.expanded_devices.insert(key);
+                }
             }
             Message::ToggleQuickOptions => {
                 self.quick_options_expanded = !self.quick_options_expanded;
