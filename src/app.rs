@@ -30,7 +30,6 @@ pub struct AppModel {
     updated: Option<String>,
     settings_open: bool,
     active_settings_section: Option<&'static str>,
-    expanded_settings_sections: HashSet<&'static str>,
     settings: FritzSettings,
     devices: Vec<FritzDevice>,
     devices_loaded: bool,
@@ -2097,6 +2096,7 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleSettings => {
                 self.settings_open = !self.settings_open;
+                self.active_settings_section = None;
                 self.settings_status = None;
             }
             Message::ToggleSettingsSection(section) => {
