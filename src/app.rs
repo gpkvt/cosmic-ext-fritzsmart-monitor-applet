@@ -1005,7 +1005,7 @@ impl AppModel {
 }
 
 fn refresh_spinner_frame(started_at: Instant) -> &'static str {
-    const FRAMES: [&str; 4] = ["◴", "◷", "◶", "◵"];
+    const FRAMES: [&str; 4] = ["↻", "⟳", "↻", "⟲"];
     let frame = (started_at.elapsed().as_millis() / 100) as usize % FRAMES.len();
     FRAMES[frame]
 }
@@ -2203,15 +2203,11 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::body("FRITZ!Power Monitor")
                         .width(cosmic::iced::Length::Fill))
                     .push(widget::text::caption(
-                        if self.refresh_started_at.is_some() {
-                            "Refreshing…".to_string()
-                        } else {
-                            self.next_refresh_at
-                                .map(|deadline| format_countdown(
-                                    deadline.saturating_duration_since(Instant::now()).as_secs()
-                                ))
-                                .unwrap_or_else(|| "Waiting…".to_string())
-                        }
+                        self.next_refresh_at
+                            .map(|deadline| format_countdown(
+                                deadline.saturating_duration_since(Instant::now()).as_secs()
+                            ))
+                            .unwrap_or_else(|| format_countdown(0))
                     ))
                     .push(icon_action_button(
                         self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("view-refresh-symbolic"),
