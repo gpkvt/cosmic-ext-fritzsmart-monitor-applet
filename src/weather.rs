@@ -102,11 +102,12 @@ fn weather_code_description(code: u8) -> &'static str {
     }
 }
 
-pub async fn fetch_weather_forecast(location: String) -> Result<WeatherForecast, String> {
+pub async fn fetch_weather_forecast(location: String, requested_days: u8) -> Result<WeatherForecast, String> {
     let location = location.trim();
     if location.is_empty() {
         return Err("Weather location is empty".into());
     }
+    let forecast_days: u8 = if requested_days == 14 { 14 } else { 7 };
     let client = Client::builder()
         .user_agent("FRITZ-Power-Monitor/0.2.6")
         .timeout(Duration::from_secs(15))
@@ -151,12 +152,12 @@ pub async fn fetch_weather_forecast(location: String) -> Result<WeatherForecast,
                 "daily",
                 "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max".to_string(),
             ),
-            ("forecast_days", "7".to_string()),
+            ("forecast_days", forecast_days.to_string()),
             ("timezone", "auto".to_string()),
         ])
         .send()
         .await
-        .map_err(|error| format!("7-day forecast request failed: {error}"))?;
+        .map_err(|error| format!("{forecast_days}-day forecast request failed: {error}"))?;
     if !response.status().is_success() {
         return Err(format!("Forecast provider returned HTTP {}", response.status()));
     }
@@ -171,8 +172,8 @@ pub async fn fetch_weather_forecast(location: String) -> Result<WeatherForecast,
         .ok_or("Forecast has no maximum temperatures")?;
     let precipitation = daily["precipitation_probability_max"].as_array();
     let wind = daily["wind_speed_10m_max"].as_array();
-    let mut days = Vec::with_capacity(7);
-    for index in 0..dates.len().min(7) {
+    let mut days = Vec::with_capacity(usize::from(forecast_days));
+    for index in 0..dates.len().min(usize::from(forecast_days)) {
         let date = dates[index].as_str().ok_or("Invalid forecast date")?;
         let code = codes[index].as_u64().ok_or("Invalid forecast weather code")?
             .min(255) as u8;
