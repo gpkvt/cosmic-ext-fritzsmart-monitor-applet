@@ -1356,8 +1356,8 @@ mod tests {
                 "power-difference"
             ]
             .into_iter()
-                .map(str::to_string)
-                .collect::<Vec<_>>()
+            .map(str::to_string)
+            .collect::<Vec<_>>()
         );
     }
 
