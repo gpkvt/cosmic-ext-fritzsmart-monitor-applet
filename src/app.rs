@@ -1304,8 +1304,8 @@ impl cosmic::Application for AppModel {
         let vertical_padding = 8_u16;
         let horizontal_padding = 10_u16;
 
-        // Each logical panel item uses the same internal padding and icon-to-value gap.
-        // The configurable row spacing is applied only between these grouped items.
+        // Keep a compact icon-to-value gap inside each item. The configured row
+        // spacing is the only gap between items, including when it is set to zero.
         let panel_item = |icon: cosmic::Element<'static, Message>,
                           value: cosmic::Element<'static, Message>| {
             let icon_slot = widget::container(icon)
@@ -1313,48 +1313,16 @@ impl cosmic::Application for AppModel {
                 .height(cosmic::iced::Length::Fixed(24.0))
                 .center_x(24)
                 .center_y(24);
-            widget::container(
-                widget::Row::new()
-                    .spacing(4)
-                    .align_y(cosmic::iced::Alignment::Center)
-                    .push(icon_slot)
-                    .push(value),
-            )
-            .padding(4)
+            widget::Row::new()
+                .spacing(4)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(icon_slot)
+                .push(value)
         };
 
         let content = widget::Row::new()
             .spacing(f32::from(self.settings.panel_item_spacing))
-            .align_y(cosmic::iced::Alignment::Center)
-            .push(
-                widget::container({
-                    let solar_icon = widget::icon::from_name(
-                        self.weather
-                            .as_ref()
-                            .map(|weather| weather.icon_name())
-                            .unwrap_or("weather-clear-symbolic"),
-                    )
-                    .size(24);
-                    cosmic::iced::widget::Stack::new().push(solar_icon)
-                })
-                .width(cosmic::iced::Length::Fixed(32.0))
-                .height(cosmic::iced::Length::Fixed(32.0))
-                .center_x(32)
-                .center_y(32)
-                .style(|theme| {
-                    let cosmic = theme.cosmic();
-                    cosmic::iced::widget::container::Style {
-                        background: Some(
-                            cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
-                        ),
-                        border: cosmic::iced::Border {
-                            radius: 8.0.into(),
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    }
-                }),
-            );
+            .align_y(cosmic::iced::Alignment::Center);
         let content = if self.settings.weather_enabled {
             if let Some(weather) = &self.weather {
                 content.push(panel_item(
@@ -1582,7 +1550,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::body(format!("Panel item spacing: {} px", self.settings.panel_item_spacing)))
                     .push(widget::slider(0.0..=16.0, f32::from(self.settings.panel_item_spacing),
                         |value| Message::PanelItemSpacingChanged(value.round() as u8)).step(1.0))
-                    .push(widget::text::caption("Controls the gap between icons and values in the panel"))
+                    .push(widget::text::caption("Controls the gap between panel items"))
                     .push(widget::Row::new()
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::Column::new()
