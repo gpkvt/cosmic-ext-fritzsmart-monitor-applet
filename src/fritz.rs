@@ -169,7 +169,7 @@ impl FritzSettings {
             self.panel_text_size.clamp(10, 24), self.graph_timespan_minutes.clamp(5, 1440),
             self.refresh_interval_seconds.clamp(30, 3600), temperature_alerts,
             if self.weather_enabled { "true" } else { "false" }, self.openweathermap_api_key,
-            self.weather_location, self.weather_refresh_interval_minutes.clamp(5, 60)
+            self.weather_location, self.weather_refresh_interval_minutes.clamp(5, 60),
         );
         #[cfg(unix)]
         let mut file = {
