@@ -2505,11 +2505,13 @@ impl cosmic::Application for AppModel {
                                                 .width(cosmic::iced::Length::Fill)
                                                 .push(widget::text::caption("POWER (W)"))
                                                 .push(graph_visual(
-                                                    device_history.into_iter().flat_map(|samples| {
-                                                        samples
-                                                            .iter()
-                                                            .map(|(_, power, _)| *power as f64)
-                                                    }),
+                                                    device_history.into_iter().flat_map(
+                                                        |samples| {
+                                                            samples
+                                                                .iter()
+                                                                .map(|(_, power, _)| *power as f64)
+                                                        },
+                                                    ),
                                                     &self.settings.graph_style,
                                                     "W",
                                                 ))
@@ -2518,7 +2520,8 @@ impl cosmic::Application for AppModel {
                                                         .width(cosmic::iced::Length::Fill)
                                                         .push(widget::text::caption(
                                                             format_graph_axis_start(
-                                                                self.settings.graph_timespan_minutes,
+                                                                self.settings
+                                                                    .graph_timespan_minutes,
                                                             ),
                                                         ))
                                                         .push(
@@ -2530,22 +2533,24 @@ impl cosmic::Application for AppModel {
                                         )
                                         .padding([8, 0])
                                         .width(cosmic::iced::Length::Fill)
-                                        .style(move |theme| {
-                                            let cosmic = theme.cosmic();
-                                            cosmic::iced::widget::container::Style {
-                                                background: Some(
-                                                    cosmic::iced::Color::from(
-                                                        cosmic.background(false).base,
-                                                    )
-                                                    .into(),
-                                                ),
-                                                border: cosmic::iced::Border {
-                                                    radius: device_corner_radius,
+                                        .style(
+                                            move |theme| {
+                                                let cosmic = theme.cosmic();
+                                                cosmic::iced::widget::container::Style {
+                                                    background: Some(
+                                                        cosmic::iced::Color::from(
+                                                            cosmic.background(false).base,
+                                                        )
+                                                        .into(),
+                                                    ),
+                                                    border: cosmic::iced::Border {
+                                                        radius: device_corner_radius,
+                                                        ..Default::default()
+                                                    },
                                                     ..Default::default()
-                                                },
-                                                ..Default::default()
-                                            }
-                                        }),
+                                                }
+                                            },
+                                        ),
                                     )
                                     .padding(1)
                                     .width(cosmic::iced::Length::Fill)
@@ -2574,11 +2579,13 @@ impl cosmic::Application for AppModel {
                                                 .width(cosmic::iced::Length::Fill)
                                                 .push(widget::text::caption("TEMPERATURE (°C)"))
                                                 .push(graph_visual(
-                                                    device_history.into_iter().flat_map(|samples| {
-                                                        samples
-                                                            .iter()
-                                                            .map(|(_, _, temperature)| *temperature)
-                                                    }),
+                                                    device_history.into_iter().flat_map(
+                                                        |samples| {
+                                                            samples.iter().map(
+                                                                |(_, _, temperature)| *temperature,
+                                                            )
+                                                        },
+                                                    ),
                                                     &self.settings.graph_style,
                                                     "°C",
                                                 ))
@@ -2587,7 +2594,8 @@ impl cosmic::Application for AppModel {
                                                         .width(cosmic::iced::Length::Fill)
                                                         .push(widget::text::caption(
                                                             format_graph_axis_start(
-                                                                self.settings.graph_timespan_minutes,
+                                                                self.settings
+                                                                    .graph_timespan_minutes,
                                                             ),
                                                         ))
                                                         .push(
@@ -2599,22 +2607,24 @@ impl cosmic::Application for AppModel {
                                         )
                                         .padding([8, 0])
                                         .width(cosmic::iced::Length::Fill)
-                                        .style(move |theme| {
-                                            let cosmic = theme.cosmic();
-                                            cosmic::iced::widget::container::Style {
-                                                background: Some(
-                                                    cosmic::iced::Color::from(
-                                                        cosmic.background(false).base,
-                                                    )
-                                                    .into(),
-                                                ),
-                                                border: cosmic::iced::Border {
-                                                    radius: device_corner_radius.into(),
+                                        .style(
+                                            move |theme| {
+                                                let cosmic = theme.cosmic();
+                                                cosmic::iced::widget::container::Style {
+                                                    background: Some(
+                                                        cosmic::iced::Color::from(
+                                                            cosmic.background(false).base,
+                                                        )
+                                                        .into(),
+                                                    ),
+                                                    border: cosmic::iced::Border {
+                                                        radius: device_corner_radius.into(),
+                                                        ..Default::default()
+                                                    },
                                                     ..Default::default()
-                                                },
-                                                ..Default::default()
-                                            }
-                                        }),
+                                                }
+                                            },
+                                        ),
                                     )
                                     .padding(1)
                                     .width(cosmic::iced::Length::Fill)
