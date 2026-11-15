@@ -643,7 +643,7 @@ impl cosmic::Application for AppModel {
             content
                 .push(
                     widget::container(
-                        widget::icon::from_name("weather-clear-symbolic")
+                        widget::icon::from_name("solar-panel-symbolic")
                             .size(suggested.1.saturating_sub(2)),
                     )
                     .padding([2, 0]),
