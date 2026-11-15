@@ -7,6 +7,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 ## Features
 
 - Displays current power in watts and temperature in the COSMIC panel, with a configurable text size, optional average temperature, and a separate input-power figure when Total power is shown.
+- Settings are grouped into collapsible sections (Panel, Graph history, Automatic refresh, Weather, Connection, Devices and Diagnostics); all sections start collapsed to keep the settings view compact.
 - Settings and popup device rows use distinct muted background tints. Each selected device has separate configurable-timespan wattage and temperature sparklines in the popup, plus a combined net-power card that follows the same visual design. Device chart panels use subtly rounded corners. Devices can be marked as Devices with “solar” in their name are automatically marked as inputs on the first device discovery; the default is applied only once so manual changes are preserved.
 
 inputs; their wattage is subtracted from the net total and each input gets its own graph in the total-power card.
@@ -36,7 +37,7 @@ inputs; their wattage is subtracted from the net total and each input gets its o
 
 ## Build and install
 
-Build and install the applet into your user account. `make install` first runs `git pull --ff-only` to update the checked-out branch without creating a merge commit, then builds and installs it. Run it from a Git checkout with a configured upstream. Development builds display the package version with a trailing `+` (for example, `0.2.1-dev+`):
+Build and install the applet into your user account. `make install` first runs `git pull --ff-only` to update the checked-out branch without creating a merge commit, then builds and installs it. Run it from a Git checkout with a configured upstream. Development builds display the package version with a trailing `+` (for example, `0.2.2-dev+`):
 
 ```sh
 make install
