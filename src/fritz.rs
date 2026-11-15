@@ -1,7 +1,13 @@
 use md5::{Digest, Md5};
 use reqwest::Client;
 use roxmltree::{Document, Node};
-use std::{collections::{HashMap, HashSet, VecDeque}, env, fs, io::Write, sync::{LazyLock, Mutex}, time::{Duration, Instant}};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    env, fs,
+    io::Write,
+    sync::{LazyLock, Mutex},
+    time::{Duration, Instant},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct HttpRequestDiagnostic {
@@ -16,13 +22,18 @@ static HTTP_REQUEST_LOG: LazyLock<Mutex<VecDeque<HttpRequestDiagnostic>>> =
     LazyLock::new(|| Mutex::new(VecDeque::new()));
 
 pub fn http_request_diagnostics() -> Vec<HttpRequestDiagnostic> {
-    HTTP_REQUEST_LOG.lock().map(|log| log.iter().cloned().collect()).unwrap_or_default()
+    HTTP_REQUEST_LOG
+        .lock()
+        .map(|log| log.iter().cloned().collect())
+        .unwrap_or_default()
 }
 
 fn record_http_response(url: &reqwest::Url, status: reqwest::StatusCode) {
     if let Ok(mut log) = HTTP_REQUEST_LOG.lock() {
         log.push_back(HttpRequestDiagnostic {
-            timestamp: chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
+            timestamp: chrono::Local::now()
+                .format("%Y-%m-%d %H:%M:%S%.3f")
+                .to_string(),
             method: "GET",
             path: url.path().to_string(),
             status: status.as_u16(),
@@ -63,7 +74,10 @@ pub struct TemperatureAlertThresholds {
 
 impl Default for TemperatureAlertThresholds {
     fn default() -> Self {
-        Self { high_c: 40, low_c: -10 }
+        Self {
+            high_c: 40,
+            low_c: -10,
+        }
     }
 }
 
@@ -158,40 +172,54 @@ fn parse_menu_order(value: &str, selected_ains: &str, total_power_first: bool) -
             }
         }
     } else {
-        if total_power_first { order.push(TOTAL.into()); }
-        for ain in selected_ains.split(',').map(normalize_ain_for_selection).filter(|ain| !ain.is_empty()) {
-            if !order.contains(&ain) { order.push(ain); }
+        if total_power_first {
+            order.push(TOTAL.into());
         }
-        if !total_power_first { order.push(TOTAL.into()); }
+        for ain in selected_ains
+            .split(',')
+            .map(normalize_ain_for_selection)
+            .filter(|ain| !ain.is_empty())
+        {
+            if !order.contains(&ain) {
+                order.push(ain);
+            }
+        }
+        if !total_power_first {
+            order.push(TOTAL.into());
+        }
         order.push(DIFFERENCE.into());
     }
     order
 }
 
 fn parse_input_ains(value: &str) -> HashSet<String> {
-    value.split(',')
+    value
+        .split(',')
         .map(normalize_ain_for_selection)
         .filter(|ain| !ain.is_empty())
         .collect()
 }
 
 fn parse_temperature_alerts(value: &str) -> HashMap<String, TemperatureAlertThresholds> {
-    value.split(';').filter_map(|entry| {
-        // Split from the right so AINs containing colons remain supported.
-        let mut parts = entry.rsplitn(3, ':');
-        let last = parts.next()?;
-        let middle = parts.next()?;
-        // Older configurations stored only AIN:high and default the low
-        // limit to -10 °C.
-        let (ain, high, low) = match parts.next() {
-            Some(ain) => (ain, middle, last),
-            None => (middle, last, "-10"),
-        };
-        let ain = normalize_ain_for_selection(ain);
-        let high_c = high.parse::<i16>().ok()?.clamp(0, 40);
-        let low_c = low.parse::<i16>().ok()?.clamp(-10, 0);
-        (!ain.is_empty()).then_some((ain, TemperatureAlertThresholds { high_c, low_c }))
-    }).collect()
+    value
+        .split(';')
+        .filter_map(|entry| {
+            // Split from the right so AINs containing colons remain supported.
+            let mut parts = entry.rsplitn(3, ':');
+            let last = parts.next()?;
+            let middle = parts.next()?;
+            // Older configurations stored only AIN:high and default the low
+            // limit to -10 °C.
+            let (ain, high, low) = match parts.next() {
+                Some(ain) => (ain, middle, last),
+                None => (middle, last, "-10"),
+            };
+            let ain = normalize_ain_for_selection(ain);
+            let high_c = high.parse::<i16>().ok()?.clamp(0, 40);
+            let low_c = low.parse::<i16>().ok()?.clamp(-10, 0);
+            (!ain.is_empty()).then_some((ain, TemperatureAlertThresholds { high_c, low_c }))
+        })
+        .collect()
 }
 
 impl FritzSettings {
@@ -202,10 +230,20 @@ impl FritzSettings {
         let mut values = HashMap::new();
         for (line_number, line) in contents.lines().enumerate() {
             let line = line.trim();
-            if line.is_empty() || line.starts_with('#') { continue; }
-            let (key, value) = line.split_once('=')
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let (key, value) = line
+                .split_once('=')
                 .ok_or_else(|| format!("Invalid configuration on line {}", line_number + 1))?;
-            values.insert(key.trim().to_string(), value.trim().trim_matches('"').trim_matches('\'').to_string());
+            values.insert(
+                key.trim().to_string(),
+                value
+                    .trim()
+                    .trim_matches('"')
+                    .trim_matches('\'')
+                    .to_string(),
+            );
         }
         let get = |key: &str| values.get(key).cloned().unwrap_or_default();
         let settings = Self {
@@ -215,35 +253,68 @@ impl FritzSettings {
             ain: get("AIN"),
             ains: {
                 let legacy_ain = get("AIN");
-                let selected: Vec<String> = get("AINS").split(',')
-                    .map(str::trim).filter(|ain| !ain.is_empty()).map(str::to_string).collect();
-                if selected.is_empty() && !legacy_ain.trim().is_empty() { vec![legacy_ain] } else { selected }
+                let selected: Vec<String> = get("AINS")
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|ain| !ain.is_empty())
+                    .map(str::to_string)
+                    .collect();
+                if selected.is_empty() && !legacy_ain.trim().is_empty() {
+                    vec![legacy_ain]
+                } else {
+                    selected
+                }
             },
             allow_invalid_certs: get("ALLOW_INVALID_CERTS").eq_ignore_ascii_case("true"),
             ca_cert_path: get("CA_CERT_PATH"),
             panel_text_size: parse_panel_text_size(&get("PANEL_TEXT_SIZE")),
             panel_item_spacing: parse_panel_item_spacing(&get("PANEL_ITEM_SPACING")),
-            panel_refresh_button: !values.contains_key("PANEL_REFRESH_BUTTON") || get("PANEL_REFRESH_BUTTON").eq_ignore_ascii_case("true"),
-            panel_average_temperature: get("PANEL_AVERAGE_TEMPERATURE").eq_ignore_ascii_case("true"),
-            panel_exclude_solar_temperature: get("PANEL_EXCLUDE_SOLAR_TEMPERATURE").eq_ignore_ascii_case("true"),
+            panel_refresh_button: !values.contains_key("PANEL_REFRESH_BUTTON")
+                || get("PANEL_REFRESH_BUTTON").eq_ignore_ascii_case("true"),
+            panel_average_temperature: get("PANEL_AVERAGE_TEMPERATURE")
+                .eq_ignore_ascii_case("true"),
+            panel_exclude_solar_temperature: get("PANEL_EXCLUDE_SOLAR_TEMPERATURE")
+                .eq_ignore_ascii_case("true"),
             graph_timespan_minutes: parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")),
-            graph_style: if get("GRAPH_STYLE") == "bar" { "bar".into() } else { "line".into() },
-            refresh_interval_seconds: parse_refresh_interval_seconds(&get("REFRESH_INTERVAL_SECONDS")),
+            graph_style: if get("GRAPH_STYLE") == "bar" {
+                "bar".into()
+            } else {
+                "line".into()
+            },
+            refresh_interval_seconds: parse_refresh_interval_seconds(&get(
+                "REFRESH_INTERVAL_SECONDS",
+            )),
             temperature_alerts: parse_temperature_alerts(&get("TEMPERATURE_ALERTS")),
             input_ains: parse_input_ains(&get("INPUT_AINS")),
-            input_defaults_initialized: get("INPUT_DEFAULTS_INITIALIZED").eq_ignore_ascii_case("true"),
+            input_defaults_initialized: get("INPUT_DEFAULTS_INITIALIZED")
+                .eq_ignore_ascii_case("true"),
             total_power_first: get("TOTAL_POWER_FIRST").eq_ignore_ascii_case("true"),
-            menu_order: parse_menu_order(&get("MENU_ORDER"), &get("AINS"), get("TOTAL_POWER_FIRST").eq_ignore_ascii_case("true")),
+            menu_order: parse_menu_order(
+                &get("MENU_ORDER"),
+                &get("AINS"),
+                get("TOTAL_POWER_FIRST").eq_ignore_ascii_case("true"),
+            ),
             weather_enabled: get("WEATHER_ENABLED").eq_ignore_ascii_case("true"),
             openweathermap_api_key: get("OPENWEATHERMAP_API_KEY"),
             weather_location: get("WEATHER_LOCATION"),
-            weather_refresh_interval_minutes: get("WEATHER_REFRESH_INTERVAL_MINUTES").parse::<u16>().unwrap_or(10).clamp(5, 60),
+            weather_refresh_interval_minutes: get("WEATHER_REFRESH_INTERVAL_MINUTES")
+                .parse::<u16>()
+                .unwrap_or(10)
+                .clamp(5, 60),
         };
         Ok(settings)
     }
 
     pub fn save(&self) -> Result<(), String> {
-        for value in [&self.url, &self.username, &self.password, &self.ain, &self.ca_cert_path, &self.openweathermap_api_key, &self.weather_location] {
+        for value in [
+            &self.url,
+            &self.username,
+            &self.password,
+            &self.ain,
+            &self.ca_cert_path,
+            &self.openweathermap_api_key,
+            &self.weather_location,
+        ] {
             if value.contains('\n') || value.contains('\r') {
                 return Err("Configuration values must not contain newlines".into());
             }
@@ -252,51 +323,111 @@ impl FritzSettings {
         let parent = path.parent().ok_or("Invalid configuration path")?;
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         let temporary = parent.join(format!(".fritz_solar.cfg.{}.tmp", std::process::id()));
-        let selected_ains = if self.ains.is_empty() { self.ain.clone() } else { self.ains.join(",") };
+        let selected_ains = if self.ains.is_empty() {
+            self.ain.clone()
+        } else {
+            self.ains.join(",")
+        };
         let first_ain = self.ains.first().map(String::as_str).unwrap_or(&self.ain);
-        let mut temperature_alerts: Vec<String> = self.temperature_alerts.iter()
-            .map(|(ain, thresholds)| format!(
-                "{}:{}:{}",
-                normalize_ain_for_selection(ain),
-                thresholds.high_c.clamp(0, 40),
-                thresholds.low_c.clamp(-10, 0),
-            ))
+        let mut temperature_alerts: Vec<String> = self
+            .temperature_alerts
+            .iter()
+            .map(|(ain, thresholds)| {
+                format!(
+                    "{}:{}:{}",
+                    normalize_ain_for_selection(ain),
+                    thresholds.high_c.clamp(0, 40),
+                    thresholds.low_c.clamp(-10, 0),
+                )
+            })
             .collect();
         temperature_alerts.sort_unstable();
         let temperature_alerts = temperature_alerts.join(";");
-        let mut input_ains: Vec<String> = self.input_ains.iter()
+        let mut input_ains: Vec<String> = self
+            .input_ains
+            .iter()
             .map(|ain| normalize_ain_for_selection(ain))
-            .filter(|ain| !ain.is_empty()).collect();
+            .filter(|ain| !ain.is_empty())
+            .collect();
         input_ains.sort_unstable();
         let input_ains = input_ains.join(",");
         let contents = format!(
             "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nTOTAL_POWER_FIRST={}\nMENU_ORDER={}\n",
-            self.url, self.username, self.password, first_ain, selected_ains,
-            if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path,
+            self.url,
+            self.username,
+            self.password,
+            first_ain,
+            selected_ains,
+            if self.allow_invalid_certs {
+                "true"
+            } else {
+                "false"
+            },
+            self.ca_cert_path,
             self.panel_text_size.clamp(10, 24),
             self.panel_item_spacing.clamp(0, 16),
-            if self.panel_refresh_button { "true" } else { "false" },
-            if self.panel_average_temperature { "true" } else { "false" },
-            if self.panel_exclude_solar_temperature { "true" } else { "false" },
+            if self.panel_refresh_button {
+                "true"
+            } else {
+                "false"
+            },
+            if self.panel_average_temperature {
+                "true"
+            } else {
+                "false"
+            },
+            if self.panel_exclude_solar_temperature {
+                "true"
+            } else {
+                "false"
+            },
             self.graph_timespan_minutes.clamp(5, 1440),
-            if self.graph_style == "bar" { "bar" } else { "line" },
-            self.refresh_interval_seconds.clamp(30, 3600), temperature_alerts,
-            if self.weather_enabled { "true" } else { "false" }, self.openweathermap_api_key,
-            self.weather_location, self.weather_refresh_interval_minutes.clamp(5, 60), input_ains,
-            if self.input_defaults_initialized { "true" } else { "false" },
-            if self.total_power_first { "true" } else { "false" },
+            if self.graph_style == "bar" {
+                "bar"
+            } else {
+                "line"
+            },
+            self.refresh_interval_seconds.clamp(30, 3600),
+            temperature_alerts,
+            if self.weather_enabled {
+                "true"
+            } else {
+                "false"
+            },
+            self.openweathermap_api_key,
+            self.weather_location,
+            self.weather_refresh_interval_minutes.clamp(5, 60),
+            input_ains,
+            if self.input_defaults_initialized {
+                "true"
+            } else {
+                "false"
+            },
+            if self.total_power_first {
+                "true"
+            } else {
+                "false"
+            },
             self.menu_order.join(",")
         );
         #[cfg(unix)]
         let mut file = {
             use std::os::unix::fs::OpenOptionsExt;
-            fs::OpenOptions::new().write(true).create_new(true).mode(0o600)
-                .open(&temporary).map_err(|error| error.to_string())?
+            fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&temporary)
+                .map_err(|error| error.to_string())?
         };
         #[cfg(not(unix))]
-        let mut file = fs::OpenOptions::new().write(true).create_new(true)
-            .open(&temporary).map_err(|error| error.to_string())?;
-        let result = file.write_all(contents.as_bytes())
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)
+            .map_err(|error| error.to_string())?;
+        let result = file
+            .write_all(contents.as_bytes())
             .and_then(|_| file.sync_all())
             .and_then(|_| fs::rename(&temporary, &path));
         if let Err(error) = result {
@@ -319,7 +450,11 @@ fn validate_settings(settings: &FritzSettings, require_ain: bool) -> Result<(), 
     if settings.username.trim().is_empty() || settings.password.is_empty() {
         return Err("Enter the FRITZ!Box username and password".into());
     }
-    if require_ain && settings.ains.iter().all(|ain| normalize_ain_for_selection(ain).is_empty())
+    if require_ain
+        && settings
+            .ains
+            .iter()
+            .all(|ain| normalize_ain_for_selection(ain).is_empty())
         && normalize_ain_for_selection(&settings.ain).is_empty()
     {
         return Err("Select at least one FRITZ!Box device".into());
@@ -328,16 +463,25 @@ fn validate_settings(settings: &FritzSettings, require_ain: bool) -> Result<(), 
 }
 
 pub fn normalize_ain_for_selection(value: &str) -> String {
-    value.chars().filter(|character| character.is_ascii_alphanumeric()).collect()
+    value
+        .chars()
+        .filter(|character| character.is_ascii_alphanumeric())
+        .collect()
 }
 
 fn find_text<'a>(document: &'a Document<'a>, tag: &str) -> Option<&'a str> {
-    document.descendants().find(|node| node.has_tag_name(tag))?.text()
+    document
+        .descendants()
+        .find(|node| node.has_tag_name(tag))?
+        .text()
 }
 
 fn child_text<'a>(node: Node<'a, 'a>, parent: &str, child: &str) -> Option<&'a str> {
-    node.descendants().find(|candidate| candidate.has_tag_name(parent))?
-        .children().find(|candidate| candidate.has_tag_name(child))?.text()
+    node.descendants()
+        .find(|candidate| candidate.has_tag_name(parent))?
+        .children()
+        .find(|candidate| candidate.has_tag_name(child))?
+        .text()
 }
 
 fn challenge_response(challenge: &str, password: &str) -> String {
@@ -442,7 +586,9 @@ async fn read_xml_response(
             Ok(None) => break,
             Err(error)
                 if content_length.is_none()
-                    && connection.as_deref().is_some_and(|value| value.eq_ignore_ascii_case("close"))
+                    && connection
+                        .as_deref()
+                        .is_some_and(|value| value.eq_ignore_ascii_case("close"))
                     && is_fritzbox_unclean_tls_eof(&error)
                     && is_complete_protocol_payload(&bytes) =>
             {
@@ -474,8 +620,12 @@ fn load_ca_certificate(path: &str) -> Result<Option<reqwest::Certificate>, Strin
         .map_err(|error| format!("Cannot read FRITZ!Box CA certificate {path}: {error}"))?;
     const PEM_BEGIN: &[u8] = b"-----BEGIN CERTIFICATE-----";
     const PEM_END: &[u8] = b"-----END CERTIFICATE-----";
-    if !certificate_pem.windows(PEM_BEGIN.len()).any(|window| window == PEM_BEGIN)
-        || !certificate_pem.windows(PEM_END.len()).any(|window| window == PEM_END)
+    if !certificate_pem
+        .windows(PEM_BEGIN.len())
+        .any(|window| window == PEM_BEGIN)
+        || !certificate_pem
+            .windows(PEM_END.len())
+            .any(|window| window == PEM_END)
     {
         return Err(format!(
             "Invalid FRITZ!Box CA certificate {path}: expected a PEM-encoded certificate"
@@ -497,23 +647,39 @@ async fn authenticated_client(settings: &FritzSettings) -> Result<(Client, Strin
     }
     let client = builder.build().map_err(|error| error.to_string())?;
     let base = settings.url.trim_end_matches('/');
-    let challenge_http_response = client.get(format!("{base}/login_sid.lua")).send().await
+    let challenge_http_response = client
+        .get(format!("{base}/login_sid.lua"))
+        .send()
+        .await
         .map_err(|error| format!("FRITZ!Box connection failed: {error}"))?;
     let challenge_xml = read_xml_response(
         challenge_http_response,
         "FRITZ!Box challenge request failed",
-    ).await?;
-    let challenge_document = Document::parse(&challenge_xml)
-        .map_err(|error| format!("Invalid login XML: {error}"))?;
+    )
+    .await?;
+    let challenge_document =
+        Document::parse(&challenge_xml).map_err(|error| format!("Invalid login XML: {error}"))?;
     let challenge = find_text(&challenge_document, "Challenge")
-        .ok_or_else(|| "FRITZ!Box did not return a login challenge".to_string())?.to_string();
-    let response = format!("{challenge}-{}", challenge_response(&challenge, &settings.password));
-    let sid_response = client.get(format!("{base}/login_sid.lua"))
-        .query(&[("username", settings.username.as_str()), ("response", response.as_str())])
-        .send().await.map_err(|error| format!("FRITZ!Box login request failed: {error}"))?;
+        .ok_or_else(|| "FRITZ!Box did not return a login challenge".to_string())?
+        .to_string();
+    let response = format!(
+        "{challenge}-{}",
+        challenge_response(&challenge, &settings.password)
+    );
+    let sid_response = client
+        .get(format!("{base}/login_sid.lua"))
+        .query(&[
+            ("username", settings.username.as_str()),
+            ("response", response.as_str()),
+        ])
+        .send()
+        .await
+        .map_err(|error| format!("FRITZ!Box login request failed: {error}"))?;
     let sid_xml = read_xml_response(sid_response, "FRITZ!Box login request failed").await?;
-    let sid_document = Document::parse(&sid_xml).map_err(|error| format!("Invalid session XML: {error}"))?;
-    let sid = find_text(&sid_document, "SID").ok_or_else(|| "FRITZ!Box did not return a session ID".to_string())?;
+    let sid_document =
+        Document::parse(&sid_xml).map_err(|error| format!("Invalid session XML: {error}"))?;
+    let sid = find_text(&sid_document, "SID")
+        .ok_or_else(|| "FRITZ!Box did not return a session ID".to_string())?;
     if sid == "0000000000000000" {
         return Err("FRITZ!Box authentication failed; check username and password".into());
     }
@@ -523,9 +689,12 @@ async fn authenticated_client(settings: &FritzSettings) -> Result<(Client, Strin
 pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<FritzDevice>, String> {
     let (client, sid) = authenticated_client(&settings).await?;
     let base = settings.url.trim_end_matches('/');
-    let device_response = client.get(format!("{base}/webservices/homeautoswitch.lua"))
+    let device_response = client
+        .get(format!("{base}/webservices/homeautoswitch.lua"))
         .query(&[("sid", sid.as_str()), ("switchcmd", "getdevicelistinfos")])
-        .send().await.map_err(|error| format!("FRITZ!Box device request failed: {error}"))?;
+        .send()
+        .await
+        .map_err(|error| format!("FRITZ!Box device request failed: {error}"))?;
     let xml = read_xml_response(device_response, "FRITZ!Box device request failed").await?;
     parse_devices_xml(&xml)
 }
@@ -533,18 +702,36 @@ pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<FritzDevice
 fn parse_devices_xml(xml: &str) -> Result<Vec<FritzDevice>, String> {
     let document = Document::parse(xml).map_err(|error| format!("Invalid device XML: {error}"))?;
     let mut devices = Vec::new();
-    for node in document.descendants().filter(|node| node.has_tag_name("device")) {
-        let Some(ain) = node.attribute("identifier") else { continue };
+    for node in document
+        .descendants()
+        .filter(|node| node.has_tag_name("device"))
+    {
+        let Some(ain) = node.attribute("identifier") else {
+            continue;
+        };
         let has_power_meter = child_text(node, "powermeter", "power")
-            .and_then(|value| value.parse::<i64>().ok()).is_some();
+            .and_then(|value| value.parse::<i64>().ok())
+            .is_some();
         let has_temperature = child_text(node, "temperature", "celsius")
-            .and_then(|value| value.parse::<i64>().ok()).is_some();
-        if !has_power_meter || !has_temperature { continue; }
-        let child_name = node.children().find(|child| child.has_tag_name("name"))
-            .and_then(|child| child.text()).filter(|name| !name.trim().is_empty());
-        let name = child_name.or_else(|| node.attribute("name"))
-            .map(str::trim).unwrap_or("Unnamed device").to_string();
-        devices.push(FritzDevice { name, ain: ain.to_string() });
+            .and_then(|value| value.parse::<i64>().ok())
+            .is_some();
+        if !has_power_meter || !has_temperature {
+            continue;
+        }
+        let child_name = node
+            .children()
+            .find(|child| child.has_tag_name("name"))
+            .and_then(|child| child.text())
+            .filter(|name| !name.trim().is_empty());
+        let name = child_name
+            .or_else(|| node.attribute("name"))
+            .map(str::trim)
+            .unwrap_or("Unnamed device")
+            .to_string();
+        devices.push(FritzDevice {
+            name,
+            ain: ain.to_string(),
+        });
     }
     devices.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     if devices.is_empty() {
@@ -553,46 +740,90 @@ fn parse_devices_xml(xml: &str) -> Result<Vec<FritzDevice>, String> {
     Ok(devices)
 }
 
-fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<FritzReading>, String> {
+fn parse_device_readings_xml(
+    xml: &str,
+    selected_ains: &[String],
+) -> Result<Vec<FritzReading>, String> {
     let document = Document::parse(xml).map_err(|error| format!("Invalid device XML: {error}"))?;
-    let wanted: Vec<String> = selected_ains.iter().map(|ain| normalize_ain_for_selection(ain))
-        .filter(|ain| !ain.is_empty()).collect();
+    let wanted: Vec<String> = selected_ains
+        .iter()
+        .map(|ain| normalize_ain_for_selection(ain))
+        .filter(|ain| !ain.is_empty())
+        .collect();
     let mut readings = Vec::new();
-    for device in document.descendants().filter(|node| node.has_tag_name("device")) {
-        let Some(ain) = device.attribute("identifier") else { continue };
-        if !wanted.iter().any(|selected| selected == &normalize_ain_for_selection(ain)) { continue; }
+    for device in document
+        .descendants()
+        .filter(|node| node.has_tag_name("device"))
+    {
+        let Some(ain) = device.attribute("identifier") else {
+            continue;
+        };
+        if !wanted
+            .iter()
+            .any(|selected| selected == &normalize_ain_for_selection(ain))
+        {
+            continue;
+        }
         let power_mw = child_text(device, "powermeter", "power")
             .ok_or_else(|| format!("Device {} does not expose power measurements", ain))?
-            .parse::<i64>().map_err(|_| format!("Device {} returned an invalid power measurement", ain))?;
+            .parse::<i64>()
+            .map_err(|_| format!("Device {} returned an invalid power measurement", ain))?;
         let temperature_c = child_text(device, "temperature", "celsius")
             .ok_or_else(|| format!("Device {} does not expose temperature measurements", ain))?
-            .parse::<i64>().map_err(|_| format!("Device {} returned an invalid temperature measurement", ain))? as f64 / 10.0;
-        let name = device.children().find(|child| child.has_tag_name("name")).and_then(|child| child.text())
-            .filter(|name| !name.trim().is_empty()).or_else(|| device.attribute("name"))
-            .unwrap_or("FRITZ!Box device").trim().to_string();
-        let power_state = child_text(device, "switch", "state").and_then(|state| match state.trim() {
-            "1" => Some(true),
-            "0" => Some(false),
-            _ => None,
+            .parse::<i64>()
+            .map_err(|_| format!("Device {} returned an invalid temperature measurement", ain))?
+            as f64
+            / 10.0;
+        let name = device
+            .children()
+            .find(|child| child.has_tag_name("name"))
+            .and_then(|child| child.text())
+            .filter(|name| !name.trim().is_empty())
+            .or_else(|| device.attribute("name"))
+            .unwrap_or("FRITZ!Box device")
+            .trim()
+            .to_string();
+        let power_state =
+            child_text(device, "switch", "state").and_then(|state| match state.trim() {
+                "1" => Some(true),
+                "0" => Some(false),
+                _ => None,
+            });
+        readings.push(FritzReading {
+            ain: ain.to_string(),
+            name,
+            power_w: power_mw / 1000,
+            temperature_c,
+            power_state,
         });
-        readings.push(FritzReading { ain: ain.to_string(), name, power_w: power_mw / 1000, temperature_c, power_state });
     }
-    readings.sort_by_key(|reading| wanted.iter().position(|selected|
-        selected == &normalize_ain_for_selection(&reading.ain)).unwrap_or(usize::MAX));
-    if readings.is_empty() { return Err("None of the selected FRITZ!Box devices were found".into()); }
+    readings.sort_by_key(|reading| {
+        wanted
+            .iter()
+            .position(|selected| selected == &normalize_ain_for_selection(&reading.ain))
+            .unwrap_or(usize::MAX)
+    });
+    if readings.is_empty() {
+        return Err("None of the selected FRITZ!Box devices were found".into());
+    }
     Ok(readings)
 }
 
 #[cfg(test)]
 fn parse_device_xml(xml: &str, ain: &str) -> Result<FritzReading, String> {
-    parse_device_readings_xml(xml, &[ain.to_string()])?.into_iter().next()
+    parse_device_readings_xml(xml, &[ain.to_string()])?
+        .into_iter()
+        .next()
         .ok_or_else(|| "Configured FRITZ!Box device was not found".to_string())
 }
 
 async fn fetch_device_list_xml(client: &Client, base: &str, sid: &str) -> Result<String, String> {
-    let response = client.get(format!("{base}/webservices/homeautoswitch.lua"))
+    let response = client
+        .get(format!("{base}/webservices/homeautoswitch.lua"))
         .query(&[("sid", sid), ("switchcmd", "getdevicelistinfos")])
-        .send().await.map_err(|error| format!("FRITZ!Box device request failed: {error}"))?;
+        .send()
+        .await
+        .map_err(|error| format!("FRITZ!Box device request failed: {error}"))?;
     read_xml_response(response, "FRITZ!Box device request failed").await
 }
 
@@ -614,13 +845,12 @@ async fn fetch_switch_state(
     sid: &str,
     ain: &str,
 ) -> Result<Option<bool>, String> {
-    let response = client.get(format!("{base}/webservices/homeautoswitch.lua"))
-        .query(&[
-            ("sid", sid),
-            ("switchcmd", "getswitchstate"),
-            ("ain", ain),
-        ])
-        .send().await.map_err(|error| format!("FRITZ!Box switch-state request failed: {error}"))?;
+    let response = client
+        .get(format!("{base}/webservices/homeautoswitch.lua"))
+        .query(&[("sid", sid), ("switchcmd", "getswitchstate"), ("ain", ain)])
+        .send()
+        .await
+        .map_err(|error| format!("FRITZ!Box switch-state request failed: {error}"))?;
     let body = read_xml_response(response, "FRITZ!Box switch-state request failed").await?;
     Ok(parse_switch_state_response(&body))
 }
@@ -634,11 +864,24 @@ fn parse_fetch_result_xml(xml: &str, selected_ains: &[String]) -> Result<FritzFe
             Ok(mut device_readings) => readings.append(&mut device_readings),
             Err(_) => {
                 let key = normalize_ain_for_selection(ain);
-                let name = document.descendants().find(|node| node.has_tag_name("device")
-                    && node.attribute("identifier").is_some_and(|id| normalize_ain_for_selection(id) == key))
-                    .and_then(|node| node.children().find(|child| child.has_tag_name("name"))
-                        .and_then(|child| child.text()).or_else(|| node.attribute("name")))
-                    .map(str::trim).filter(|name| !name.is_empty()).unwrap_or(ain).to_string();
+                let name = document
+                    .descendants()
+                    .find(|node| {
+                        node.has_tag_name("device")
+                            && node
+                                .attribute("identifier")
+                                .is_some_and(|id| normalize_ain_for_selection(id) == key)
+                    })
+                    .and_then(|node| {
+                        node.children()
+                            .find(|child| child.has_tag_name("name"))
+                            .and_then(|child| child.text())
+                            .or_else(|| node.attribute("name"))
+                    })
+                    .map(str::trim)
+                    .filter(|name| !name.is_empty())
+                    .unwrap_or(ain)
+                    .to_string();
                 missing_devices.push((ain.clone(), name));
             }
         }
@@ -647,17 +890,30 @@ fn parse_fetch_result_xml(xml: &str, selected_ains: &[String]) -> Result<FritzFe
         return Err(if missing_devices.is_empty() {
             "No selected devices returned usable readings".into()
         } else {
-            format!("No selected devices returned usable readings: {}", missing_devices.iter()
-                .map(|(_, name)| name.as_str()).collect::<Vec<_>>().join(", "))
+            format!(
+                "No selected devices returned usable readings: {}",
+                missing_devices
+                    .iter()
+                    .map(|(_, name)| name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
         });
     }
-    Ok(FritzFetchResult { readings, missing_devices })
+    Ok(FritzFetchResult {
+        readings,
+        missing_devices,
+    })
 }
 
 pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     let settings = FritzSettings::load()?;
     validate_settings(&settings, true)?;
-    let selected_ains = if settings.ains.is_empty() { vec![settings.ain.clone()] } else { settings.ains.clone() };
+    let selected_ains = if settings.ains.is_empty() {
+        vec![settings.ain.clone()]
+    } else {
+        settings.ains.clone()
+    };
     let (client, sid) = authenticated_client(&settings).await?;
     let base = settings.url.trim_end_matches('/');
     let devices_xml = fetch_device_list_xml(&client, base, &sid).await?;
@@ -665,9 +921,13 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
 
     // Query the dedicated switch-state endpoint: power-meter XML can lag behind
     // the actual actuator state on some FRITZ!Box devices.
-    let states = futures::future::join_all(result.readings.iter().map(|reading|
-        fetch_switch_state(&client, base, &sid, &reading.ain),
-    )).await;
+    let states = futures::future::join_all(
+        result
+            .readings
+            .iter()
+            .map(|reading| fetch_switch_state(&client, base, &sid, &reading.ain)),
+    )
+    .await;
     for (reading, state) in result.readings.iter_mut().zip(states) {
         reading.power_state = state.unwrap_or(None);
     }
@@ -681,12 +941,22 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
     let (client, sid) = authenticated_client(&settings).await?;
     let base = settings.url.trim_end_matches('/');
     let command = if on { "setswitchon" } else { "setswitchoff" };
-    let response = client.get(format!("{base}/webservices/homeautoswitch.lua"))
-        .query(&[("sid", sid.as_str()), ("switchcmd", command), ("ain", ain.as_str())])
-        .send().await.map_err(|error| format!("FRITZ!Box power command failed: {error}"))?;
+    let response = client
+        .get(format!("{base}/webservices/homeautoswitch.lua"))
+        .query(&[
+            ("sid", sid.as_str()),
+            ("switchcmd", command),
+            ("ain", ain.as_str()),
+        ])
+        .send()
+        .await
+        .map_err(|error| format!("FRITZ!Box power command failed: {error}"))?;
     let body = read_xml_response(response, "FRITZ!Box power command failed").await?;
     if !switch_command_response_matches(&body, on) {
-        return Err(format!("FRITZ!Box rejected the power command: {}", body.trim()));
+        return Err(format!(
+            "FRITZ!Box rejected the power command: {}",
+            body.trim()
+        ));
     }
 
     let deadline = Instant::now() + Duration::from_secs(30);
@@ -694,14 +964,20 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
     while Instant::now() < deadline {
         match fetch_switch_state(&client, base, &sid, &ain).await {
             Ok(Some(state)) if state == on => return Ok(()),
-            Ok(_) => {},
+            Ok(_) => {}
             Err(error) => last_error = Some(error),
         }
         tokio::time::sleep(Duration::from_secs(2)).await;
     }
     Err(match last_error {
-        Some(error) => format!("Timed out waiting for the device to turn {} (last check: {error})", if on { "on" } else { "off" }),
-        None => format!("Timed out waiting for the device to turn {}", if on { "on" } else { "off" }),
+        Some(error) => format!(
+            "Timed out waiting for the device to turn {} (last check: {error})",
+            if on { "on" } else { "off" }
+        ),
+        None => format!(
+            "Timed out waiting for the device to turn {}",
+            if on { "on" } else { "off" }
+        ),
     })
 }
 
@@ -753,19 +1029,52 @@ mod tests {
     #[test]
     fn input_device_ains_parse_and_normalize() {
         let inputs = parse_input_ains("12:34-56, 123456, , 78:90-12");
-        assert_eq!(inputs, HashSet::from(["123456".to_string(), "789012".to_string()]));
+        assert_eq!(
+            inputs,
+            HashSet::from(["123456".to_string(), "789012".to_string()])
+        );
         assert!(parse_input_ains("").is_empty());
     }
 
     #[test]
     fn temperature_alerts_parse_and_normalize_ains() {
         let alerts = parse_temperature_alerts("12:34-56 78:35:-8;222222222222:40:-10;bad:abc;:60");
-        assert_eq!(alerts.get("12345678"), Some(&TemperatureAlertThresholds { high_c: 35, low_c: -8 }));
-        assert_eq!(alerts.get("222222222222"), Some(&TemperatureAlertThresholds { high_c: 40, low_c: -10 }));
+        assert_eq!(
+            alerts.get("12345678"),
+            Some(&TemperatureAlertThresholds {
+                high_c: 35,
+                low_c: -8
+            })
+        );
+        assert_eq!(
+            alerts.get("222222222222"),
+            Some(&TemperatureAlertThresholds {
+                high_c: 40,
+                low_c: -10
+            })
+        );
         assert_eq!(alerts.len(), 2);
-        assert_eq!(parse_temperature_alerts("123:55").get("123"), Some(&TemperatureAlertThresholds { high_c: 40, low_c: -10 }));
-        assert_eq!(parse_temperature_alerts("123:-5:5").get("123"), Some(&TemperatureAlertThresholds { high_c: 0, low_c: 0 }));
-        assert_eq!(TemperatureAlertThresholds::default(), TemperatureAlertThresholds { high_c: 40, low_c: -10 });
+        assert_eq!(
+            parse_temperature_alerts("123:55").get("123"),
+            Some(&TemperatureAlertThresholds {
+                high_c: 40,
+                low_c: -10
+            })
+        );
+        assert_eq!(
+            parse_temperature_alerts("123:-5:5").get("123"),
+            Some(&TemperatureAlertThresholds {
+                high_c: 0,
+                low_c: 0
+            })
+        );
+        assert_eq!(
+            TemperatureAlertThresholds::default(),
+            TemperatureAlertThresholds {
+                high_c: 40,
+                low_c: -10
+            }
+        );
         assert!(FritzSettings::default().temperature_alerts.is_empty());
     }
 
@@ -804,8 +1113,7 @@ mod tests {
 
     #[test]
     fn rejects_non_utf8_xml_response_with_context() {
-        let error = decode_xml_response(b"<device>\xff</device>", "device request")
-            .unwrap_err();
+        let error = decode_xml_response(b"<device>\xff</device>", "device request").unwrap_err();
         assert!(error.starts_with("device request: response is not valid UTF-8:"));
     }
 
@@ -907,10 +1215,13 @@ mod tests {
             </devicelist>
         "#;
         let devices = parse_devices_xml(xml).unwrap();
-        assert_eq!(devices, vec![FritzDevice {
-            name: "Solar inverter".into(),
-            ain: "111111111111".into(),
-        }]);
+        assert_eq!(
+            devices,
+            vec![FritzDevice {
+                name: "Solar inverter".into(),
+                ain: "111111111111".into(),
+            }]
+        );
     }
 
     #[test]
@@ -934,10 +1245,9 @@ mod tests {
               </device>
             </devicelist>
         "#;
-        let readings = parse_device_readings_xml(
-            xml,
-            &["2222 2222 2222".into(), "111111111111".into()],
-        ).unwrap();
+        let readings =
+            parse_device_readings_xml(xml, &["2222 2222 2222".into(), "111111111111".into()])
+                .unwrap();
         assert_eq!(readings.len(), 2);
         assert_eq!(readings[0].name, "Battery inverter");
         assert_eq!(readings[0].power_w, 456);
@@ -973,13 +1283,15 @@ mod tests {
     #[test]
     fn parses_switch_power_state_when_available() {
         for (state, expected) in [("1", Some(true)), ("0", Some(false)), ("unknown", None)] {
-            let xml = format!(r#"
+            let xml = format!(
+                r#"
                 <devicelist><device identifier="123456789012">
                   <powermeter><power>123000</power></powermeter>
                   <temperature><celsius>215</celsius></temperature>
                   <switch><state>{state}</state></switch>
                 </device></devicelist>
-            "#);
+            "#
+            );
             let reading = parse_device_xml(&xml, "123456789012").unwrap();
             assert_eq!(reading.power_state, expected);
         }
@@ -997,13 +1309,14 @@ mod tests {
               </device>
             </devicelist>
         "#;
-        let result = parse_fetch_result_xml(
-            xml,
-            &["111111111111".into(), "222222222222".into()],
-        ).unwrap();
+        let result =
+            parse_fetch_result_xml(xml, &["111111111111".into(), "222222222222".into()]).unwrap();
         assert_eq!(result.readings.len(), 1);
         assert_eq!(result.readings[0].power_state, Some(true));
-        assert_eq!(result.missing_devices, vec![("222222222222".into(), "222222222222".into())]);
+        assert_eq!(
+            result.missing_devices,
+            vec![("222222222222".into(), "222222222222".into())]
+        );
     }
 
     #[test]
@@ -1016,6 +1329,4 @@ mod tests {
         assert!(settings.weather_location.is_empty());
         assert_eq!(settings.weather_refresh_interval_minutes, 10);
     }
-
 }
-
