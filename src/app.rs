@@ -80,6 +80,7 @@ pub enum Message {
     PanelTextSizeChanged(u8),
     PanelPaddingChanged(u8),
     PanelAverageTemperatureChanged(bool),
+    PanelExcludeSolarTemperatureChanged(bool),
     GraphTimespanChanged(u16),
     RefreshIntervalChanged(u32),
     DiscoverDevices,
@@ -347,9 +348,14 @@ fn input_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64
     }).map(|reading| signed_device_power(reading.power_w, true)).sum()
 }
 
-fn average_temperature_c(readings: &[FritzReading]) -> Option<f64> {
-    let count = readings.len();
-    (count > 0).then(|| readings.iter().map(|reading| reading.temperature_c).sum::<f64>() / count as f64)
+fn average_temperature_c(readings: &[FritzReading], exclude_solar: bool) -> Option<f64> {
+    let temperatures = readings.iter().filter(|reading| {
+        !exclude_solar || !reading.name.to_lowercase().contains("solar")
+    });
+    let (sum, count) = temperatures.fold((0.0, 0usize), |(sum, count), reading| {
+        (sum + reading.temperature_c, count + 1)
+    });
+    (count > 0).then(|| sum / count as f64)
 }
 
 fn rebuild_net_power_history(
@@ -923,7 +929,7 @@ impl cosmic::Application for AppModel {
                 .unwrap_or_else(|| "-- W".to_string())
         };
         let temperature = if self.settings.panel_average_temperature {
-            Some(average_temperature_c(&self.readings)
+            Some(average_temperature_c(&self.readings, self.settings.panel_exclude_solar_temperature)
                 .map(|value| format!("{value:.1} °C"))
                 .unwrap_or_else(|| "-- °C".to_string()))
         } else if self.settings.total_power_first {
@@ -1084,6 +1090,22 @@ impl cosmic::Application for AppModel {
                                 .on_toggle(Message::PanelAverageTemperatureChanged)
                         )
                         .padding([8, 10])) )
+                    .push(if self.settings.panel_average_temperature {
+                        widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::Column::new()
+                                .spacing(3)
+                                .width(cosmic::iced::Length::Fill)
+                                .push(widget::text::body("Exclude solar devices"))
+                                .push(widget::text::caption("Ignore temperatures from devices whose name contains “solar” when calculating the average.")))
+                            .push(widget::container(
+                                widget::toggler(self.settings.panel_exclude_solar_temperature)
+                                    .on_toggle(Message::PanelExcludeSolarTemperatureChanged)
+                            ).padding([8, 10]))
+                            .into()
+                    } else {
+                        widget::text::caption("Enable average temperature to configure which devices contribute to it.").into()
+                    })
                     .push(widget::divider::horizontal::default())
             }
 
@@ -1504,7 +1526,7 @@ impl cosmic::Application for AppModel {
                 ).map(|power| format!("{power} W"))
                     .unwrap_or_else(|| "-- W".into());
                 let summary_temperature = if self.settings.panel_average_temperature {
-                    average_temperature_c(&self.readings).map(|value| format!("{value:.1} °C"))
+                    average_temperature_c(&self.readings, self.settings.panel_exclude_solar_temperature).map(|value| format!("{value:.1} °C"))
                 } else if self.settings.total_power_first {
                     None
                 } else {
@@ -2144,6 +2166,10 @@ impl cosmic::Application for AppModel {
                 self.settings.panel_average_temperature = value;
                 self.persist_settings();
             }
+            Message::PanelExcludeSolarTemperatureChanged(value) => {
+                self.settings.panel_exclude_solar_temperature = value;
+                self.persist_settings();
+            }
             Message::GraphTimespanChanged(value) => {
                 self.settings.graph_timespan_minutes = value.clamp(5, 1440);
                 let now = Instant::now();
@@ -2495,8 +2521,21 @@ mod history_tests {
             FritzReading { ain: "111111".into(), name: "First".into(), power_w: 100, temperature_c: 20.0, power_state: None },
             FritzReading { ain: "222222".into(), name: "Second".into(), power_w: 200, temperature_c: 24.0, power_state: None },
         ];
-        assert_eq!(average_temperature_c(&readings), Some(22.0));
-        assert_eq!(average_temperature_c(&[]), None);
+        assert_eq!(average_temperature_c(&readings, false), Some(22.0));
+        assert_eq!(average_temperature_c(&readings, true), Some(22.0));
+        assert_eq!(average_temperature_c(&[], false), None);
+    }
+
+    #[test]
+    fn average_temperature_can_exclude_solar_named_devices_case_insensitively() {
+        let readings = vec![
+            FritzReading { ain: "111111".into(), name: "Living room".into(), power_w: 100, temperature_c: 20.0, power_state: None },
+            FritzReading { ain: "222222".into(), name: "Solar inverter".into(), power_w: 200, temperature_c: 40.0, power_state: None },
+            FritzReading { ain: "333333".into(), name: "ROOF SOLAR METER".into(), power_w: 300, temperature_c: 50.0, power_state: None },
+        ];
+        assert_eq!(average_temperature_c(&readings, false), Some(110.0 / 3.0));
+        assert_eq!(average_temperature_c(&readings, true), Some(20.0));
+        assert_eq!(average_temperature_c(&readings[1..], true), None);
     }
 
     #[test]
