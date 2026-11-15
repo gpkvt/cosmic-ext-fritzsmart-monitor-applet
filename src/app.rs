@@ -1059,10 +1059,15 @@ impl cosmic::Application for AppModel {
         } else {
             content
         };
-        let content = content
-            .push(widget::icon::from_name("electricity-symbolic").size(self.settings.panel_text_size.into()))
-            .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)));
-        let content = if let Some(input_power) = input_power {
+        let content = if self.error.is_none() {
+            content
+                .push(widget::icon::from_name("electricity-symbolic").size(self.settings.panel_text_size.into()))
+                .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)))
+        } else {
+            content
+        };
+        let content = if self.error.is_none() {
+            if let Some(input_power) = input_power {
             let icon_size = f32::from(self.settings.panel_text_size.clamp(12, 20));
             let solar_panel = cosmic::iced::widget::svg(
                 cosmic::iced::widget::svg::Handle::from_memory(
@@ -1071,16 +1076,23 @@ impl cosmic::Application for AppModel {
             )
             .width(icon_size)
             .height(icon_size);
-            content
-                .push(solar_panel)
-                .push(self.core.applet.text(input_power).size(f32::from(self.settings.panel_text_size)))
+                content
+                    .push(solar_panel)
+                    .push(self.core.applet.text(input_power).size(f32::from(self.settings.panel_text_size)))
+            } else {
+                content
+            }
         } else {
             content
         };
-        let content = if let Some(temperature) = temperature {
-            content
-                .push(widget::icon::from_name("thermometer-symbolic").size(self.settings.panel_text_size.into()))
-                .push(self.core.applet.text(temperature).size(f32::from(self.settings.panel_text_size)))
+        let content = if self.error.is_none() {
+            if let Some(temperature) = temperature {
+                content
+                    .push(widget::icon::from_name("thermometer-symbolic").size(self.settings.panel_text_size.into()))
+                    .push(self.core.applet.text(temperature).size(f32::from(self.settings.panel_text_size)))
+            } else {
+                content
+            }
         } else {
             content
         };
@@ -1617,7 +1629,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default());
             }
 
-            if !self.readings.is_empty() {
+            if self.error.is_none() && !self.readings.is_empty() {
             if !self.readings.is_empty() {
                 let primary = self.selected_ains.first()
                     .and_then(|selected| self.readings.iter().find(|reading|
@@ -1865,8 +1877,10 @@ impl cosmic::Application for AppModel {
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                     .push(icon_action_button("⚙", "Quick settings", Message::ToggleQuickOptions)),
             );
-            if let Some(updated) = &self.updated {
-                content = content.push(widget::text::caption(format!("Updated at {updated}")));
+            if self.error.is_none() {
+                if let Some(updated) = &self.updated {
+                    content = content.push(widget::text::caption(format!("Updated at {updated}")));
+                }
             }
             if self.quick_options_expanded {
                 const REFRESH_ANCHORS: [f32; 5] = [30.0, 300.0, 900.0, 1800.0, 3600.0];
