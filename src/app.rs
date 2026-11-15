@@ -487,7 +487,8 @@ fn move_menu_entry(order: &mut Vec<String>, dragged: &str, target: &str) {
     }
 }
 
-// Retained for the legacy device-order unit tests.
+// Retained only for the legacy device-order unit tests.
+#[cfg(test)]
 fn move_sortable_entry(
     ains: &mut Vec<String>,
     total_power_first: &mut bool,
@@ -1005,6 +1006,7 @@ fn power_difference_sort_row(position: usize) -> cosmic::Element<'static, Messag
     .into()
 }
 
+#[cfg(test)]
 fn move_selected_device_to_drop_target(ains: &mut Vec<String>, dragged_ain: &str, target_ain: &str) {
     let dragged = crate::fritz::normalize_ain_for_selection(dragged_ain);
     let target = crate::fritz::normalize_ain_for_selection(target_ain);
