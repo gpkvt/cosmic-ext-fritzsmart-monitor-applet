@@ -51,6 +51,7 @@ pub struct AppModel {
     refresh_started_at: Option<Instant>,
     weather: Option<WeatherData>,
     weather_attribution_expanded: bool,
+    quick_options_expanded: bool,
     next_weather_refresh_at: Option<Instant>,
     pending_power_changes: HashSet<String>,
     pending_power_targets: HashMap<String, bool>,
@@ -91,6 +92,7 @@ pub enum Message {
     TemperatureAlertLowChanged(String, i16),
     WeatherUpdated(Result<WeatherData, String>),
     ToggleWeatherAttribution,
+    ToggleQuickOptions,
     WeatherEnabledChanged(bool),
     OpenWeatherMapApiKeyChanged(String),
     WeatherLocationChanged(String),
@@ -1423,6 +1425,45 @@ impl cosmic::Application for AppModel {
                 content = content.push(widget::text::caption(format!("Updated at {updated}")));
             }
 
+            let quick_options_label = if self.quick_options_expanded {
+                "▾ Quick options"
+            } else {
+                "▸ Quick options"
+            };
+            content = content.push(
+                widget::button::custom(
+                    widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::icon::from_name("preferences-system-symbolic").size(14))
+                        .push(widget::text::body(quick_options_label)),
+                )
+                .on_press(Message::ToggleQuickOptions)
+                .padding([8, 10])
+                .class(cosmic::theme::Button::Standard),
+            );
+            if self.quick_options_expanded {
+                content = content
+                    .push(widget::text::caption(format!(
+                        "REFRESH INTERVAL · {}",
+                        format_countdown(u64::from(self.settings.refresh_interval_seconds))
+                    )))
+                    .push(widget::slider(
+                        30.0..=3600.0,
+                        self.settings.refresh_interval_seconds as f32,
+                        |value| Message::RefreshIntervalChanged(value.round() as u32),
+                    ).step(30.0))
+                    .push(widget::text::caption(format!(
+                        "GRAPH DURATION · {}",
+                        format_graph_timespan(self.settings.graph_timespan_minutes)
+                    )))
+                    .push(widget::slider(
+                        5.0..=1440.0,
+                        f32::from(self.settings.graph_timespan_minutes),
+                        |value| Message::GraphTimespanChanged(value.round() as u16),
+                    ).step(5.0));
+            }
+
             if let Some(error) = &self.error {
                 content = content.push(error_notice("CONNECTION ERROR", error));
             }
@@ -1667,6 +1708,9 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleWeatherAttribution => {
                 self.weather_attribution_expanded = !self.weather_attribution_expanded;
+            }
+            Message::ToggleQuickOptions => {
+                self.quick_options_expanded = !self.quick_options_expanded;
             }
             Message::WeatherUpdated(result) => {
                 match result {
