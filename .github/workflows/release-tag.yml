@@ -18,19 +18,29 @@ jobs:
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - name: Create version tag when it does not exist
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create or repair version tag
         run: |
           set -euo pipefail
           version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n1)"
+          previous_version="$(git show "${GITHUB_SHA}^:Cargo.toml" | sed -n 's/^version = "\([^"]*\)"/\1/p' | head -n1)"
           test -n "$version"
-          tag="v$version"
-          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-            echo "$tag already exists; nothing to do."
+          if [ "$version" = "$previous_version" ]; then
+            echo "Version unchanged ($version); no release tag needed."
             exit 0
           fi
+          tag="v$version"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --tags origin
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            current_target="$(git rev-parse "$tag^{commit}")"
+            if [ "$current_target" = "$GITHUB_SHA" ]; then
+              echo "$tag already points to this release commit."
+              exit 0
+            fi
+            echo "$tag points to $current_target; repairing it to $GITHUB_SHA."
+            git tag -d "$tag"
+            git push origin ":refs/tags/$tag"
+          fi
           git tag -a "$tag" -m "Release $tag" "$GITHUB_SHA"
           git push origin "refs/tags/$tag"
