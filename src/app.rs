@@ -580,45 +580,36 @@ fn live_power_summary(
     temperature: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     let title = if is_net { "NET POWER" } else { "CURRENT POWER" };
-    let primary = widget::Row::new()
+    let power_metric = widget::Column::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
-        .align_y(cosmic::iced::Alignment::Start)
-        .push(widget::Column::new()
+        .push(widget::Row::new()
             .spacing(8)
-            .push(widget::Row::new()
-                .spacing(8)
-                .align_y(cosmic::iced::Alignment::Start)
-                .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(18))
-                .push(widget::text::caption(title))))
-        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(18))
+            .push(widget::text::caption(title)))
         .push(widget::text::title2(keep_value_unit_together(power)));
 
-    let mut supporting = widget::Column::new()
-        .spacing(8)
-        .width(cosmic::iced::Length::Fill);
-    let mut has_supporting = false;
-    if let Some(input) = input_power {
-        has_supporting = true;
-        supporting = supporting.push(metric_tile("INPUT", input, "go-down-symbolic"));
-    }
+    let mut metrics = widget::Row::new()
+        .spacing(12)
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Start)
+        .push(power_metric);
     if let Some(temp) = temperature {
-        has_supporting = true;
         let temperature_metric = widget::Column::new()
             .spacing(8)
             .width(cosmic::iced::Length::Fill)
             .push(widget::text::caption("TEMP"))
             .push(widget::text::title2(keep_value_unit_together(temp)));
-        supporting = supporting.push(surface_card(temperature_metric.into(), 10));
+        metrics = metrics.push(temperature_metric);
     }
 
-    let mut content = widget::Row::new()
-        .spacing(12)
+    let mut content = widget::Column::new()
+        .spacing(10)
         .width(cosmic::iced::Length::Fill)
-        .align_y(cosmic::iced::Alignment::Start)
-        .push(primary);
-    if has_supporting {
-        content = content.push(supporting);
+        .push(metrics);
+    if let Some(input) = input_power {
+        content = content.push(metric_tile("INPUT", input, "go-down-symbolic"));
     }
     surface_card(content.into(), 14)
 }
