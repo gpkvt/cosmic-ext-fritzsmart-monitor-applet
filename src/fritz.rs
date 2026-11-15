@@ -131,7 +131,12 @@ impl Default for FritzSettings {
             input_ains: HashSet::new(),
             input_defaults_initialized: false,
             total_power_first: false,
-            menu_order: vec!["__TOTAL_POWER__".into(), "__POWER_DIFFERENCE__".into()],
+            menu_order: vec![
+                "__TOTAL_POWER__".into(),
+                "__POWER_DIFFERENCE__".into(),
+                "__LIVE_SUMMARY__".into(),
+                "__WEATHER__".into(),
+            ],
             weather_enabled: false,
             openweathermap_api_key: String::new(),
             weather_location: String::new(),
