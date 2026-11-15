@@ -534,7 +534,8 @@ fn move_menu_entry_at(order: &mut Vec<String>, dragged: &str, target: &str, afte
     let Some(from) = order.iter().position(|entry| normalize(entry) == dragged) else {
         return;
     };
-    let Some(target_before_removal) = order.iter().position(|entry| normalize(entry) == target) else {
+    let Some(target_before_removal) = order.iter().position(|entry| normalize(entry) == target)
+    else {
         return;
     };
     if from == target_before_removal {
@@ -1148,13 +1149,7 @@ fn sortable_menu_card<'a>(
             .style(|theme| {
                 let surface = cosmic::iced::Color::from(theme.cosmic().background(false).base);
                 cosmic::iced::widget::container::Style {
-                    background: Some(
-                        cosmic::iced::Color {
-                            a: 0.5,
-                            ..surface
-                        }
-                        .into(),
-                    ),
+                    background: Some(cosmic::iced::Color { a: 0.5, ..surface }.into()),
                     ..Default::default()
                 }
             });
@@ -1163,11 +1158,10 @@ fn sortable_menu_card<'a>(
         card
     };
 
-    let drag_handle = widget::mouse_area(
-        widget::container(widget::text("⠿").size(24)).padding([10, 10]),
-    )
-    .on_press(Message::StartDeviceDrag(id.clone()))
-    .on_release(Message::EndDeviceDrag);
+    let drag_handle =
+        widget::mouse_area(widget::container(widget::text("⠿").size(24)).padding([10, 10]))
+            .on_press(Message::StartDeviceDrag(id.clone()))
+            .on_release(Message::EndDeviceDrag);
     let before = widget::mouse_area(
         widget::container(widget::divider::horizontal::default())
             .height(cosmic::iced::Length::Fixed(10.0))
@@ -1260,7 +1254,10 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
                 }
             }),
     )
-    .on_enter(Message::DragOverDevice(TOTAL_POWER_DRAG_ID.to_string(), false))
+    .on_enter(Message::DragOverDevice(
+        TOTAL_POWER_DRAG_ID.to_string(),
+        false,
+    ))
     .on_release(Message::EndDeviceDrag)
     .into()
 }
@@ -3116,8 +3113,7 @@ impl cosmic::Application for AppModel {
                         device_cards = device_cards.push(widget::divider::horizontal::default());
                     }
                     let is_dragging = self.dragging_device_ain.as_deref() == Some(id.as_str());
-                    device_cards =
-                        device_cards.push(sortable_menu_card(id, card, is_dragging));
+                    device_cards = device_cards.push(sortable_menu_card(id, card, is_dragging));
                 }
                 let device_list = widget::container(device_cards)
                     .width(cosmic::iced::Length::Fill)
