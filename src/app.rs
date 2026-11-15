@@ -10,7 +10,6 @@ use cosmic::prelude::*;
 use cosmic::widget;
 use futures::SinkExt;
 use std::collections::{HashMap, VecDeque};
-use std::process::Command;
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
@@ -62,7 +61,10 @@ fn notify_temperature_alert(name: &str, temperature: f64, threshold: u16) {
     let summary = format!("High temperature: {name}");
     let body = format!("{temperature:.1} °C (alert threshold: {threshold} °C)");
     // A missing notification service must never interrupt data refreshes.
-    let _ = Command::new("notify-send").arg(summary).arg(body).spawn();
+    let _ = notify_rust::Notification::new()
+        .summary(&summary)
+        .body(&body)
+        .show();
 }
 
 fn device_background_color(base: cosmic::iced::Color, index: usize) -> cosmic::iced::Color {
