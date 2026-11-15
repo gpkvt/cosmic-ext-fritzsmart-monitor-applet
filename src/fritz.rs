@@ -390,6 +390,14 @@ fn parse_devices_xml(xml: &str) -> Result<Vec<FritzDevice>, String> {
     Ok(devices)
 }
 
+fn parse_switch_state(value: Option<&str>) -> Option<bool> {
+    match value?.trim() {
+        "0" => Some(false),
+        "1" => Some(true),
+        _ => None,
+    }
+}
+
 fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<FritzReading>, String> {
     let document = Document::parse(xml).map_err(|error| format!("Invalid device XML: {error}"))?;
     let wanted: Vec<String> = selected_ains.iter().map(|ain| normalize_ain_for_selection(ain))
@@ -407,12 +415,7 @@ fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<
         let name = device.children().find(|child| child.has_tag_name("name")).and_then(|child| child.text())
             .filter(|name| !name.trim().is_empty()).or_else(|| device.attribute("name"))
             .unwrap_or("FRITZ!Box device").trim().to_string();
-        let power_state = child_text(device, "switch", "state")
-            .and_then(|state| match state.trim() {
-                "0" => Some(false),
-                "1" => Some(true),
-                _ => None,
-            });
+        let power_state = parse_switch_state(child_text(device, "switch", "state"));
         readings.push(FritzReading {
             ain: ain.to_string(),
             name,
@@ -689,6 +692,14 @@ mod tests {
         assert_eq!(readings[1].name, "Solar inverter");
         assert_eq!(readings[1].power_w, 123);
         assert_eq!(readings[1].temperature_c, 21.5);
+    }
+
+    #[test]
+    fn switch_state_parser_handles_on_off_and_unknown_values() {
+        assert_eq!(parse_switch_state(Some("0")), Some(false));
+        assert_eq!(parse_switch_state(Some("1")), Some(true));
+        assert_eq!(parse_switch_state(Some("2")), None);
+        assert_eq!(parse_switch_state(None), None);
     }
 
     #[test]
