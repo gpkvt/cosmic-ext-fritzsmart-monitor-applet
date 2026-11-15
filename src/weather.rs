@@ -10,14 +10,16 @@ pub struct WeatherData {
 
 impl WeatherData {
     pub fn icon_name(&self) -> &'static str {
-        match self.icon_code.get(..2).unwrap_or("") {
-            "01" => "weather-clear-symbolic",
-            "02" => "weather-few-clouds-symbolic",
-            "03" | "04" => "weather-overcast-symbolic",
-            "09" | "10" => "weather-showers-symbolic",
-            "11" => "weather-storm-symbolic",
-            "13" => "weather-snow-symbolic",
-            "50" => "weather-fog-symbolic",
+        match self.icon_code.as_str() {
+            "01n" => "weather-clear-night-symbolic",
+            "02n" => "weather-few-clouds-night-symbolic",
+            "01d" => "weather-clear-symbolic",
+            "02d" => "weather-few-clouds-symbolic",
+            "03d" | "03n" | "04d" | "04n" => "weather-overcast-symbolic",
+            "09d" | "09n" | "10d" | "10n" => "weather-showers-symbolic",
+            "11d" | "11n" => "weather-storm-symbolic",
+            "13d" | "13n" => "weather-snow-symbolic",
+            "50d" | "50n" => "weather-fog-symbolic",
             _ => "weather-clear-symbolic",
         }
     }
@@ -81,8 +83,9 @@ mod tests {
     fn maps_openweathermap_conditions_to_symbolic_icons() {
         for (code, expected) in [
             ("01d", "weather-clear-symbolic"),
-            ("01n", "weather-clear-symbolic"),
+            ("01n", "weather-clear-night-symbolic"),
             ("02d", "weather-few-clouds-symbolic"),
+            ("02n", "weather-few-clouds-night-symbolic"),
             ("04n", "weather-overcast-symbolic"),
             ("09d", "weather-showers-symbolic"),
             ("11d", "weather-storm-symbolic"),
