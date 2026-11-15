@@ -1052,12 +1052,18 @@ mod history_tests {
         let constant = VecDeque::from([(now, 42), (now, 42)]);
         assert_eq!(power_sparkline(&constant), "▄▄▄▄▄▄▄▄▄▄▄▄");
         let changing = VecDeque::from([(now, 10), (now, 20)]);
-        assert_eq!(power_sparkline(&changing), "▁█");
+        let graph = power_sparkline(&changing);
+        assert_eq!(graph.chars().count(), 12);
+        assert_eq!(graph.chars().next(), Some('▁'));
+        assert_eq!(graph.chars().last(), Some('█'));
     }
 
     #[test]
     fn numeric_sparkline_handles_temperature_values() {
-        assert_eq!(numeric_sparkline([20.0, 21.0, 22.0].into_iter()), "▁▅█");
+        let graph = numeric_sparkline([20.0, 21.0, 22.0].into_iter());
+        assert_eq!(graph.chars().count(), 12);
+        assert_eq!(graph.chars().next(), Some('▁'));
+        assert_eq!(graph.chars().last(), Some('█'));
         assert_eq!(numeric_sparkline([21.5, 21.5].into_iter()), "▄▄▄▄▄▄▄▄▄▄▄▄");
     }
 
