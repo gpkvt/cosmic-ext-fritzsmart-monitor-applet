@@ -925,6 +925,10 @@ impl cosmic::Application for AppModel {
                                             let cosmic = theme.cosmic();
                                             cosmic::iced::widget::container::Style {
                                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
+                                                border: cosmic::iced::Border {
+                                                    radius: 3.0.into(),
+                                                    ..Default::default()
+                                                },
                                                 ..Default::default()
                                             }
                                         }),
@@ -935,6 +939,10 @@ impl cosmic::Application for AppModel {
                                         let cosmic = theme.cosmic();
                                         cosmic::iced::widget::container::Style {
                                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                                            border: cosmic::iced::Border {
+                                                radius: 3.0.into(),
+                                                ..Default::default()
+                                            },
                                             ..Default::default()
                                         }
                                     }),
@@ -961,6 +969,10 @@ impl cosmic::Application for AppModel {
                                             let cosmic = theme.cosmic();
                                             cosmic::iced::widget::container::Style {
                                                 background: Some(cosmic::iced::Color::from(cosmic.background(false).base).into()),
+                                                border: cosmic::iced::Border {
+                                                    radius: 3.0.into(),
+                                                    ..Default::default()
+                                                },
                                                 ..Default::default()
                                             }
                                         }),
@@ -971,6 +983,10 @@ impl cosmic::Application for AppModel {
                                         let cosmic = theme.cosmic();
                                         cosmic::iced::widget::container::Style {
                                             background: Some(cosmic::iced::Color::from(cosmic.background(false).small_widget).into()),
+                                            border: cosmic::iced::Border {
+                                                radius: 3.0.into(),
+                                                ..Default::default()
+                                            },
                                             ..Default::default()
                                         }
                                     }),
@@ -992,9 +1008,45 @@ impl cosmic::Application for AppModel {
                     self.history.iter().map(|(_, value)| *value).min(),
                     self.history.iter().map(|(_, value)| *value).max(),
                 ) {
-                    content = content.push(widget::text::caption(format!("TOTAL POWER · LAST {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
-                        .push(widget::text::body(format!("Low  {low} W     High  {high} W")))
-                        .push(widget::text::title2(power_sparkline(&self.history)));
+                    let total_power = self.readings.iter().map(|reading| reading.power_w).sum::<i64>();
+                    let total_power_content = widget::Column::new()
+                        .spacing(6)
+                        .push(widget::text::body(format!(
+                            "TOTAL POWER · LAST {}",
+                            format_graph_timespan(self.settings.graph_timespan_minutes),
+                        )))
+                        .push(widget::text::title2(format!("{total_power} W")))
+                        .push(widget::text::caption(format!("Low  {low} W     High  {high} W")))
+                        .push(
+                            widget::container(widget::text::body(power_sparkline(&self.history)))
+                                .padding(8)
+                                .width(cosmic::iced::Length::Fill)
+                                .style(|theme| {
+                                    let cosmic = theme.cosmic();
+                                    cosmic::iced::widget::container::Style {
+                                        background: Some(
+                                            cosmic::iced::Color::from(cosmic.background(false).base).into(),
+                                        ),
+                                        border: cosmic::iced::Border {
+                                            radius: 3.0.into(),
+                                            ..Default::default()
+                                        },
+                                        ..Default::default()
+                                    }
+                                }),
+                        );
+                    content = content.push(
+                        widget::container(total_power_content)
+                            .padding(10)
+                            .style(move |theme| {
+                                let cosmic = theme.cosmic();
+                                let base = cosmic::iced::Color::from(cosmic.background(false).base);
+                                cosmic::iced::widget::container::Style {
+                                    background: Some(device_background_color(base, 0).into()),
+                                    ..Default::default()
+                                }
+                            }),
+                    );
                 }
             } else {
                 content = content.push(widget::text::body("Select one or more devices in Settings"));
