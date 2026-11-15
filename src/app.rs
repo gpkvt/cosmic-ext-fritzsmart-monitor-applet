@@ -765,10 +765,9 @@ fn total_power_overview(
                 )).width(cosmic::iced::Length::Fill)),
         )
         .push(graph_panel(total_graph));
-    let mut power_columns = widget::Row::new()
+    let mut power_columns = widget::Column::new()
         .spacing(12)
         .width(cosmic::iced::Length::Fill)
-        .align_y(cosmic::iced::Alignment::Start)
         .push(output_column);
     if has_input_readings {
         let mut input_column = widget::Column::new()
