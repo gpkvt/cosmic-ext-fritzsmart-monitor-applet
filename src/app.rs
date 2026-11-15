@@ -1587,6 +1587,9 @@ impl cosmic::Application for AppModel {
                 content = content
                     .push(weather_heading)
                     .push(weather_card);
+                if let Some(error) = &self.weather_error {
+                    content = content.push(error_notice("WEATHER UNAVAILABLE", error));
+                }
                 if let Some(credit) = weather.image_attribution.as_ref() {
                     let label = if self.weather_attribution_expanded {
                         "Hide image attribution"
@@ -1636,10 +1639,13 @@ impl cosmic::Application for AppModel {
                 }
                 content = content.push(widget::divider::horizontal::default());
             } else if self.settings.weather_enabled {
-                content = content
-                    .push(widget::text::title3("Weather"))
-                    .push(widget::text::body("Weather data is loading…"))
-                    .push(widget::divider::horizontal::default());
+                content = content.push(widget::text::title3("Weather"));
+                if let Some(error) = &self.weather_error {
+                    content = content.push(error_notice("WEATHER UNAVAILABLE", error));
+                } else {
+                    content = content.push(widget::text::body("Weather data is loading…"));
+                }
+                content = content.push(widget::divider::horizontal::default());
             }
 
             if self.error.is_none() && !self.readings.is_empty() {
