@@ -2642,7 +2642,7 @@ impl cosmic::Application for AppModel {
                             .push(widget::divider::horizontal::default())
                             .push(
                                 widget::container(device_content)
-                                    .padding(12)
+                                    .padding([12, 0])
                                     .width(cosmic::iced::Length::Fill),
                             );
                     }
