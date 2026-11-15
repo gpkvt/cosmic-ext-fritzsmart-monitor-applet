@@ -334,11 +334,13 @@ fn signed_device_power(power_w: i64, is_input: bool) -> i64 {
     if is_input { -power_w.abs() } else { power_w }
 }
 
-fn net_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
-    readings.iter().map(|reading| {
-        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-        signed_device_power(reading.power_w, input_ains.contains(&key))
-    }).sum()
+fn output_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
+    readings.iter()
+        .filter(|reading| !input_ains.contains(
+            &crate::fritz::normalize_ain_for_selection(&reading.ain),
+        ))
+        .map(|reading| reading.power_w)
+        .sum()
 }
 
 fn graph_visual(values: impl Iterator<Item = f64>, style: &str, unit: &str) -> cosmic::Element<'static, Message> {
@@ -411,15 +413,16 @@ fn rebuild_input_power_history(
     samples.into_iter().collect()
 }
 
-fn rebuild_net_power_history(
+fn rebuild_output_power_history(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     input_ains: &HashSet<String>,
 ) -> VecDeque<(Instant, i64)> {
     let mut samples = BTreeMap::<Instant, i64>::new();
     for (ain, history) in device_history {
-        let is_input = input_ains.contains(ain);
-        for (timestamp, power_w, _) in history {
-            *samples.entry(*timestamp).or_default() += signed_device_power(*power_w, is_input);
+        if !input_ains.contains(ain) {
+            for (timestamp, power_w, _) in history {
+                *samples.entry(*timestamp).or_default() += *power_w;
+            }
         }
     }
     samples.into_iter().collect()
@@ -623,7 +626,7 @@ fn displayed_power_w(
     input_ains: &HashSet<String>,
 ) -> Option<i64> {
     if total_power_first {
-        (!readings.is_empty()).then(|| net_power_w(readings, input_ains))
+        (!readings.is_empty()).then(|| output_power_w(readings, input_ains))
     } else {
         selected_ains.first()
             .and_then(|selected| readings.iter().find(|reading|
@@ -694,7 +697,7 @@ fn total_power_overview(
     let input_history = rebuild_input_power_history(device_history, &settings.input_ains);
     let input_low = input_history.iter().map(|(_, value)| *value).min();
     let input_high = input_history.iter().map(|(_, value)| *value).max();
-    let total_power = net_power_w(readings, &settings.input_ains);
+    let total_power = output_power_w(readings, &settings.input_ains);
     let axis_start = format_graph_axis_start(settings.graph_timespan_minutes);
     let total_graph: cosmic::Element<'static, Message> = widget::Column::new()
         .spacing(4)
@@ -1079,7 +1082,7 @@ impl cosmic::Application for AppModel {
             if self.readings.is_empty() {
                 "-- W".to_string()
             } else {
-                format!("{} W", net_power_w(&self.readings, &self.settings.input_ains))
+                format!("{} W", output_power_w(&self.readings, &self.settings.input_ains))
             }
         } else {
             primary_reading.map(|reading| format!("{} W", reading.power_w))
@@ -2361,7 +2364,7 @@ impl cosmic::Application for AppModel {
                     if readings.is_empty() {
                         self.error = Some("No selected devices returned usable readings".into());
                     } else {
-                    let total_power = net_power_w(&readings, &self.settings.input_ains);
+                    let total_power = output_power_w(&readings, &self.settings.input_ains);
                     let now = Instant::now();
                     let history_window = graph_history_window(self.settings.graph_timespan_minutes);
                     record_power_sample(&mut self.history, total_power, now, history_window);
@@ -2619,7 +2622,7 @@ impl cosmic::Application for AppModel {
                     self.settings.input_ains.remove(&key);
                 }
                 self.persist_settings();
-                self.history = rebuild_net_power_history(
+                self.history = rebuild_output_power_history(
                     &self.device_history,
                     &self.settings.input_ains,
                 ).into_iter().collect();
@@ -2936,15 +2939,15 @@ mod history_tests {
     }
 
     #[test]
-    fn changing_input_roles_recalculates_net_history() {
+    fn changing_input_roles_recalculates_output_history() {
         let now = Instant::now();
         let device_history = HashMap::from([
             ("111111".to_string(), VecDeque::from([(now, 900, 20.0)])),
             ("222222".to_string(), VecDeque::from([(now, 250, 21.0)])),
         ]);
         let inputs = HashSet::from(["222222".to_string()]);
-        let history = rebuild_net_power_history(&device_history, &inputs);
-        assert_eq!(history, VecDeque::from([(now, 650)]));
+        let history = rebuild_output_power_history(&device_history, &inputs);
+        assert_eq!(history, VecDeque::from([(now, 900)]));
     }
 
     #[test]
@@ -2960,7 +2963,7 @@ mod history_tests {
     }
 
     #[test]
-    fn input_devices_are_subtracted_from_net_power() {
+    fn input_devices_are_not_subtracted_from_output_power() {
         let readings = vec![
             FritzReading {
                 ain: "11:11 11".into(),
@@ -2980,8 +2983,8 @@ mod history_tests {
         let inputs = HashSet::from(["222222".to_string()]);
         assert_eq!(signed_device_power(250, true), -250);
         assert_eq!(signed_device_power(250, false), 250);
-        assert_eq!(net_power_w(&readings, &inputs), 650);
-        assert_eq!(net_power_w(&readings, &HashSet::new()), 1150);
+        assert_eq!(output_power_w(&readings, &inputs), 900);
+        assert_eq!(output_power_w(&readings, &HashSet::new()), 1150);
     }
 
     #[test]
