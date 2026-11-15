@@ -670,23 +670,8 @@ fn total_power_overview(
                 .push(graph_panel(total_graph))
                 .push(graph_panel(input_graphs.into())),
         );
-    Some(
-        widget::container(content)
-            .padding(14)
-            .style(move |theme| {
-                let cosmic = theme.cosmic();
-                let base = cosmic::iced::Color::from(cosmic.background(false).base);
-                cosmic::iced::widget::container::Style {
-                    background: Some(device_background_color(base, position).into()),
-                    border: cosmic::iced::Border {
-                        radius: 12.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }
-            })
-            .into(),
-    )
+    let _ = position;
+    Some(surface_card(content.into(), 14))
 }
 
 fn settings_section_details(section: &'static str) -> (&'static str, &'static str) {
@@ -1572,10 +1557,15 @@ impl cosmic::Application for AppModel {
                 }
                 content = content
                     .push(widget::Row::new()
-                        .spacing(8)
+                        .spacing(12)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::title2("Devices"))
-                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(widget::container(widget::icon::from_name("computer-symbolic").size(20))
+                            .center_x(32).center_y(36))
+                        .push(widget::Column::new()
+                            .spacing(3)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::body("Devices"))
+                            .push(widget::text::caption("Live power and temperature readings")))
                         .push(widget::text::caption(format!("{}", self.readings.len()))));
                 for (index, reading) in self.readings.iter().enumerate() {
                     let device_history = self.device_history.get(
@@ -1611,12 +1601,12 @@ impl cosmic::Application for AppModel {
                     let state_label = reading.power_state.map(|on| if on { "ON" } else { "OFF" })
                         .unwrap_or("MONITORING");
                     let device_heading = widget::Row::new()
-                        .spacing(8)
+                        .spacing(12)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::container(widget::icon::from_name("computer-symbolic").size(18))
-                            .center_x(36).center_y(36))
+                        .push(widget::container(widget::icon::from_name("computer-symbolic").size(20))
+                            .center_x(32).center_y(36))
                         .push(widget::Column::new()
-                            .spacing(2)
+                            .spacing(3)
                             .width(cosmic::iced::Length::Fill)
                             .push(widget::text::body(reading.name.clone()))
                             .push(widget::text::caption(format!("{} · LAST {}", state_label, format_graph_timespan(self.settings.graph_timespan_minutes)))))
@@ -1724,23 +1714,7 @@ impl cosmic::Application for AppModel {
                                     }),
                                 ),
                         );
-                    content = content.push(
-                        widget::container(device_content)
-                            .width(cosmic::iced::Length::Fill)
-                            .padding(12)
-                            .style(move |theme| {
-                                let cosmic = theme.cosmic();
-                                let base = cosmic::iced::Color::from(cosmic.background(false).base);
-                                cosmic::iced::widget::container::Style {
-                                    background: Some(device_background_color(base, index).into()),
-                                    border: cosmic::iced::Border {
-                                        radius: 12.0.into(),
-                                        ..Default::default()
-                                    },
-                                    ..Default::default()
-                                }
-                            })
-                    );
+                    content = content.push(surface_card(device_content.into(), 12));
                 }
                 content = content.push(widget::divider::horizontal::default());
                 if !self.settings.total_power_first {
