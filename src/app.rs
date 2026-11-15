@@ -246,7 +246,10 @@ impl cosmic::Application for AppModel {
 
         // popup_container fixes the popup width at 320px. Keep the content
         // padded so controls and text do not touch the popup border.
-        let mut content = widget::Column::new().spacing(12).padding(16);
+        let mut content = widget::Column::new()
+            .spacing(12)
+            .padding(16)
+            .width(cosmic::iced::Length::Fill);
 
         if self.settings_open {
             content = content
@@ -495,7 +498,9 @@ impl cosmic::Application for AppModel {
 
         // Give the popup content an opaque base so it remains readable even
         // when the panel theme uses a translucent applet background.
-        let content = widget::container(content).style(|theme| {
+        let content = widget::container(content)
+            .width(cosmic::iced::Length::Fill)
+            .style(|theme| {
             let cosmic = theme.cosmic();
             cosmic::iced::widget::container::Style {
                 background: Some(
@@ -509,7 +514,11 @@ impl cosmic::Application for AppModel {
         // scrollable. The same wrapper is used for the main view and settings,
         // so long device lists and diagnostics remain reachable on short screens.
         self.core.applet
-            .popup_container(widget::scrollable(content).height(cosmic::iced::Length::Fill))
+            .popup_container(
+                widget::scrollable(content)
+                    .width(cosmic::iced::Length::Fill)
+                    .height(cosmic::iced::Length::Fill),
+            )
             .max_height(600.0)
             .into()
     }
