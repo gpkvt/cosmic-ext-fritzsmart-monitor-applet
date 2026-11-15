@@ -341,10 +341,11 @@ fn net_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
 
 fn graph_visual(values: impl Iterator<Item = f64>, style: &str) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
-    if values.is_empty() { return widget::text::caption("Waiting for samples…").into(); }
     const COUNT: usize = 24;
     const WIDTH: f64 = 120.0;
     const HEIGHT: f64 = 48.0;
+    // Keep the graph slot identical in size before the first sample arrives.
+    let values = if values.is_empty() { vec![0.0] } else { values };
     let minimum = values.iter().copied().reduce(f64::min).unwrap_or(0.0);
     let maximum = values.iter().copied().reduce(f64::max).unwrap_or(minimum);
     let range = (maximum - minimum).max(1.0);
