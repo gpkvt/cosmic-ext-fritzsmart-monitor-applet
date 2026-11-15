@@ -550,21 +550,19 @@ fn live_power_summary(
     is_net: bool,
     input_power: Option<String>,
     temperature: Option<String>,
-    device_count: usize,
 ) -> cosmic::Element<'static, Message> {
     let title = if is_net { "NET POWER" } else { "CURRENT POWER" };
-    let details = widget::Row::new()
+    let primary = widget::Column::new()
         .spacing(8)
-        .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(18))
-        .push(widget::text::caption(title))
-        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-        .push(widget::text::caption(format!("{device_count} devices")));
-    let mut content = widget::Column::new()
-        .spacing(10)
-        .push(details)
+        .width(cosmic::iced::Length::Fill)
+        .push(widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(18))
+            .push(widget::text::caption(title)))
         .push(widget::text::title2(power));
-    let mut supporting = widget::Row::new()
+
+    let mut supporting = widget::Column::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill);
     let mut has_supporting = false;
@@ -576,6 +574,12 @@ fn live_power_summary(
         has_supporting = true;
         supporting = supporting.push(metric_tile("TEMPERATURE", temp, "thermometer-symbolic"));
     }
+
+    let mut content = widget::Row::new()
+        .spacing(12)
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Start)
+        .push(primary);
     if has_supporting {
         content = content.push(supporting);
     }
@@ -1545,7 +1549,6 @@ impl cosmic::Application for AppModel {
                     self.settings.total_power_first,
                     summary_input,
                     summary_temperature,
-                    self.readings.len(),
                 ));
             }
 
@@ -1573,10 +1576,13 @@ impl cosmic::Application for AppModel {
                                 .width(cosmic::iced::Length::Fill)
                                 .push(widget::text::body("Devices"))
                                 .push(widget::text::caption("Live power and temperature readings")))
-                            .push(widget::text::caption(format!("{}", self.readings.len())))
-                            .push(widget::icon::from_name(
-                                if self.devices_expanded { "go-down-symbolic" } else { "go-next-symbolic" }
-                            ).size(16)),
+                            .push(widget::Column::new()
+                                .align_x(cosmic::iced::Alignment::End)
+                                .spacing(2)
+                                .push(widget::text::caption(format!("{}", self.readings.len())))
+                                .push(widget::icon::from_name(
+                                    if self.devices_expanded { "go-down-symbolic" } else { "go-next-symbolic" }
+                                ).size(16)),
                     )
                     .on_press(Message::ToggleDevices)
                     .padding([8, 10])
