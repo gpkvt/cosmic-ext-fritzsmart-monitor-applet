@@ -131,7 +131,12 @@ impl Default for FritzSettings {
             input_ains: HashSet::new(),
             input_defaults_initialized: false,
             total_power_first: false,
-            menu_order: vec!["__TOTAL_POWER__".into(), "__POWER_DIFFERENCE__".into()],
+            menu_order: vec![
+                "__WEATHER__".into(),
+                "__LIVE_SUMMARY__".into(),
+                "__TOTAL_POWER__".into(),
+                "__POWER_DIFFERENCE__".into(),
+            ],
             weather_enabled: false,
             openweathermap_api_key: String::new(),
             weather_location: String::new(),
@@ -159,19 +164,24 @@ fn parse_refresh_interval_seconds(value: &str) -> u32 {
 fn parse_menu_order(value: &str, selected_ains: &str, total_power_first: bool) -> Vec<String> {
     const TOTAL: &str = "__TOTAL_POWER__";
     const DIFFERENCE: &str = "__POWER_DIFFERENCE__";
+    const SUMMARY: &str = "__LIVE_SUMMARY__";
+    const WEATHER: &str = "__WEATHER__";
     let mut order = Vec::new();
     if !value.trim().is_empty() {
         for entry in value.split(',') {
-            let normalized = if entry == TOTAL || entry == DIFFERENCE {
-                entry.to_string()
-            } else {
-                normalize_ain_for_selection(entry)
-            };
+            let normalized =
+                if entry == TOTAL || entry == DIFFERENCE || entry == SUMMARY || entry == WEATHER {
+                    entry.to_string()
+                } else {
+                    normalize_ain_for_selection(entry)
+                };
             if !normalized.is_empty() && !order.contains(&normalized) {
                 order.push(normalized);
             }
         }
     } else {
+        order.push(WEATHER.into());
+        order.push(SUMMARY.into());
         if total_power_first {
             order.push(TOTAL.into());
         }
@@ -188,6 +198,12 @@ fn parse_menu_order(value: &str, selected_ains: &str, total_power_first: bool) -
             order.push(TOTAL.into());
         }
         order.push(DIFFERENCE.into());
+    }
+    if !order.contains(&SUMMARY.to_string()) {
+        order.push(SUMMARY.into());
+    }
+    if !order.contains(&WEATHER.to_string()) {
+        order.push(WEATHER.into());
     }
     order
 }

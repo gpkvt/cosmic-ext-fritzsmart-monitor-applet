@@ -22,6 +22,8 @@ static DRAG_SCROLL_ID: LazyLock<widget::Id> =
 
 const TOTAL_POWER_DRAG_ID: &str = "__TOTAL_POWER__";
 const POWER_DIFFERENCE_DRAG_ID: &str = "__POWER_DIFFERENCE__";
+const SUMMARY_DRAG_ID: &str = "__LIVE_SUMMARY__";
+const WEATHER_DRAG_ID: &str = "__WEATHER__";
 
 #[derive(Default)]
 pub struct AppModel {
@@ -516,7 +518,11 @@ fn record_device_sample(
 
 fn move_menu_entry(order: &mut Vec<String>, dragged: &str, target: &str) {
     let normalize = |entry: &str| {
-        if entry == TOTAL_POWER_DRAG_ID || entry == POWER_DIFFERENCE_DRAG_ID {
+        if entry == TOTAL_POWER_DRAG_ID
+            || entry == POWER_DIFFERENCE_DRAG_ID
+            || entry == SUMMARY_DRAG_ID
+            || entry == WEATHER_DRAG_ID
+        {
             entry.to_string()
         } else {
             crate::fritz::normalize_ain_for_selection(entry)
@@ -1092,6 +1098,59 @@ fn settings_section_header<'a>(
     .class(cosmic::theme::Button::Text)
     .into();
     section_row
+}
+
+fn sortable_menu_card<'a>(
+    id: String,
+    card: cosmic::Element<'a, Message>,
+) -> cosmic::Element<'a, Message> {
+    let drag_handle = widget::mouse_area(widget::text("⠿").size(20))
+        .on_press(Message::StartDeviceDrag(id.clone()))
+        .on_release(Message::EndDeviceDrag);
+    let drop_target = widget::mouse_area(card)
+        .on_enter(Message::DragOverDevice(id))
+        .on_release(Message::EndDeviceDrag);
+    widget::Row::new()
+        .spacing(6)
+        .align_y(cosmic::iced::Alignment::Start)
+        .width(cosmic::iced::Length::Fill)
+        .push(widget::container(drag_handle).padding([8, 2]))
+        .push(widget::container(drop_target).width(cosmic::iced::Length::Fill))
+        .into()
+}
+
+fn special_menu_sort_row(
+    id: &'static str,
+    label: &'static str,
+    position: usize,
+) -> cosmic::Element<'static, Message> {
+    let row = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
+        .spacing(6)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(
+            widget::mouse_area(widget::text("⠿").size(20))
+                .on_press(Message::StartDeviceDrag(id.to_string()))
+                .on_release(Message::EndDeviceDrag),
+        )
+        .push(widget::text::body(label).width(cosmic::iced::Length::Fill))
+        .push(widget::text::caption(format!("#{position}")));
+    widget::mouse_area(
+        widget::container(row)
+            .width(cosmic::iced::Length::Fill)
+            .padding(8)
+            .style(|theme| {
+                let cosmic = theme.cosmic();
+                let base = cosmic::iced::Color::from(cosmic.background(false).base);
+                cosmic::iced::widget::container::Style {
+                    background: Some(device_background_color(base, 0).into()),
+                    ..Default::default()
+                }
+            }),
+    )
+    .on_enter(Message::DragOverDevice(id.to_string()))
+    .on_release(Message::EndDeviceDrag)
+    .into()
 }
 
 fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
@@ -1946,6 +2005,36 @@ impl cosmic::Application for AppModel {
                                 .iter()
                                 .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID)
                                 .unwrap_or(usize::MAX);
+                            let summary_position = self
+                                .settings
+                                .menu_order
+                                .iter()
+                                .position(|entry| entry == SUMMARY_DRAG_ID)
+                                .unwrap_or(usize::MAX);
+                            let weather_position = self
+                                .settings
+                                .menu_order
+                                .iter()
+                                .position(|entry| entry == WEATHER_DRAG_ID)
+                                .unwrap_or(usize::MAX);
+                            if weather_position <= device_position
+                                && inserted_specials.insert(WEATHER_DRAG_ID)
+                            {
+                                content = content.push(special_menu_sort_row(
+                                    WEATHER_DRAG_ID,
+                                    "Weather",
+                                    weather_position + 1,
+                                ));
+                            }
+                            if summary_position <= device_position
+                                && inserted_specials.insert(SUMMARY_DRAG_ID)
+                            {
+                                content = content.push(special_menu_sort_row(
+                                    SUMMARY_DRAG_ID,
+                                    "Live power summary",
+                                    summary_position + 1,
+                                ));
+                            }
                             if total_position <= device_position
                                 && inserted_specials.insert(TOTAL_POWER_DRAG_ID)
                             {
@@ -2099,25 +2188,44 @@ impl cosmic::Application for AppModel {
                             );
                         }
                     }
-                    if inserted_specials.insert(TOTAL_POWER_DRAG_ID) {
+                    for entry in &self.settings.menu_order {
+                        if inserted_specials.contains(entry.as_str()) {
+                            continue;
+                        }
                         let position = self
                             .settings
                             .menu_order
                             .iter()
-                            .position(|entry| entry == TOTAL_POWER_DRAG_ID)
-                            .unwrap_or(self.selected_ains.len());
-                        content = content.push(total_power_sort_row(position + 1));
+                            .position(|candidate| candidate == entry)
+                            .unwrap_or_default()
+                            + 1;
+                        match entry.as_str() {
+                            TOTAL_POWER_DRAG_ID => {
+                                content = content.push(total_power_sort_row(position));
+                            }
+                            POWER_DIFFERENCE_DRAG_ID => {
+                                content = content.push(power_difference_sort_row(position));
+                            }
+                            SUMMARY_DRAG_ID => {
+                                content = content.push(special_menu_sort_row(
+                                    SUMMARY_DRAG_ID,
+                                    "Live power summary",
+                                    position,
+                                ));
+                            }
+                            WEATHER_DRAG_ID => {
+                                content = content.push(special_menu_sort_row(
+                                    WEATHER_DRAG_ID,
+                                    "Weather",
+                                    position,
+                                ));
+                            }
+                            _ => {}
+                        }
                     }
-                    if inserted_specials.insert(POWER_DIFFERENCE_DRAG_ID) {
-                        let position = self
-                            .settings
-                            .menu_order
-                            .iter()
-                            .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID)
-                            .unwrap_or(self.selected_ains.len() + 1);
-                        content = content.push(power_difference_sort_row(position + 1));
-                    }
-                    content = content.push(widget::text::caption("Drag the ⠿ handles to reorder devices, Total power output with Total power input grouped alongside it, and Power difference. The order is saved automatically."));
+                    content = content.push(widget::text::caption(
+                        "Drag the ⠿ handles to reorder the weather section, live power summary, power cards and selected devices. The order is saved automatically.",
+                    ));
                 }
             }
 
@@ -2271,7 +2379,9 @@ impl cosmic::Application for AppModel {
                 content = content.push(widget::text::caption("✓ Saved"));
             }
         } else {
+            let mut weather_menu_card: Option<cosmic::Element<'_, Message>> = None;
             if let Some(weather) = &self.weather {
+                let mut weather_section = widget::Column::new().spacing(8);
                 let wind_direction = weather
                     .wind_direction_degrees
                     .map(|degrees| format!("{degrees}°"))
@@ -2453,7 +2563,7 @@ impl cosmic::Application for AppModel {
                 .padding([4, 0])
                 .width(cosmic::iced::Length::Fill)
                 .class(cosmic::theme::Button::Text);
-                content = content.push(weather_heading).push(weather_card);
+                weather_section = weather_section.push(weather_heading).push(weather_card);
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
                     let forecast_range_selector = widget::Row::new()
@@ -2497,7 +2607,7 @@ impl cosmic::Application for AppModel {
                                 cosmic::theme::Button::Text
                             }),
                         );
-                    content = content
+                    weather_section = weather_section
                         .push(widget::divider::horizontal::default())
                         .push(
                             widget::Row::new()
@@ -2511,10 +2621,12 @@ impl cosmic::Application for AppModel {
                         )
                         .push(widget::text::caption("Forecast data by Open-Meteo"));
                     if self.weather_forecast_loading {
-                        content = content.push(widget::text::caption("Loading forecast…"));
+                        weather_section =
+                            weather_section.push(widget::text::caption("Loading forecast…"));
                     }
                     if let Some(error) = &self.weather_forecast_error {
-                        content = content.push(error_notice("FORECAST UNAVAILABLE", error));
+                        weather_section =
+                            weather_section.push(error_notice("FORECAST UNAVAILABLE", error));
                     }
                     if let Some(forecast) = &self.weather_forecast {
                         for day in &forecast.days {
@@ -2561,78 +2673,86 @@ impl cosmic::Application for AppModel {
                                             day.wind_speed_kmh
                                         ))),
                                 );
-                            content = content.push(day_row);
+                            weather_section = weather_section.push(day_row);
                         }
                     }
                 }
                 if let Some(error) = &self.weather_error {
-                    content = content.push(error_notice("WEATHER UNAVAILABLE", error));
+                    weather_section =
+                        weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
                 }
-                content = content.push(widget::divider::horizontal::default());
+                weather_section = weather_section.push(widget::divider::horizontal::default());
+                weather_menu_card = Some(weather_section.into());
             } else if self.settings.weather_enabled {
-                content = content.push(widget::text::title3("Weather"));
+                let mut weather_section = widget::Column::new().spacing(8);
+                weather_section = weather_section.push(widget::text::title3("Weather"));
                 if let Some(error) = &self.weather_error {
-                    content = content.push(error_notice("WEATHER UNAVAILABLE", error));
+                    weather_section =
+                        weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
                 } else {
-                    content = content.push(widget::text::body("Weather data is loading…"));
+                    weather_section =
+                        weather_section.push(widget::text::body("Weather data is loading…"));
                 }
-                content = content.push(widget::divider::horizontal::default());
+                weather_section = weather_section.push(widget::divider::horizontal::default());
+                weather_menu_card = Some(weather_section.into());
             }
 
             if self.error.is_none() && !self.readings.is_empty() {
-                if !self.readings.is_empty() {
-                    let primary = self
-                        .selected_ains
-                        .first()
-                        .and_then(|selected| {
-                            self.readings.iter().find(|reading| {
-                                crate::fritz::normalize_ain_for_selection(&reading.ain)
-                                    == crate::fritz::normalize_ain_for_selection(selected)
-                            })
+                let primary = self
+                    .selected_ains
+                    .first()
+                    .and_then(|selected| {
+                        self.readings.iter().find(|reading| {
+                            crate::fritz::normalize_ain_for_selection(&reading.ain)
+                                == crate::fritz::normalize_ain_for_selection(selected)
                         })
-                        .or_else(|| self.readings.first());
-                    let summary_power = displayed_power_w(
+                    })
+                    .or_else(|| self.readings.first());
+                let summary_power = displayed_power_w(
+                    &self.readings,
+                    &self.selected_ains,
+                    self.settings.total_power_first,
+                    &self.settings.input_ains,
+                )
+                .map(|power| format!("{power} W"))
+                .unwrap_or_else(|| "-- W".into());
+                let summary_temperature = if self.settings.panel_average_temperature {
+                    average_temperature_c(
                         &self.readings,
-                        &self.selected_ains,
-                        self.settings.total_power_first,
-                        &self.settings.input_ains,
+                        self.settings.panel_exclude_solar_temperature,
                     )
-                    .map(|power| format!("{power} W"))
-                    .unwrap_or_else(|| "-- W".into());
-                    let summary_temperature = if self.settings.panel_average_temperature {
-                        average_temperature_c(
-                            &self.readings,
-                            self.settings.panel_exclude_solar_temperature,
+                    .map(|value| format!("{value:.1} °C"))
+                } else if self.settings.total_power_first {
+                    None
+                } else {
+                    primary.map(|reading| format!("{:.1} °C", reading.temperature_c))
+                };
+                let summary_input = self
+                    .readings
+                    .iter()
+                    .any(|reading| {
+                        self.settings
+                            .input_ains
+                            .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+                    })
+                    .then(|| {
+                        format!(
+                            "{} W",
+                            input_power_w(&self.readings, &self.settings.input_ains)
                         )
-                        .map(|value| format!("{value:.1} °C"))
-                    } else if self.settings.total_power_first {
-                        None
-                    } else {
-                        primary.map(|reading| format!("{:.1} °C", reading.temperature_c))
-                    };
-                    let summary_input = self
-                        .readings
-                        .iter()
-                        .any(|reading| {
-                            self.settings
-                                .input_ains
-                                .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
-                        })
-                        .then(|| {
-                            format!(
-                                "{} W",
-                                input_power_w(&self.readings, &self.settings.input_ains)
-                            )
-                        });
-                    content = content.push(live_power_summary(
-                        summary_power,
-                        self.settings.total_power_first,
-                        summary_input,
-                        summary_temperature,
-                    ));
-                }
+                    });
+                let summary_card = live_power_summary(
+                    summary_power,
+                    self.settings.total_power_first,
+                    summary_input,
+                    summary_temperature,
+                );
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
+                menu_cards.push((SUMMARY_DRAG_ID.to_string(), summary_card));
+                if let Some(weather_card) = weather_menu_card.take() {
+                    menu_cards.push((WEATHER_DRAG_ID.to_string(), weather_card));
+                }
                 for (index, reading) in self.readings.iter().enumerate() {
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                     let is_expanded = self.collapsed_devices.contains(&device_key);
@@ -2908,11 +3028,11 @@ impl cosmic::Application for AppModel {
                         .unwrap_or(usize::MAX)
                 });
                 let mut device_cards = widget::Column::new().spacing(0);
-                for (index, (_, card)) in menu_cards.into_iter().enumerate() {
+                for (index, (id, card)) in menu_cards.into_iter().enumerate() {
                     if index > 0 {
                         device_cards = device_cards.push(widget::divider::horizontal::default());
                     }
-                    device_cards = device_cards.push(card);
+                    device_cards = device_cards.push(sortable_menu_card(id, card));
                 }
                 let device_list = widget::container(device_cards)
                     .width(cosmic::iced::Length::Fill)
@@ -2934,6 +3054,13 @@ impl cosmic::Application for AppModel {
             } else {
                 content =
                     content.push(widget::text::body("Select one or more devices in Settings"));
+            }
+
+            if let Some(weather_card) = weather_menu_card.take() {
+                content = content.push(sortable_menu_card(
+                    WEATHER_DRAG_ID.to_string(),
+                    weather_card,
+                ));
             }
 
             let remaining = self
@@ -3671,6 +3798,8 @@ impl cosmic::Application for AppModel {
             Message::StartDeviceDrag(ain) => {
                 if ain == TOTAL_POWER_DRAG_ID
                     || ain == POWER_DIFFERENCE_DRAG_ID
+                    || ain == SUMMARY_DRAG_ID
+                    || ain == WEATHER_DRAG_ID
                     || self.selected_ains.iter().any(|selected| {
                         crate::fritz::normalize_ain_for_selection(selected)
                             == crate::fritz::normalize_ain_for_selection(&ain)
@@ -3689,14 +3818,24 @@ impl cosmic::Application for AppModel {
                 if let Some(dragged_ain) = self.dragging_device_ain.as_deref() {
                     let target_is_valid = target_ain == TOTAL_POWER_DRAG_ID
                         || target_ain == POWER_DIFFERENCE_DRAG_ID
+                        || target_ain == SUMMARY_DRAG_ID
+                        || target_ain == WEATHER_DRAG_ID
                         || self.selected_ains.iter().any(|selected| {
                             crate::fritz::normalize_ain_for_selection(selected)
                                 == crate::fritz::normalize_ain_for_selection(&target_ain)
                         });
+                    let is_special = |id: &str| {
+                        id == TOTAL_POWER_DRAG_ID
+                            || id == POWER_DIFFERENCE_DRAG_ID
+                            || id == SUMMARY_DRAG_ID
+                            || id == WEATHER_DRAG_ID
+                    };
                     let same_target = self.drag_target_ain.as_deref().is_some_and(|current| {
                         current == target_ain
-                            || crate::fritz::normalize_ain_for_selection(current)
-                                == crate::fritz::normalize_ain_for_selection(&target_ain)
+                            || (!is_special(current)
+                                && !is_special(&target_ain)
+                                && crate::fritz::normalize_ain_for_selection(current)
+                                    == crate::fritz::normalize_ain_for_selection(&target_ain))
                     });
                     if target_is_valid && dragged_ain != target_ain && !same_target {
                         // Move the dragged entry as soon as a new row is entered.
@@ -3749,6 +3888,8 @@ impl cosmic::Application for AppModel {
                             .filter(|entry| {
                                 entry.as_str() != TOTAL_POWER_DRAG_ID
                                     && entry.as_str() != POWER_DIFFERENCE_DRAG_ID
+                                    && entry.as_str() != SUMMARY_DRAG_ID
+                                    && entry.as_str() != WEATHER_DRAG_ID
                             })
                             .cloned()
                             .collect();
@@ -4404,6 +4545,7 @@ mod history_tests {
             "a".into(),
             "b".into(),
             POWER_DIFFERENCE_DRAG_ID.into(),
+            SUMMARY_DRAG_ID.into(),
         ];
 
         move_menu_entry(&mut order, POWER_DIFFERENCE_DRAG_ID, "a");
@@ -4414,6 +4556,7 @@ mod history_tests {
                 POWER_DIFFERENCE_DRAG_ID.to_string(),
                 "a".to_string(),
                 "b".to_string(),
+                SUMMARY_DRAG_ID.to_string(),
             ]
         );
 
@@ -4421,6 +4564,19 @@ mod history_tests {
         assert_eq!(
             order,
             vec![
+                "b".to_string(),
+                TOTAL_POWER_DRAG_ID.to_string(),
+                POWER_DIFFERENCE_DRAG_ID.to_string(),
+                "a".to_string(),
+                SUMMARY_DRAG_ID.to_string(),
+            ]
+        );
+
+        move_menu_entry(&mut order, SUMMARY_DRAG_ID, "b");
+        assert_eq!(
+            order,
+            vec![
+                SUMMARY_DRAG_ID.to_string(),
                 "b".to_string(),
                 TOTAL_POWER_DRAG_ID.to_string(),
                 POWER_DIFFERENCE_DRAG_ID.to_string(),
