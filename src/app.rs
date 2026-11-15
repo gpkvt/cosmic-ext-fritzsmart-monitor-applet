@@ -1700,7 +1700,7 @@ impl cosmic::Application for AppModel {
                                 .spacing(3)
                                 .width(cosmic::iced::Length::Fill)
                                 .push(widget::text::body(reading.name.clone()).class(cosmic::theme::Text::Accent))
-                                .push(widget::text::caption(format!("{} · LAST {}", state_label, format_graph_timespan(self.settings.graph_timespan_minutes)))))
+                                .push(widget::text::caption(format!("{} · {} W · {:.1} °C", state_label, reading.power_w, reading.temperature_c))))
                             .push(widget::text::caption(format!("#{}", index + 1)))
                             .push(widget::icon::from_name(if is_expanded { "go-down-symbolic" } else { "go-next-symbolic" }).size(16)),
                     )
