@@ -1635,6 +1635,29 @@ impl cosmic::Application for AppModel {
                 content = content.push(widget::text::caption("✓ Saved"));
             }
         } else {
+            let header_countdown = self.next_refresh_at
+                .map(|deadline| format_countdown(deadline.saturating_duration_since(Instant::now()).as_secs()))
+                .unwrap_or_else(|| "Refreshing…".into());
+            let header_refresh = widget::button::custom(
+                widget::container(widget::icon::from_name("view-refresh-symbolic").size(16))
+                    .center_x(36)
+                    .center_y(36),
+            )
+            .on_press(Message::Refresh)
+            .padding(0)
+            .width(cosmic::iced::Length::Fixed(36.0))
+            .height(cosmic::iced::Length::Fixed(36.0))
+            .class(cosmic::theme::Button::Icon)
+            .name("Reload now");
+            content = content.push(
+                widget::Row::new()
+                    .width(cosmic::iced::Length::Fill)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::text::title2("Power monitor"))
+                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                    .push(widget::text::caption(header_countdown))
+                    .push(header_refresh),
+            );
             if let Some(weather) = &self.weather {
                 let wind_direction = weather.wind_direction_degrees
                     .map(|degrees| format!("{degrees}°"))
