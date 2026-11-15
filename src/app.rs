@@ -1827,7 +1827,7 @@ impl cosmic::Application for AppModel {
                                 ));
                         }
                         content = content.push(
-                            widget::mouse_area(widget::container(device_row).padding(8).style(
+                            widget::container(device_row).padding(8).style(
                                 move |theme| {
                                     let cosmic = theme.cosmic();
                                     let base =
@@ -2365,9 +2365,9 @@ impl cosmic::Application for AppModel {
                 );
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
-                menu_cards.push((SUMMARY_DRAG_ID.to_string(), summary_card));
+                menu_cards.push(("0-summary".to_string(), summary_card));
                 if let Some(weather_card) = weather_menu_card.take() {
-                    menu_cards.push((WEATHER_DRAG_ID.to_string(), weather_card));
+                    menu_cards.push(("1-weather".to_string(), weather_card));
                 }
                 for (index, reading) in self.readings.iter().enumerate() {
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
@@ -2618,7 +2618,7 @@ impl cosmic::Application for AppModel {
                                 ..Default::default()
                             }
                         });
-                    menu_cards.push((device_key, device_card.into()));
+                    menu_cards.push((format!("2-{device_key}"), device_card.into()));
                 }
                 if let Some(overview) = total_power_overview(
                     &self.readings,
@@ -2626,7 +2626,7 @@ impl cosmic::Application for AppModel {
                     &self.history,
                     &self.device_history,
                 ) {
-                    menu_cards.push((TOTAL_POWER_DRAG_ID.to_string(), overview));
+                    menu_cards.push(("3-total-power".to_string(), overview));
                 }
                 if let Some(difference) = power_difference_overview(
                     &self.readings,
@@ -2634,7 +2634,7 @@ impl cosmic::Application for AppModel {
                     &self.history,
                     &self.device_history,
                 ) {
-                    menu_cards.push((POWER_DIFFERENCE_DRAG_ID.to_string(), difference));
+                    menu_cards.push(("4-power-difference".to_string(), difference));
                 }
                 // Use a stable device order; menu items cannot be manually rearranged.
                 menu_cards.sort_by(|(left, _), (right, _)| left.cmp(right));
