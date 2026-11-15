@@ -64,6 +64,7 @@ pub enum Message {
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
+    PanelAverageTemperatureChanged(bool),
     GraphTimespanChanged(u16),
     RefreshIntervalChanged(u32),
     DiscoverDevices,
@@ -270,6 +271,17 @@ fn power_sparkline(history: &VecDeque<(Instant, i64)>) -> String {
     numeric_sparkline(history.iter().map(|(_, value)| *value as f64))
 }
 
+fn input_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
+    readings.iter().filter(|reading| {
+        input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+    }).map(|reading| signed_device_power(reading.power_w, true)).sum()
+}
+
+fn average_temperature_c(readings: &[FritzReading]) -> Option<f64> {
+    let count = readings.len();
+    (count > 0).then(|| readings.iter().map(|reading| reading.temperature_c).sum::<f64>() / count as f64)
+}
+
 fn rebuild_net_power_history(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     input_ains: &HashSet<String>,
@@ -372,10 +384,11 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
         .align_y(cosmic::iced::Alignment::Center)
         .push(widget::mouse_area(widget::text("⠿").size(20))
             .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string())))
-        .push(widget::text::body("Total power (net)"))
+        .push(widget::text::body("Total power (net)").width(cosmic::iced::Length::Fill))
         .push(widget::text::caption(format!("#{position}")));
     widget::mouse_area(
         widget::container(row)
+            .width(cosmic::iced::Length::Fill)
             .padding(8)
             .style(|theme| {
                 let cosmic = theme.cosmic();
@@ -565,11 +578,21 @@ impl cosmic::Application for AppModel {
             primary_reading.map(|reading| format!("{} W", reading.power_w))
                 .unwrap_or_else(|| "-- W".to_string())
         };
-        let temperature = if self.settings.total_power_first {
+        let temperature = if self.settings.panel_average_temperature {
+            Some(average_temperature_c(&self.readings)
+                .map(|value| format!("{value:.1} °C"))
+                .unwrap_or_else(|| "-- °C".to_string()))
+        } else if self.settings.total_power_first {
             None
         } else {
             Some(primary_reading.map(|reading| format!("{:.1} °C", reading.temperature_c))
                 .unwrap_or_else(|| "-- °C".to_string()))
+        };
+        let input_power = if self.settings.total_power_first {
+            let value = input_power_w(&self.readings, &self.settings.input_ains);
+            (value != 0).then(|| format!("{value} W"))
+        } else {
+            None
         };
 
         let suggested = self.core.applet.suggested_size(true);
@@ -595,6 +618,11 @@ impl cosmic::Application for AppModel {
                     .padding([2, 0]),
             )
             .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)));
+        let content = if let Some(input_power) = input_power {
+            content.push(self.core.applet.text(input_power).size(f32::from(self.settings.panel_text_size)))
+        } else {
+            content
+        };
         let content = if let Some(temperature) = temperature {
             content.push(self.core.applet.text(temperature).size(f32::from(self.settings.panel_text_size)))
         } else {
@@ -646,6 +674,13 @@ impl cosmic::Application for AppModel {
                     .step(1.0),
                 )
                 .push(widget::text::caption("Adjusts the power and temperature text in the panel"))
+                .push(widget::Row::new()
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::text::body("Show average temperature in panel")
+                        .width(cosmic::iced::Length::Fill))
+                    .push(widget::toggler(self.settings.panel_average_temperature)
+                        .on_toggle(Message::PanelAverageTemperatureChanged)))
+                .push(widget::text::caption("Uses the mean temperature of all selected devices"))
                 .push(widget::divider::horizontal::default())
                 .push(widget::text::caption(format!(
                     "GRAPH HISTORY: {}",
@@ -1537,6 +1572,10 @@ impl cosmic::Application for AppModel {
             }
             Message::PanelTextSizeChanged(value) => {
                 self.settings.panel_text_size = value.clamp(10, 24);
+                self.persist_settings();
+            }
+            Message::PanelAverageTemperatureChanged(value) => {
+                self.settings.panel_average_temperature = value;
                 self.persist_settings();
             }
             Message::GraphTimespanChanged(value) => {
