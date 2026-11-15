@@ -52,6 +52,8 @@ pub struct AppModel {
     weather: Option<WeatherData>,
     weather_attribution_expanded: bool,
     quick_options_expanded: bool,
+    quick_refresh_interval: u32,
+    quick_graph_timespan: u16,
     next_weather_refresh_at: Option<Instant>,
     pending_power_changes: HashSet<String>,
     pending_power_targets: HashMap<String, bool>,
@@ -93,6 +95,10 @@ pub enum Message {
     WeatherUpdated(Result<WeatherData, String>),
     ToggleWeatherAttribution,
     ToggleQuickOptions,
+    QuickRefreshIntervalPreview(u32),
+    CommitQuickRefreshInterval,
+    QuickGraphTimespanPreview(u16),
+    CommitQuickGraphTimespan,
     WeatherEnabledChanged(bool),
     OpenWeatherMapApiKeyChanged(String),
     WeatherLocationChanged(String),
@@ -1446,22 +1452,24 @@ impl cosmic::Application for AppModel {
                 content = content
                     .push(widget::text::caption(format!(
                         "REFRESH INTERVAL · {}",
-                        format_countdown(u64::from(self.settings.refresh_interval_seconds))
+                        format_countdown(u64::from(self.quick_refresh_interval))
                     )))
                     .push(widget::slider(
                         30.0..=3600.0,
-                        self.settings.refresh_interval_seconds as f32,
-                        |value| Message::RefreshIntervalChanged(value.round() as u32),
-                    ).step(30.0))
+                        self.quick_refresh_interval as f32,
+                        |value| Message::QuickRefreshIntervalPreview(value.round() as u32),
+                    ).step(30.0).on_release(Message::CommitQuickRefreshInterval))
+                    .push(widget::text::caption("30s          5m          15m          30m          60m"))
                     .push(widget::text::caption(format!(
                         "GRAPH DURATION · {}",
-                        format_graph_timespan(self.settings.graph_timespan_minutes)
+                        format_graph_timespan(self.quick_graph_timespan)
                     )))
                     .push(widget::slider(
                         5.0..=1440.0,
-                        f32::from(self.settings.graph_timespan_minutes),
-                        |value| Message::GraphTimespanChanged(value.round() as u16),
-                    ).step(5.0));
+                        f32::from(self.quick_graph_timespan),
+                        |value| Message::QuickGraphTimespanPreview(value.round() as u16),
+                    ).step(5.0).on_release(Message::CommitQuickGraphTimespan))
+                    .push(widget::text::caption("5m          1h          6h          12h          24h"));
             }
 
             if let Some(error) = &self.error {
@@ -1711,6 +1719,39 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleQuickOptions => {
                 self.quick_options_expanded = !self.quick_options_expanded;
+                if self.quick_options_expanded {
+                    self.quick_refresh_interval = self.settings.refresh_interval_seconds;
+                    self.quick_graph_timespan = self.settings.graph_timespan_minutes;
+                }
+            }
+            Message::QuickRefreshIntervalPreview(value) => {
+                self.quick_refresh_interval = value.clamp(30, 3600);
+            }
+            Message::CommitQuickRefreshInterval => {
+                if self.settings.refresh_interval_seconds != self.quick_refresh_interval {
+                    self.settings.refresh_interval_seconds = self.quick_refresh_interval.clamp(30, 3600);
+                    if self.next_refresh_at.is_some() {
+                        self.next_refresh_at = Some(
+                            Instant::now() + Duration::from_secs(u64::from(self.settings.refresh_interval_seconds)),
+                        );
+                    }
+                    self.persist_settings();
+                }
+            }
+            Message::QuickGraphTimespanPreview(value) => {
+                self.quick_graph_timespan = value.clamp(5, 1440);
+            }
+            Message::CommitQuickGraphTimespan => {
+                if self.settings.graph_timespan_minutes != self.quick_graph_timespan {
+                    self.settings.graph_timespan_minutes = self.quick_graph_timespan.clamp(5, 1440);
+                    let now = Instant::now();
+                    let window = graph_history_window(self.settings.graph_timespan_minutes);
+                    self.history.retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
+                    for samples in self.device_history.values_mut() {
+                        samples.retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
+                    }
+                    self.persist_settings();
+                }
             }
             Message::WeatherUpdated(result) => {
                 match result {
