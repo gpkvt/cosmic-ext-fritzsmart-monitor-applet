@@ -31,6 +31,7 @@ pub struct AppModel {
     history: VecDeque<(Instant, i64)>,
     device_history: HashMap<String, VecDeque<(Instant, i64, f64)>>,
     temperature_alert_state: HashMap<String, bool>,
+    next_refresh_at: Option<Instant>,
 }
 
 #[derive(Debug, Clone)]
@@ -38,6 +39,7 @@ pub enum Message {
     TogglePopup,
     PopupClosed(Id),
     Refresh,
+    ClockTick,
     Updated(Result<Vec<FritzReading>, String>),
     ToggleSettings,
     UrlChanged(String),
@@ -47,6 +49,7 @@ pub enum Message {
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
     GraphTimespanChanged(u16),
+    RefreshIntervalChanged(u32),
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
     ToggleDevice(String, bool),
@@ -125,6 +128,19 @@ fn graph_history_window(minutes: u16) -> Duration {
 
 fn max_history_samples(window: Duration) -> usize {
     (window.as_secs() / 60) as usize + 1
+}
+
+fn format_countdown(seconds: u64) -> String {
+    let hours = seconds / 3600;
+    let minutes = (seconds % 3600) / 60;
+    let seconds = seconds % 60;
+    if hours > 0 {
+        format!("{hours}h {minutes:02}m {seconds:02}s")
+    } else if minutes > 0 {
+        format!("{minutes}m {seconds:02}s")
+    } else {
+        format!("{seconds}s")
+    }
 }
 
 fn format_graph_timespan(minutes: u16) -> String {
@@ -262,13 +278,15 @@ impl cosmic::Application for AppModel {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
+        // A lightweight one-second tick updates the visible countdown and
+        // checks the deadline. Refresh timing itself remains configurable.
         Subscription::run(|| {
             cosmic::iced::stream::channel(4, |mut output: futures::channel::mpsc::Sender<Message>| async move {
-                let mut interval = tokio::time::interval(Duration::from_secs(60));
+                let mut interval = tokio::time::interval(Duration::from_secs(1));
                 interval.tick().await;
                 loop {
                     interval.tick().await;
-                    if output.send(Message::Refresh).await.is_err() { break; }
+                    if output.send(Message::ClockTick).await.is_err() { break; }
                 }
             })
         })
@@ -363,7 +381,21 @@ impl cosmic::Application for AppModel {
                     )
                     .step(5.0),
                 )
-                .push(widget::text::caption("5 minutes to 24 hours; samples are collected once per minute"))
+                .push(widget::text::caption("5 minutes to 24 hours; samples are collected once per refresh"))
+                .push(widget::divider::horizontal::default())
+                .push(widget::text::caption(format!(
+                    "AUTOMATIC REFRESH: {}",
+                    format_countdown(u64::from(self.settings.refresh_interval_seconds))
+                )))
+                .push(
+                    widget::slider(
+                        30.0..=3600.0,
+                        self.settings.refresh_interval_seconds as f32,
+                        |value| Message::RefreshIntervalChanged(value.round() as u32),
+                    )
+                    .step(30.0),
+                )
+                .push(widget::text::caption("30 seconds to 1 hour"))
                 .push(widget::divider::horizontal::default())
                 .push(widget::text::caption("CONNECTION"))
                 .push(widget::text::body("FRITZ!Box URL"))
@@ -630,6 +662,12 @@ impl cosmic::Application for AppModel {
                 content = content.push(widget::text::body("Select one or more devices in Settings"));
             }
 
+            let remaining = self.next_refresh_at
+                .map(|deadline| deadline.saturating_duration_since(Instant::now()));
+            let countdown = remaining
+                .map(|duration| format_countdown(duration.as_secs()))
+                .unwrap_or_else(|| "Refreshing…".into());
+            content = content.push(widget::text::caption(format!("Next refresh in {countdown}")));
             if let Some(updated) = &self.updated {
                 content = content.push(widget::text::caption(format!("Updated at {updated}")));
             }
@@ -689,9 +727,17 @@ impl cosmic::Application for AppModel {
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
             Message::Refresh => {
+                self.next_refresh_at = None;
                 return Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result)));
             }
-            Message::Updated(result) => match result {
+            Message::ClockTick => {
+                if self.next_refresh_at.is_some_and(|deadline| Instant::now() >= deadline) {
+                    self.next_refresh_at = None;
+                    return Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result)));
+                }
+            }
+            Message::Updated(result) => {
+                match result {
                 Ok(readings) => {
                     let total_power = readings.iter().map(|reading| reading.power_w).sum();
                     let now = Instant::now();
@@ -722,7 +768,11 @@ impl cosmic::Application for AppModel {
                 Err(error) => {
                     self.error = Some(error);
                 },
-            },
+                }
+                self.next_refresh_at = Some(
+                    Instant::now() + Duration::from_secs(u64::from(self.settings.refresh_interval_seconds.clamp(30, 3600))),
+                );
+            }
             Message::ToggleSettings => {
                 self.settings_open = !self.settings_open;
                 self.settings_status = None;
@@ -758,6 +808,15 @@ impl cosmic::Application for AppModel {
                 self.history.retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
                 for samples in self.device_history.values_mut() {
                     samples.retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
+                }
+                self.persist_settings();
+            }
+            Message::RefreshIntervalChanged(value) => {
+                self.settings.refresh_interval_seconds = value.clamp(30, 3600);
+                if self.next_refresh_at.is_some() {
+                    self.next_refresh_at = Some(
+                        Instant::now() + Duration::from_secs(u64::from(self.settings.refresh_interval_seconds)),
+                    );
                 }
                 self.persist_settings();
             }
@@ -929,6 +988,15 @@ mod history_tests {
         assert_eq!(graph_history_window(0), Duration::from_secs(300));
         assert_eq!(graph_history_window(2000), Duration::from_secs(86400));
         assert_eq!(max_history_samples(graph_history_window(60)), 61);
+    }
+
+    #[test]
+    fn countdown_format_is_compact_and_realtime_friendly() {
+        assert_eq!(format_countdown(0), "0s");
+        assert_eq!(format_countdown(29), "29s");
+        assert_eq!(format_countdown(60), "1m 00s");
+        assert_eq!(format_countdown(3599), "59m 59s");
+        assert_eq!(format_countdown(3600), "1h 00m 00s");
     }
 
     #[test]
