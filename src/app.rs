@@ -2232,7 +2232,9 @@ impl cosmic::Application for AppModel {
                             position + 1,
                         ));
                     }
-                    content = content.push(widget::text::caption("Drag the ⠿ handles to reorder the weather section, live power summary, power cards and selected devices. The order is saved automatically."));
+                    content = content.push(widget::text::caption(
+                        "Drag the ⠿ handles to reorder the weather section, live power summary, power cards and selected devices. The order is saved automatically.",
+                    ));
                 }
             }
 
