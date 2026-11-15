@@ -860,7 +860,7 @@ mod history_tests {
     }
 
     #[test]
-    fn temperature_alerts_only_fire_on_a_below_to_above_transition() {
+    fn temperature_alerts_only_fire_when_leaving_safe_range() {
         assert!(!should_notify_temperature_alert(None, true));
         assert!(!should_notify_temperature_alert(Some(true), true));
         assert!(!should_notify_temperature_alert(Some(false), false));
