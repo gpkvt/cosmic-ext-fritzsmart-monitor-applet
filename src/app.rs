@@ -1168,19 +1168,6 @@ impl cosmic::Application for AppModel {
                     if !has_input_graph {
                         input_graphs = input_graphs.push(widget::text::caption("No input devices"));
                     }
-                    let graph_background = |theme: &cosmic::Theme| {
-                        let cosmic = theme.cosmic();
-                        cosmic::iced::widget::container::Style {
-                            background: Some(
-                                cosmic::iced::Color::from(cosmic.background(false).base).into(),
-                            ),
-                            border: cosmic::iced::Border {
-                                radius: 3.0.into(),
-                                ..Default::default()
-                            },
-                            ..Default::default()
-                        }
-                    };
                     let total_power_content = widget::Column::new()
                         .spacing(6)
                         .push(widget::text::body(format!(
@@ -1198,7 +1185,19 @@ impl cosmic::Application for AppModel {
                                     widget::container(total_graph)
                                         .padding(8)
                                         .width(cosmic::iced::Length::Fill)
-                                        .style(graph_background),
+                                        .style(|theme| {
+                                            let cosmic = theme.cosmic();
+                                            cosmic::iced::widget::container::Style {
+                                                background: Some(
+                                                    cosmic::iced::Color::from(cosmic.background(false).base).into(),
+                                                ),
+                                                border: cosmic::iced::Border {
+                                                    radius: 3.0.into(),
+                                                    ..Default::default()
+                                                },
+                                                ..Default::default()
+                                            }
+                                        }),
                                 )
                                 .push(
                                     widget::container(input_graphs)
