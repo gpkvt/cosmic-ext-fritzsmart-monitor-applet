@@ -156,10 +156,19 @@ fn parse_refresh_interval_seconds(value: &str) -> u32 {
     value.parse::<u32>().unwrap_or(60).clamp(30, 3600)
 }
 
-const MENU_ELEMENT_IDS: [&str; 5] = ["summary", "weather", "devices", "total-power", "power-difference"];
+const MENU_ELEMENT_IDS: [&str; 5] = [
+    "summary",
+    "weather",
+    "devices",
+    "total-power",
+    "power-difference",
+];
 
 fn default_menu_order() -> Vec<String> {
-    MENU_ELEMENT_IDS.iter().map(|id| (*id).to_string()).collect()
+    MENU_ELEMENT_IDS
+        .iter()
+        .map(|id| (*id).to_string())
+        .collect()
 }
 
 fn parse_menu_order(value: &str) -> Vec<String> {
@@ -1339,8 +1348,14 @@ mod tests {
     fn menu_order_defaults_to_all_popup_sections() {
         assert_eq!(
             FritzSettings::default().menu_order,
-            vec!["summary", "weather", "devices", "total-power", "power-difference"]
-                .into_iter()
+            vec![
+                "summary",
+                "weather",
+                "devices",
+                "total-power",
+                "power-difference"
+            ]
+            .into_iter()
                 .map(str::to_string)
                 .collect::<Vec<_>>()
         );
@@ -1350,8 +1365,14 @@ mod tests {
     fn menu_order_parser_preserves_custom_order_and_repairs_invalid_entries() {
         assert_eq!(
             parse_menu_order("devices,summary,devices,unknown"),
-            vec!["devices", "summary", "weather", "total-power", "power-difference"]
-                .into_iter()
+            vec![
+                "devices",
+                "summary",
+                "weather",
+                "total-power",
+                "power-difference"
+            ]
+            .into_iter()
                 .map(str::to_string)
                 .collect::<Vec<_>>()
         );
