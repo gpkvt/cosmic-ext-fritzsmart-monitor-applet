@@ -1220,7 +1220,6 @@ impl cosmic::Application for AppModel {
             }
 
             if !self.readings.is_empty() {
-                content = content.push(widget::text::caption("SELECTED DEVICES"));
                 if self.settings.total_power_first {
                     if let Some(overview) = total_power_overview(
                         &self.readings,
@@ -1229,9 +1228,12 @@ impl cosmic::Application for AppModel {
                         &self.device_history,
                         0,
                     ) {
-                        content = content.push(overview);
+                        content = content
+                            .push(overview)
+                            .push(widget::divider::horizontal::default());
                     }
                 }
+                content = content.push(widget::text::caption("SELECTED DEVICES"));
                 for (index, reading) in self.readings.iter().enumerate() {
                     let device_history = self.device_history.get(
                         &crate::fritz::normalize_ain_for_selection(&reading.ain),
