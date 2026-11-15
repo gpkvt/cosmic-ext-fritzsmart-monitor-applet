@@ -6,7 +6,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 
 ## Features
 
-- Displays current power in watts and temperature in the COSMIC panel, with a configurable text size.
+- Displays current power in watts and temperature in the COSMIC panel, with a configurable text size, optional average temperature, and a separate input-power figure when Total power is shown.
 - Settings and popup device rows use distinct muted background tints. Each selected device has separate configurable-timespan wattage and temperature sparklines in the popup, plus a combined net-power card that follows the same visual design. Device chart panels use subtly rounded corners. Devices can be marked as Devices with “solar” in their name are automatically marked as inputs on the first device discovery; the default is applied only once so manual changes are preserved.
 
 inputs; their wattage is subtracted from the net total and each input gets its own graph in the total-power card.
@@ -79,7 +79,7 @@ list.
 
 ## Configuration
 
-Open the applet popup and choose **Settings**. Adjust **Panel text size** (10–24 pt) to change the power and temperature labels in the panel. The setting is saved with the rest of the applet configuration. Set **Automatic refresh** from 30 seconds to 1 hour; the main popup shows a live countdown to the next refresh. The default is 60 seconds. Enter the FRITZ!Box URL,
+Open the applet popup and choose **Settings**. Adjust **Panel text size** (10–24 pt) to change the power and temperature labels in the panel. Enable **Show average temperature in panel** to show the mean temperature across all selected devices instead of the first device's temperature (and alongside net power when Total power is first). When Total power is first, input devices' combined signed wattage is also shown as a second power figure. These settings are saved with the rest of the applet configuration. Set **Automatic refresh** from 30 seconds to 1 hour; the main popup shows a live countdown to the next refresh. The default is 60 seconds. Enter the FRITZ!Box URL,
 username and password, then choose **Load devices**. The applet discovers
 devices that expose both power and temperature measurements. Check every
 device you want to monitor, then use the grip (⠿) handles to reorder selected
