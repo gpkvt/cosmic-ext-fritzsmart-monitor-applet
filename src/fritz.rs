@@ -398,18 +398,32 @@ fn parse_switch_state(value: Option<&str>) -> Option<bool> {
     }
 }
 
-fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<FritzReading>, String> {
+#[derive(Debug, Clone)]
+pub struct FritzFetchResult {
+    pub readings: Vec<FritzReading>,
+    pub missing_devices: Vec<(String, String)>,
+}
+
+fn parse_device_readings_detailed_xml(
+    xml: &str,
+    selected_ains: &[String],
+) -> Result<FritzFetchResult, String> {
     let document = Document::parse(xml).map_err(|error| format!("Invalid device XML: {error}"))?;
-    let wanted: Vec<String> = selected_ains.iter().map(|ain| normalize_ain_for_selection(ain))
-        .filter(|ain| !ain.is_empty()).collect();
+    let wanted: Vec<String> = selected_ains.iter()
+        .map(|ain| normalize_ain_for_selection(ain))
+        .filter(|ain| !ain.is_empty())
+        .collect();
     let mut readings = Vec::new();
-    let mut device_errors = Vec::new();
+    let mut missing_devices = Vec::new();
+    let mut seen = std::collections::HashSet::new();
 
     for device in document.descendants().filter(|node| node.has_tag_name("device")) {
         let Some(ain) = device.attribute("identifier") else { continue };
-        if !wanted.iter().any(|selected| selected == &normalize_ain_for_selection(ain)) {
+        let normalized_ain = normalize_ain_for_selection(ain);
+        if !wanted.iter().any(|selected| selected == &normalized_ain) {
             continue;
         }
+        seen.insert(normalized_ain.clone());
 
         let name = device.children().find(|child| child.has_tag_name("name"))
             .and_then(|child| child.text())
@@ -441,21 +455,40 @@ fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<
 
         match reading {
             Ok(reading) => readings.push(reading),
-            Err(error) => device_errors.push(format!("{name}: {error}")),
+            Err(error) => missing_devices.push((name, format!("{ain}: {error}"))),
+        }
+    }
+
+    for selected in &wanted {
+        if !seen.contains(selected) {
+            let original_ain = selected_ains.iter()
+                .find(|ain| normalize_ain_for_selection(ain) == *selected)
+                .map(String::as_str)
+                .unwrap_or(selected);
+            missing_devices.push((
+                format!("Device {original_ain}"),
+                format!("{original_ain}: not found in the FRITZ!Box device list"),
+            ));
         }
     }
 
     readings.sort_by_key(|reading| wanted.iter().position(|selected|
         selected == &normalize_ain_for_selection(&reading.ain)).unwrap_or(usize::MAX));
+    Ok(FritzFetchResult { readings, missing_devices })
+}
 
-    if readings.is_empty() {
-        if device_errors.is_empty() {
+fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<FritzReading>, String> {
+    let result = parse_device_readings_detailed_xml(xml, selected_ains)?;
+    if result.readings.is_empty() {
+        if result.missing_devices.is_empty() {
             return Err("None of the selected FRITZ!Box devices were found".into());
         }
-        return Err(format!("No selected devices returned usable readings: {}", device_errors.join("; ")));
+        return Err(format!(
+            "No selected devices returned usable readings: {}",
+            result.missing_devices.iter().map(|(_, detail)| detail.as_str()).collect::<Vec<_>>().join("; ")
+        ));
     }
-
-    Ok(readings)
+    Ok(result.readings)
 }
 
 #[cfg(test)]
@@ -504,7 +537,7 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
     Ok(())
 }
 
-pub async fn fetch_fritz_data() -> Result<Vec<FritzReading>, String> {
+pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     let settings = FritzSettings::load()?;
     validate_settings(&settings, true)?;
     let selected_ains = if settings.ains.is_empty() { vec![settings.ain.clone()] } else { settings.ains.clone() };
@@ -514,7 +547,7 @@ pub async fn fetch_fritz_data() -> Result<Vec<FritzReading>, String> {
         .query(&[("sid", sid.as_str()), ("switchcmd", "getdevicelistinfos")])
         .send().await.map_err(|error| format!("FRITZ!Box device request failed: {error}"))?;
     let devices_xml = read_xml_response(device_response, "FRITZ!Box device request failed").await?;
-    parse_device_readings_xml(&devices_xml, &selected_ains)
+    parse_device_readings_detailed_xml(&devices_xml, &selected_ains)
 }
 
 #[cfg(test)]
