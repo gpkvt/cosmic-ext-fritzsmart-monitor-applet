@@ -54,7 +54,7 @@ Remove the user-local installation with:
 make uninstall
 ```
 
-Run the formatting check, test suite and optimized build independently with:
+Run the formatter, test suite and optimized build independently with:
 
 ```sh
 cargo fmt --all -- --check
@@ -62,7 +62,7 @@ cargo test
 cargo build --release
 ```
 
-GitHub Actions runs these checks on pull requests and pushes to `main`. Pushing
+GitHub Actions formats the Rust sources, runs the test suite, checks compilation, builds the optimized binary and validates installation on pull requests and pushes to `main`. Pushing
 a version tag such as `v0.1.5` builds a Linux x86_64 release archive containing
 the applet binary, desktop entry, icon, README and license, and publishes the
 archive with a SHA-256 checksum on the GitHub Releases page.
