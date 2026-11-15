@@ -1143,8 +1143,10 @@ impl cosmic::Application for AppModel {
             content
         };
 
-        // Use a content-sized applet button: button_from_element() deliberately
-        // fixes the width to an icon, while text_button() only accepts Text.
+        // Keep the readings in their own popup button and provide a separate
+        // one-click refresh action at the panel's trailing edge. Since COSMIC
+        // places applets before Quick Settings, this puts the refresh symbol
+        // immediately to its left without making the whole applet clickable.
         let button = widget::button::custom(content)
             .on_press(Message::TogglePopup)
             .padding([vertical_padding, horizontal_padding])
@@ -1153,9 +1155,27 @@ impl cosmic::Application for AppModel {
             ))
             .class(cosmic::theme::Button::AppletIcon);
 
-        // The default applet window is icon-sized. Autosize it to the full
-        // row so the icon and both live readings remain visible.
-        widget::autosize::autosize(button, AUTOSIZE_MAIN_ID.clone()).into()
+        let refresh_button = widget::button::custom(
+            widget::container(widget::icon::from_name("view-refresh-symbolic").size(16))
+                .center_x(32)
+                .center_y(f32::from((suggested.1 + 2 * vertical_padding).max(40))),
+        )
+        .on_press(Message::Refresh)
+        .padding(0)
+        .width(cosmic::iced::Length::Fixed(32.0))
+        .height(cosmic::iced::Length::Fixed(
+            f32::from((suggested.1 + 2 * vertical_padding).max(40)),
+        ))
+        .class(cosmic::theme::Button::AppletIcon)
+        .name("Refresh now");
+
+        // Autosize the complete row so both panel controls remain visible.
+        let panel_controls = widget::Row::new()
+            .spacing(0)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(button)
+            .push(refresh_button);
+        widget::autosize::autosize(panel_controls, AUTOSIZE_MAIN_ID.clone()).into()
     }
 
     fn view_window(&self, id: Id) -> Element<'_, Self::Message> {
