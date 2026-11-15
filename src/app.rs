@@ -510,6 +510,12 @@ fn surface_card<'a>(
         .into()
 }
 
+fn keep_value_unit_together(value: String) -> String {
+    value.rsplit_once(' ')
+        .map(|(number, unit)| format!("{number}\u{00a0}{unit}"))
+        .unwrap_or(value)
+}
+
 fn metric_tile<'a>(
     label: impl Into<String>,
     value: impl Into<String>,
@@ -520,11 +526,11 @@ fn metric_tile<'a>(
         .align_y(cosmic::iced::Alignment::Start)
         .push(widget::Row::new()
             .spacing(6)
-            .align_y(cosmic::iced::Alignment::Center)
+            .align_y(cosmic::iced::Alignment::Start)
             .push(widget::icon::from_name(icon).size(14))
             .push(widget::text::caption(label.into())))
         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-        .push(widget::text::title3(value.into()));
+        .push(widget::text::title3(keep_value_unit_together(value.into())));
     surface_card(content.into(), 10)
 }
 
@@ -561,11 +567,11 @@ fn live_power_summary(
             .spacing(8)
             .push(widget::Row::new()
                 .spacing(8)
-                .align_y(cosmic::iced::Alignment::Center)
+                .align_y(cosmic::iced::Alignment::Start)
                 .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(18))
                 .push(widget::text::caption(title))))
         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-        .push(widget::text::title2(power));
+        .push(widget::text::title2(keep_value_unit_together(power)));
 
     let mut supporting = widget::Column::new()
         .spacing(8)
@@ -2556,6 +2562,13 @@ mod history_tests {
         let inputs = HashSet::from(["222222".to_string(), "333333".to_string()]);
         assert_eq!(input_power_w(&readings, &inputs), -350);
         assert_eq!(input_power_w(&readings, &HashSet::new()), 0);
+    }
+
+    #[test]
+    fn metric_values_keep_units_on_the_same_line() {
+        assert_eq!(keep_value_unit_together("32 W".into()), "32\u{00a0}W");
+        assert_eq!(keep_value_unit_together("15.0 °C".into()), "15.0\u{00a0}°C");
+        assert_eq!(keep_value_unit_together("Unknown".into()), "Unknown");
     }
 
     #[test]
