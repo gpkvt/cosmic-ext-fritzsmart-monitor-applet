@@ -1,0 +1,36 @@
+name: Commit reproducible Flatpak inputs
+
+on:
+  push:
+    branches:
+      - build/commit-flatpak-inputs
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  commit-inputs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: build/commit-flatpak-inputs
+      - uses: actions/download-artifact@v4
+        with:
+          name: flatpak-source-inputs
+          repository: gpkvt/cosmic-ext-fritzsmart-monitor-applet
+          run-id: 43738002484
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/flatpak-inputs
+      - name: Commit generated inputs
+        run: |
+          set -euo pipefail
+          cp /tmp/flatpak-inputs/Cargo.lock Cargo.lock
+          cp /tmp/flatpak-inputs/cargo-sources.json cargo-sources.json
+          rm .github/workflows/commit-flatpak-inputs.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock cargo-sources.json .github/workflows/commit-flatpak-inputs.yml
+          git commit -m "Add reproducible Flatpak Cargo inputs"
+          git push
