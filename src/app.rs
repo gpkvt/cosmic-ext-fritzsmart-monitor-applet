@@ -1703,28 +1703,17 @@ impl cosmic::Application for AppModel {
             let countdown = remaining
                 .map(|duration| format_countdown(duration.as_secs()))
                 .unwrap_or_else(|| "Refreshing…".into());
-            content = content.push(widget::text::caption(format!("Next refresh in {countdown}")));
+            content = content.push(
+                widget::Row::new()
+                    .width(cosmic::iced::Length::Fill)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::text::caption(format!("Next refresh in {countdown}")))
+                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                    .push(icon_action_button("⚙", "Quick settings", Message::ToggleQuickOptions)),
+            );
             if let Some(updated) = &self.updated {
                 content = content.push(widget::text::caption(format!("Updated at {updated}")));
             }
-
-            let quick_options_label = if self.quick_options_expanded {
-                "▾ Quick options"
-            } else {
-                "▸ Quick options"
-            };
-            content = content.push(
-                widget::button::custom(
-                    widget::Row::new()
-                        .spacing(8)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::icon::from_name("preferences-system-symbolic").size(14))
-                        .push(widget::text::body(quick_options_label)),
-                )
-                .on_press(Message::ToggleQuickOptions)
-                .padding([8, 10])
-                .class(cosmic::theme::Button::Standard),
-            );
             if self.quick_options_expanded {
                 const REFRESH_ANCHORS: [f32; 5] = [30.0, 300.0, 900.0, 1800.0, 3600.0];
                 const GRAPH_ANCHORS: [f32; 5] = [5.0, 60.0, 360.0, 720.0, 1440.0];
