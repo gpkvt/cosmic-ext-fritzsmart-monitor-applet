@@ -2694,7 +2694,8 @@ impl cosmic::Application for AppModel {
                 let mut weather_section = widget::Column::new().spacing(8);
                 weather_section = weather_section.push(widget::text::title3("Weather"));
                 if let Some(error) = &self.weather_error {
-                    weather_section = weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
+                    weather_section =
+                        weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
                 } else {
                     weather_section =
                         weather_section.push(widget::text::body("Weather data is loading…"));
