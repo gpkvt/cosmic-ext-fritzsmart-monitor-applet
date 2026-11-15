@@ -80,6 +80,7 @@ pub enum Message {
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
+    PanelItemSpacingChanged(u8),
     PanelRefreshButtonChanged(bool),
     PanelAverageTemperatureChanged(bool),
     PanelExcludeSolarTemperatureChanged(bool),
@@ -1122,7 +1123,7 @@ impl cosmic::Application for AppModel {
         let horizontal_padding = 10_u16;
 
         let content = widget::Row::new()
-            .spacing(3)
+            .spacing(f32::from(self.settings.panel_item_spacing))
             .align_y(cosmic::iced::Alignment::Center)
             .push(
                 widget::container({
@@ -1328,6 +1329,10 @@ impl cosmic::Application for AppModel {
                         .step(1.0),
                     )
                     .push(widget::text::caption("Adjusts the power and temperature text in the panel"))
+                    .push(widget::text::body(format!("Panel item spacing: {} px", self.settings.panel_item_spacing)))
+                    .push(widget::slider(0.0..=16.0, f32::from(self.settings.panel_item_spacing),
+                        |value| Message::PanelItemSpacingChanged(value.round() as u8)).step(1.0))
+                    .push(widget::text::caption("Controls the gap between icons and values in the panel"))
                     .push(widget::Row::new()
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::Column::new()
@@ -2541,6 +2546,10 @@ impl cosmic::Application for AppModel {
             }
             Message::PanelTextSizeChanged(value) => {
                 self.settings.panel_text_size = value.clamp(10, 24);
+                self.persist_settings();
+            }
+            Message::PanelItemSpacingChanged(value) => {
+                self.settings.panel_item_spacing = value.clamp(0, 16);
                 self.persist_settings();
             }
             Message::PanelRefreshButtonChanged(value) => {
