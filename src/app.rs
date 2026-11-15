@@ -22,6 +22,7 @@ static DRAG_SCROLL_ID: LazyLock<widget::Id> =
 
 const TOTAL_POWER_DRAG_ID: &str = "__TOTAL_POWER__";
 const POWER_DIFFERENCE_DRAG_ID: &str = "__POWER_DIFFERENCE__";
+const SUMMARY_DRAG_ID: &str = "__LIVE_SUMMARY__";
 
 #[derive(Default)]
 pub struct AppModel {
@@ -516,7 +517,7 @@ fn record_device_sample(
 
 fn move_menu_entry(order: &mut Vec<String>, dragged: &str, target: &str) {
     let normalize = |entry: &str| {
-        if entry == TOTAL_POWER_DRAG_ID || entry == POWER_DIFFERENCE_DRAG_ID {
+        if entry == TOTAL_POWER_DRAG_ID || entry == POWER_DIFFERENCE_DRAG_ID || entry == SUMMARY_DRAG_ID {
             entry.to_string()
         } else {
             crate::fritz::normalize_ain_for_selection(entry)
@@ -1092,6 +1093,25 @@ fn settings_section_header<'a>(
     .class(cosmic::theme::Button::Text)
     .into();
     section_row
+}
+
+fn sortable_menu_card(
+    id: String,
+    card: cosmic::Element<'static, Message>,
+) -> cosmic::Element<'static, Message> {
+    let drag_handle = widget::mouse_area(widget::text("⠿").size(20))
+        .on_press(Message::StartDeviceDrag(id.clone()))
+        .on_release(Message::EndDeviceDrag);
+    let drop_target = widget::mouse_area(card)
+        .on_enter(Message::DragOverDevice(id))
+        .on_release(Message::EndDeviceDrag);
+    widget::Row::new()
+        .spacing(6)
+        .align_y(cosmic::iced::Alignment::Start)
+        .width(cosmic::iced::Length::Fill)
+        .push(widget::container(drag_handle).padding([8, 2]))
+        .push(widget::container(drop_target).width(cosmic::iced::Length::Fill))
+        .into()
 }
 
 fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
@@ -2624,15 +2644,15 @@ impl cosmic::Application for AppModel {
                                 input_power_w(&self.readings, &self.settings.input_ains)
                             )
                         });
-                    content = content.push(live_power_summary(
+                    let summary_card = live_power_summary(
                         summary_power,
                         self.settings.total_power_first,
                         summary_input,
                         summary_temperature,
-                    ));
-                }
+                    );
 
-                let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
+                    let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
+                    menu_cards.push((SUMMARY_DRAG_ID.to_string(), summary_card));
                 for (index, reading) in self.readings.iter().enumerate() {
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                     let is_expanded = self.collapsed_devices.contains(&device_key);
@@ -2908,11 +2928,11 @@ impl cosmic::Application for AppModel {
                         .unwrap_or(usize::MAX)
                 });
                 let mut device_cards = widget::Column::new().spacing(0);
-                for (index, (_, card)) in menu_cards.into_iter().enumerate() {
+                for (index, (id, card)) in menu_cards.into_iter().enumerate() {
                     if index > 0 {
                         device_cards = device_cards.push(widget::divider::horizontal::default());
                     }
-                    device_cards = device_cards.push(card);
+                    device_cards = device_cards.push(sortable_menu_card(id, card));
                 }
                 let device_list = widget::container(device_cards)
                     .width(cosmic::iced::Length::Fill)
@@ -3671,6 +3691,7 @@ impl cosmic::Application for AppModel {
             Message::StartDeviceDrag(ain) => {
                 if ain == TOTAL_POWER_DRAG_ID
                     || ain == POWER_DIFFERENCE_DRAG_ID
+                    || ain == SUMMARY_DRAG_ID
                     || self.selected_ains.iter().any(|selected| {
                         crate::fritz::normalize_ain_for_selection(selected)
                             == crate::fritz::normalize_ain_for_selection(&ain)
@@ -3689,6 +3710,7 @@ impl cosmic::Application for AppModel {
                 if let Some(dragged_ain) = self.dragging_device_ain.as_deref() {
                     let target_is_valid = target_ain == TOTAL_POWER_DRAG_ID
                         || target_ain == POWER_DIFFERENCE_DRAG_ID
+                        || target_ain == SUMMARY_DRAG_ID
                         || self.selected_ains.iter().any(|selected| {
                             crate::fritz::normalize_ain_for_selection(selected)
                                 == crate::fritz::normalize_ain_for_selection(&target_ain)
@@ -3749,6 +3771,7 @@ impl cosmic::Application for AppModel {
                             .filter(|entry| {
                                 entry.as_str() != TOTAL_POWER_DRAG_ID
                                     && entry.as_str() != POWER_DIFFERENCE_DRAG_ID
+                                    && entry.as_str() != SUMMARY_DRAG_ID
                             })
                             .cloned()
                             .collect();
