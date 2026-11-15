@@ -105,6 +105,7 @@ pub struct FritzSettings {
     pub openweathermap_api_key: String,
     pub weather_location: String,
     pub weather_refresh_interval_minutes: u16,
+    pub menu_order: Vec<String>,
 }
 
 impl Default for FritzSettings {
@@ -132,6 +133,7 @@ impl Default for FritzSettings {
             openweathermap_api_key: String::new(),
             weather_location: String::new(),
             weather_refresh_interval_minutes: 10,
+            menu_order: default_menu_order(),
         }
     }
 }
@@ -150,6 +152,32 @@ fn parse_graph_timespan_minutes(value: &str) -> u16 {
 
 fn parse_refresh_interval_seconds(value: &str) -> u32 {
     value.parse::<u32>().unwrap_or(60).clamp(30, 3600)
+}
+
+const MENU_ELEMENT_IDS: [&str; 5] = ["summary", "weather", "devices", "total-power", "power-difference"];
+
+fn default_menu_order() -> Vec<String> {
+    MENU_ELEMENT_IDS.iter().map(|id| (*id).to_string()).collect()
+}
+
+fn parse_menu_order(value: &str) -> Vec<String> {
+    let mut order: Vec<String> = value
+        .split(',')
+        .map(str::trim)
+        .filter(|id| MENU_ELEMENT_IDS.contains(id) && !id.is_empty())
+        .map(str::to_string)
+        .fold(Vec::new(), |mut order, id| {
+            if !order.contains(&id) {
+                order.push(id);
+            }
+            order
+        });
+    for id in MENU_ELEMENT_IDS {
+        if !order.iter().any(|existing| existing == id) {
+            order.push(id.to_string());
+        }
+    }
+    order
 }
 
 fn parse_input_ains(value: &str) -> HashSet<String> {
@@ -255,6 +283,7 @@ impl FritzSettings {
                 .parse::<u16>()
                 .unwrap_or(10)
                 .clamp(5, 60),
+            menu_order: parse_menu_order(&get("MENU_ORDER")),
         };
         Ok(settings)
     }
@@ -305,8 +334,9 @@ impl FritzSettings {
             .collect();
         input_ains.sort_unstable();
         let input_ains = input_ains.join(",");
+        let menu_order = parse_menu_order(&self.menu_order.join(",")).join(",");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\n",
             self.url,
             self.username,
             self.password,
@@ -357,6 +387,7 @@ impl FritzSettings {
             } else {
                 "false"
             },
+            menu_order,
         );
         #[cfg(unix)]
         let mut file = {
