@@ -88,6 +88,7 @@ pub struct FritzSettings {
     pub input_ains: HashSet<String>,
     pub input_defaults_initialized: bool,
     pub total_power_first: bool,
+    pub menu_order: Vec<String>,
     pub weather_enabled: bool,
     pub openweathermap_api_key: String,
     pub weather_location: String,
@@ -116,6 +117,7 @@ impl Default for FritzSettings {
             input_ains: HashSet::new(),
             input_defaults_initialized: false,
             total_power_first: false,
+            menu_order: vec!["__TOTAL_POWER__".into(), "__POWER_DIFFERENCE__".into()],
             weather_enabled: false,
             openweathermap_api_key: String::new(),
             weather_location: String::new(),
@@ -138,6 +140,32 @@ fn parse_graph_timespan_minutes(value: &str) -> u16 {
 
 fn parse_refresh_interval_seconds(value: &str) -> u32 {
     value.parse::<u32>().unwrap_or(60).clamp(30, 3600)
+}
+
+fn parse_menu_order(value: &str, selected_ains: &str, total_power_first: bool) -> Vec<String> {
+    const TOTAL: &str = "__TOTAL_POWER__";
+    const DIFFERENCE: &str = "__POWER_DIFFERENCE__";
+    let mut order = Vec::new();
+    if !value.trim().is_empty() {
+        for entry in value.split(',') {
+            let normalized = if entry == TOTAL || entry == DIFFERENCE {
+                entry.to_string()
+            } else {
+                normalize_ain_for_selection(entry)
+            };
+            if !normalized.is_empty() && !order.contains(&normalized) {
+                order.push(normalized);
+            }
+        }
+    } else {
+        if total_power_first { order.push(TOTAL.into()); }
+        for ain in selected_ains.split(',').map(normalize_ain_for_selection).filter(|ain| !ain.is_empty()) {
+            if !order.contains(&ain) { order.push(ain); }
+        }
+        if !total_power_first { order.push(TOTAL.into()); }
+        order.push(DIFFERENCE.into());
+    }
+    order
 }
 
 fn parse_input_ains(value: &str) -> HashSet<String> {
@@ -205,6 +233,7 @@ impl FritzSettings {
             input_ains: parse_input_ains(&get("INPUT_AINS")),
             input_defaults_initialized: get("INPUT_DEFAULTS_INITIALIZED").eq_ignore_ascii_case("true"),
             total_power_first: get("TOTAL_POWER_FIRST").eq_ignore_ascii_case("true"),
+            menu_order: parse_menu_order(&get("MENU_ORDER"), &get("AINS"), get("TOTAL_POWER_FIRST").eq_ignore_ascii_case("true")),
             weather_enabled: get("WEATHER_ENABLED").eq_ignore_ascii_case("true"),
             openweathermap_api_key: get("OPENWEATHERMAP_API_KEY"),
             weather_location: get("WEATHER_LOCATION"),
@@ -241,7 +270,7 @@ impl FritzSettings {
         input_ains.sort_unstable();
         let input_ains = input_ains.join(",");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nTOTAL_POWER_FIRST={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nTOTAL_POWER_FIRST={}\nMENU_ORDER={}\n",
             self.url, self.username, self.password, first_ain, selected_ains,
             if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path,
             self.panel_text_size.clamp(10, 24),
@@ -255,7 +284,8 @@ impl FritzSettings {
             if self.weather_enabled { "true" } else { "false" }, self.openweathermap_api_key,
             self.weather_location, self.weather_refresh_interval_minutes.clamp(5, 60), input_ains,
             if self.input_defaults_initialized { "true" } else { "false" },
-            if self.total_power_first { "true" } else { "false" }
+            if self.total_power_first { "true" } else { "false" },
+            self.menu_order.join(",")
         );
         #[cfg(unix)]
         let mut file = {
