@@ -853,14 +853,16 @@ fn icon_action_button<'a>(
     // Use the same symbolic refresh icon in every part of the applet.
     // Other compact actions (such as Settings) retain their text glyphs.
     let glyph = glyph.into();
-    let icon = if glyph == "view-refresh-symbolic" {
+    let icon: cosmic::Element<'a, Message> = if glyph == "view-refresh-symbolic" {
         widget::container(widget::icon::from_name("view-refresh-symbolic").size(16))
             .center_x(36)
             .center_y(36)
+            .into()
     } else {
         widget::container(widget::text(glyph).size(20))
             .center_x(36)
             .center_y(36)
+            .into()
     };
     widget::button::custom(icon)
     .on_press(message)
