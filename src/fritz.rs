@@ -403,30 +403,58 @@ fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<
     let wanted: Vec<String> = selected_ains.iter().map(|ain| normalize_ain_for_selection(ain))
         .filter(|ain| !ain.is_empty()).collect();
     let mut readings = Vec::new();
+    let mut device_errors = Vec::new();
+
     for device in document.descendants().filter(|node| node.has_tag_name("device")) {
         let Some(ain) = device.attribute("identifier") else { continue };
-        if !wanted.iter().any(|selected| selected == &normalize_ain_for_selection(ain)) { continue; }
-        let power_mw = child_text(device, "powermeter", "power")
-            .ok_or_else(|| format!("Device {} does not expose power measurements", ain))?
-            .parse::<i64>().map_err(|_| format!("Device {} returned an invalid power measurement", ain))?;
-        let temperature_c = child_text(device, "temperature", "celsius")
-            .ok_or_else(|| format!("Device {} does not expose temperature measurements", ain))?
-            .parse::<i64>().map_err(|_| format!("Device {} returned an invalid temperature measurement", ain))? as f64 / 10.0;
-        let name = device.children().find(|child| child.has_tag_name("name")).and_then(|child| child.text())
-            .filter(|name| !name.trim().is_empty()).or_else(|| device.attribute("name"))
-            .unwrap_or("FRITZ!Box device").trim().to_string();
-        let power_state = parse_switch_state(child_text(device, "switch", "state"));
-        readings.push(FritzReading {
-            ain: ain.to_string(),
-            name,
-            power_w: power_mw / 1000,
-            temperature_c,
-            power_state,
-        });
+        if !wanted.iter().any(|selected| selected == &normalize_ain_for_selection(ain)) {
+            continue;
+        }
+
+        let name = device.children().find(|child| child.has_tag_name("name"))
+            .and_then(|child| child.text())
+            .filter(|name| !name.trim().is_empty())
+            .or_else(|| device.attribute("name"))
+            .unwrap_or("FRITZ!Box device")
+            .trim()
+            .to_string();
+
+        let reading = (|| {
+            let power_mw = child_text(device, "powermeter", "power")
+                .ok_or_else(|| "does not expose power measurements".to_string())?
+                .parse::<i64>()
+                .map_err(|_| "returned an invalid power measurement".to_string())?;
+            let temperature_c = child_text(device, "temperature", "celsius")
+                .ok_or_else(|| "does not expose temperature measurements".to_string())?
+                .parse::<i64>()
+                .map_err(|_| "returned an invalid temperature measurement".to_string())?
+                as f64 / 10.0;
+
+            Ok::<FritzReading, String>(FritzReading {
+                ain: ain.to_string(),
+                name: name.clone(),
+                power_w: power_mw / 1000,
+                temperature_c,
+                power_state: parse_switch_state(child_text(device, "switch", "state")),
+            })
+        })();
+
+        match reading {
+            Ok(reading) => readings.push(reading),
+            Err(error) => device_errors.push(format!("{name}: {error}")),
+        }
     }
+
     readings.sort_by_key(|reading| wanted.iter().position(|selected|
         selected == &normalize_ain_for_selection(&reading.ain)).unwrap_or(usize::MAX));
-    if readings.is_empty() { return Err("None of the selected FRITZ!Box devices were found".into()); }
+
+    if readings.is_empty() {
+        if device_errors.is_empty() {
+            return Err("None of the selected FRITZ!Box devices were found".into());
+        }
+        return Err(format!("No selected devices returned usable readings: {}", device_errors.join("; ")));
+    }
+
     Ok(readings)
 }
 
@@ -692,6 +720,31 @@ mod tests {
         assert_eq!(readings[1].name, "Solar inverter");
         assert_eq!(readings[1].power_w, 123);
         assert_eq!(readings[1].temperature_c, 21.5);
+    }
+
+    #[test]
+    fn skips_unavailable_selected_device_and_keeps_healthy_readings() {
+        let xml = r#"
+            <devicelist>
+              <device identifier="111111111111">
+                <name>Offline inverter</name>
+                <present>0</present>
+              </device>
+              <device identifier="222222222222">
+                <name>Working inverter</name>
+                <powermeter><power>456000</power></powermeter>
+                <temperature><celsius>198</celsius></temperature>
+              </device>
+            </devicelist>
+        "#;
+        let readings = parse_device_readings_xml(
+            xml,
+            &["111111111111".into(), "222222222222".into()],
+        ).unwrap();
+        assert_eq!(readings.len(), 1);
+        assert_eq!(readings[0].name, "Working inverter");
+        assert_eq!(readings[0].power_w, 456);
+        assert_eq!(readings[0].temperature_c, 19.8);
     }
 
     #[test]
