@@ -488,7 +488,7 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
         .query(&[("sid", sid.as_str()), ("switchcmd", command), ("ain", ain.as_str())])
         .send().await.map_err(|error| format!("FRITZ!Box power command failed: {error}"))?;
     let body = read_xml_response(response, "FRITZ!Box power command failed").await?;
-    if body.trim() != "1" && body.trim() != "0" {
+    if body.trim() != "1" {
         return Err(format!("FRITZ!Box rejected the power command: {}", body.trim()));
     }
 
