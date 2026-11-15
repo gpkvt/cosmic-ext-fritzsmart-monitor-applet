@@ -683,8 +683,6 @@ impl cosmic::Application for AppModel {
                 .push(widget::divider::horizontal::default())
                             content = content.push(settings_section_header("Panel", self.expanded_settings_sections.contains("panel"), "panel"));
             if self.expanded_settings_sections.contains("panel") {
-    content = content
-        .push(widget::text::caption("PANEL"))
                     .push(widget::text::body(format!("Panel text size: {} pt", self.settings.panel_text_size)))
                     .push(
                         widget::slider(
@@ -745,8 +743,6 @@ impl cosmic::Application for AppModel {
 
             content = content.push(settings_section_header("Weather", self.expanded_settings_sections.contains("weather"), "weather"));
             if self.expanded_settings_sections.contains("weather") {
-    content = content
-        .push(widget::text::caption("WEATHER"))
                     .push(widget::Row::new()
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::text::body("Use current weather icon"))
@@ -767,8 +763,6 @@ impl cosmic::Application for AppModel {
 
             content = content.push(settings_section_header("Connection", self.expanded_settings_sections.contains("connection"), "connection"));
             if self.expanded_settings_sections.contains("connection") {
-    content = content
-        .push(widget::text::caption("CONNECTION"))
                     .push(widget::text::body("FRITZ!Box URL"))
                     .push(
                         widget::text_input("https://fritz.box", &self.settings.url)
@@ -808,8 +802,6 @@ impl cosmic::Application for AppModel {
 
             content = content.push(settings_section_header("Devices", self.expanded_settings_sections.contains("device"), "device"));
             if self.expanded_settings_sections.contains("device") {
-    content = content
-        .push(widget::text::caption("DEVICE"))
                     .push(action_button("view-refresh-symbolic", "Load devices", Message::DiscoverDevices));
     
                 if !self.devices.is_empty() {
@@ -1598,12 +1590,12 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleSettings => {
                 self.settings_open = !self.settings_open;
+                self.settings_status = None;
             }
             Message::ToggleSettingsSection(section) => {
                 if !self.expanded_settings_sections.remove(section) {
                     self.expanded_settings_sections.insert(section);
                 }
-                self.settings_status = None;
             }
             Message::UrlChanged(value) => {
                 self.settings.url = value;
