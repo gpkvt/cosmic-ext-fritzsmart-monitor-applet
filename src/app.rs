@@ -80,6 +80,7 @@ pub enum Message {
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
+    PanelRefreshButtonChanged(bool),
     PanelAverageTemperatureChanged(bool),
     PanelExcludeSolarTemperatureChanged(bool),
     GraphTimespanChanged(u16),
@@ -1150,10 +1151,8 @@ impl cosmic::Application for AppModel {
             content
         };
 
-        // Keep the readings in their own popup button and provide a separate
-        // one-click refresh action at the panel's trailing edge. Since COSMIC
-        // places applets before Quick Settings, this puts the refresh symbol
-        // immediately to its left without making the whole applet clickable.
+        // Keep the readings in their own popup button so the refresh action
+        // can be shown or hidden independently in the applet's Panel settings.
         let button = widget::button::custom(content)
             .on_press(Message::TogglePopup)
             .padding([vertical_padding, horizontal_padding])
@@ -1176,12 +1175,15 @@ impl cosmic::Application for AppModel {
         .class(cosmic::theme::Button::AppletIcon)
         .name("Refresh now");
 
-        // Autosize the complete row so both panel controls remain visible.
-        let panel_controls = widget::Row::new()
-            .spacing(0)
-            .align_y(cosmic::iced::Alignment::Center)
-            .push(button)
-            .push(refresh_button);
+        let panel_controls = if self.settings.panel_refresh_button {
+            widget::Row::new()
+                .spacing(0)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(button)
+                .push(refresh_button)
+        } else {
+            widget::Row::new().push(button)
+        };
         widget::autosize::autosize(panel_controls, AUTOSIZE_MAIN_ID.clone()).into()
     }
 
@@ -1261,6 +1263,17 @@ impl cosmic::Application for AppModel {
                         .step(1.0),
                     )
                     .push(widget::text::caption("Adjusts the power and temperature text in the panel"))
+                    .push(widget::Row::new()
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::Column::new()
+                            .spacing(3)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::body("Show panel refresh button"))
+                            .push(widget::text::caption("Display a separate refresh button beside the applet in the panel.")))
+                        .push(widget::container(
+                            widget::toggler(self.settings.panel_refresh_button)
+                                .on_toggle(Message::PanelRefreshButtonChanged)
+                        ).padding([8, 10])))
                     .push(widget::Row::new()
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::Column::new()
@@ -2466,6 +2479,10 @@ impl cosmic::Application for AppModel {
             }
             Message::PanelTextSizeChanged(value) => {
                 self.settings.panel_text_size = value.clamp(10, 24);
+                self.persist_settings();
+            }
+            Message::PanelRefreshButtonChanged(value) => {
+                self.settings.panel_refresh_button = value;
                 self.persist_settings();
             }
             Message::PanelAverageTemperatureChanged(value) => {
