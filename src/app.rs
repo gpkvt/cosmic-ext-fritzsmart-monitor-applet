@@ -1137,9 +1137,11 @@ fn sortable_menu_card<'a>(
     id: String,
     card: cosmic::Element<'a, Message>,
 ) -> cosmic::Element<'a, Message> {
-    let drag_handle = widget::mouse_area(widget::text("⠿").size(24))
-        .on_press(Message::StartDeviceDrag(id.clone()))
-        .on_release(Message::EndDeviceDrag);
+    let drag_handle = widget::mouse_area(
+        widget::container(widget::text("⠿").size(24)).padding([10, 10]),
+    )
+    .on_press(Message::StartDeviceDrag(id.clone()))
+    .on_release(Message::EndDeviceDrag);
     let before = widget::mouse_area(
         widget::container(widget::divider::horizontal::default())
             .height(cosmic::iced::Length::Fixed(10.0))
