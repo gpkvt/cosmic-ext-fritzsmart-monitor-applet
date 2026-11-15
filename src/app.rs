@@ -1816,6 +1816,7 @@ impl cosmic::Application for AppModel {
                         ));
                     }
                 }
+            }
 
             if self.active_settings_section == Some("diagnostics") {
                 let endpoint = self.settings.url.trim();
@@ -2297,8 +2298,8 @@ impl cosmic::Application for AppModel {
                     })
                     .or_else(|| self.readings.first());
                 let summary_power = displayed_power_w(&self.readings, &self.selected_ains)
-                .map(|power| format!("{power} W"))
-                .unwrap_or_else(|| "-- W".into());
+                    .map(|power| format!("{power} W"))
+                    .unwrap_or_else(|| "-- W".into());
                 let summary_temperature = if self.settings.panel_average_temperature {
                     average_temperature_c(
                         &self.readings,
