@@ -795,7 +795,7 @@ impl cosmic::Application for AppModel {
                     let temperature_graph = device_history.map(|samples|
                         numeric_sparkline(samples.iter().map(|(_, _, temperature)| *temperature)))
                         .unwrap_or_else(|| "Waiting for samples…".into());
-                    let power_control = reading.power_state.map(|is_on| {
+                    let power_control: Option<cosmic::Element<'_, Message>> = reading.power_state.map(|is_on| {
                         let ain = reading.ain.clone();
                         let key = crate::fritz::normalize_ain_for_selection(&ain);
                         let pending = self.pending_power_changes.contains(&key);
