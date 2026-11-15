@@ -340,8 +340,9 @@ fn net_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
     }).sum()
 }
 
-fn graph_visual(values: impl Iterator<Item = f64>, style: &str) -> cosmic::Element<'static, Message> {
+fn graph_visual(values: impl Iterator<Item = f64>, style: &str, unit: &str) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
+    let current_value = values.last().copied().unwrap_or(0.0);
     const COUNT: usize = 24;
     const WIDTH: f64 = 120.0;
     const HEIGHT: f64 = 48.0;
@@ -372,7 +373,7 @@ fn graph_visual(values: impl Iterator<Item = f64>, style: &str) -> cosmic::Eleme
         format!("<polyline points=\"{points}\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>")
     };
     let baseline=HEIGHT-2.0;
-    let svg=format!("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {HEIGHT}\"><path d=\"M0 {baseline}H{WIDTH}\" stroke=\"#808080\" stroke-opacity=\"0.35\"/>{drawing}</svg>");
+    let svg=format!("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {HEIGHT}\"><title>{current_value:.1} {unit}</title><path d=\"M0 {baseline}H{WIDTH}\" stroke=\"#808080\" stroke-opacity=\"0.35\"/>{drawing}</svg>");
     widget::svg(cosmic::iced::widget::svg::Handle::from_memory(svg.into_bytes()))
         .width(cosmic::iced::Length::Fill).height(56).into()
 }
@@ -680,7 +681,7 @@ fn total_power_overview(
     let total_graph: cosmic::Element<'static, Message> = widget::Column::new()
         .spacing(4)
         .push(widget::text::caption("TOTAL POWER (W)"))
-        .push(graph_visual(history.iter().map(|(_, value)| *value as f64), &settings.graph_style))
+        .push(graph_visual(history.iter().map(|(_, value)| *value as f64), &settings.graph_style, "W"))
         .push(widget::Row::new()
             .width(cosmic::iced::Length::Fill)
             .push(widget::text::caption(axis_start.clone()))
@@ -705,7 +706,7 @@ fn total_power_overview(
                     reading.name,
                     signed_device_power(reading.power_w, true),
                 )))
-                .push(graph_visual(device_history.get(&key).into_iter().flat_map(|samples| samples.iter().map(|(_, power, _)| signed_device_power(*power, true) as f64)), &settings.graph_style))
+                .push(graph_visual(device_history.get(&key).into_iter().flat_map(|samples| samples.iter().map(|(_, power, _)| signed_device_power(*power, true) as f64)), &settings.graph_style, "W"))
                 .push(widget::Row::new()
                     .width(cosmic::iced::Length::Fill)
                     .push(widget::text::caption(axis_start.clone()))
@@ -1836,7 +1837,7 @@ impl cosmic::Application for AppModel {
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
                                                 .push(widget::text::caption("POWER (W)"))
-                                                .push(graph_visual(device_history.into_iter().flat_map(|samples| samples.iter().map(|(_, power, _)| *power as f64)), &self.settings.graph_style))
+                                                .push(graph_visual(device_history.into_iter().flat_map(|samples| samples.iter().map(|(_, power, _)| *power as f64)), &self.settings.graph_style, "W"))
                                                 .push(
                                                     widget::Row::new()
                                                         .width(cosmic::iced::Length::Fill)
@@ -1880,7 +1881,7 @@ impl cosmic::Application for AppModel {
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
                                                 .push(widget::text::caption("TEMPERATURE (°C)"))
-                                                .push(graph_visual(device_history.into_iter().flat_map(|samples| samples.iter().map(|(_, _, temperature)| *temperature)), &self.settings.graph_style))
+                                                .push(graph_visual(device_history.into_iter().flat_map(|samples| samples.iter().map(|(_, _, temperature)| *temperature)), &self.settings.graph_style, "°C"))
                                                 .push(
                                                     widget::Row::new()
                                                         .width(cosmic::iced::Length::Fill)
