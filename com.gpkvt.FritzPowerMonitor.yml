@@ -27,5 +27,5 @@ modules:
       - install -Dm0644 data/com.gpkvt.FritzPowerMonitor.svg /app/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg
     sources:
       - type: dir
-        path: .
+        path: flatpak-source
       - cargo-sources.json
