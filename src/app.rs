@@ -58,6 +58,10 @@ pub enum Message {
 
 
 
+fn temperature_outside_limits(temperature: f64, thresholds: TemperatureAlertThresholds) -> bool {
+    temperature > f64::from(thresholds.high_c) || temperature < f64::from(thresholds.low_c)
+}
+
 fn should_notify_temperature_alert(previously_outside: Option<bool>, currently_outside: bool) -> bool {
     previously_outside == Some(false) && currently_outside
 }
@@ -697,8 +701,7 @@ impl cosmic::Application for AppModel {
                         record_device_sample(&mut self.device_history, reading, now, history_window);
                         let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                         if let Some(thresholds) = self.settings.temperature_alerts.get(&key).copied() {
-                            let outside_limits = reading.temperature_c > f64::from(thresholds.high_c)
-                                || reading.temperature_c < f64::from(thresholds.low_c);
+                            let outside_limits = temperature_outside_limits(reading.temperature_c, thresholds);
                             if should_notify_temperature_alert(
                                 self.temperature_alert_state.get(&key).copied(),
                                 outside_limits,
@@ -845,6 +848,16 @@ impl cosmic::Application for AppModel {
 mod history_tests {
     use super::*;
 
+
+    #[test]
+    fn temperature_alert_limits_include_exact_boundary_values() {
+        let thresholds = TemperatureAlertThresholds::default();
+        assert!(!temperature_outside_limits(40.0, thresholds));
+        assert!(temperature_outside_limits(40.1, thresholds));
+        assert!(!temperature_outside_limits(-10.0, thresholds));
+        assert!(temperature_outside_limits(-10.1, thresholds));
+        assert!(!temperature_outside_limits(20.0, thresholds));
+    }
 
     #[test]
     fn temperature_alerts_only_fire_on_a_below_to_above_transition() {
