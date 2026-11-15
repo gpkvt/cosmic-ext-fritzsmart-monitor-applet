@@ -681,7 +681,7 @@ fn total_power_overview(
     let axis_start = format_graph_axis_start(settings.graph_timespan_minutes);
     let total_graph: cosmic::Element<'static, Message> = widget::Column::new()
         .spacing(4)
-        .push(widget::text::caption("TOTAL POWER (W)"))
+        .push(widget::text::caption("TOTAL POWER OUTPUT (W)"))
         .push(graph_visual(history.iter().map(|(_, value)| *value as f64), &settings.graph_style, "W"))
         .push(widget::Row::new()
             .width(cosmic::iced::Length::Fill)
@@ -734,7 +734,7 @@ fn total_power_overview(
             .push(widget::Column::new()
                 .spacing(3)
                 .width(cosmic::iced::Length::Fill)
-                .push(widget::text::body("Total power"))
+                .push(widget::text::body("Total power output"))
                 .push(widget::text::caption(format!("Net · Last {timespan}"))))
             .push(widget::text::title3(format!("{} W", total_power))))
         .push(
@@ -818,7 +818,7 @@ fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
         .push(widget::mouse_area(widget::text("⠿").size(20))
             .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string()))
             .on_release(Message::EndDeviceDrag))
-        .push(widget::text::body("Total power (net)").width(cosmic::iced::Length::Fill))
+        .push(widget::text::body("Total power output (net)").width(cosmic::iced::Length::Fill))
         .push(widget::text::caption(format!("#{position}")));
     widget::mouse_area(
         widget::container(row)
@@ -1543,7 +1543,7 @@ impl cosmic::Application for AppModel {
                     if !self.settings.total_power_first {
                         content = content.push(total_power_sort_row(self.selected_ains.len() + 1));
                     }
-                    content = content.push(widget::text::caption("Drag the ⠿ handles to reorder devices and Total power. Move Total power to the top to show combined net watts in the panel; move it to the bottom to show the first device's power and temperature. Temperature alerts notify once when a device crosses its configured threshold."));
+                    content = content.push(widget::text::caption("Drag the ⠿ handles to reorder devices and Total power output. Move Total power output to the top to show combined net watts in the panel; move it to the bottom to show the first device's power and temperature. Temperature alerts notify once when a device crosses its configured threshold."));
                 }
             }
 
