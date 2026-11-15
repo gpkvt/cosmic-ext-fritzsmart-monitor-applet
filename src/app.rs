@@ -17,6 +17,8 @@ use std::time::{Duration, Instant};
 static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
     LazyLock::new(|| widget::Id::new("fritz-power-monitor-autosize-main"));
 
+const TOTAL_POWER_DRAG_ID: &str = "__TOTAL_POWER__";
+
 #[derive(Default)]
 pub struct AppModel {
     core: cosmic::Core,
@@ -337,6 +339,55 @@ fn record_device_sample(
     }
 }
 
+fn move_sortable_entry(
+    ains: &mut Vec<String>,
+    total_power_first: &mut bool,
+    dragged: &str,
+    target: &str,
+) {
+    if dragged == TOTAL_POWER_DRAG_ID {
+        if target != TOTAL_POWER_DRAG_ID && ains.iter().any(|ain|
+            crate::fritz::normalize_ain_for_selection(ain)
+                == crate::fritz::normalize_ain_for_selection(target))
+        {
+            *total_power_first = true;
+        }
+    } else if target == TOTAL_POWER_DRAG_ID {
+        if ains.iter().any(|ain|
+            crate::fritz::normalize_ain_for_selection(ain)
+                == crate::fritz::normalize_ain_for_selection(dragged))
+        {
+            *total_power_first = false;
+        }
+    } else {
+        move_selected_device_to_drop_target(ains, dragged, target);
+    }
+}
+
+fn total_power_sort_row() -> cosmic::Element<'static, Message> {
+    let row = widget::Row::new()
+        .spacing(6)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(widget::mouse_area(widget::text("⠿").size(20))
+            .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string())))
+        .push(widget::text::body("Total power (net)"))
+        .push(widget::text::caption("combined"));
+    widget::mouse_area(
+        widget::container(row)
+            .padding(8)
+            .style(|theme| {
+                let cosmic = theme.cosmic();
+                let base = cosmic::iced::Color::from(cosmic.background(false).base);
+                cosmic::iced::widget::container::Style {
+                    background: Some(device_background_color(base, 0).into()),
+                    ..Default::default()
+                }
+            })
+    )
+    .on_enter(Message::DragOverDevice(TOTAL_POWER_DRAG_ID.to_string()))
+    .into()
+}
+
 fn move_selected_device_to_drop_target(ains: &mut Vec<String>, dragged_ain: &str, target_ain: &str) {
     let dragged = crate::fritz::normalize_ain_for_selection(dragged_ain);
     let target = crate::fritz::normalize_ain_for_selection(target_ain);
@@ -502,10 +553,22 @@ impl cosmic::Application for AppModel {
                 crate::fritz::normalize_ain_for_selection(&reading.ain)
                     == crate::fritz::normalize_ain_for_selection(selected)))
             .or_else(|| self.readings.first());
-        let power = primary_reading.map(|reading| format!("{} W", reading.power_w))
-            .unwrap_or_else(|| "-- W".to_string());
-        let temperature = primary_reading.map(|reading| format!("{:.1} °C", reading.temperature_c))
-            .unwrap_or_else(|| "-- °C".to_string());
+        let power = if self.settings.total_power_first {
+            if self.readings.is_empty() {
+                "-- W".to_string()
+            } else {
+                format!("{} W", net_power_w(&self.readings, &self.settings.input_ains))
+            }
+        } else {
+            primary_reading.map(|reading| format!("{} W", reading.power_w))
+                .unwrap_or_else(|| "-- W".to_string())
+        };
+        let temperature = if self.settings.total_power_first {
+            None
+        } else {
+            Some(primary_reading.map(|reading| format!("{:.1} °C", reading.temperature_c))
+                .unwrap_or_else(|| "-- °C".to_string()))
+        };
 
         let suggested = self.core.applet.suggested_size(true);
         let (major_padding, minor_padding) = self.core.applet.suggested_padding(true);
@@ -529,8 +592,12 @@ impl cosmic::Application for AppModel {
                     // a small top inset aligns their visual centers.
                     .padding([2, 0]),
             )
-            .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)))
-            .push(self.core.applet.text(temperature).size(f32::from(self.settings.panel_text_size)));
+            .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)));
+        let content = if let Some(temperature) = temperature {
+            content.push(self.core.applet.text(temperature).size(f32::from(self.settings.panel_text_size)))
+        } else {
+            content
+        };
 
         // Use a content-sized applet button: button_from_element() deliberately
         // fixes the width to an icon, while text_button() only accepts Text.
@@ -664,6 +731,9 @@ impl cosmic::Application for AppModel {
 
             if !self.devices.is_empty() {
                 content = content.push(widget::text::body("Select and order power-meter devices"));
+                if self.settings.total_power_first {
+                    content = content.push(total_power_sort_row());
+                }
                 let mut ordered_devices: Vec<&FritzDevice> = self.selected_ains.iter()
                     .filter_map(|ain| self.devices.iter().find(|device|
                         crate::fritz::normalize_ain_for_selection(&device.ain)
@@ -695,7 +765,10 @@ impl cosmic::Application for AppModel {
                                 move |checked| Message::ToggleDevice(ain.clone(), checked)
                             }));
                     if let Some(index) = selected_index {
-                        row = row.push(widget::text::caption(format!("#{}", index + 1)));
+                        row = row.push(widget::text::caption(format!(
+                            "#{}",
+                            index + 1 + usize::from(self.settings.total_power_first),
+                        )));
                     }
                     let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
                     let alert_thresholds = self.settings.temperature_alerts.get(&normalized_ain).copied();
@@ -774,7 +847,10 @@ impl cosmic::Application for AppModel {
                         );
                     }
                 }
-                content = content.push(widget::text::caption("Drag the ⠿ handle to reorder selected devices. The first selected device supplies the panel readings. Temperature alerts notify once when a device crosses its configured threshold."));
+                if !self.settings.total_power_first {
+                    content = content.push(total_power_sort_row());
+                }
+                content = content.push(widget::text::caption("Drag the ⠿ handles to reorder devices and Total power. Move Total power to the top to show combined net watts in the panel; move it to the bottom to show the first device's power and temperature. Temperature alerts notify once when a device crosses its configured threshold."));
             }
 
             content = content
@@ -1504,7 +1580,7 @@ impl cosmic::Application for AppModel {
                 ).into_iter().collect();
             }
             Message::StartDeviceDrag(ain) => {
-                if self.selected_ains.iter().any(|selected|
+                if ain == TOTAL_POWER_DRAG_ID || self.selected_ains.iter().any(|selected|
                     crate::fritz::normalize_ain_for_selection(selected)
                         == crate::fritz::normalize_ain_for_selection(&ain))
                 {
@@ -1515,12 +1591,15 @@ impl cosmic::Application for AppModel {
             }
             Message::DragOverDevice(target_ain) => {
                 if let Some(dragged_ain) = self.dragging_device_ain.as_deref() {
-                    let dragged = crate::fritz::normalize_ain_for_selection(dragged_ain);
-                    let target = crate::fritz::normalize_ain_for_selection(&target_ain);
-                    if dragged != target
-                        && self.drag_target_ain.as_deref().is_none_or(|current|
-                            crate::fritz::normalize_ain_for_selection(current) != target)
-                    {
+                    let target_is_valid = target_ain == TOTAL_POWER_DRAG_ID
+                        || self.selected_ains.iter().any(|selected|
+                            crate::fritz::normalize_ain_for_selection(selected)
+                                == crate::fritz::normalize_ain_for_selection(&target_ain));
+                    let same_target = self.drag_target_ain.as_deref().is_some_and(|current|
+                        current == target_ain
+                            || crate::fritz::normalize_ain_for_selection(current)
+                                == crate::fritz::normalize_ain_for_selection(&target_ain));
+                    if target_is_valid && dragged_ain != target_ain && !same_target {
                         self.drag_target_ain = Some(target_ain);
                         self.drag_target_since = Some(Instant::now());
                     }
@@ -1529,8 +1608,9 @@ impl cosmic::Application for AppModel {
             Message::EndDeviceDrag => {
                 if let Some(dragged_ain) = self.dragging_device_ain.take() {
                     if let Some(target_ain) = self.drag_target_ain.take() {
-                        move_selected_device_to_drop_target(
+                        move_sortable_entry(
                             &mut self.selected_ains,
+                            &mut self.settings.total_power_first,
                             &dragged_ain,
                             &target_ain,
                         );
@@ -1647,6 +1727,32 @@ mod history_tests {
         assert_eq!(ains, vec!["333333333333", "222222222222", "111111111111"]);
         move_selected_device_to_drop_target(&mut ains, "missing", "222222222222");
         assert_eq!(ains, vec!["333333333333", "222222222222", "111111111111"]);
+    }
+
+    #[test]
+    fn dragging_total_power_reorders_it_without_changing_device_selection() {
+        let mut ains = vec!["111111111111".into(), "222222222222".into()];
+        let mut total_first = false;
+
+        move_sortable_entry(&mut ains, &mut total_first, TOTAL_POWER_DRAG_ID, "111111111111");
+        assert!(total_first);
+        assert_eq!(ains, vec!["111111111111", "222222222222"]);
+
+        move_sortable_entry(&mut ains, &mut total_first, "222222222222", TOTAL_POWER_DRAG_ID);
+        assert!(!total_first);
+        assert_eq!(ains, vec!["111111111111", "222222222222"]);
+    }
+
+    #[test]
+    fn total_power_drag_ignores_unselected_targets() {
+        let mut ains = vec!["111111111111".into()];
+        let mut total_first = false;
+
+        move_sortable_entry(&mut ains, &mut total_first, TOTAL_POWER_DRAG_ID, "unselected");
+        assert!(!total_first);
+        move_sortable_entry(&mut ains, &mut total_first, "unselected", TOTAL_POWER_DRAG_ID);
+        assert!(!total_first);
+        assert_eq!(ains, vec!["111111111111"]);
     }
 
     #[test]
