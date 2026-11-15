@@ -1794,6 +1794,7 @@ impl cosmic::Application for AppModel {
                                             widget::Column::new()
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
+                                                .push(widget::text::caption("TEMPERATURE (°C)"))
                                                 .push(graph_visual(device_history.into_iter().flat_map(|samples| samples.iter().map(|(_, _, temperature)| *temperature)), &self.settings.graph_style))
                                                 .push(
                                                     widget::Row::new()
