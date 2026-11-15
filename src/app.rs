@@ -73,6 +73,7 @@ pub enum Message {
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
+    PanelPaddingChanged(u8),
     PanelAverageTemperatureChanged(bool),
     GraphTimespanChanged(u16),
     RefreshIntervalChanged(u32),
@@ -764,17 +765,9 @@ impl cosmic::Application for AppModel {
         };
 
         let suggested = self.core.applet.suggested_size(true);
-        let (major_padding, minor_padding) = self.core.applet.suggested_padding(true);
-        let vertical_padding = if self.core.applet.is_horizontal() {
-            minor_padding
-        } else {
-            major_padding
-        };
-        let horizontal_padding = if self.core.applet.is_horizontal() {
-            major_padding
-        } else {
-            minor_padding
-        };
+        let panel_padding = u16::from(self.settings.panel_padding);
+        let vertical_padding = panel_padding;
+        let horizontal_padding = panel_padding;
 
         let content = widget::Row::new()
             .spacing(6)
@@ -855,6 +848,16 @@ impl cosmic::Application for AppModel {
                         .step(1.0),
                     )
                     .push(widget::text::caption("Adjusts the power and temperature text in the panel"))
+                    .push(widget::text::body(format!("Panel padding: {} px", self.settings.panel_padding)))
+                    .push(
+                        widget::slider(
+                            0.0..=16.0,
+                            f32::from(self.settings.panel_padding),
+                            |value| Message::PanelPaddingChanged(value.round() as u8),
+                        )
+                        .step(1.0),
+                    )
+                    .push(widget::text::caption("Controls the space around the panel contents"))
                     .push(widget::Row::new()
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::text::body("Show average temperature in panel")
@@ -1730,6 +1733,10 @@ impl cosmic::Application for AppModel {
             }
             Message::PanelTextSizeChanged(value) => {
                 self.settings.panel_text_size = value.clamp(10, 24);
+                self.persist_settings();
+            }
+            Message::PanelPaddingChanged(value) => {
+                self.settings.panel_padding = value.min(16);
                 self.persist_settings();
             }
             Message::PanelAverageTemperatureChanged(value) => {
