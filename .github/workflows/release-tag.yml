@@ -44,6 +44,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         env:
           BUMP_TYPE: ${{ inputs.bump_type }}
+        shell: bash
         run: |
           set -euo pipefail
           if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
@@ -51,38 +52,26 @@ jobs:
             exit 1
           fi
 
-          # A queued manual run may have been created before an earlier run
-          # finished. Always base the next version bump on the current main.
-          git fetch origin main
-          git reset --hard origin/main
+          # A merge can land after the initial fetch but before the push.
+          # Recalculate the version from the newest main and retry only when
+          # the remote branch actually advanced.
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git reset --hard origin/main
+            base_sha="$(git rev-parse HEAD)"
 
-          new_version="$(python3 - <<'PY'
+            new_version="$(python3 - <<'PY'
           import os
+          import re
           from pathlib import Path
 
           path = Path("Cargo.toml")
-          lines = path.read_text().splitlines()
-          in_package = False
-          version_line = None
-          for index, line in enumerate(lines):
-              if line.strip() == "[package]":
-                  in_package = True
-                  continue
-              if line.startswith("["):
-                  in_package = False
-              if in_package and line.startswith("version = "):
-                  version_line = index
-                  break
+          text = path.read_text()
+          match = re.search(r'(?ms)^\\[package\\]\\s+.*?^version\\s*=\\s*"([0-9]+)\\.([0-9]+)\\.([0-9]+)"\\s*$', text)
+          if not match:
+              raise SystemExit("Could not find a stable [package].version in Cargo.toml")
 
-          if version_line is None:
-              raise SystemExit("Could not find [package].version in Cargo.toml")
-
-          current = lines[version_line].split('"')[1]
-          parts = current.split(".")
-          if len(parts) != 3 or not all(part.isdigit() for part in parts):
-              raise SystemExit(f"Expected stable MAJOR.MINOR.PATCH version, got {current!r}")
-          major, minor, patch = map(int, parts)
-
+          major, minor, patch = map(int, match.groups())
           bump = os.environ["BUMP_TYPE"]
           if bump == "major":
               major, minor, patch = major + 1, 0, 0
@@ -94,18 +83,42 @@ jobs:
               raise SystemExit(f"Unsupported bump type: {bump}")
 
           new_version = f"{major}.{minor}.{patch}"
-          lines[version_line] = f'version = "{new_version}"'
-          path.write_text("\n".join(lines) + "\n")
+          updated, count = re.subn(
+              r'(?ms)(^\\[package\\]\\s+.*?^version\\s*=\\s*")[0-9]+\\.[0-9]+\\.[0-9]+("\\s*$)',
+              rf'\\g<1>{new_version}\\g<2>',
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Failed to update [package].version")
+          path.write_text(updated)
           print(new_version)
           PY
-          )"
-          echo "Bumping package version to ${new_version}"
-          cargo update --workspace
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.toml Cargo.lock
-          git commit -m "chore(release): bump version to ${new_version}"
-          git push origin HEAD:main
+            )"
+
+            echo "Bumping package version to ${new_version} (attempt ${attempt}/5)"
+            cargo update --workspace
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add Cargo.toml Cargo.lock
+            git commit -m "chore(release): bump version to ${new_version}"
+
+            if git push origin HEAD:main; then
+              echo "Pushed version bump ${new_version}."
+              exit 0
+            fi
+
+            git fetch origin main
+            remote_sha="$(git rev-parse origin/main)"
+            if [[ "${remote_sha}" == "${base_sha}" ]]; then
+              echo "Push failed although main did not advance; check RELEASE_TOKEN and branch permissions." >&2
+              exit 1
+            fi
+            echo "main advanced during the bump; retrying against ${remote_sha}."
+          done
+
+          echo "Could not publish version bump after 5 attempts because main kept advancing." >&2
+          exit 1
 
       - name: Create or repair version tag
         shell: bash
