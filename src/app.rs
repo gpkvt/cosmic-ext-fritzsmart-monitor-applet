@@ -1246,7 +1246,12 @@ impl cosmic::Application for AppModel {
                     .input_ains
                     .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
             })
-            .then(|| format!("{} W", input_power_w(&self.readings, &self.settings.input_ains)));
+            .then(|| {
+                format!(
+                    "{} W",
+                    input_power_w(&self.readings, &self.settings.input_ains)
+                )
+            });
 
         let suggested = self.core.applet.suggested_size(true);
         // Keep a comfortable pointer/touch target with a compact icon-to-value gap.
@@ -1702,9 +1707,11 @@ impl cosmic::Application for AppModel {
                             .on_input(Message::DeviceSearchChanged),
                         );
                     let mut ordered_devices: Vec<&FritzDevice> = self.devices.iter().collect();
-                    ordered_devices.retain(|device| device_matches_search(device, &self.device_search));
+                    ordered_devices
+                        .retain(|device| device_matches_search(device, &self.device_search));
                     if ordered_devices.is_empty() {
-                        content = content.push(widget::text::caption("No devices match your search"));
+                        content =
+                            content.push(widget::text::caption("No devices match your search"));
                     }
                     for (row_index, device) in ordered_devices.iter().enumerate() {
                         let selected = self.selected_ains.iter().any(|selected_ain| {
@@ -1795,26 +1802,20 @@ impl cosmic::Application for AppModel {
                                     "Notify above the upper limit or below the lower limit",
                                 ));
                         }
-                        content = content.push(
-                            widget::container(device_row).padding(8).style(
-                                move |theme| {
-                                    let cosmic = theme.cosmic();
-                                    let base =
-                                        cosmic::iced::Color::from(cosmic.background(false).base);
-                                    cosmic::iced::widget::container::Style {
-                                        background: Some(
-                                            device_background_color(base, row_index).into(),
-                                        ),
-                                        ..Default::default()
-                                    }
-                                },
-                            ),
-                        );
-
+                        content = content.push(widget::container(device_row).padding(8).style(
+                            move |theme| {
+                                let cosmic = theme.cosmic();
+                                let base = cosmic::iced::Color::from(cosmic.background(false).base);
+                                cosmic::iced::widget::container::Style {
+                                    background: Some(
+                                        device_background_color(base, row_index).into(),
+                                    ),
+                                    ..Default::default()
+                                }
+                            },
+                        ));
+                    }
                 }
-            }
-
-            }
 
             if self.active_settings_section == Some("diagnostics") {
                 let endpoint = self.settings.url.trim();
@@ -2321,11 +2322,8 @@ impl cosmic::Application for AppModel {
                             input_power_w(&self.readings, &self.settings.input_ains)
                         )
                     });
-                let summary_card = live_power_summary(
-                    summary_power,
-                    summary_input,
-                    summary_temperature,
-                );
+                let summary_card =
+                    live_power_summary(summary_power, summary_input, summary_temperature);
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
                 menu_cards.push(("0-summary".to_string(), summary_card));
@@ -3467,10 +3465,7 @@ mod history_tests {
             },
         ];
         let selected = vec!["222222".to_string(), "111111".to_string()];
-        assert_eq!(
-            displayed_power_w(&readings, &selected),
-            Some(250)
-        );
+        assert_eq!(displayed_power_w(&readings, &selected), Some(250));
         assert_eq!(displayed_power_w(&[], &selected), None);
     }
 
@@ -3865,5 +3860,4 @@ mod history_tests {
             assert_eq!(pending_changes.contains("123456"), should_remain_pending);
         }
     }
-
 }
