@@ -85,6 +85,7 @@ pub enum Message {
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
     DeviceSearchChanged(String),
     ToggleDevice(String, bool),
+    MoveDevice(String, bool),
     ToggleDeviceInput(String, bool),
     ToggleTemperatureAlert(String, bool),
     TemperatureAlertHighChanged(String, i16),
@@ -1757,6 +1758,16 @@ impl cosmic::Application for AppModel {
                             .on_input(Message::DeviceSearchChanged),
                         );
                     let mut ordered_devices: Vec<&FritzDevice> = self.devices.iter().collect();
+                    ordered_devices.sort_by_key(|device| {
+                        self.settings
+                            .device_order
+                            .iter()
+                            .position(|ain| {
+                                crate::fritz::normalize_ain_for_selection(ain)
+                                    == crate::fritz::normalize_ain_for_selection(&device.ain)
+                            })
+                            .unwrap_or(usize::MAX)
+                    });
                     ordered_devices
                         .retain(|device| device_matches_search(device, &self.device_search));
                     if ordered_devices.is_empty() {
@@ -1779,7 +1790,18 @@ impl cosmic::Application for AppModel {
                                         let ain = ain.clone();
                                         move |checked| Message::ToggleDevice(ain.clone(), checked)
                                     }),
-                            );
+                            )
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(icon_action_button(
+                                "+",
+                                "Move device up",
+                                Message::MoveDevice(ain.clone(), true),
+                            ))
+                            .push(icon_action_button(
+                                "−",
+                                "Move device down",
+                                Message::MoveDevice(ain.clone(), false),
+                            ));
                         let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
                         let alert_thresholds = self
                             .settings
@@ -3143,6 +3165,38 @@ impl cosmic::Application for AppModel {
                 };
                 if let Some(target) = target {
                     self.settings.menu_order.swap(index, target);
+                    self.persist_settings();
+                }
+            }
+            Message::MoveDevice(ain, move_up) => {
+                let mut order: Vec<String> =
+                    self.devices.iter().map(|device| device.ain.clone()).collect();
+                order.sort_by_key(|device_ain| {
+                    self.settings
+                        .device_order
+                        .iter()
+                        .position(|existing| {
+                            crate::fritz::normalize_ain_for_selection(existing)
+                                == crate::fritz::normalize_ain_for_selection(device_ain)
+                        })
+                        .unwrap_or(usize::MAX)
+                });
+                let normalized = crate::fritz::normalize_ain_for_selection(&ain);
+                let Some(index) = order.iter().position(|device_ain| {
+                    crate::fritz::normalize_ain_for_selection(device_ain) == normalized
+                }) else {
+                    return Task::none();
+                };
+                let target = if move_up {
+                    index.checked_sub(1)
+                } else if index + 1 < order.len() {
+                    Some(index + 1)
+                } else {
+                    None
+                };
+                if let Some(target) = target {
+                    order.swap(index, target);
+                    self.settings.device_order = order;
                     self.persist_settings();
                 }
             }
