@@ -380,6 +380,7 @@ fn move_sortable_entry(
 
 fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
     let row = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
         .spacing(6)
         .align_y(cosmic::iced::Alignment::Center)
         .push(widget::mouse_area(widget::text("⠿").size(20))
@@ -588,9 +589,10 @@ impl cosmic::Application for AppModel {
             Some(primary_reading.map(|reading| format!("{:.1} °C", reading.temperature_c))
                 .unwrap_or_else(|| "-- °C".to_string()))
         };
-        let input_power = if self.settings.total_power_first {
-            let value = input_power_w(&self.readings, &self.settings.input_ains);
-            (value != 0).then(|| format!("{value} W"))
+        let input_power = if self.settings.total_power_first && self.readings.iter().any(|reading|
+            self.settings.input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+        ) {
+            Some(format!("{} W", input_power_w(&self.readings, &self.settings.input_ains)))
         } else {
             None
         };
@@ -1822,6 +1824,28 @@ mod history_tests {
         move_sortable_entry(&mut ains, &mut total_first, "unselected", TOTAL_POWER_DRAG_ID);
         assert!(!total_first);
         assert_eq!(ains, vec!["111111111111"]);
+    }
+
+    #[test]
+    fn input_power_totals_include_only_input_devices_and_keep_the_negative_sign() {
+        let readings = vec![
+            FritzReading { ain: "111111".into(), name: "Load".into(), power_w: 400, temperature_c: 20.0, power_state: None },
+            FritzReading { ain: "222222".into(), name: "Solar".into(), power_w: 250, temperature_c: 21.0, power_state: None },
+            FritzReading { ain: "333333".into(), name: "Solar battery".into(), power_w: 100, temperature_c: 22.0, power_state: None },
+        ];
+        let inputs = HashSet::from(["222222".to_string(), "333333".to_string()]);
+        assert_eq!(input_power_w(&readings, &inputs), -350);
+        assert_eq!(input_power_w(&readings, &HashSet::new()), 0);
+    }
+
+    #[test]
+    fn average_temperature_uses_all_available_selected_readings() {
+        let readings = vec![
+            FritzReading { ain: "111111".into(), name: "First".into(), power_w: 100, temperature_c: 20.0, power_state: None },
+            FritzReading { ain: "222222".into(), name: "Second".into(), power_w: 200, temperature_c: 24.0, power_state: None },
+        ];
+        assert_eq!(average_temperature_c(&readings), Some(22.0));
+        assert_eq!(average_temperature_c(&[]), None);
     }
 
     #[test]
