@@ -1103,8 +1103,10 @@ impl cosmic::Application for AppModel {
             content
                 .push(widget::icon::from_name("dialog-warning-symbolic")
                     .size(self.settings.panel_text_size.into()))
-                .push(self.core.applet.text("Connection error")
-                    .size(f32::from(self.settings.panel_text_size)))
+                .push(widget::container(
+                    self.core.applet.text("Connection error")
+                        .size(f32::from(self.settings.panel_text_size)),
+                ).padding([0, 0, 0, 4]))
         } else {
             content
         };
