@@ -82,6 +82,7 @@ pub enum Message {
     PanelAverageTemperatureChanged(bool),
     PanelExcludeSolarTemperatureChanged(bool),
     GraphTimespanChanged(u16),
+    GraphStyleChanged(String),
     RefreshIntervalChanged(u32),
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
@@ -336,6 +337,42 @@ fn net_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
         let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
         signed_device_power(reading.power_w, input_ains.contains(&key))
     }).sum()
+}
+
+fn graph_visual(values: impl Iterator<Item = f64>, style: &str) -> cosmic::Element<'static, Message> {
+    let values: Vec<f64> = values.collect();
+    if values.is_empty() { return widget::text::caption("Waiting for samples…").into(); }
+    const COUNT: usize = 24;
+    const WIDTH: f64 = 120.0;
+    const HEIGHT: f64 = 48.0;
+    let minimum = values.iter().copied().reduce(f64::min).unwrap_or(0.0);
+    let maximum = values.iter().copied().reduce(f64::max).unwrap_or(minimum);
+    let range = (maximum - minimum).max(1.0);
+    let samples: Vec<f64> = if values.len() == 1 { vec![values[0]; COUNT] } else {
+        (0..COUNT).map(|i| {
+            let p = i as f64 * (values.len()-1) as f64 / (COUNT-1) as f64;
+            let l = p.floor() as usize; let r = (l+1).min(values.len()-1);
+            values[l] + (values[r]-values[l])*(p-l as f64)
+        }).collect()
+    };
+    let y = |v: f64| HEIGHT - 4.0 - ((v-minimum)/range)*(HEIGHT-8.0);
+    let drawing = if style == "bar" {
+        let slot = WIDTH / COUNT as f64;
+        samples.iter().enumerate().map(|(i,v)| {
+            let top=y(*v);
+            format!("<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"1\" fill=\"#8ab4f8\"/>",
+                i as f64*slot+1.0, top, slot-2.0, (HEIGHT-4.0-top).max(1.0))
+        }).collect::<String>()
+    } else {
+        let points=samples.iter().enumerate().map(|(i,v)|
+            format!("{:.2},{:.2}",i as f64*WIDTH/(COUNT-1) as f64,y(*v))
+        ).collect::<Vec<_>>().join(" ");
+        format!("<polyline points=\"{points}\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>")
+    };
+    let baseline=HEIGHT-2.0;
+    let svg=format!("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {HEIGHT}\"><path d=\"M0 {baseline}H{WIDTH}\" stroke=\"#808080\" stroke-opacity=\"0.35\"/>{drawing}</svg>");
+    widget::svg(cosmic::iced::widget::svg::Handle::from_memory(svg.into_bytes()))
+        .width(cosmic::iced::Length::Fill).height(56).into()
 }
 
 fn power_sparkline(history: &VecDeque<(Instant, i64)>) -> String {
@@ -679,9 +716,7 @@ fn total_power_overview(
     let total_graph: cosmic::Element<'static, Message> = widget::Column::new()
         .spacing(4)
         .push(widget::text::caption("TOTAL POWER (W)"))
-        .push(widget::text::body(power_sparkline(history))
-            .width(cosmic::iced::Length::Fill)
-            .align_x(cosmic::iced::Alignment::End))
+        .push(graph_visual(history.iter().map(|(_, value)| *value as f64), &settings.graph_style))
         .push(widget::Row::new()
             .width(cosmic::iced::Length::Fill)
             .push(widget::text::caption(axis_start.clone()))
@@ -698,10 +733,6 @@ fn total_power_overview(
     }) {
         has_input_graph = true;
         let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-        let graph = device_history.get(&key)
-            .map(|samples| numeric_sparkline(samples.iter().map(|(_, power, _)|
-                signed_device_power(*power, true) as f64)))
-            .unwrap_or_else(|| "Waiting for samples…".into());
         input_graphs = input_graphs.push(
             widget::Column::new()
                 .spacing(4)
@@ -710,9 +741,7 @@ fn total_power_overview(
                     reading.name,
                     signed_device_power(reading.power_w, true),
                 )))
-                .push(widget::text::body(graph)
-                    .width(cosmic::iced::Length::Fill)
-                    .align_x(cosmic::iced::Alignment::End))
+                .push(graph_visual(device_history.get(&key).into_iter().flat_map(|samples| samples.iter().map(|(_, power, _)| signed_device_power(*power, true) as f64)), &settings.graph_style))
                 .push(widget::Row::new()
                     .width(cosmic::iced::Length::Fill)
                     .push(widget::text::caption(axis_start.clone()))
@@ -1214,19 +1243,17 @@ impl cosmic::Application for AppModel {
             }
 
             if self.active_settings_section == Some("graph") {
-    content = content
-        .push(widget::text::caption(format!(
-                        "GRAPH HISTORY: {}",
-                        format_graph_timespan(self.settings.graph_timespan_minutes)
-                    )))
-                    .push(
-                        widget::slider(
-                            5.0..=1440.0,
-                            f32::from(self.settings.graph_timespan_minutes),
-                            |value| Message::GraphTimespanChanged(value.round() as u16),
-                        )
-                        .step(5.0),
-                    )
+                content = content
+                    .push(widget::text::caption("GRAPH STYLE"))
+                    .push(widget::Row::new().spacing(8)
+                        .push(widget::button::text(if self.settings.graph_style == "line" { "✓ Line" } else { "Line" })
+                            .on_press(Message::GraphStyleChanged("line".into())))
+                        .push(widget::button::text(if self.settings.graph_style == "bar" { "✓ Bar" } else { "Bar" })
+                            .on_press(Message::GraphStyleChanged("bar".into()))))
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::caption(format!("GRAPH HISTORY: {}", format_graph_timespan(self.settings.graph_timespan_minutes))))
+                    .push(widget::slider(5.0..=1440.0, f32::from(self.settings.graph_timespan_minutes),
+                        |value| Message::GraphTimespanChanged(value.round() as u16)).step(5.0))
                     .push(widget::text::caption("5 minutes to 24 hours; samples are collected once per refresh"))
                     .push(widget::divider::horizontal::default())
             }
@@ -1669,12 +1696,6 @@ impl cosmic::Application for AppModel {
                     let is_expanded = self.collapsed_devices.contains(&device_key);
                     let device_corner_radius = device_corner_radius(index, self.readings.len());
                     let device_history = self.device_history.get(&device_key);
-                    let power_graph = device_history.map(|samples|
-                        numeric_sparkline(samples.iter().map(|(_, power, _)| *power as f64)))
-                        .unwrap_or_else(|| "Waiting for samples…".into());
-                    let temperature_graph = device_history.map(|samples|
-                        numeric_sparkline(samples.iter().map(|(_, _, temperature)| *temperature)))
-                        .unwrap_or_else(|| "Waiting for samples…".into());
                     let power_toggle: Option<cosmic::Element<'_, Message>> = reading.power_state.map(|is_on| {
                         let ain = reading.ain.clone();
                         let key = crate::fritz::normalize_ain_for_selection(&ain);
@@ -1723,9 +1744,7 @@ impl cosmic::Application for AppModel {
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
                                                 .push(widget::text::caption("POWER (W)"))
-                                                .push(widget::text::body(power_graph)
-                                                    .width(cosmic::iced::Length::Fill)
-                                                    .align_x(cosmic::iced::Alignment::End))
+                                                .push(graph_visual(device_history.into_iter().flat_map(|samples| samples.iter().map(|(_, power, _)| *power as f64)), &self.settings.graph_style))
                                                 .push(
                                                     widget::Row::new()
                                                         .width(cosmic::iced::Length::Fill)
@@ -1768,9 +1787,7 @@ impl cosmic::Application for AppModel {
                                             widget::Column::new()
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
-                                                .push(widget::text::body(temperature_graph)
-                                                    .width(cosmic::iced::Length::Fill)
-                                                    .align_x(cosmic::iced::Alignment::End))
+                                                .push(graph_visual(device_history.into_iter().flat_map(|samples| samples.iter().map(|(_, _, temperature)| *temperature)), &self.settings.graph_style))
                                                 .push(
                                                     widget::Row::new()
                                                         .width(cosmic::iced::Length::Fill)
@@ -2295,6 +2312,10 @@ impl cosmic::Application for AppModel {
                 for samples in self.device_history.values_mut() {
                     samples.retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
                 }
+                self.persist_settings();
+            }
+            Message::GraphStyleChanged(value) => {
+                self.settings.graph_style = if value == "bar" { "bar".into() } else { "line".into() };
                 self.persist_settings();
             }
             Message::RefreshIntervalChanged(value) => {
