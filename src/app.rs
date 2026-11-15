@@ -17,14 +17,6 @@ use std::time::{Duration, Instant};
 
 static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
     LazyLock::new(|| widget::Id::new("fritz-power-monitor-autosize-main"));
-static DRAG_SCROLL_ID: LazyLock<widget::Id> =
-    LazyLock::new(|| widget::Id::new("fritz-power-monitor-drag-scroll"));
-
-const TOTAL_POWER_DRAG_ID: &str = "__TOTAL_POWER__";
-const POWER_DIFFERENCE_DRAG_ID: &str = "__POWER_DIFFERENCE__";
-const SUMMARY_DRAG_ID: &str = "__LIVE_SUMMARY__";
-const WEATHER_DRAG_ID: &str = "__WEATHER__";
-
 #[derive(Default)]
 pub struct AppModel {
     core: cosmic::Core,
@@ -41,14 +33,6 @@ pub struct AppModel {
     devices_loading: bool,
     device_search: String,
     selected_ains: Vec<String>,
-    dragging_device_ain: Option<String>,
-    drag_scroll_direction: i8,
-    drag_target_ain: Option<String>,
-    drag_target_after: bool,
-    drag_target_since: Option<Instant>,
-    drag_original_ains: Option<Vec<String>>,
-    drag_original_total_power_first: Option<bool>,
-    drag_original_menu_order: Option<Vec<String>>,
     settings_status: Option<String>,
     settings_saved_until: Option<Instant>,
     history: VecDeque<(Instant, i64)>,
@@ -102,11 +86,6 @@ pub enum Message {
     DeviceSearchChanged(String),
     ToggleDevice(String, bool),
     ToggleDeviceInput(String, bool),
-    StartDeviceDrag(String),
-    DragOverDevice(String, bool),
-    DragPointerMoved(f32),
-    DragPointerLeft,
-    EndDeviceDrag,
     ToggleTemperatureAlert(String, bool),
     TemperatureAlertHighChanged(String, i16),
     TemperatureAlertLowChanged(String, i16),
@@ -514,97 +493,6 @@ fn record_device_sample(
     }
     while samples.len() > max_history_samples(window) {
         samples.pop_front();
-    }
-}
-
-fn move_menu_entry_at(order: &mut Vec<String>, dragged: &str, target: &str, after: bool) {
-    let normalize = |entry: &str| {
-        if entry == TOTAL_POWER_DRAG_ID
-            || entry == POWER_DIFFERENCE_DRAG_ID
-            || entry == SUMMARY_DRAG_ID
-            || entry == WEATHER_DRAG_ID
-        {
-            entry.to_string()
-        } else {
-            crate::fritz::normalize_ain_for_selection(entry)
-        }
-    };
-    let dragged = normalize(dragged);
-    let target = normalize(target);
-    let Some(from) = order.iter().position(|entry| normalize(entry) == dragged) else {
-        return;
-    };
-    let Some(target_before_removal) = order.iter().position(|entry| normalize(entry) == target)
-    else {
-        return;
-    };
-    if from == target_before_removal {
-        return;
-    }
-    let entry = order.remove(from);
-    let Some(target_index) = order.iter().position(|item| normalize(item) == target) else {
-        order.insert(from.min(order.len()), entry);
-        return;
-    };
-    let insertion_index = target_index + if after { 1 } else { 0 };
-    order.insert(insertion_index.min(order.len()), entry);
-}
-
-#[cfg(test)]
-fn move_menu_entry(order: &mut Vec<String>, dragged: &str, target: &str) {
-    let normalize = |entry: &str| {
-        if entry == TOTAL_POWER_DRAG_ID
-            || entry == POWER_DIFFERENCE_DRAG_ID
-            || entry == SUMMARY_DRAG_ID
-            || entry == WEATHER_DRAG_ID
-        {
-            entry.to_string()
-        } else {
-            crate::fritz::normalize_ain_for_selection(entry)
-        }
-    };
-    let dragged = normalize(dragged);
-    let target = normalize(target);
-    let Some(from) = order.iter().position(|entry| normalize(entry) == dragged) else {
-        return;
-    };
-    let Some(to) = order.iter().position(|entry| normalize(entry) == target) else {
-        return;
-    };
-    if from != to {
-        let entry = order.remove(from);
-        order.insert(to, entry);
-    }
-}
-
-// Retained only for the legacy device-order unit tests.
-#[cfg(test)]
-fn move_sortable_entry(
-    ains: &mut Vec<String>,
-    total_power_first: &mut bool,
-    dragged: &str,
-    target: &str,
-) {
-    if dragged == TOTAL_POWER_DRAG_ID {
-        if target != TOTAL_POWER_DRAG_ID
-            && ains.iter().any(|ain| {
-                crate::fritz::normalize_ain_for_selection(ain)
-                    == crate::fritz::normalize_ain_for_selection(target)
-            })
-        {
-            *total_power_first = true;
-        }
-    } else if target == TOTAL_POWER_DRAG_ID {
-        if let Some(index) = ains.iter().position(|ain| {
-            crate::fritz::normalize_ain_for_selection(ain)
-                == crate::fritz::normalize_ain_for_selection(dragged)
-        }) {
-            let device = ains.remove(index);
-            ains.push(device);
-            *total_power_first = false;
-        }
-    } else {
-        move_selected_device_to_drop_target(ains, dragged, target);
     }
 }
 
@@ -1080,7 +968,7 @@ fn settings_section_details(section: &'static str) -> (&'static str, &'static st
         ),
         "weather" => ("Weather", "Show local weather alongside power readings"),
         "connection" => ("Connection", "FRITZ!Box address and security settings"),
-        "device" => ("Devices", "Select, order and configure monitored devices"),
+        "device" => ("Devices", "Select and configure monitored devices"),
         "diagnostics" => ("Diagnostics", "Connection and settings status"),
         _ => ("Settings", "Configure your power monitor"),
     }
@@ -1105,7 +993,7 @@ fn settings_section_header<'a>(
             "Current conditions and background",
         ),
         "connection" => ("network-server-symbolic", "FRITZ!Box access and security"),
-        "device" => ("computer-symbolic", "Choose, order and configure devices"),
+        "device" => ("computer-symbolic", "Choose and configure devices"),
         "diagnostics" => ("dialog-information-symbolic", "Connection and save status"),
         _ => ("preferences-system-symbolic", "Applet preferences"),
     };
@@ -1133,185 +1021,6 @@ fn settings_section_header<'a>(
     .class(cosmic::theme::Button::Text)
     .into();
     section_row
-}
-
-fn sortable_menu_card<'a>(
-    id: String,
-    card: cosmic::Element<'a, Message>,
-    _is_dragging: bool,
-) -> cosmic::Element<'a, Message> {
-    // The pinned libcosmic Iced API does not expose a stack/opacity widget.
-    // Keep the original card intact while the drag handle and drop indicators
-    // communicate the active drag state.
-    let card = card;
-
-    let drag_handle =
-        widget::mouse_area(widget::container(widget::text("⠿").size(24)).padding([10, 10]))
-            .on_press(Message::StartDeviceDrag(id.clone()))
-            .on_release(Message::EndDeviceDrag);
-    let before = widget::mouse_area(
-        widget::container(widget::divider::horizontal::default())
-            .height(cosmic::iced::Length::Fixed(10.0))
-            .width(cosmic::iced::Length::Fill),
-    )
-    .on_enter(Message::DragOverDevice(id.clone(), false))
-    .on_release(Message::EndDeviceDrag);
-    let after = widget::mouse_area(
-        widget::container(widget::divider::horizontal::default())
-            .height(cosmic::iced::Length::Fixed(10.0))
-            .width(cosmic::iced::Length::Fill),
-    )
-    .on_enter(Message::DragOverDevice(id.clone(), true))
-    .on_release(Message::EndDeviceDrag);
-    let drop_target = widget::mouse_area(card)
-        .on_enter(Message::DragOverDevice(id, false))
-        .on_release(Message::EndDeviceDrag);
-    widget::Column::new()
-        .spacing(0)
-        .width(cosmic::iced::Length::Fill)
-        .push(before)
-        .push(
-            widget::Row::new()
-                .spacing(6)
-                .align_y(cosmic::iced::Alignment::Start)
-                .width(cosmic::iced::Length::Fill)
-                .push(widget::container(drag_handle).padding([8, 2]))
-                .push(widget::container(drop_target).width(cosmic::iced::Length::Fill)),
-        )
-        .push(after)
-        .into()
-}
-
-fn special_menu_sort_row(
-    id: &'static str,
-    label: &'static str,
-    position: usize,
-) -> cosmic::Element<'static, Message> {
-    let row = widget::Row::new()
-        .width(cosmic::iced::Length::Fill)
-        .spacing(6)
-        .align_y(cosmic::iced::Alignment::Center)
-        .push(
-            widget::mouse_area(widget::text("⠿").size(20))
-                .on_press(Message::StartDeviceDrag(id.to_string()))
-                .on_release(Message::EndDeviceDrag),
-        )
-        .push(widget::text::body(label).width(cosmic::iced::Length::Fill))
-        .push(widget::text::caption(format!("#{position}")));
-    widget::mouse_area(
-        widget::container(row)
-            .width(cosmic::iced::Length::Fill)
-            .padding(8)
-            .style(|theme| {
-                let cosmic = theme.cosmic();
-                let base = cosmic::iced::Color::from(cosmic.background(false).base);
-                cosmic::iced::widget::container::Style {
-                    background: Some(device_background_color(base, 0).into()),
-                    ..Default::default()
-                }
-            }),
-    )
-    .on_enter(Message::DragOverDevice(id.to_string(), false))
-    .on_release(Message::EndDeviceDrag)
-    .into()
-}
-
-fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
-    let row = widget::Row::new()
-        .width(cosmic::iced::Length::Fill)
-        .spacing(6)
-        .align_y(cosmic::iced::Alignment::Center)
-        .push(
-            widget::mouse_area(widget::text("⠿").size(20))
-                .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string()))
-                .on_release(Message::EndDeviceDrag),
-        )
-        .push(widget::text::body("Total power output").width(cosmic::iced::Length::Fill))
-        .push(widget::text::caption(format!("#{position}")));
-    widget::mouse_area(
-        widget::container(row)
-            .width(cosmic::iced::Length::Fill)
-            .padding(8)
-            .style(|theme| {
-                let cosmic = theme.cosmic();
-                let base = cosmic::iced::Color::from(cosmic.background(false).base);
-                cosmic::iced::widget::container::Style {
-                    background: Some(device_background_color(base, 0).into()),
-                    ..Default::default()
-                }
-            }),
-    )
-    .on_enter(Message::DragOverDevice(
-        TOTAL_POWER_DRAG_ID.to_string(),
-        false,
-    ))
-    .on_release(Message::EndDeviceDrag)
-    .into()
-}
-
-fn power_difference_sort_row(position: usize) -> cosmic::Element<'static, Message> {
-    let row = widget::Row::new()
-        .width(cosmic::iced::Length::Fill)
-        .spacing(6)
-        .align_y(cosmic::iced::Alignment::Center)
-        .push(
-            widget::mouse_area(widget::text("⠿").size(20))
-                .on_press(Message::StartDeviceDrag(
-                    POWER_DIFFERENCE_DRAG_ID.to_string(),
-                ))
-                .on_release(Message::EndDeviceDrag),
-        )
-        .push(widget::text::body("Power difference").width(cosmic::iced::Length::Fill))
-        .push(widget::text::caption(format!("#{position}")));
-    widget::mouse_area(
-        widget::container(row)
-            .width(cosmic::iced::Length::Fill)
-            .padding(8)
-            .style(|theme| {
-                let cosmic = theme.cosmic();
-                let base = cosmic::iced::Color::from(cosmic.background(false).base);
-                cosmic::iced::widget::container::Style {
-                    background: Some(device_background_color(base, 0).into()),
-                    ..Default::default()
-                }
-            }),
-    )
-    .on_enter(Message::DragOverDevice(
-        POWER_DIFFERENCE_DRAG_ID.to_string(),
-        false,
-    ))
-    .on_release(Message::EndDeviceDrag)
-    .into()
-}
-
-#[cfg(test)]
-fn move_selected_device_to_drop_target(
-    ains: &mut Vec<String>,
-    dragged_ain: &str,
-    target_ain: &str,
-) {
-    let dragged = crate::fritz::normalize_ain_for_selection(dragged_ain);
-    let target = crate::fritz::normalize_ain_for_selection(target_ain);
-    let Some(from) = ains
-        .iter()
-        .position(|ain| crate::fritz::normalize_ain_for_selection(ain) == dragged)
-    else {
-        return;
-    };
-    let Some(target_index) = ains
-        .iter()
-        .position(|ain| crate::fritz::normalize_ain_for_selection(ain) == target)
-    else {
-        return;
-    };
-    if from == target_index {
-        return;
-    }
-
-    let device = ains.remove(from);
-    // Inserting at the target's original index places the dragged device
-    // after a target it crossed downward, or before one it crossed upward.
-    ains.insert(target_index, device);
 }
 
 fn icon_action_button<'a>(
@@ -1462,7 +1171,7 @@ fn diagnostics_clock_ticks() -> impl futures::Stream<Item = Message> {
     clock_ticks(Duration::from_millis(250))
 }
 
-fn drag_animation_ticks() -> impl futures::Stream<Item = Message> {
+fn animation_ticks() -> impl futures::Stream<Item = Message> {
     clock_ticks(Duration::from_millis(16))
 }
 
@@ -1501,10 +1210,9 @@ impl cosmic::Application for AppModel {
     fn subscription(&self) -> Subscription<Self::Message> {
         // Use non-capturing function pointers: this libcosmic iced version's
         // Subscription::run accepts a fn pointer rather than a closure.
-        // Dragging gets frame-rate ticks for the animated insertion preview;
-        // otherwise a one-second tick updates countdowns and deadlines.
-        if self.dragging_device_ain.is_some() || self.refresh_started_at.is_some() {
-            Subscription::run(drag_animation_ticks)
+        // Refreshing gets frame-rate ticks for the spinner; otherwise a one-second tick updates countdowns and deadlines.
+        if self.refresh_started_at.is_some() {
+            Subscription::run(animation_ticks)
         } else if self.active_settings_section == Some("diagnostics") {
             // Refresh the diagnostics view frequently so newly recorded HTTP
             // responses appear while the section remains open.
@@ -2016,7 +1724,7 @@ impl cosmic::Application for AppModel {
 
                 if !self.devices.is_empty() {
                     content = content
-                        .push(widget::text::body("Select and order power-meter devices"))
+                        .push(widget::text::body("Select power-meter devices"))
                         .push(
                             widget::text_input(
                                 "Search devices by name or AIN",
@@ -2024,127 +1732,28 @@ impl cosmic::Application for AppModel {
                             )
                             .on_input(Message::DeviceSearchChanged),
                         );
-                    let mut inserted_specials = HashSet::new();
-                    let mut ordered_devices: Vec<&FritzDevice> = self
-                        .selected_ains
-                        .iter()
-                        .filter_map(|ain| {
-                            self.devices.iter().find(|device| {
-                                crate::fritz::normalize_ain_for_selection(&device.ain)
-                                    == crate::fritz::normalize_ain_for_selection(ain)
-                            })
-                        })
-                        .collect();
-                    ordered_devices.extend(self.devices.iter().filter(|device| {
-                        !self.selected_ains.iter().any(|ain| {
-                            crate::fritz::normalize_ain_for_selection(ain)
-                                == crate::fritz::normalize_ain_for_selection(&device.ain)
-                        })
-                    }));
-                    ordered_devices
-                        .retain(|device| device_matches_search(device, &self.device_search));
+                    let mut ordered_devices: Vec<&FritzDevice> = self.devices.iter().collect();
+                    ordered_devices.retain(|device| device_matches_search(device, &self.device_search));
                     if ordered_devices.is_empty() {
-                        content =
-                            content.push(widget::text::caption("No devices match your search"));
+                        content = content.push(widget::text::caption("No devices match your search"));
                     }
                     for (row_index, device) in ordered_devices.iter().enumerate() {
-                        let selected_index = self.selected_ains.iter().position(|ain| {
-                            crate::fritz::normalize_ain_for_selection(ain)
+                        let selected = self.selected_ains.iter().any(|selected_ain| {
+                            crate::fritz::normalize_ain_for_selection(selected_ain)
                                 == crate::fritz::normalize_ain_for_selection(&device.ain)
                         });
-                        if let Some(_) = selected_index {
-                            let device_key = crate::fritz::normalize_ain_for_selection(&device.ain);
-                            let device_position = self
-                                .settings
-                                .menu_order
-                                .iter()
-                                .position(|entry| entry == &device_key)
-                                .unwrap_or(usize::MAX);
-                            let total_position = self
-                                .settings
-                                .menu_order
-                                .iter()
-                                .position(|entry| entry == TOTAL_POWER_DRAG_ID)
-                                .unwrap_or(usize::MAX);
-                            let difference_position = self
-                                .settings
-                                .menu_order
-                                .iter()
-                                .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID)
-                                .unwrap_or(usize::MAX);
-                            let summary_position = self
-                                .settings
-                                .menu_order
-                                .iter()
-                                .position(|entry| entry == SUMMARY_DRAG_ID)
-                                .unwrap_or(usize::MAX);
-                            let weather_position = self
-                                .settings
-                                .menu_order
-                                .iter()
-                                .position(|entry| entry == WEATHER_DRAG_ID)
-                                .unwrap_or(usize::MAX);
-                            if weather_position <= device_position
-                                && inserted_specials.insert(WEATHER_DRAG_ID)
-                            {
-                                content = content.push(special_menu_sort_row(
-                                    WEATHER_DRAG_ID,
-                                    "Weather",
-                                    weather_position + 1,
-                                ));
-                            }
-                            if summary_position <= device_position
-                                && inserted_specials.insert(SUMMARY_DRAG_ID)
-                            {
-                                content = content.push(special_menu_sort_row(
-                                    SUMMARY_DRAG_ID,
-                                    "Live power summary",
-                                    summary_position + 1,
-                                ));
-                            }
-                            if total_position <= device_position
-                                && inserted_specials.insert(TOTAL_POWER_DRAG_ID)
-                            {
-                                content = content.push(total_power_sort_row(total_position + 1));
-                            }
-                            if difference_position <= device_position
-                                && inserted_specials.insert(POWER_DIFFERENCE_DRAG_ID)
-                            {
-                                content = content
-                                    .push(power_difference_sort_row(difference_position + 1));
-                            }
-                        }
-                        let selected = selected_index.is_some();
                         let ain = device.ain.clone();
-                        let mut row = widget::Row::new()
+                        let row = widget::Row::new()
                             .spacing(6)
-                            .align_y(cosmic::iced::Alignment::Center);
-                        if selected {
-                            row = row.push(
-                                widget::mouse_area(widget::text("⠿").size(20))
-                                    .on_press(Message::StartDeviceDrag(ain.clone()))
-                                    .on_release(Message::EndDeviceDrag),
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::checkbox(selected)
+                                    .label(device.name.clone())
+                                    .on_toggle({
+                                        let ain = ain.clone();
+                                        move |checked| Message::ToggleDevice(ain.clone(), checked)
+                                    }),
                             );
-                        }
-                        row = row.push(
-                            widget::checkbox(selected)
-                                .label(device.name.clone())
-                                .on_toggle({
-                                    let ain = ain.clone();
-                                    move |checked| Message::ToggleDevice(ain.clone(), checked)
-                                }),
-                        );
-                        if selected_index.is_some() {
-                            let position = self
-                                .settings
-                                .menu_order
-                                .iter()
-                                .position(|entry| {
-                                    entry == &crate::fritz::normalize_ain_for_selection(&ain)
-                                })
-                                .unwrap_or_else(|| selected_index.unwrap_or_default());
-                            row = row.push(widget::text::caption(format!("#{}", position + 1)));
-                        }
                         let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
                         let alert_thresholds = self
                             .settings
@@ -2230,69 +1839,9 @@ impl cosmic::Application for AppModel {
                                         ..Default::default()
                                     }
                                 },
-                            ))
-                            .on_enter(Message::DragOverDevice(ain.clone(), false))
-                            .on_release(Message::EndDeviceDrag),
+                            ),
                         );
-                        if self.dragging_device_ain.is_some()
-                            && self.drag_target_ain.as_deref().is_some_and(|target| {
-                                crate::fritz::normalize_ain_for_selection(target)
-                                    == crate::fritz::normalize_ain_for_selection(&ain)
-                            })
-                        {
-                            let progress = self
-                                .drag_target_since
-                                .map(|started| {
-                                    (started.elapsed().as_secs_f32() / 0.18).clamp(0.0, 1.0)
-                                })
-                                .unwrap_or(1.0);
-                            let gap_height = 18.0 * progress;
-                            content = content.push(
-                                widget::container(widget::text("Drop here").size(11))
-                                    .height(cosmic::iced::Length::Fixed(gap_height))
-                                    .width(cosmic::iced::Length::Fill)
-                                    .padding([0, 8]),
-                            );
-                        }
-                    }
-                    for entry in &self.settings.menu_order {
-                        if inserted_specials.contains(entry.as_str()) {
-                            continue;
-                        }
-                        let position = self
-                            .settings
-                            .menu_order
-                            .iter()
-                            .position(|candidate| candidate == entry)
-                            .unwrap_or_default()
-                            + 1;
-                        match entry.as_str() {
-                            TOTAL_POWER_DRAG_ID => {
-                                content = content.push(total_power_sort_row(position));
-                            }
-                            POWER_DIFFERENCE_DRAG_ID => {
-                                content = content.push(power_difference_sort_row(position));
-                            }
-                            SUMMARY_DRAG_ID => {
-                                content = content.push(special_menu_sort_row(
-                                    SUMMARY_DRAG_ID,
-                                    "Live power summary",
-                                    position,
-                                ));
-                            }
-                            WEATHER_DRAG_ID => {
-                                content = content.push(special_menu_sort_row(
-                                    WEATHER_DRAG_ID,
-                                    "Weather",
-                                    position,
-                                ));
-                            }
-                            _ => {}
-                        }
-                    }
-                    content = content.push(widget::text::caption(
-                        "Drag the ⠿ handles to reorder the weather section, live power summary, power cards and selected devices. The order is saved automatically.",
-                    ));
+
                 }
             }
 
@@ -3087,20 +2636,14 @@ impl cosmic::Application for AppModel {
                 ) {
                     menu_cards.push((POWER_DIFFERENCE_DRAG_ID.to_string(), difference));
                 }
-                menu_cards.sort_by_key(|(id, _)| {
-                    self.settings
-                        .menu_order
-                        .iter()
-                        .position(|entry| entry == id)
-                        .unwrap_or(usize::MAX)
-                });
+                // Use a stable device order; menu items cannot be manually rearranged.
+                menu_cards.sort_by(|(left, _), (right, _)| left.cmp(right));
                 let mut device_cards = widget::Column::new().spacing(0);
-                for (index, (id, card)) in menu_cards.into_iter().enumerate() {
+                for (index, (_, card)) in menu_cards.into_iter().enumerate() {
                     if index > 0 {
                         device_cards = device_cards.push(widget::divider::horizontal::default());
                     }
-                    let is_dragging = self.dragging_device_ain.as_deref() == Some(id.as_str());
-                    device_cards = device_cards.push(sortable_menu_card(id, card, is_dragging));
+                    device_cards = device_cards.push(card);
                 }
                 let device_list = widget::container(device_cards)
                     .width(cosmic::iced::Length::Fill)
@@ -3125,12 +2668,7 @@ impl cosmic::Application for AppModel {
             }
 
             if let Some(weather_card) = weather_menu_card.take() {
-                let is_dragging = self.dragging_device_ain.as_deref() == Some(WEATHER_DRAG_ID);
-                content = content.push(sortable_menu_card(
-                    WEATHER_DRAG_ID.to_string(),
-                    weather_card,
-                    is_dragging,
-                ));
+                content = content.push(weather_card);
             }
 
             let remaining = self
@@ -3251,14 +2789,8 @@ impl cosmic::Application for AppModel {
         // This keeps the applet name and both actions visible while the device
         // cards and graphs scroll independently beneath it.
         let scrollable_content = widget::scrollable(content)
-            .id(DRAG_SCROLL_ID.clone())
             .width(cosmic::iced::Length::Fill)
             .height(cosmic::iced::Length::Fill);
-
-        let scrollable_content = widget::mouse_area(scrollable_content)
-            .on_move(|position| Message::DragPointerMoved(position.y))
-            .on_exit(Message::DragPointerLeft)
-            .on_release(Message::EndDeviceDrag);
 
         let popup_content = if self.settings_open {
             widget::Column::new()
@@ -3352,15 +2884,6 @@ impl cosmic::Application for AppModel {
                     .is_some_and(|deadline| Instant::now() >= deadline)
                 {
                     self.settings_saved_until = None;
-                }
-                if self.dragging_device_ain.is_some() && self.drag_scroll_direction != 0 {
-                    return cosmic::iced::widget::scrollable::scroll_by(
-                        DRAG_SCROLL_ID.clone(),
-                        cosmic::iced::widget::scrollable::AbsoluteOffset {
-                            x: 0.0,
-                            y: f32::from(self.drag_scroll_direction) * 14.0,
-                        },
-                    );
                 }
                 if self.settings.weather_enabled
                     && self.next_weather_refresh_at.is_none()
@@ -3829,24 +3352,6 @@ impl cosmic::Application for AppModel {
                 });
                 if selected {
                     self.selected_ains.push(ain);
-                    if !self
-                        .settings
-                        .menu_order
-                        .iter()
-                        .any(|entry| crate::fritz::normalize_ain_for_selection(entry) == normalized)
-                    {
-                        let insert_at = self
-                            .settings
-                            .menu_order
-                            .iter()
-                            .position(|entry| entry == POWER_DIFFERENCE_DRAG_ID)
-                            .unwrap_or(self.settings.menu_order.len());
-                        self.settings.menu_order.insert(insert_at, normalized);
-                    }
-                } else {
-                    self.settings.menu_order.retain(|entry| {
-                        crate::fritz::normalize_ain_for_selection(entry) != normalized
-                    });
                 }
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
@@ -3864,124 +3369,6 @@ impl cosmic::Application for AppModel {
                     rebuild_output_power_history(&self.device_history, &self.settings.input_ains)
                         .into_iter()
                         .collect();
-            }
-            Message::StartDeviceDrag(ain) => {
-                if ain == TOTAL_POWER_DRAG_ID
-                    || ain == POWER_DIFFERENCE_DRAG_ID
-                    || ain == SUMMARY_DRAG_ID
-                    || ain == WEATHER_DRAG_ID
-                    || self.selected_ains.iter().any(|selected| {
-                        crate::fritz::normalize_ain_for_selection(selected)
-                            == crate::fritz::normalize_ain_for_selection(&ain)
-                    })
-                {
-                    self.dragging_device_ain = Some(ain);
-                    self.drag_target_ain = None;
-                    self.drag_target_after = false;
-                    self.drag_target_since = None;
-                    self.drag_scroll_direction = 0;
-                    self.drag_original_ains = Some(self.selected_ains.clone());
-                    self.drag_original_total_power_first = Some(self.settings.total_power_first);
-                    self.drag_original_menu_order = Some(self.settings.menu_order.clone());
-                }
-            }
-            Message::DragOverDevice(target_ain, insert_after) => {
-                if let Some(dragged_ain) = self.dragging_device_ain.as_deref() {
-                    let target_is_valid = target_ain == TOTAL_POWER_DRAG_ID
-                        || target_ain == POWER_DIFFERENCE_DRAG_ID
-                        || target_ain == SUMMARY_DRAG_ID
-                        || target_ain == WEATHER_DRAG_ID
-                        || self.selected_ains.iter().any(|selected| {
-                            crate::fritz::normalize_ain_for_selection(selected)
-                                == crate::fritz::normalize_ain_for_selection(&target_ain)
-                        });
-                    let is_special = |id: &str| {
-                        id == TOTAL_POWER_DRAG_ID
-                            || id == POWER_DIFFERENCE_DRAG_ID
-                            || id == SUMMARY_DRAG_ID
-                            || id == WEATHER_DRAG_ID
-                    };
-                    let same_target = self.drag_target_ain.as_deref().is_some_and(|current| {
-                        current == target_ain
-                            || (!is_special(current)
-                                && !is_special(&target_ain)
-                                && crate::fritz::normalize_ain_for_selection(current)
-                                    == crate::fritz::normalize_ain_for_selection(&target_ain))
-                    });
-                    if target_is_valid
-                        && dragged_ain != target_ain
-                        && (!same_target || self.drag_target_after != insert_after)
-                    {
-                        // Drop zones on both edges make the insertion point explicit,
-                        // just like the insertion marker between browser tabs.
-                        move_menu_entry_at(
-                            &mut self.settings.menu_order,
-                            dragged_ain,
-                            &target_ain,
-                            insert_after,
-                        );
-                        self.settings.total_power_first = self
-                            .settings
-                            .menu_order
-                            .first()
-                            .is_some_and(|entry| entry == TOTAL_POWER_DRAG_ID);
-                        self.drag_target_ain = Some(target_ain);
-                        self.drag_target_after = insert_after;
-                        self.drag_target_since = Some(Instant::now());
-                    }
-                }
-            }
-            Message::DragPointerMoved(y) => {
-                if self.dragging_device_ain.is_some() {
-                    self.drag_scroll_direction = if y < 48.0 {
-                        -1
-                    } else if y > 500.0 {
-                        1
-                    } else {
-                        0
-                    };
-                }
-            }
-            Message::DragPointerLeft => {
-                self.drag_scroll_direction = 0;
-            }
-            Message::EndDeviceDrag => {
-                self.drag_scroll_direction = 0;
-                if self.dragging_device_ain.take().is_some() {
-                    let previous_ains = self.drag_original_ains.take().unwrap_or_default();
-                    let previous_total_power_first = self
-                        .drag_original_total_power_first
-                        .take()
-                        .unwrap_or(self.settings.total_power_first);
-                    let previous_menu_order =
-                        self.drag_original_menu_order.take().unwrap_or_default();
-                    self.drag_target_ain = None;
-                    self.drag_target_after = false;
-                    self.drag_target_since = None;
-                    if self.selected_ains != previous_ains
-                        || self.settings.total_power_first != previous_total_power_first
-                        || self.settings.menu_order != previous_menu_order
-                    {
-                        let ordered_devices: Vec<String> = self
-                            .settings
-                            .menu_order
-                            .iter()
-                            .filter(|entry| {
-                                entry.as_str() != TOTAL_POWER_DRAG_ID
-                                    && entry.as_str() != POWER_DIFFERENCE_DRAG_ID
-                                    && entry.as_str() != SUMMARY_DRAG_ID
-                                    && entry.as_str() != WEATHER_DRAG_ID
-                            })
-                            .cloned()
-                            .collect();
-                        if !ordered_devices.is_empty() {
-                            self.selected_ains = ordered_devices;
-                        }
-                        self.settings.ains = self.selected_ains.clone();
-                        self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
-                        self.persist_settings();
-                    }
-                }
             }
             Message::ToggleTemperatureAlert(ain, enabled) => {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
@@ -4212,83 +3599,6 @@ mod history_tests {
         assert!(!should_notify_temperature_alert(Some(true), true));
         assert!(!should_notify_temperature_alert(Some(false), false));
         assert!(should_notify_temperature_alert(Some(false), true));
-    }
-
-    #[test]
-    fn dragging_selected_devices_reorders_them_and_ignores_unknown_targets() {
-        let mut ains = vec![
-            "111111111111".into(),
-            "222222222222".into(),
-            "333333333333".into(),
-        ];
-        move_selected_device_to_drop_target(&mut ains, "111111111111", "333333333333");
-        assert_eq!(ains, vec!["222222222222", "333333333333", "111111111111"]);
-        move_selected_device_to_drop_target(&mut ains, "333333333333", "222222222222");
-        assert_eq!(ains, vec!["333333333333", "222222222222", "111111111111"]);
-        move_selected_device_to_drop_target(&mut ains, "missing", "222222222222");
-        assert_eq!(ains, vec!["333333333333", "222222222222", "111111111111"]);
-    }
-
-    #[test]
-    fn dragging_total_power_reorders_it_without_changing_device_selection() {
-        let mut ains = vec!["111111111111".into(), "222222222222".into()];
-        let mut total_first = false;
-
-        move_sortable_entry(
-            &mut ains,
-            &mut total_first,
-            TOTAL_POWER_DRAG_ID,
-            "111111111111",
-        );
-        assert!(total_first);
-        assert_eq!(ains, vec!["111111111111", "222222222222"]);
-
-        move_sortable_entry(
-            &mut ains,
-            &mut total_first,
-            "111111111111",
-            TOTAL_POWER_DRAG_ID,
-        );
-        assert!(!total_first);
-        assert_eq!(ains, vec!["222222222222", "111111111111"]);
-
-        move_sortable_entry(
-            &mut ains,
-            &mut total_first,
-            TOTAL_POWER_DRAG_ID,
-            "222222222222",
-        );
-        assert!(total_first);
-        move_sortable_entry(
-            &mut ains,
-            &mut total_first,
-            "111111111111",
-            TOTAL_POWER_DRAG_ID,
-        );
-        assert!(!total_first);
-        assert_eq!(ains, vec!["222222222222", "111111111111"]);
-    }
-
-    #[test]
-    fn total_power_drag_ignores_unselected_targets() {
-        let mut ains = vec!["111111111111".into()];
-        let mut total_first = false;
-
-        move_sortable_entry(
-            &mut ains,
-            &mut total_first,
-            TOTAL_POWER_DRAG_ID,
-            "unselected",
-        );
-        assert!(!total_first);
-        move_sortable_entry(
-            &mut ains,
-            &mut total_first,
-            "unselected",
-            TOTAL_POWER_DRAG_ID,
-        );
-        assert!(!total_first);
-        assert_eq!(ains, vec!["111111111111"]);
     }
 
     #[test]
@@ -4600,83 +3910,4 @@ mod history_tests {
         }
     }
 
-    #[test]
-    fn drag_drop_inserts_before_or_after_the_explicit_target_edge() {
-        let mut order = vec!["a".into(), "b".into(), "c".into()];
-
-        move_menu_entry_at(&mut order, "a", "c", false);
-        assert_eq!(order, vec!["b", "a", "c"]);
-
-        move_menu_entry_at(&mut order, "b", "c", true);
-        assert_eq!(order, vec!["a", "c", "b"]);
-
-        move_menu_entry_at(&mut order, "b", "a", false);
-        assert_eq!(order, vec!["b", "a", "c"]);
-    }
-
-    #[test]
-    fn live_drag_reorders_devices_as_targets_are_entered() {
-        let mut order = vec!["a".into(), "b".into(), "c".into()];
-
-        move_menu_entry(&mut order, "a", "c");
-
-        assert_eq!(
-            order,
-            vec!["b".to_string(), "c".to_string(), "a".to_string()]
-        );
-
-        move_menu_entry(&mut order, "a", "b");
-
-        assert_eq!(
-            order,
-            vec!["a".to_string(), "b".to_string(), "c".to_string()]
-        );
-    }
-
-    #[test]
-    fn live_drag_reorders_both_power_cards_with_devices() {
-        let mut order = vec![
-            TOTAL_POWER_DRAG_ID.into(),
-            "a".into(),
-            "b".into(),
-            POWER_DIFFERENCE_DRAG_ID.into(),
-            SUMMARY_DRAG_ID.into(),
-        ];
-
-        move_menu_entry(&mut order, POWER_DIFFERENCE_DRAG_ID, "a");
-        assert_eq!(
-            order,
-            vec![
-                TOTAL_POWER_DRAG_ID.to_string(),
-                POWER_DIFFERENCE_DRAG_ID.to_string(),
-                "a".to_string(),
-                "b".to_string(),
-                SUMMARY_DRAG_ID.to_string(),
-            ]
-        );
-
-        move_menu_entry(&mut order, "b", TOTAL_POWER_DRAG_ID);
-        assert_eq!(
-            order,
-            vec![
-                "b".to_string(),
-                TOTAL_POWER_DRAG_ID.to_string(),
-                POWER_DIFFERENCE_DRAG_ID.to_string(),
-                "a".to_string(),
-                SUMMARY_DRAG_ID.to_string(),
-            ]
-        );
-
-        move_menu_entry(&mut order, SUMMARY_DRAG_ID, "b");
-        assert_eq!(
-            order,
-            vec![
-                SUMMARY_DRAG_ID.to_string(),
-                "b".to_string(),
-                TOTAL_POWER_DRAG_ID.to_string(),
-                POWER_DIFFERENCE_DRAG_ID.to_string(),
-                "a".to_string(),
-            ]
-        );
-    }
 }
