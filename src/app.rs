@@ -119,7 +119,7 @@ fn clear_confirmed_power_changes(
 ) {
     let confirmed: Vec<String> = pending_targets.iter()
         .filter(|(ain, requested)| readings.iter().any(|reading|
-            crate::fritz::normalize_ain_for_selection(&reading.ain) == **ain
+            crate::fritz::normalize_ain_for_selection(&reading.ain) == ain.as_str()
                 && reading.power_state == Some(**requested)))
         .map(|(ain, _)| ain.clone())
         .collect();
