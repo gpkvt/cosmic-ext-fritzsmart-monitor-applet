@@ -36,7 +36,10 @@ jobs:
             libvulkan-dev \
             libwayland-dev \
             libxkbcommon-dev \
-            pkg-config
+            pkg-config \
+            dpkg-dev \
+            patchelf \
+            file
       - name: Format Rust sources
         run: cargo fmt --all
       - name: Generate locked Cargo dependencies
@@ -58,6 +61,12 @@ jobs:
         run: cargo check --locked
       - name: Build optimized binary
         run: cargo build --release --locked
+      - name: Build Debian and AppImage packages
+        run: |
+          APP_VERSION=0.0.0 OUTPUT_DIR="$RUNNER_TEMP/packages" packaging/build-linux-packages.sh
+          test -s "$RUNNER_TEMP/packages/fritz-power-monitor_0.0.0_amd64.deb"
+          test -x "$RUNNER_TEMP/packages/fritz-power-monitor-0.0.0-x86_64.AppImage"
+          dpkg-deb --info "$RUNNER_TEMP/packages/fritz-power-monitor_0.0.0_amd64.deb"
       - name: Test user-local installation
         run: |
           prefix="$RUNNER_TEMP/fritz-power-monitor-install"
