@@ -1323,7 +1323,7 @@ impl cosmic::Application for AppModel {
             widget::tooltip(
                 item.push(value),
                 widget::text::caption(label),
-                cosmic::iced::widget::tooltip::Position::Top,
+                cosmic::widget::tooltip::Position::Top,
             )
         };
 
