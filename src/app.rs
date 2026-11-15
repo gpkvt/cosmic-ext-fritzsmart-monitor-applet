@@ -1079,7 +1079,8 @@ impl cosmic::Application for AppModel {
                         let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                         let input_history = self.device_history.get(&key);
                         let graph = input_history.map(|samples|
-                            numeric_sparkline(samples.iter().map(|(_, power, _)| -(*power as f64))))
+                            numeric_sparkline(samples.iter().map(|(_, power, _)|
+                                signed_device_power(*power, true) as f64)))
                             .unwrap_or_else(|| "Waiting for samples…".into());
                         total_power_content = total_power_content.push(
                             widget::Column::new()
