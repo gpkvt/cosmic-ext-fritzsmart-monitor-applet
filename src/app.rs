@@ -495,8 +495,6 @@ fn total_power_overview(
                 .push(graph_panel(total_graph))
                 .push(graph_panel(input_graphs.into())),
         );
-    let base = cosmic::iced::Color::from(cosmic::iced::Theme::Dark.palette().background);
-    let _ = base;
     Some(
         widget::container(content)
             .padding(10)
