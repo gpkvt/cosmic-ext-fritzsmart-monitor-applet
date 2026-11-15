@@ -465,10 +465,7 @@ fn parse_device_readings_detailed_xml(
                 .find(|ain| normalize_ain_for_selection(ain) == *selected)
                 .map(String::as_str)
                 .unwrap_or(selected);
-            missing_devices.push((
-                format!("Device {original_ain}"),
-                format!("{original_ain}: not found in the FRITZ!Box device list"),
-            ));
+            missing_devices.push((selected.clone(), format!("Device {original_ain}")));
         }
     }
 
@@ -485,7 +482,7 @@ fn parse_device_readings_xml(xml: &str, selected_ains: &[String]) -> Result<Vec<
         }
         return Err(format!(
             "No selected devices returned usable readings: {}",
-            result.missing_devices.iter().map(|(_, detail)| detail.as_str()).collect::<Vec<_>>().join("; ")
+            result.missing_devices.iter().map(|(ain, name)| format!("{name} ({ain})")).collect::<Vec<_>>().join("; ")
         ));
     }
     Ok(result.readings)
