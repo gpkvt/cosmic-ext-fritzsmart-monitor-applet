@@ -1708,7 +1708,9 @@ impl cosmic::Application for AppModel {
             if self.active_settings_section == Some("menu-order") {
                 content = content
                     .push(widget::text::body("Popup element order"))
-                    .push(widget::text::caption("Move sections up or down. Changes are saved automatically."));
+                    .push(widget::text::caption(
+                        "Move sections up or down. Changes are saved automatically.",
+                    ));
                 for (index, element) in self.settings.menu_order.iter().enumerate() {
                     let id = match element.as_str() {
                         "summary" => "summary",
@@ -3153,7 +3155,12 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::MoveMenuElement(element, move_up) => {
-                let Some(index) = self.settings.menu_order.iter().position(|item| item == element) else {
+                let Some(index) = self
+                    .settings
+                    .menu_order
+                    .iter()
+                    .position(|item| item == element)
+                else {
                     return Task::none();
                 };
                 let target = if move_up {
@@ -3169,8 +3176,11 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::MoveDevice(ain, move_up) => {
-                let mut order: Vec<String> =
-                    self.devices.iter().map(|device| device.ain.clone()).collect();
+                let mut order: Vec<String> = self
+                    .devices
+                    .iter()
+                    .map(|device| device.ain.clone())
+                    .collect();
                 order.sort_by_key(|device_ain| {
                     self.settings
                         .device_order
