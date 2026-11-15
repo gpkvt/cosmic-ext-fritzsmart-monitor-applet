@@ -55,6 +55,27 @@ pub enum Message {
 
 
 
+fn device_background_color(base: cosmic::iced::Color, index: usize) -> cosmic::iced::Color {
+    // Distinct, muted hues make adjacent devices easy to tell apart while
+    // retaining some of the active COSMIC theme's background color.
+    const TINTS: [(f32, f32, f32); 6] = [
+        (0.16, 0.42, 0.82), // blue
+        (0.08, 0.58, 0.48), // teal
+        (0.38, 0.58, 0.16), // green
+        (0.78, 0.48, 0.10), // amber
+        (0.76, 0.30, 0.20), // coral
+        (0.52, 0.32, 0.76), // purple
+    ];
+    let (red, green, blue) = TINTS[index % TINTS.len()];
+    let strength = 0.28;
+    cosmic::iced::Color::from_rgba(
+        base.r * (1.0 - strength) + red * strength,
+        base.g * (1.0 - strength) + green * strength,
+        base.b * (1.0 - strength) + blue * strength,
+        base.a,
+    )
+}
+
 fn format_graph_axis_start(minutes: u16) -> String {
     let minutes = u32::from(minutes);
     if minutes % 1440 == 0 {
@@ -368,18 +389,13 @@ impl cosmic::Application for AppModel {
                             row = row.push(action_button("go-down-symbolic", "Down", Message::MoveDevice(ain.clone(), false)));
                         }
                     }
-                    let alternate = row_index % 2 == 1;
                     content = content.push(widget::container(row)
                         .padding(8)
                         .style(move |theme| {
                             let cosmic = theme.cosmic();
-                            let background = if alternate {
-                                cosmic.background(false).small_widget
-                            } else {
-                                cosmic.background(false).base
-                            };
+                            let base = cosmic::iced::Color::from(cosmic.background(false).base);
                             cosmic::iced::widget::container::Style {
-                                background: Some(cosmic::iced::Color::from(background).into()),
+                                background: Some(device_background_color(base, row_index).into()),
                                 ..Default::default()
                             }
                         }));
@@ -509,18 +525,13 @@ impl cosmic::Application for AppModel {
                                     }),
                                 ),
                         );
-                    let alternate = index % 2 == 1;
                     content = content.push(widget::container(device_content)
                         .padding(10)
                         .style(move |theme| {
                             let cosmic = theme.cosmic();
-                            let background = if alternate {
-                                cosmic.background(false).small_widget
-                            } else {
-                                cosmic.background(false).base
-                            };
+                            let base = cosmic::iced::Color::from(cosmic.background(false).base);
                             cosmic::iced::widget::container::Style {
-                                background: Some(cosmic::iced::Color::from(background).into()),
+                                background: Some(device_background_color(base, index).into()),
                                 ..Default::default()
                             }
                         }));
