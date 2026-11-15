@@ -1843,16 +1843,12 @@ impl cosmic::Application for AppModel {
         } else {
             let title_bar = widget::container(
                 widget::Row::new()
-                    .spacing(10)
+                    .spacing(8)
                     .align_y(cosmic::iced::Alignment::Center)
-                    .push(widget::container(widget::icon::from_name("utilities-system-monitor-symbolic").size(22))
-                        .center_x(40).center_y(40))
-                    .push(widget::Column::new()
-                        .spacing(1)
-                        .width(cosmic::iced::Length::Fill)
-                        .push(widget::text::title3("Power Monitor"))
-                        .push(widget::text::caption("FRITZ!Box · Live overview")))
-                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                    .push(widget::container(widget::icon::from_name("utilities-system-monitor-symbolic").size(20))
+                        .center_x(36).center_y(36))
+                    .push(widget::text::title3("FRITZ!Power Monitor")
+                        .width(cosmic::iced::Length::Fill))
                     .push(icon_action_button(
                         self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("↻"),
                         if self.refresh_started_at.is_some() { "Refreshing readings" } else { "Refresh readings" },
@@ -1860,7 +1856,7 @@ impl cosmic::Application for AppModel {
                     ))
                     .push(icon_action_button("⚙", "Settings", Message::ToggleSettings)),
             )
-            .padding([12, 16])
+            .padding([8, 12])
             .width(cosmic::iced::Length::Fill);
 
             widget::Column::new()
