@@ -543,13 +543,16 @@ fn live_power_summary(
     let mut supporting = widget::Row::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill);
+    let mut has_supporting = false;
     if let Some(input) = input_power {
+        has_supporting = true;
         supporting = supporting.push(metric_tile("INPUT", input, "go-down-symbolic"));
     }
     if let Some(temp) = temperature {
+        has_supporting = true;
         supporting = supporting.push(metric_tile("TEMPERATURE", temp, "thermometer-symbolic"));
     }
-    if supporting.width(cosmic::iced::Length::Fill) == cosmic::iced::Length::Fill {
+    if has_supporting {
         content = content.push(supporting);
     }
     surface_card(content.into(), 14)
@@ -612,10 +615,17 @@ fn total_power_overview(
     }
 
     let content = widget::Column::new()
-        .spacing(6)
-        .push(widget::text::caption(format!("TOTAL POWER · LAST {timespan}")))
-        .push(widget::text::title2(format!("{total_power} W")))
-        .push(widget::text::caption(format!("Low  {low} W     High  {high} W")))
+        .spacing(10)
+        .push(widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::Column::new()
+                .spacing(2)
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::title3("Total power"))
+                .push(widget::text::caption(format!("NET · LAST {timespan}"))))
+            .push(widget::text::caption(format!("{} W", total_power))))
+        .push(widget::text::caption(format!("Low {low} W     ·     High {high} W")))
         .push(
             widget::Row::new()
                 .spacing(8)
@@ -632,6 +642,10 @@ fn total_power_overview(
                 let base = cosmic::iced::Color::from(cosmic.background(false).base);
                 cosmic::iced::widget::container::Style {
                     background: Some(device_background_color(base, position).into()),
+                    border: cosmic::iced::Border {
+                        radius: 12.0.into(),
+                        ..Default::default()
+                    },
                     ..Default::default()
                 }
             })
