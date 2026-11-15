@@ -2079,6 +2079,8 @@ impl cosmic::Application for AppModel {
 
 #[cfg(test)]
 mod history_tests {
+    use super::*;
+
     #[test]
     fn quick_setting_sliders_snap_to_anchor_points() {
         for anchor in 0..=4 {
@@ -2100,9 +2102,6 @@ mod history_tests {
             assert!((quick_slider_value(position as f32, graph) - value).abs() < 0.001);
         }
     }
-
-     {
-    use super::*;
 
     #[test]
     fn missing_device_notifications_only_fire_on_new_missing_transitions() {
