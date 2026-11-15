@@ -1607,7 +1607,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::Column::new()
                             .spacing(3)
                             .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::body(reading.name.clone()).color(cosmic::iced::Color::from_rgb(0.30, 0.78, 0.42)))
+                            .push(widget::text::body(reading.name.clone()).class(cosmic::theme::Text::Color(cosmic::iced::Color::from_rgb(0.30, 0.78, 0.42))))
                             .push(widget::text::caption(format!("{} · LAST {}", state_label, format_graph_timespan(self.settings.graph_timespan_minutes)))))
                         .push(widget::text::caption(format!("#{}", index + 1)));
                     let metrics = widget::Row::new()
