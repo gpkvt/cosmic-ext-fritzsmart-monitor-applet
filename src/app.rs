@@ -113,6 +113,13 @@ fn newly_missing_devices(
     newly_missing
 }
 
+fn toggle_device_options(expanded: &mut HashSet<String>, ain: &str) {
+    let key = crate::fritz::normalize_ain_for_selection(ain);
+    if !expanded.remove(&key) {
+        expanded.insert(key);
+    }
+}
+
 fn notify_missing_devices(names: &[String]) {
     if names.is_empty() {
         return;
@@ -1341,10 +1348,7 @@ impl cosmic::Application for AppModel {
                 Err(error) => self.settings_status = Some(format!("Connection failed: {error}")),
             },
             Message::ToggleDeviceOptions(ain) => {
-                let key = crate::fritz::normalize_ain_for_selection(&ain);
-                if !self.expanded_device_options.remove(&key) {
-                    self.expanded_device_options.insert(key);
-                }
+                toggle_device_options(&mut self.expanded_device_options, &ain);
             }
             Message::ToggleDevice(ain, selected) => {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
@@ -1470,6 +1474,19 @@ mod history_tests {
         assert!(newly_missing_devices(&mut previous, &missing, &pending).is_empty());
         assert!(newly_missing_devices(&mut previous, &missing, &HashSet::new()).is_empty());
         assert!(newly_missing_devices(&mut previous, &[], &HashSet::new()).is_empty());
+    }
+
+    #[test]
+    fn device_options_are_collapsed_by_default_and_toggle_independently() {
+        let mut expanded = HashSet::new();
+        toggle_device_options(&mut expanded, "12:34-56");
+        assert!(expanded.contains("123456"));
+        toggle_device_options(&mut expanded, "98:76-54");
+        assert!(expanded.contains("123456"));
+        assert!(expanded.contains("987654"));
+        toggle_device_options(&mut expanded, "12:34-56");
+        assert!(!expanded.contains("123456"));
+        assert!(expanded.contains("987654"));
     }
 
     #[test]
