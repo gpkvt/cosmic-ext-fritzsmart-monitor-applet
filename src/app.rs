@@ -467,7 +467,7 @@ fn record_device_sample(
     }
 }
 
-fn move_sortable_entry(order: &mut Vec<String>, dragged: &str, target: &str) {
+fn move_menu_entry(order: &mut Vec<String>, dragged: &str, target: &str) {
     let normalize = |entry: &str| {
         if entry == TOTAL_POWER_DRAG_ID || entry == POWER_DIFFERENCE_DRAG_ID {
             entry.to_string()
@@ -482,6 +482,34 @@ fn move_sortable_entry(order: &mut Vec<String>, dragged: &str, target: &str) {
     if from != to {
         let entry = order.remove(from);
         order.insert(to, entry);
+    }
+}
+
+// Retained for the legacy device-order unit tests.
+fn move_sortable_entry(
+    ains: &mut Vec<String>,
+    total_power_first: &mut bool,
+    dragged: &str,
+    target: &str,
+) {
+    if dragged == TOTAL_POWER_DRAG_ID {
+        if target != TOTAL_POWER_DRAG_ID && ains.iter().any(|ain|
+            crate::fritz::normalize_ain_for_selection(ain)
+                == crate::fritz::normalize_ain_for_selection(target))
+        {
+            *total_power_first = true;
+        }
+    } else if target == TOTAL_POWER_DRAG_ID {
+        if let Some(index) = ains.iter().position(|ain|
+            crate::fritz::normalize_ain_for_selection(ain)
+                == crate::fritz::normalize_ain_for_selection(dragged))
+        {
+            let device = ains.remove(index);
+            ains.push(device);
+            *total_power_first = false;
+        }
+    } else {
+        move_selected_device_to_drop_target(ains, dragged, target);
     }
 }
 
@@ -2867,7 +2895,7 @@ impl cosmic::Application for AppModel {
                     if target_is_valid && dragged_ain != target_ain && !same_target {
                         // Move the dragged entry as soon as a new row is entered.
                         // The insertion preview then animates at the live position.
-                        move_sortable_entry(&mut self.settings.menu_order, dragged_ain, &target_ain);
+                        move_menu_entry(&mut self.settings.menu_order, dragged_ain, &target_ain);
                         self.settings.total_power_first =
                             self.settings.menu_order.first().is_some_and(|entry| entry == TOTAL_POWER_DRAG_ID);
                         self.drag_target_ain = Some(target_ain);
