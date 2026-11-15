@@ -2,29 +2,57 @@
 set -euo pipefail
 
 APP_VERSION="${APP_VERSION:?Set APP_VERSION to the package version}"
+APP_RELEASE_VERSION="${APP_RELEASE_VERSION:-$APP_VERSION}"
 OUTPUT_DIR="${OUTPUT_DIR:-dist}"
 WORKSPACE="$(pwd)"
 BINARY="$WORKSPACE/target/release/fritz-power-monitor"
 DESKTOP="$WORKSPACE/data/com.gpkvt.FritzPowerMonitor.desktop"
 ICON="$WORKSPACE/data/com.gpkvt.FritzPowerMonitor.svg"
+APP_ID="com.gpkvt.FritzPowerMonitor"
+FLATPAK_MANIFEST="$WORKSPACE/$APP_ID.yml"
 LINUXDEPLOY_VERSION="1-alpha-20251107-1"
+FLATPAK_RUNTIME_VERSION="26.08"
+FLATPAK_BRANCH="${FLATPAK_BRANCH:-stable}"
 
-test -x "$BINARY"
+require_command() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        echo "Missing required command: $1" >&2
+        exit 1
+    fi
+}
+
+for command in cargo curl dpkg-deb dpkg-shlibdeps desktop-file-validate     flatpak flatpak-builder git python3 sha256sum file; do
+    require_command "$command"
+done
+
+test -s "$WORKSPACE/Cargo.lock"
+test -s "$WORKSPACE/README.md"
+test -s "$WORKSPACE/LICENSE"
 test -s "$DESKTOP"
 test -s "$ICON"
+test -s "$FLATPAK_MANIFEST"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 TEMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TEMP_DIR"' EXIT
+CARGO_SOURCES="$WORKSPACE/cargo-sources.json"
+FLATPAK_SOURCE="$WORKSPACE/flatpak-source"
+cleanup() {
+    rm -rf "$TEMP_DIR" "$CARGO_SOURCES" "$FLATPAK_SOURCE"
+}
+trap cleanup EXIT
 
-# Build a Debian package and derive its runtime dependencies from ELF metadata.
+export APP_RELEASE_VERSION
+cargo build --release --locked
+test -x "$BINARY"
+
+# Build a Debian package and derive runtime dependencies from ELF metadata.
 DEB_ROOT="$TEMP_DIR/deb-package"
 install -Dm0755 "$BINARY" "$DEB_ROOT/usr/bin/fritz-power-monitor"
-install -Dm0644 "$DESKTOP" "$DEB_ROOT/usr/share/applications/com.gpkvt.FritzPowerMonitor.desktop"
+install -Dm0644 "$DESKTOP" "$DEB_ROOT/usr/share/applications/$APP_ID.desktop"
 sed -i 's|^Exec=.*|Exec=/usr/bin/fritz-power-monitor|' \
-    "$DEB_ROOT/usr/share/applications/com.gpkvt.FritzPowerMonitor.desktop"
+    "$DEB_ROOT/usr/share/applications/$APP_ID.desktop"
 install -Dm0644 "$ICON" \
-    "$DEB_ROOT/usr/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg"
+    "$DEB_ROOT/usr/share/icons/hicolor/scalable/apps/$APP_ID.svg"
 install -Dm0644 "$WORKSPACE/README.md" \
     "$DEB_ROOT/usr/share/doc/fritz-power-monitor/README.md"
 install -Dm0644 "$WORKSPACE/LICENSE" \
@@ -68,7 +96,7 @@ Description: FRITZ!Box power monitor for the COSMIC desktop
  COSMIC panel applet for monitoring FRITZ!Box smart-home power
  generation, consumption and temperature readings.
 CONTROL
-desktop-file-validate "$DEB_ROOT/usr/share/applications/com.gpkvt.FritzPowerMonitor.desktop"
+desktop-file-validate "$DEB_ROOT/usr/share/applications/$APP_ID.desktop"
 DEB_FILE="$OUTPUT_DIR/fritz-power-monitor_${APP_VERSION}_amd64.deb"
 dpkg-deb --build --root-owner-group "$DEB_ROOT" "$DEB_FILE"
 dpkg-deb --info "$DEB_FILE"
@@ -94,9 +122,45 @@ if [[ -z "$APPIMAGE_SOURCE" ]]; then
 fi
 APPIMAGE_FILE="$OUTPUT_DIR/fritz-power-monitor-$APP_VERSION-x86_64.AppImage"
 install -m0755 "$APPIMAGE_SOURCE" "$APPIMAGE_FILE"
+file "$APPIMAGE_FILE"
+
+# Generate offline Cargo sources and build a self-contained Flatpak bundle.
+if [[ -e "$CARGO_SOURCES" || -e "$FLATPAK_SOURCE" ]]; then
+    echo "Refusing to overwrite existing Flatpak source inputs" >&2
+    exit 1
+fi
+python3 -m venv "$TEMP_DIR/venv"
+"$TEMP_DIR/venv/bin/pip" install --disable-pip-version-check tomlkit aiohttp
+git clone --depth 1 https://github.com/flatpak/flatpak-builder-tools.git \
+    "$TEMP_DIR/flatpak-builder-tools"
+"$TEMP_DIR/venv/bin/python" \
+    "$TEMP_DIR/flatpak-builder-tools/cargo/flatpak-cargo-generator.py" \
+    "$WORKSPACE/Cargo.lock" -o "$CARGO_SOURCES"
+mkdir -p "$FLATPAK_SOURCE"
+cp "$WORKSPACE/Cargo.toml" "$WORKSPACE/Cargo.lock" "$WORKSPACE/build.rs" "$FLATPAK_SOURCE/"
+cp -r "$WORKSPACE/src" "$WORKSPACE/data" "$FLATPAK_SOURCE/"
+
+flatpak remote-add --user --if-not-exists flathub \
+    https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user --noninteractive --or-update flathub \
+    "org.freedesktop.Platform//$FLATPAK_RUNTIME_VERSION" \
+    "org.freedesktop.Sdk//$FLATPAK_RUNTIME_VERSION" \
+    "org.freedesktop.Sdk.Extension.rust-stable//$FLATPAK_RUNTIME_VERSION"
+FLATPAK_REPO="$TEMP_DIR/flatpak-repo"
+flatpak-builder --user --force-clean --default-branch="$FLATPAK_BRANCH" \
+    --repo="$FLATPAK_REPO" "$TEMP_DIR/build-flatpak" "$FLATPAK_MANIFEST"
+FLATPAK_FILE="$OUTPUT_DIR/fritz-power-monitor-$APP_VERSION.flatpak"
+flatpak build-bundle "$FLATPAK_REPO" "$FLATPAK_FILE" "$APP_ID" "$FLATPAK_BRANCH" \
+    --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
+test -s "$FLATPAK_FILE"
 
 (
     cd "$OUTPUT_DIR"
-    sha256sum "$(basename "$DEB_FILE")" "$(basename "$APPIMAGE_FILE")" > SHA256SUMS
+    sha256sum "$(basename "$DEB_FILE")" \
+        "$(basename "$APPIMAGE_FILE")" \
+        "$(basename "$FLATPAK_FILE")" > SHA256SUMS
 )
-file "$APPIMAGE_FILE"
+
+echo "Built packages:"
+printf '  %s\n' "$DEB_FILE" "$APPIMAGE_FILE" "$FLATPAK_FILE"
+echo "Checksums: $OUTPUT_DIR/SHA256SUMS"
