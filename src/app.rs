@@ -518,7 +518,11 @@ fn record_device_sample(
 
 fn move_menu_entry(order: &mut Vec<String>, dragged: &str, target: &str) {
     let normalize = |entry: &str| {
-        if entry == TOTAL_POWER_DRAG_ID || entry == POWER_DIFFERENCE_DRAG_ID || entry == SUMMARY_DRAG_ID || entry == WEATHER_DRAG_ID {
+        if entry == TOTAL_POWER_DRAG_ID
+            || entry == POWER_DIFFERENCE_DRAG_ID
+            || entry == SUMMARY_DRAG_ID
+            || entry == WEATHER_DRAG_ID
+        {
             entry.to_string()
         } else {
             crate::fritz::normalize_ain_for_selection(entry)
@@ -2534,10 +2538,12 @@ impl cosmic::Application for AppModel {
                         )
                         .push(widget::text::caption("Forecast data by Open-Meteo"));
                     if self.weather_forecast_loading {
-                        weather_section = weather_section.push(widget::text::caption("Loading forecast…"));
+                        weather_section =
+                            weather_section.push(widget::text::caption("Loading forecast…"));
                     }
                     if let Some(error) = &self.weather_forecast_error {
-                        weather_section = weather_section.push(error_notice("FORECAST UNAVAILABLE", error));
+                        weather_section =
+                            weather_section.push(error_notice("FORECAST UNAVAILABLE", error));
                     }
                     if let Some(forecast) = &self.weather_forecast {
                         for day in &forecast.days {
@@ -2589,7 +2595,8 @@ impl cosmic::Application for AppModel {
                     }
                 }
                 if let Some(error) = &self.weather_error {
-                    weather_section = weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
+                    weather_section =
+                        weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
                 }
                 weather_section = weather_section.push(widget::divider::horizontal::default());
                 weather_menu_card = Some(weather_section.into());
@@ -2599,7 +2606,8 @@ impl cosmic::Application for AppModel {
                 if let Some(error) = &self.weather_error {
                     weather_section = weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
                 } else {
-                    weather_section = weather_section.push(widget::text::body("Weather data is loading…"));
+                    weather_section =
+                        weather_section.push(widget::text::body("Weather data is loading…"));
                 }
                 weather_section = weather_section.push(widget::divider::horizontal::default());
                 weather_menu_card = Some(weather_section.into());
@@ -2607,60 +2615,60 @@ impl cosmic::Application for AppModel {
 
             if self.error.is_none() && !self.readings.is_empty() {
                 let primary = self
-                        .selected_ains
-                        .first()
-                        .and_then(|selected| {
-                            self.readings.iter().find(|reading| {
-                                crate::fritz::normalize_ain_for_selection(&reading.ain)
-                                    == crate::fritz::normalize_ain_for_selection(selected)
-                            })
+                    .selected_ains
+                    .first()
+                    .and_then(|selected| {
+                        self.readings.iter().find(|reading| {
+                            crate::fritz::normalize_ain_for_selection(&reading.ain)
+                                == crate::fritz::normalize_ain_for_selection(selected)
                         })
-                        .or_else(|| self.readings.first());
-                    let summary_power = displayed_power_w(
+                    })
+                    .or_else(|| self.readings.first());
+                let summary_power = displayed_power_w(
+                    &self.readings,
+                    &self.selected_ains,
+                    self.settings.total_power_first,
+                    &self.settings.input_ains,
+                )
+                .map(|power| format!("{power} W"))
+                .unwrap_or_else(|| "-- W".into());
+                let summary_temperature = if self.settings.panel_average_temperature {
+                    average_temperature_c(
                         &self.readings,
-                        &self.selected_ains,
-                        self.settings.total_power_first,
-                        &self.settings.input_ains,
+                        self.settings.panel_exclude_solar_temperature,
                     )
-                    .map(|power| format!("{power} W"))
-                    .unwrap_or_else(|| "-- W".into());
-                    let summary_temperature = if self.settings.panel_average_temperature {
-                        average_temperature_c(
-                            &self.readings,
-                            self.settings.panel_exclude_solar_temperature,
+                    .map(|value| format!("{value:.1} °C"))
+                } else if self.settings.total_power_first {
+                    None
+                } else {
+                    primary.map(|reading| format!("{:.1} °C", reading.temperature_c))
+                };
+                let summary_input = self
+                    .readings
+                    .iter()
+                    .any(|reading| {
+                        self.settings
+                            .input_ains
+                            .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+                    })
+                    .then(|| {
+                        format!(
+                            "{} W",
+                            input_power_w(&self.readings, &self.settings.input_ains)
                         )
-                        .map(|value| format!("{value:.1} °C"))
-                    } else if self.settings.total_power_first {
-                        None
-                    } else {
-                        primary.map(|reading| format!("{:.1} °C", reading.temperature_c))
-                    };
-                    let summary_input = self
-                        .readings
-                        .iter()
-                        .any(|reading| {
-                            self.settings
-                                .input_ains
-                                .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
-                        })
-                        .then(|| {
-                            format!(
-                                "{} W",
-                                input_power_w(&self.readings, &self.settings.input_ains)
-                            )
-                        });
-                    let summary_card = live_power_summary(
-                        summary_power,
-                        self.settings.total_power_first,
-                        summary_input,
-                        summary_temperature,
-                    );
+                    });
+                let summary_card = live_power_summary(
+                    summary_power,
+                    self.settings.total_power_first,
+                    summary_input,
+                    summary_temperature,
+                );
 
-                    let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
-                    menu_cards.push((SUMMARY_DRAG_ID.to_string(), summary_card));
-                    if let Some(weather_card) = weather_menu_card.take() {
-                        menu_cards.push((WEATHER_DRAG_ID.to_string(), weather_card));
-                    }
+                let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
+                menu_cards.push((SUMMARY_DRAG_ID.to_string(), summary_card));
+                if let Some(weather_card) = weather_menu_card.take() {
+                    menu_cards.push((WEATHER_DRAG_ID.to_string(), weather_card));
+                }
                 for (index, reading) in self.readings.iter().enumerate() {
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                     let is_expanded = self.collapsed_devices.contains(&device_key);
@@ -2965,7 +2973,10 @@ impl cosmic::Application for AppModel {
             }
 
             if let Some(weather_card) = weather_menu_card.take() {
-                content = content.push(sortable_menu_card(WEATHER_DRAG_ID.to_string(), weather_card));
+                content = content.push(sortable_menu_card(
+                    WEATHER_DRAG_ID.to_string(),
+                    weather_card,
+                ));
             }
 
             let remaining = self
