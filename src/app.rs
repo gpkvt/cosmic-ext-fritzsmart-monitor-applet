@@ -521,7 +521,18 @@ impl cosmic::Application for AppModel {
 
         if self.settings_open {
             content = content
-                .push(widget::text::title3("FRITZ!Power Monitor settings"))
+                .push(
+                    widget::Row::new()
+                        .width(cosmic::iced::Length::Fill)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::title3("FRITZ!Power Monitor settings"))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(icon_action_button(
+                            "‹",
+                            "Back",
+                            Message::ToggleSettings,
+                        )),
+                )
                 .push(widget::divider::horizontal::default())
                 .push(widget::text::caption("PANEL"))
                 .push(widget::text::body(format!("Panel text size: {} pt", self.settings.panel_text_size)))
@@ -762,7 +773,7 @@ impl cosmic::Application for AppModel {
             if self.settings_saved_until.is_some_and(|deadline| Instant::now() < deadline) {
                 content = content.push(widget::text::caption("✓ Saved"));
             }
-            content = content.push(action_button("go-previous-symbolic", "Back", Message::ToggleSettings));
+
         } else {
             if let Some(weather) = &self.weather {
                 let wind_direction = weather.wind_direction_degrees
