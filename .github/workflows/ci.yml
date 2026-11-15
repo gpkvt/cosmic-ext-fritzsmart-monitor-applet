@@ -24,6 +24,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes \
+            appstream \
             desktop-file-utils \
             flatpak-builder \
             python3-venv \
@@ -41,6 +42,10 @@ jobs:
             dpkg-dev \
             patchelf \
             file
+      - name: Validate desktop entry and AppStream metadata
+        run: |
+          desktop-file-validate data/com.gpkvt.FritzPowerMonitor.desktop
+          appstreamcli validate --no-net data/com.gpkvt.FritzPowerMonitor.metainfo.xml
       - name: Check Rust formatting
         run: cargo fmt --all -- --check
       - name: Generate locked Cargo dependencies
