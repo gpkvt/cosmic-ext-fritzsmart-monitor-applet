@@ -654,39 +654,25 @@ fn range_metric_tile<'a>(
     surface_card(content.into(), 12)
 }
 
-fn displayed_power_w(
-    readings: &[FritzReading],
-    selected_ains: &[String],
-    total_power_first: bool,
-    input_ains: &HashSet<String>,
-) -> Option<i64> {
-    if total_power_first {
-        (!readings.is_empty()).then(|| output_power_w(readings, input_ains))
-    } else {
-        selected_ains
-            .first()
-            .and_then(|selected| {
-                readings.iter().find(|reading| {
-                    crate::fritz::normalize_ain_for_selection(&reading.ain)
-                        == crate::fritz::normalize_ain_for_selection(selected)
-                })
+fn displayed_power_w(readings: &[FritzReading], selected_ains: &[String]) -> Option<i64> {
+    selected_ains
+        .first()
+        .and_then(|selected| {
+            readings.iter().find(|reading| {
+                crate::fritz::normalize_ain_for_selection(&reading.ain)
+                    == crate::fritz::normalize_ain_for_selection(selected)
             })
-            .or_else(|| readings.first())
-            .map(|reading| reading.power_w)
-    }
+        })
+        .or_else(|| readings.first())
+        .map(|reading| reading.power_w)
 }
 
 fn live_power_summary(
     power: String,
-    is_net: bool,
     input_power: Option<String>,
     temperature: Option<String>,
 ) -> cosmic::Element<'static, Message> {
-    let title = if is_net {
-        "TOTAL POWER OUTPUT"
-    } else {
-        "CURRENT POWER"
-    };
+    let title = "CURRENT POWER";
     // Keep the heading on its own full-width row so the power and
     // temperature values share the same baseline beneath it.
     let heading = widget::Row::new()
@@ -1233,20 +1219,9 @@ impl cosmic::Application for AppModel {
                 })
             })
             .or_else(|| self.readings.first());
-        let power = if self.settings.total_power_first {
-            if self.readings.is_empty() {
-                "-- W".to_string()
-            } else {
-                format!(
-                    "{} W",
-                    output_power_w(&self.readings, &self.settings.input_ains)
-                )
-            }
-        } else {
-            primary_reading
-                .map(|reading| format!("{} W", reading.power_w))
-                .unwrap_or_else(|| "-- W".to_string())
-        };
+        let power = primary_reading
+            .map(|reading| format!("{} W", reading.power_w))
+            .unwrap_or_else(|| "-- W".to_string());
         let temperature = if self.settings.panel_average_temperature {
             Some(
                 average_temperature_c(
@@ -1256,8 +1231,6 @@ impl cosmic::Application for AppModel {
                 .map(|value| format!("{value:.1} °C"))
                 .unwrap_or_else(|| "-- °C".to_string()),
             )
-        } else if self.settings.total_power_first {
-            None
         } else {
             Some(
                 primary_reading
@@ -1265,19 +1238,15 @@ impl cosmic::Application for AppModel {
                     .unwrap_or_else(|| "-- °C".to_string()),
             )
         };
-        let input_power = if self.settings.total_power_first
-            && self.readings.iter().any(|reading| {
+        let input_power = self
+            .readings
+            .iter()
+            .any(|reading| {
                 self.settings
                     .input_ains
                     .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
-            }) {
-            Some(format!(
-                "{} W",
-                input_power_w(&self.readings, &self.settings.input_ains)
-            ))
-        } else {
-            None
-        };
+            })
+            .then(|| format!("{} W", input_power_w(&self.readings, &self.settings.input_ains)));
 
         let suggested = self.core.applet.suggested_size(true);
         // Keep a comfortable pointer/touch target with a compact icon-to-value gap.
@@ -2324,12 +2293,7 @@ impl cosmic::Application for AppModel {
                         })
                     })
                     .or_else(|| self.readings.first());
-                let summary_power = displayed_power_w(
-                    &self.readings,
-                    &self.selected_ains,
-                    self.settings.total_power_first,
-                    &self.settings.input_ains,
-                )
+                let summary_power = displayed_power_w(&self.readings, &self.selected_ains)
                 .map(|power| format!("{power} W"))
                 .unwrap_or_else(|| "-- W".into());
                 let summary_temperature = if self.settings.panel_average_temperature {
@@ -2338,8 +2302,6 @@ impl cosmic::Application for AppModel {
                         self.settings.panel_exclude_solar_temperature,
                     )
                     .map(|value| format!("{value:.1} °C"))
-                } else if self.settings.total_power_first {
-                    None
                 } else {
                     primary.map(|reading| format!("{:.1} °C", reading.temperature_c))
                 };
@@ -2359,7 +2321,6 @@ impl cosmic::Application for AppModel {
                     });
                 let summary_card = live_power_summary(
                     summary_power,
-                    self.settings.total_power_first,
                     summary_input,
                     summary_temperature,
                 );
@@ -3486,7 +3447,7 @@ mod history_tests {
     }
 
     #[test]
-    fn displayed_power_uses_selected_device_or_output_total_by_layout_mode() {
+    fn displayed_power_uses_first_selected_device() {
         let readings = vec![
             FritzReading {
                 ain: "111111".into(),
@@ -3507,15 +3468,10 @@ mod history_tests {
         let inputs = HashSet::from(["222222".to_string()]);
 
         assert_eq!(
-            displayed_power_w(&readings, &selected, false, &inputs),
+            displayed_power_w(&readings, &selected),
             Some(250)
         );
-        assert_eq!(
-            displayed_power_w(&readings, &selected, true, &inputs),
-            Some(800)
-        );
-        assert_eq!(displayed_power_w(&[], &selected, true, &inputs), None);
-        assert_eq!(displayed_power_w(&[], &selected, false, &inputs), None);
+        assert_eq!(displayed_power_w(&[], &selected), None);
     }
 
     #[test]
