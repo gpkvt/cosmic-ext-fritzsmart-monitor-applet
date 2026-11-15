@@ -1109,7 +1109,7 @@ impl cosmic::Application for AppModel {
             .width(icon_size)
             .height(icon_size);
                 content
-                    .push(solar_panel)
+                    .push(widget::container(solar_panel).padding([0, 0, 0, 4]))
                     .push(self.core.applet.text(input_power).size(f32::from(self.settings.panel_text_size)))
             } else {
                 content
