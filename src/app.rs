@@ -604,7 +604,12 @@ fn live_power_summary(
     }
     if let Some(temp) = temperature {
         has_supporting = true;
-        supporting = supporting.push(metric_tile("TEMP", temp, "utilities-temperature-symbolic"));
+        let temperature_metric = widget::Column::new()
+            .spacing(8)
+            .width(cosmic::iced::Length::Fill)
+            .push(widget::text::caption("TEMP"))
+            .push(widget::text::title2(keep_value_unit_together(temp)));
+        supporting = supporting.push(surface_card(temperature_metric.into(), 10));
     }
 
     let mut content = widget::Row::new()
