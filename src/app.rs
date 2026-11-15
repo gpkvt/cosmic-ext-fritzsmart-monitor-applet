@@ -681,7 +681,7 @@ fn live_power_summary(
         .width(cosmic::iced::Length::Fill)
         .push(metrics);
     if let Some(input) = input_power {
-        content = content.push(metric_tile("INPUT", input, "go-down-symbolic"));
+        content = content.push(metric_tile("TOTAL POWER INPUT", input, "go-down-symbolic"));
     }
     surface_card(content.into(), 14)
 }
