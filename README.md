@@ -7,10 +7,11 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 ## Features
 
 - Displays current power in watts and temperature in the COSMIC panel, with a configurable text size.
-- Settings and popup device rows use alternating backgrounds. Each selected device has separate configurable-timespan wattage and temperature sparklines in the popup, plus combined power history.
+- Settings and popup device rows use distinct muted background tints. Each selected device has separate configurable-timespan wattage and temperature sparklines in the popup, plus combined power history.
 - The main menu and settings are vertically scrollable when their content exceeds the popup height.
 - The first selected device supplies both power and temperature values shown in the panel. Selected devices can be reordered in Settings.
-- In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy.
+- In-applet settings for FRITZ!Box URL, username, password and TLS certificate policy; every setting is saved immediately when changed.
+- Optional per-device high-temperature alerts with configurable thresholds (30–100 °C); desktop notifications fire once when a reading crosses the threshold and re-arm after it cools below the limit.
 - Optional per-router PEM CA certificate trust without disabling hostname verification.
 - Discovers compatible power-meter devices and lets the user select any combination with checkboxes.
 - Refreshes every 60 seconds and keeps total and per-device samples for the configured graph history (5 minutes to 24 hours).
@@ -69,7 +70,11 @@ Open the applet popup and choose **Settings**. Adjust **Panel text size** (10–
 username and password, then choose **Load devices**. The applet discovers
 devices that expose both power and temperature measurements. Check every
 device you want to monitor, then use **Up** and **Down** to order the selected
-devices before choosing **Save settings**. The first selected device supplies
+devices. Changes are saved automatically as you make them. For each device,
+enable **High-temperature alert** and set the temperature threshold; the applet
+sends a desktop notification when a new reading crosses that threshold. Alerts
+are disabled by default and do not repeat while the temperature remains above
+the threshold. The first selected device supplies
 the panel's power and temperature readings. The popup shows every selected
 device separately, with its own wattage and temperature graph. Set the graph
 history from 5 minutes to 24 hours in 5-minute increments under Settings; the
