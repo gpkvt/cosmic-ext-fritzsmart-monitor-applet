@@ -4434,6 +4434,7 @@ mod history_tests {
             "a".into(),
             "b".into(),
             POWER_DIFFERENCE_DRAG_ID.into(),
+            SUMMARY_DRAG_ID.into(),
         ];
 
         move_menu_entry(&mut order, POWER_DIFFERENCE_DRAG_ID, "a");
@@ -4444,6 +4445,7 @@ mod history_tests {
                 POWER_DIFFERENCE_DRAG_ID.to_string(),
                 "a".to_string(),
                 "b".to_string(),
+                SUMMARY_DRAG_ID.to_string(),
             ]
         );
 
@@ -4455,6 +4457,7 @@ mod history_tests {
                 TOTAL_POWER_DRAG_ID.to_string(),
                 POWER_DIFFERENCE_DRAG_ID.to_string(),
                 "a".to_string(),
+                SUMMARY_DRAG_ID.to_string(),
             ]
         );
 
