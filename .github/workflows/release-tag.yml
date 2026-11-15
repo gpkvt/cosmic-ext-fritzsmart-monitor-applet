@@ -99,6 +99,14 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            commit_message="$(jq -r '.head_commit.message // ""' "$GITHUB_EVENT_PATH")"
+            if [[ "$commit_message" == "chore(release): bump version to "* ]]; then
+              echo "The manual release run handles this version bump; skipping duplicate tag creation."
+              exit 0
+            fi
+          fi
+
           version="$(sed -n '/^\[package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n1)"
           if [[ -z "$version" ]]; then
             echo "Could not read Cargo.toml package version" >&2
