@@ -1419,13 +1419,8 @@ impl cosmic::Application for AppModel {
             content = content
                 .push(widget::divider::horizontal::default())
                 .push(
-                    widget::button::custom(
-                        widget::text::body("Settings").width(cosmic::iced::Length::Fill),
-                    )
-                    .on_press(Message::ToggleSettings)
-                    .padding(10)
-                    .class(cosmic::theme::Button::Standard)
-                    .width(cosmic::iced::Length::Fill),
+                    action_button("preferences-system-symbolic", "Settings", Message::ToggleSettings)
+                        .width(cosmic::iced::Length::Fill),
                 );
         }
 
@@ -1476,7 +1471,8 @@ impl cosmic::Application for AppModel {
                         self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("↻"),
                         if self.refresh_started_at.is_some() { "Refreshing readings" } else { "Refresh readings" },
                         Message::Refresh,
-                    )), 
+                    ))
+                    .push(icon_action_button("⚙", "Open settings", Message::ToggleSettings)),
             )
             .padding([12, 16])
             .width(cosmic::iced::Length::Fill);
