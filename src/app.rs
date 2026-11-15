@@ -1569,7 +1569,7 @@ impl cosmic::Application for AppModel {
                                 .push(widget::text::caption(format!("{}", self.readings.len())))
                                 .push(widget::icon::from_name(
                                     if self.devices_expanded { "go-down-symbolic" } else { "go-next-symbolic" }
-                                ).size(16)),
+                                ).size(16))),
                     )
                     .on_press(Message::ToggleDevices)
                     .padding([8, 10])
