@@ -259,7 +259,7 @@ The API key is stored in the owner-only configuration file.
 
 ## Releases and packages
 
-Push a version tag such as `v0.2.7` to build Linux x86_64 release packages and
+Push a version tag such as `v0.2.9` to build Linux x86_64 release packages and
 publish them on the GitHub Releases page.
 
 Each release includes SHA-256 checksums and the following artifacts:
@@ -271,7 +271,7 @@ Each release includes SHA-256 checksums and the following artifacts:
 | Portable `.tar.gz` | Applet binary, desktop entry, icon, README and license |
 | Flatpak | Sandboxed COSMIC applet bundle |
 
-The Flatpak uses the Freedesktop 24.08 runtime and Rust SDK extension. It
+The Flatpak uses the Freedesktop 26.08 runtime and Rust SDK extension. It
 requests Wayland and network access for FRITZ!Box/OpenWeatherMap connections,
 plus desktop-notification permission.
 

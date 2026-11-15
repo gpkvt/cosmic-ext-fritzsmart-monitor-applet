@@ -40,9 +40,9 @@ jobs:
             desktop-file-utils \
             patchelf \
             file
-      - name: Format Rust sources and run tests
+      - name: Check Rust formatting and run tests
         run: |
-          cargo fmt --all
+          cargo fmt --all -- --check
           cargo generate-lockfile
           cargo test --locked
       - name: Build optimized binary
