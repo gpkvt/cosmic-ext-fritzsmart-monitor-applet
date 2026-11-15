@@ -1084,13 +1084,14 @@ impl cosmic::Application for AppModel {
                             .spacing(3)
                             .width(cosmic::iced::Length::Fill)
                             .push(widget::text::body("Average temperature"))
-                            .push(widget::text::caption("When enabled, the panel shows the mean temperature across all selected devices instead of a single device's temperature.")))
+                            .push(widget::text::caption("When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.")))
                         .push(widget::container(
                             widget::toggler(self.settings.panel_average_temperature)
                                 .on_toggle(Message::PanelAverageTemperatureChanged)
                         )
-                        .padding([8, 10])) )
-                    .push(if self.settings.panel_average_temperature {
+                        .padding([8, 10])) );
+                if self.settings.panel_average_temperature {
+                    content = content.push(
                         widget::Row::new()
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::Column::new()
@@ -1102,11 +1103,9 @@ impl cosmic::Application for AppModel {
                                 widget::toggler(self.settings.panel_exclude_solar_temperature)
                                     .on_toggle(Message::PanelExcludeSolarTemperatureChanged)
                             ).padding([8, 10]))
-                            .into()
-                    } else {
-                        widget::text::caption("Enable average temperature to configure which devices contribute to it.").into()
-                    })
-                    .push(widget::divider::horizontal::default())
+                    );
+                }
+                content = content.push(widget::divider::horizontal::default());
             }
 
             if self.active_settings_section == Some("graph") {
