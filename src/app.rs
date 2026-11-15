@@ -977,7 +977,7 @@ impl cosmic::Application for AppModel {
                     }
                 }),
             )
-            .push(widget::icon::from_name("electricity-symbolic").size(self.settings.panel_text_size))
+            .push(widget::icon::from_name("electricity-symbolic").size(self.settings.panel_text_size.into()))
             .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)));
         let content = if let Some(input_power) = input_power {
             let icon_size = f32::from(self.settings.panel_text_size.clamp(12, 20));
@@ -996,7 +996,7 @@ impl cosmic::Application for AppModel {
         };
         let content = if let Some(temperature) = temperature {
             content
-                .push(widget::icon::from_name("thermometer-symbolic").size(self.settings.panel_text_size))
+                .push(widget::icon::from_name("thermometer-symbolic").size(self.settings.panel_text_size.into()))
                 .push(self.core.applet.text(temperature).size(f32::from(self.settings.panel_text_size)))
         } else {
             content
