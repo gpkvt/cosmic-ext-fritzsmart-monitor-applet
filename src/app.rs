@@ -1,4 +1,4 @@
-use crate::fritz::{discover_devices, fetch_fritz_data, FritzDevice, FritzReading, FritzSettings, TemperatureAlertThresholds};
+use crate::fritz::{discover_devices, fetch_fritz_data, FritzDevice, FritzFetchResult, FritzReading, FritzSettings, TemperatureAlertThresholds};
 use crate::weather::{fetch_weather, WeatherData};
 use cosmic::iced::{
     futures,
@@ -36,6 +36,7 @@ pub struct AppModel {
     history: VecDeque<(Instant, i64)>,
     device_history: HashMap<String, VecDeque<(Instant, i64, f64)>>,
     temperature_alert_state: HashMap<String, bool>,
+    missing_device_ains: HashSet<String>,
     next_refresh_at: Option<Instant>,
     refresh_started_at: Option<Instant>,
     weather: Option<WeatherData>,
@@ -50,7 +51,7 @@ pub enum Message {
     PopupClosed(Id),
     Refresh,
     ClockTick,
-    Updated(Result<Vec<FritzReading>, String>),
+    Updated(Result<FritzFetchResult, String>),
     SetDevicePower(String, bool),
     PowerCommandFinished(String, bool, Result<(), String>),
     ToggleSettings,
@@ -87,6 +88,34 @@ fn temperature_outside_limits(temperature: f64, thresholds: TemperatureAlertThre
 
 fn should_notify_temperature_alert(previously_outside: Option<bool>, currently_outside: bool) -> bool {
     previously_outside == Some(false) && currently_outside
+}
+
+fn newly_missing_devices(
+    previously_missing: &mut HashSet<String>,
+    missing_devices: &[(String, String)],
+) -> Vec<String> {
+    let current: HashSet<String> = missing_devices.iter()
+        .map(|(ain, _)| crate::fritz::normalize_ain_for_selection(ain))
+        .collect();
+    let newly_missing = missing_devices.iter()
+        .filter(|(ain, _)| !previously_missing.contains(
+            &crate::fritz::normalize_ain_for_selection(ain)
+        ))
+        .map(|(_, name)| name.clone())
+        .collect();
+    *previously_missing = current;
+    newly_missing
+}
+
+fn notify_missing_devices(names: &[String]) {
+    if names.is_empty() {
+        return;
+    }
+    let body = names.join("\n");
+    let _ = notify_rust::Notification::new()
+        .summary(if names.len() == 1 { "FRITZ!Box device unavailable" } else { "FRITZ!Box devices unavailable" })
+        .body(&body)
+        .show();
 }
 
 fn notify_temperature_alert(name: &str, temperature: f64, thresholds: TemperatureAlertThresholds) {
@@ -1138,7 +1167,13 @@ impl cosmic::Application for AppModel {
             Message::Updated(result) => {
                 self.refresh_started_at = None;
                 match result {
-                Ok(readings) => {
+                Ok(result) => {
+                    let newly_missing = newly_missing_devices(
+                        &mut self.missing_device_ains,
+                        &result.missing_devices,
+                    );
+                    notify_missing_devices(&newly_missing);
+                    let readings = result.readings;
                     let total_power = readings.iter().map(|reading| reading.power_w).sum();
                     let now = Instant::now();
                     let history_window = graph_history_window(self.settings.graph_timespan_minutes);
@@ -1372,6 +1407,19 @@ impl cosmic::Application for AppModel {
 #[cfg(test)]
 mod history_tests {
     use super::*;
+
+    #[test]
+    fn missing_device_notifications_only_fire_on_new_missing_transitions() {
+        let mut previous = HashSet::new();
+        let missing = vec![
+            ("12:34-56".to_string(), "Solar inverter".to_string()),
+        ];
+        assert_eq!(newly_missing_devices(&mut previous, &missing), vec!["Solar inverter"]);
+        assert!(newly_missing_devices(&mut previous, &missing).is_empty());
+        assert!(newly_missing_devices(&mut previous, &[]).is_empty());
+        assert_eq!(newly_missing_devices(&mut previous, &missing), vec!["Solar inverter"]);
+    }
+
 
 
     #[test]
