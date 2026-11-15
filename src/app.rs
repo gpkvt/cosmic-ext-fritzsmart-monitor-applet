@@ -2597,7 +2597,7 @@ impl cosmic::Application for AppModel {
                                                     .push(widget::text::caption("Now")),
                                             ),
                                     )
-                                    .padding(8)
+                                    .padding([8, 0])
                                     .width(cosmic::iced::Length::Fill)
                                     .style(move |theme| {
                                         let cosmic = theme.cosmic();
