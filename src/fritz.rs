@@ -70,14 +70,19 @@ fn parse_graph_timespan_minutes(value: &str) -> u16 {
 
 fn parse_temperature_alerts(value: &str) -> HashMap<String, TemperatureAlertThresholds> {
     value.split(';').filter_map(|entry| {
-        let mut parts = entry.split(':');
-        let ain = normalize_ain_for_selection(parts.next()?);
-        let high_c = parts.next()?.parse::<i16>().ok()?.clamp(0, 40);
-        // Older configurations stored only the high threshold.
-        let low_c = parts.next()
-            .and_then(|value| value.parse::<i16>().ok())
-            .unwrap_or(-10)
-            .clamp(-10, 0);
+        // Split from the right so AINs containing colons remain supported.
+        let mut parts = entry.rsplitn(3, ':');
+        let last = parts.next()?;
+        let middle = parts.next()?;
+        // Older configurations stored only AIN:high and default the low
+        // limit to -10 °C.
+        let (ain, high, low) = match parts.next() {
+            Some(ain) => (ain, middle, last),
+            None => (middle, last, "-10"),
+        };
+        let ain = normalize_ain_for_selection(ain);
+        let high_c = high.parse::<i16>().ok()?.clamp(0, 40);
+        let low_c = low.parse::<i16>().ok()?.clamp(-10, 0);
         (!ain.is_empty()).then_some((ain, TemperatureAlertThresholds { high_c, low_c }))
     }).collect()
 }
