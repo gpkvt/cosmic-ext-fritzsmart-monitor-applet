@@ -2207,7 +2207,7 @@ impl cosmic::Application for AppModel {
                             .map(|deadline| format_countdown(
                                 deadline.saturating_duration_since(Instant::now()).as_secs()
                             ))
-                            .unwrap_or_else(|| format_countdown(0))
+                            .unwrap_or_default()
                     ))
                     .push(icon_action_button(
                         self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("view-refresh-symbolic"),
