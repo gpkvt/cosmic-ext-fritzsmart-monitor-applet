@@ -17,6 +17,18 @@ pub struct FritzDevice {
     pub ain: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TemperatureAlertThresholds {
+    pub high_c: i16,
+    pub low_c: i16,
+}
+
+impl Default for TemperatureAlertThresholds {
+    fn default() -> Self {
+        Self { high_c: 40, low_c: -10 }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct FritzSettings {
     pub url: String,
@@ -28,7 +40,7 @@ pub struct FritzSettings {
     pub ca_cert_path: String,
     pub panel_text_size: u8,
     pub graph_timespan_minutes: u16,
-    pub temperature_alerts: HashMap<String, u16>,
+    pub temperature_alerts: HashMap<String, TemperatureAlertThresholds>,
 }
 
 impl Default for FritzSettings {
@@ -56,12 +68,17 @@ fn parse_graph_timespan_minutes(value: &str) -> u16 {
     value.parse::<u16>().unwrap_or(15).clamp(5, 1440)
 }
 
-fn parse_temperature_alerts(value: &str) -> HashMap<String, u16> {
+fn parse_temperature_alerts(value: &str) -> HashMap<String, TemperatureAlertThresholds> {
     value.split(';').filter_map(|entry| {
-        let (ain, threshold) = entry.rsplit_once(':')?;
-        let ain = normalize_ain_for_selection(ain);
-        let threshold = threshold.parse::<u16>().ok()?.clamp(30, 100);
-        (!ain.is_empty()).then_some((ain, threshold))
+        let mut parts = entry.split(':');
+        let ain = normalize_ain_for_selection(parts.next()?);
+        let high_c = parts.next()?.parse::<i16>().ok()?.clamp(0, 40);
+        // Older configurations stored only the high threshold.
+        let low_c = parts.next()
+            .and_then(|value| value.parse::<i16>().ok())
+            .unwrap_or(-10)
+            .clamp(-10, 0);
+        (!ain.is_empty()).then_some((ain, TemperatureAlertThresholds { high_c, low_c }))
     }).collect()
 }
 
@@ -112,7 +129,12 @@ impl FritzSettings {
         let selected_ains = if self.ains.is_empty() { self.ain.clone() } else { self.ains.join(",") };
         let first_ain = self.ains.first().map(String::as_str).unwrap_or(&self.ain);
         let mut temperature_alerts: Vec<String> = self.temperature_alerts.iter()
-            .map(|(ain, threshold)| format!("{}:{}", normalize_ain_for_selection(ain), (*threshold).clamp(30, 100)))
+            .map(|(ain, thresholds)| format!(
+                "{}:{}:{}",
+                normalize_ain_for_selection(ain),
+                thresholds.high_c.clamp(0, 40),
+                thresholds.low_c.clamp(-10, 0),
+            ))
             .collect();
         temperature_alerts.sort_unstable();
         let temperature_alerts = temperature_alerts.join(";");
@@ -411,12 +433,13 @@ mod tests {
 
     #[test]
     fn temperature_alerts_parse_and_normalize_ains() {
-        let alerts = parse_temperature_alerts("12:34-56 78:55;222222222222:75;bad:abc;:60");
-        assert_eq!(alerts.get("12345678"), Some(&55));
-        assert_eq!(alerts.get("222222222222"), Some(&75));
+        let alerts = parse_temperature_alerts("12:34-56 78:35:-8;222222222222:40:-10;bad:abc;:60");
+        assert_eq!(alerts.get("12345678"), Some(&TemperatureAlertThresholds { high_c: 35, low_c: -8 }));
+        assert_eq!(alerts.get("222222222222"), Some(&TemperatureAlertThresholds { high_c: 40, low_c: -10 }));
         assert_eq!(alerts.len(), 2);
-        assert_eq!(parse_temperature_alerts("123:10").get("123"), Some(&30));
-        assert_eq!(parse_temperature_alerts("123:120").get("123"), Some(&100));
+        assert_eq!(parse_temperature_alerts("123:55").get("123"), Some(&TemperatureAlertThresholds { high_c: 40, low_c: -10 }));
+        assert_eq!(parse_temperature_alerts("123:-5:5").get("123"), Some(&TemperatureAlertThresholds { high_c: 0, low_c: 0 }));
+        assert_eq!(TemperatureAlertThresholds::default(), TemperatureAlertThresholds { high_c: 40, low_c: -10 });
         assert!(FritzSettings::default().temperature_alerts.is_empty());
     }
 
