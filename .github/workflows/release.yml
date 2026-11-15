@@ -38,6 +38,7 @@ jobs:
             python3-venv \
             dpkg-dev \
             desktop-file-utils \
+            appstream \
             patchelf \
             file
       - name: Check Rust formatting and run tests
@@ -45,6 +46,10 @@ jobs:
           cargo fmt --all -- --check
           cargo generate-lockfile
           cargo test --locked
+      - name: Validate desktop entry and AppStream metadata
+        run: |
+          desktop-file-validate data/com.gpkvt.FritzPowerMonitor.desktop
+          appstreamcli validate --no-net data/com.gpkvt.FritzPowerMonitor.metainfo.xml
       - name: Build optimized binary
         run: APP_RELEASE_VERSION="${GITHUB_REF_NAME#v}" cargo build --release --locked
       - name: Build Debian and AppImage packages
@@ -75,7 +80,6 @@ jobs:
             "dist/fritz-power-monitor-${GITHUB_REF_NAME}.flatpak" \
             com.gpkvt.FritzPowerMonitor stable \
             --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
-          # Verify that the generated bundle installs with the runtime already installed above.
           flatpak install --user --noninteractive --bundle \
             "dist/fritz-power-monitor-${GITHUB_REF_NAME}.flatpak"
           flatpak uninstall --user --noninteractive com.gpkvt.FritzPowerMonitor
@@ -88,10 +92,13 @@ jobs:
           package_dir="dist/${package_name}"
           mkdir -p "${package_dir}/bin" \
             "${package_dir}/share/applications" \
+            "${package_dir}/share/metainfo" \
             "${package_dir}/share/icons/hicolor/scalable/apps"
           install -Dm0755 target/release/fritz-power-monitor "${package_dir}/bin/fritz-power-monitor"
           install -Dm0644 data/com.gpkvt.FritzPowerMonitor.desktop \
             "${package_dir}/share/applications/com.gpkvt.FritzPowerMonitor.desktop"
+          install -Dm0644 data/com.gpkvt.FritzPowerMonitor.metainfo.xml \
+            "${package_dir}/share/metainfo/com.gpkvt.FritzPowerMonitor.metainfo.xml"
           install -Dm0644 data/com.gpkvt.FritzPowerMonitor.svg \
             "${package_dir}/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg"
           install -Dm0644 README.md "${package_dir}/README.md"

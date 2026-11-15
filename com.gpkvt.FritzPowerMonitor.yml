@@ -24,6 +24,7 @@ modules:
       - cargo build --offline --release --locked
       - install -Dm0755 target/release/fritz-power-monitor /app/bin/fritz-power-monitor
       - install -Dm0644 data/com.gpkvt.FritzPowerMonitor.desktop /app/share/applications/com.gpkvt.FritzPowerMonitor.desktop
+      - install -Dm0644 data/com.gpkvt.FritzPowerMonitor.metainfo.xml /app/share/metainfo/com.gpkvt.FritzPowerMonitor.metainfo.xml
       - install -Dm0644 data/com.gpkvt.FritzPowerMonitor.svg /app/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg
     sources:
       - type: dir

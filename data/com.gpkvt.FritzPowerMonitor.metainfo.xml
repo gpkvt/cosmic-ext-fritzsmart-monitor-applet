@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.gpkvt.FritzPowerMonitor</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <project_group>COSMIC</project_group>
+  <name>FRITZ!Power Monitor</name>
+  <summary>FRITZ!Box power and temperature monitor for COSMIC</summary>
+  <developer id="com.gpkvt">
+    <name>gpkvt</name>
+  </developer>
+  <url type="homepage">https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet</url>
+  <url type="bugtracker">https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues</url>
+  <description>
+    <p>A native COSMIC panel applet for monitoring live power and temperature readings from compatible FRITZ!Box Smart Home devices. It communicates with the FRITZ!Box directly and does not execute or depend on fritz_solar.sh.</p>
+    <p>Show live power and temperature readings in the COSMIC panel, monitor multiple selected devices, review power and temperature history, receive configurable temperature alerts, and switch compatible devices directly from the popup.</p>
+  </description>
+  <launchable type="desktop-id">com.gpkvt.FritzPowerMonitor.desktop</launchable>
+  <icon type="stock">com.gpkvt.FritzPowerMonitor</icon>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/main/docs/fritz-power-monitor-overview.png</image>
+      <caption>FRITZ!Power Monitor applet on the COSMIC desktop panel</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/main/docs/fritz-power-monitor-settings-overview.png</image>
+      <caption>FRITZ!Power Monitor settings</caption>
+    </screenshot>
+  </screenshots>
+  <provides>
+    <binary>fritz-power-monitor</binary>
+  </provides>
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <keywords>
+    <keyword>COSMIC</keyword>
+    <keyword>FRITZ!Box</keyword>
+    <keyword>Smart Home</keyword>
+    <keyword>power</keyword>
+    <keyword>energy</keyword>
+    <keyword>temperature</keyword>
+    <keyword>monitor</keyword>
+  </keywords>
+  <content_rating type="oars-1.1" />
+</component>
