@@ -160,10 +160,11 @@ fn parse_menu_order(value: &str, selected_ains: &str, total_power_first: bool) -
     const TOTAL: &str = "__TOTAL_POWER__";
     const DIFFERENCE: &str = "__POWER_DIFFERENCE__";
     const SUMMARY: &str = "__LIVE_SUMMARY__";
+    const WEATHER: &str = "__WEATHER__";
     let mut order = Vec::new();
     if !value.trim().is_empty() {
         for entry in value.split(',') {
-            let normalized = if entry == TOTAL || entry == DIFFERENCE || entry == SUMMARY {
+            let normalized = if entry == TOTAL || entry == DIFFERENCE || entry == SUMMARY || entry == WEATHER {
                 entry.to_string()
             } else {
                 normalize_ain_for_selection(entry)
@@ -192,6 +193,9 @@ fn parse_menu_order(value: &str, selected_ains: &str, total_power_first: bool) -
     }
     if !order.contains(&SUMMARY.to_string()) {
         order.push(SUMMARY.into());
+    }
+    if !order.contains(&WEATHER.to_string()) {
+        order.push(WEATHER.into());
     }
     order
 }
