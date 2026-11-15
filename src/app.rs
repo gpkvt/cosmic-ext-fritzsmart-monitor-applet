@@ -10,7 +10,7 @@ use cosmic::iced::{
 use cosmic::prelude::*;
 use cosmic::widget;
 use futures::SinkExt;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
@@ -40,7 +40,7 @@ pub struct AppModel {
     refresh_started_at: Option<Instant>,
     weather: Option<WeatherData>,
     next_weather_refresh_at: Option<Instant>,
-}
+    pending_power_changes: HashSet<String>,}
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -49,6 +49,8 @@ pub enum Message {
     Refresh,
     ClockTick,
     Updated(Result<Vec<FritzReading>, String>),
+    SetDevicePower(String, bool),
+    PowerCommandFinished(String, bool, Result<(), String>),
     ToggleSettings,
     UrlChanged(String),
     UsernameChanged(String),
@@ -793,12 +795,35 @@ impl cosmic::Application for AppModel {
                     let temperature_graph = device_history.map(|samples|
                         numeric_sparkline(samples.iter().map(|(_, _, temperature)| *temperature)))
                         .unwrap_or_else(|| "Waiting for samples…".into());
+                    let power_control = reading.power_state.map(|is_on| {
+                        let ain = reading.ain.clone();
+                        let key = crate::fritz::normalize_ain_for_selection(&ain);
+                        let pending = self.pending_power_changes.contains(&key);
+                        let action: cosmic::Element<'_, Message> = if pending {
+                            widget::text::caption("Switching…").into()
+                        } else {
+                            widget::button::custom(widget::text::body(
+                                if is_on { "Turn off" } else { "Turn on" },
+                            ))
+                            .on_press(Message::SetDevicePower(ain, !is_on))
+                            .into()
+                        };
+                        widget::Row::new()
+                            .spacing(8)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::text::caption("POWER"))
+                            .push(widget::text::body(if is_on { "● ON" } else { "○ OFF" }))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(action)
+                            .into()
+                    });
                     let device_content = widget::Column::new()
                         .spacing(6)
                         .push(widget::text::body(format!("{} · LAST {}", reading.name, format_graph_timespan(self.settings.graph_timespan_minutes))))
                         .push(widget::Row::new().spacing(12).align_y(cosmic::iced::Alignment::Center)
                             .push(widget::text::title2(format!("{} W", reading.power_w)))
                             .push(widget::text::body(format!("{:.1} °C", reading.temperature_c))))
+                        .push_maybe(power_control)
                         .push(
                             widget::Row::new()
                                 .spacing(12)
@@ -1039,6 +1064,50 @@ impl cosmic::Application for AppModel {
                     self.refresh_started_at = Some(Instant::now());
                     self.next_refresh_at = None;
                     return Task::perform(fetch_fritz_data(), |result| cosmic::Action::App(Message::Updated(result)));
+                }
+            }
+            Message::SetDevicePower(ain, on) => {
+                let key = crate::fritz::normalize_ain_for_selection(&ain);
+                if key.is_empty() || self.pending_power_changes.contains(&key) {
+                    return Task::none();
+                }
+                if !self.readings.iter().any(|reading|
+                    crate::fritz::normalize_ain_for_selection(&reading.ain) == key
+                        && reading.power_state.is_some())
+                {
+                    return Task::none();
+                }
+                self.pending_power_changes.insert(key);
+                return Task::perform(
+                    crate::fritz::set_device_power(ain.clone(), on),
+                    move |result| cosmic::Action::App(
+                        Message::PowerCommandFinished(ain, on, result),
+                    ),
+                );
+            }
+            Message::PowerCommandFinished(ain, on, result) => {
+                self.pending_power_changes.remove(
+                    &crate::fritz::normalize_ain_for_selection(&ain),
+                );
+                match result {
+                    Ok(()) => {
+                        self.error = None;
+                        self.refresh_started_at = Some(Instant::now());
+                        self.next_refresh_at = None;
+                        return Task::perform(fetch_fritz_data(), |result|
+                            cosmic::Action::App(Message::Updated(result)));
+                    }
+                    Err(error) => {
+                        let device_name = self.readings.iter().find(|reading|
+                            crate::fritz::normalize_ain_for_selection(&reading.ain)
+                                == crate::fritz::normalize_ain_for_selection(&ain))
+                            .map(|reading| reading.name.as_str())
+                            .unwrap_or("device");
+                        self.error = Some(format!(
+                            "Could not turn {} {device_name}: {error}",
+                            if on { "on" } else { "off" },
+                        ));
+                    }
                 }
             }
             Message::Updated(result) => {
@@ -1315,6 +1384,7 @@ mod history_tests {
             name: "Test device".into(),
             power_w: 120,
             temperature_c: 21.5,
+            power_state: None,
         };
         for minute in 0_u64..18 {
             record_device_sample(
