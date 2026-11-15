@@ -18,6 +18,7 @@ directly from a FRITZ!Box smart-home device. It does not execute or depend on
 - Refreshes automatically on a configurable interval from 30 seconds to 1 hour (default 60 seconds), with a live countdown in the popup menu. Total and per-device graph samples are collected on each successful refresh.
 - Keeps the last successful reading visible when a later refresh fails.
 - Reads selected devices independently: a selected device with missing or invalid measurements is skipped without discarding readings from healthy devices. If no selected device returns usable readings, the refresh reports the device errors.
+- Sends a desktop notification when a selected device disappears from the FRITZ!Box device list or stops providing usable readings. Repeated refreshes do not repeat the same alert; a device can alert again after it recovers and goes missing again.
 - Optional OpenWeatherMap integration replaces the panel sun icon with the current weather condition and shows a detailed weather summary at the top of the popup. The weather card uses a Wikimedia Commons photograph selected to match the reported condition, with a dark readability overlay and visible author/license/file attribution; photo lookup failures fall back to the normal themed card. Configure the API key, city or `latitude,longitude`, and an independent 5–60 minute refresh interval (default 10 minutes).
 - Uses FRITZ!Box challenge-response login and HTTPS certificate validation by
   default.
