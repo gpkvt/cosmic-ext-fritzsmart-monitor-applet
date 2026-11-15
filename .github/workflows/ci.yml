@@ -65,8 +65,8 @@ jobs:
             org.freedesktop.Sdk.Extension.rust-stable//26.08
       - name: Build Flatpak application
         run: |
-          flatpak-builder --user --force-clean --repo=flatpak-repo \
-            build-flatpak com.gpkvt.FritzPowerMonitor.yml
+          flatpak-builder --user --force-clean --default-branch=stable \
+            --repo=flatpak-repo build-flatpak com.gpkvt.FritzPowerMonitor.yml
       - name: Build and smoke-test distributable Flatpak bundle
         run: |
           set -euo pipefail
