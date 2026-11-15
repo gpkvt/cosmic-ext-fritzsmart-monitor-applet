@@ -559,31 +559,36 @@ fn total_power_overview(
 }
 
 fn settings_section_header<'a>(title: &'a str, expanded: bool, section: &'static str) -> cosmic::Element<'a, Message> {
-    let row = widget::Row::new()
-        .spacing(10)
-        .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::text::body(title).width(cosmic::iced::Length::Fill))
-        .push(widget::text(if expanded { "⌄" } else { "›" }).font(cosmic::font::default()).size(18));
+    // Use COSMIC's standard button treatment so section navigation follows
+    // the same interaction, focus and theme conventions as system settings.
+    let section_icon = match section {
+        "panel" => "preferences-desktop-display-symbolic",
+        "graph" => "view-statistics-symbolic",
+        "refresh" => "view-refresh-symbolic",
+        "weather" => "weather-clear-symbolic",
+        "connection" => "network-server-symbolic",
+        "device" => "computer-symbolic",
+        "diagnostics" => "dialog-information-symbolic",
+        _ => "preferences-system-symbolic",
+    };
+    let disclosure_icon = if expanded {
+        "go-down-symbolic"
+    } else {
+        "go-next-symbolic"
+    };
 
-    widget::mouse_area(
-        widget::container(row)
-            .padding([10, 12])
-            .width(cosmic::iced::Length::Fill)
-            .style(|theme| {
-                let cosmic = theme.cosmic();
-                cosmic::iced::widget::container::Style {
-                    background: Some(
-                        cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
-                    ),
-                    border: cosmic::iced::Border {
-                        radius: 8.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }
-            }),
+    widget::button::custom(
+        widget::Row::new()
+            .spacing(10)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::icon::from_name(section_icon).size(18))
+            .push(widget::text::body(title).width(cosmic::iced::Length::Fill))
+            .push(widget::icon::from_name(disclosure_icon).size(16)),
     )
     .on_press(Message::ToggleSettingsSection(section))
+    .padding([10, 12])
+    .width(cosmic::iced::Length::Fill)
+    .class(cosmic::theme::Button::Standard)
     .into()
 }
 
@@ -694,11 +699,13 @@ fn action_button<'a>(
     widget::button::custom(
         widget::Row::new()
             .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
             .push(widget::icon::from_name(icon_name).size(16))
-            .push(widget::text::body(label)),
+            .push(widget::text::body(label).width(cosmic::iced::Length::Fill)),
     )
     .on_press(message)
-    .padding(8)
+    .padding([10, 12])
+    .width(cosmic::iced::Length::Fill)
     .class(cosmic::theme::Button::Standard)
 }
 
