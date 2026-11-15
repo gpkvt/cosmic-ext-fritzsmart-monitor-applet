@@ -41,8 +41,7 @@ directly and does **not** execute or depend on `fritz_solar.sh`.
 - Configure panel text size (10–24 pt).
 - Show the average temperature across selected devices, with an option to
   exclude devices whose names contain `solar`.
-- Choose and save the order of selected devices, Total power output,
-  Total power input, and Power difference.
+- View menu cards in a consistent, fixed order without drag-and-drop controls.
 - Use the popup's sticky title bar for Refresh and Settings. Its content scrolls
   independently when needed.
 - View a live refresh countdown and configure automatic refresh from
@@ -159,7 +158,7 @@ Devices and Diagnostics.
 5. Enter the FRITZ!Box URL, username and password, then choose **Load devices**.
 6. Select the devices to monitor.
 
-Use the grip (⠿) handles in the popup itself to drag and reorder the weather section (including its forecast), live power summary, Total power output, Power difference and individual device cards. The same complete ordering is available in Devices settings. The order is saved automatically and restored after restarting the applet.
+Menu cards use a fixed order: live power summary, weather, selected devices (sorted by AIN), Total power output and Power difference. Device settings list available devices in the order returned by the FRITZ!Box.
 Each selected device appears separately in the popup with its own readings and
 history graphs.
 
@@ -176,8 +175,7 @@ rather than generation.
   first discovered. This default is applied only once; manual changes are
   preserved.
 
-The sortable list contains selected devices, **Total power output** (with
-**Total power input** grouped alongside it), and **Power difference**.
+The popup keeps its menu sections in a consistent order. Device selection and input configuration remain available in Settings.
 
 ### Temperature alerts
 
