@@ -850,14 +850,19 @@ fn icon_action_button<'a>(
     accessible_name: &'static str,
     message: Message,
 ) -> widget::Button<'a, Message> {
-    // Render the compact controls as text glyphs rather than theme icon names:
-    // icon themes may not provide every symbolic name on every COSMIC setup.
-    // Fixed dimensions keep both actions visible in the 320px popup.
-    widget::button::custom(
-        widget::container(widget::text(glyph.into()).size(20))
+    // Use the same symbolic refresh icon in every part of the applet.
+    // Other compact actions (such as Settings) retain their text glyphs.
+    let glyph = glyph.into();
+    let icon = if glyph == "view-refresh-symbolic" {
+        widget::container(widget::icon::from_name("view-refresh-symbolic").size(16))
             .center_x(36)
-            .center_y(36),
-    )
+            .center_y(36)
+    } else {
+        widget::container(widget::text(glyph).size(20))
+            .center_x(36)
+            .center_y(36)
+    };
+    widget::button::custom(icon)
     .on_press(message)
     .padding(0)
     .width(cosmic::iced::Length::Fixed(36.0))
@@ -1558,7 +1563,7 @@ impl cosmic::Application for AppModel {
                 ).filter(|remaining| !remaining.is_zero() && *remaining < Duration::from_secs(10)) {
                     countdown_action_button(remaining.as_secs().saturating_add(1))
                 } else {
-                    icon_action_button("↻", "Reload now", Message::Refresh)
+                    icon_action_button("view-refresh-symbolic", "Reload now", Message::Refresh)
                 };
                 content = content.push(
                     widget::Row::new()
@@ -2151,7 +2156,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::body("FRITZ!Power Monitor")
                         .width(cosmic::iced::Length::Fill))
                     .push(icon_action_button(
-                        self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("↻"),
+                        self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("view-refresh-symbolic"),
                         if self.refresh_started_at.is_some() { "Refreshing readings" } else { "Refresh readings" },
                         Message::Refresh,
                     ))
