@@ -1502,9 +1502,31 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::body(tls_status))
                     .push(widget::text::caption(format!("Endpoint: {}", if endpoint.is_empty() { "Not configured" } else { endpoint })));
                 let requests = crate::fritz::http_request_diagnostics();
-                content = content
-                    .push(widget::text::title3("HTTP requests"))
-                    .push(widget::text::caption("Most recent responses · query parameters and session IDs are omitted"));
+                let request_countdown = if self.refresh_started_at.is_some() {
+                    "Request in progress…".to_string()
+                } else {
+                    self.next_refresh_at
+                        .map(|deadline| format!(
+                            "Next request in {}",
+                            format_countdown(deadline.saturating_duration_since(Instant::now()).as_secs())
+                        ))
+                        .unwrap_or_else(|| "Waiting for next request".to_string())
+                };
+                content = content.push(
+                    widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::title3("HTTP requests")
+                            .width(cosmic::iced::Length::Fill))
+                        .push(widget::text::caption(request_countdown))
+                        .push(icon_action_button(
+                            self.refresh_started_at.map(refresh_spinner_frame).unwrap_or("↻"),
+                            if self.refresh_started_at.is_some() { "Request in progress" } else { "Reload now" },
+                            Message::Refresh,
+                        ))
+                ).push(widget::text::caption(
+                    "Most recent responses · query parameters and session IDs are omitted"
+                ));
                 if requests.is_empty() {
                     content = content.push(widget::text::caption("No HTTP responses recorded yet"));
                 } else {
