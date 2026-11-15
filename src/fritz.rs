@@ -46,6 +46,7 @@ pub struct FritzSettings {
     pub allow_invalid_certs: bool,
     pub ca_cert_path: String,
     pub panel_text_size: u8,
+    pub panel_average_temperature: bool,
     pub graph_timespan_minutes: u16,
     pub refresh_interval_seconds: u32,
     pub temperature_alerts: HashMap<String, TemperatureAlertThresholds>,
@@ -69,6 +70,7 @@ impl Default for FritzSettings {
             allow_invalid_certs: false,
             ca_cert_path: String::new(),
             panel_text_size: 14,
+            panel_average_temperature: false,
             graph_timespan_minutes: 15,
             refresh_interval_seconds: 60,
             temperature_alerts: HashMap::new(),
@@ -149,6 +151,7 @@ impl FritzSettings {
             allow_invalid_certs: get("ALLOW_INVALID_CERTS").eq_ignore_ascii_case("true"),
             ca_cert_path: get("CA_CERT_PATH"),
             panel_text_size: parse_panel_text_size(&get("PANEL_TEXT_SIZE")),
+            panel_average_temperature: get("PANEL_AVERAGE_TEMPERATURE").eq_ignore_ascii_case("true"),
             graph_timespan_minutes: parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")),
             refresh_interval_seconds: parse_refresh_interval_seconds(&get("REFRESH_INTERVAL_SECONDS")),
             temperature_alerts: parse_temperature_alerts(&get("TEMPERATURE_ALERTS")),
@@ -191,10 +194,12 @@ impl FritzSettings {
         input_ains.sort_unstable();
         let input_ains = input_ains.join(",");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nTOTAL_POWER_FIRST={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_AVERAGE_TEMPERATURE={}\nGRAPH_TIMESPAN_MINUTES={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nTOTAL_POWER_FIRST={}\n",
             self.url, self.username, self.password, first_ain, selected_ains,
             if self.allow_invalid_certs { "true" } else { "false" }, self.ca_cert_path,
-            self.panel_text_size.clamp(10, 24), self.graph_timespan_minutes.clamp(5, 1440),
+            self.panel_text_size.clamp(10, 24),
+            if self.panel_average_temperature { "true" } else { "false" },
+            self.graph_timespan_minutes.clamp(5, 1440),
             self.refresh_interval_seconds.clamp(30, 3600), temperature_alerts,
             if self.weather_enabled { "true" } else { "false" }, self.openweathermap_api_key,
             self.weather_location, self.weather_refresh_interval_minutes.clamp(5, 60), input_ains,

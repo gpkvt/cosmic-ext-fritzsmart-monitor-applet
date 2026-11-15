@@ -27,6 +27,7 @@ pub struct AppModel {
     error: Option<String>,
     updated: Option<String>,
     settings_open: bool,
+    expanded_settings_sections: HashSet<&'static str>,
     settings: FritzSettings,
     devices: Vec<FritzDevice>,
     selected_ains: Vec<String>,
@@ -58,12 +59,14 @@ pub enum Message {
     SetDevicePower(String, bool),
     PowerCommandFinished(String, bool, Result<(), String>),
     ToggleSettings,
+    ToggleSettingsSection(&'static str),
     UrlChanged(String),
     UsernameChanged(String),
     PasswordChanged(String),
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
+    PanelAverageTemperatureChanged(bool),
     GraphTimespanChanged(u16),
     RefreshIntervalChanged(u32),
     DiscoverDevices,
@@ -270,6 +273,17 @@ fn power_sparkline(history: &VecDeque<(Instant, i64)>) -> String {
     numeric_sparkline(history.iter().map(|(_, value)| *value as f64))
 }
 
+fn input_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
+    readings.iter().filter(|reading| {
+        input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+    }).map(|reading| signed_device_power(reading.power_w, true)).sum()
+}
+
+fn average_temperature_c(readings: &[FritzReading]) -> Option<f64> {
+    let count = readings.len();
+    (count > 0).then(|| readings.iter().map(|reading| reading.temperature_c).sum::<f64>() / count as f64)
+}
+
 fn rebuild_net_power_history(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     input_ains: &HashSet<String>,
@@ -366,16 +380,32 @@ fn move_sortable_entry(
     }
 }
 
+fn settings_section_header<'a>(title: &'a str, expanded: bool, section: &'static str) -> cosmic::Element<'a, Message> {
+    widget::button::custom(
+        widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::text(if expanded { "▾" } else { "▸" }).size(16))
+            .push(widget::text::body(title).width(cosmic::iced::Length::Fill)),
+    )
+    .on_press(Message::ToggleSettingsSection(section))
+    .padding([6, 8])
+    .width(cosmic::iced::Length::Fill)
+    .into()
+}
+
 fn total_power_sort_row(position: usize) -> cosmic::Element<'static, Message> {
     let row = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
         .spacing(6)
         .align_y(cosmic::iced::Alignment::Center)
         .push(widget::mouse_area(widget::text("⠿").size(20))
             .on_press(Message::StartDeviceDrag(TOTAL_POWER_DRAG_ID.to_string())))
-        .push(widget::text::body("Total power (net)"))
+        .push(widget::text::body("Total power (net)").width(cosmic::iced::Length::Fill))
         .push(widget::text::caption(format!("#{position}")));
     widget::mouse_area(
         widget::container(row)
+            .width(cosmic::iced::Length::Fill)
             .padding(8)
             .style(|theme| {
                 let cosmic = theme.cosmic();
@@ -565,11 +595,22 @@ impl cosmic::Application for AppModel {
             primary_reading.map(|reading| format!("{} W", reading.power_w))
                 .unwrap_or_else(|| "-- W".to_string())
         };
-        let temperature = if self.settings.total_power_first {
+        let temperature = if self.settings.panel_average_temperature {
+            Some(average_temperature_c(&self.readings)
+                .map(|value| format!("{value:.1} °C"))
+                .unwrap_or_else(|| "-- °C".to_string()))
+        } else if self.settings.total_power_first {
             None
         } else {
             Some(primary_reading.map(|reading| format!("{:.1} °C", reading.temperature_c))
                 .unwrap_or_else(|| "-- °C".to_string()))
+        };
+        let input_power = if self.settings.total_power_first && self.readings.iter().any(|reading|
+            self.settings.input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+        ) {
+            Some(format!("{} W", input_power_w(&self.readings, &self.settings.input_ains)))
+        } else {
+            None
         };
 
         let suggested = self.core.applet.suggested_size(true);
@@ -595,6 +636,11 @@ impl cosmic::Application for AppModel {
                     .padding([2, 0]),
             )
             .push(self.core.applet.text(power).size(f32::from(self.settings.panel_text_size)));
+        let content = if let Some(input_power) = input_power {
+            content.push(self.core.applet.text(input_power).size(f32::from(self.settings.panel_text_size)))
+        } else {
+            content
+        };
         let content = if let Some(temperature) = temperature {
             content.push(self.core.applet.text(temperature).size(f32::from(self.settings.panel_text_size)))
         } else {
@@ -635,252 +681,287 @@ impl cosmic::Application for AppModel {
             content = content
                 .push(widget::text::title3("FRITZ!Power Monitor settings"))
                 .push(widget::divider::horizontal::default())
-                .push(widget::text::caption("PANEL"))
-                .push(widget::text::body(format!("Panel text size: {} pt", self.settings.panel_text_size)))
-                .push(
-                    widget::slider(
-                        10.0..=24.0,
-                        f32::from(self.settings.panel_text_size),
-                        |value| Message::PanelTextSizeChanged(value.round() as u8),
-                    )
-                    .step(1.0),
-                )
-                .push(widget::text::caption("Adjusts the power and temperature text in the panel"))
-                .push(widget::divider::horizontal::default())
-                .push(widget::text::caption(format!(
-                    "GRAPH HISTORY: {}",
-                    format_graph_timespan(self.settings.graph_timespan_minutes)
-                )))
-                .push(
-                    widget::slider(
-                        5.0..=1440.0,
-                        f32::from(self.settings.graph_timespan_minutes),
-                        |value| Message::GraphTimespanChanged(value.round() as u16),
-                    )
-                    .step(5.0),
-                )
-                .push(widget::text::caption("5 minutes to 24 hours; samples are collected once per refresh"))
-                .push(widget::divider::horizontal::default())
-                .push(widget::text::caption(format!(
-                    "AUTOMATIC REFRESH: {}",
-                    format_countdown(u64::from(self.settings.refresh_interval_seconds))
-                )))
-                .push(
-                    widget::slider(
-                        30.0..=3600.0,
-                        self.settings.refresh_interval_seconds as f32,
-                        |value| Message::RefreshIntervalChanged(value.round() as u32),
-                    )
-                    .step(30.0),
-                )
-                .push(widget::text::caption("30 seconds to 1 hour"))
-                .push(widget::divider::horizontal::default())
-                .push(widget::text::caption("WEATHER"))
-                .push(widget::Row::new()
-                    .align_y(cosmic::iced::Alignment::Center)
-                    .push(widget::text::body("Use current weather icon"))
-                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                    .push(widget::toggler(self.settings.weather_enabled).on_toggle(Message::WeatherEnabledChanged)))
-                .push(widget::text::body("OpenWeatherMap API key"))
-                .push(widget::secure_input("API key", &self.settings.openweathermap_api_key, None, true)
-                    .on_input(Message::OpenWeatherMapApiKeyChanged))
-                .push(widget::text::body("Location (city or latitude,longitude)"))
-                .push(widget::text_input("e.g. Amsterdam or 52.37,4.90", &self.settings.weather_location)
-                    .on_input(Message::WeatherLocationChanged))
-                .push(widget::text::caption(format!("Weather refresh: {} minutes", self.settings.weather_refresh_interval_minutes)))
-                .push(widget::slider(5.0..=60.0, f32::from(self.settings.weather_refresh_interval_minutes),
-                    |value| Message::WeatherRefreshIntervalChanged(value.round() as u16)).step(5.0))
-                .push(widget::text::caption("Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location."))
-                .push(widget::divider::horizontal::default())
-                .push(widget::text::caption("CONNECTION"))
-                .push(widget::text::body("FRITZ!Box URL"))
-                .push(
-                    widget::text_input("https://fritz.box", &self.settings.url)
-                        .on_input(Message::UrlChanged),
-                )
-                .push(widget::text::body("Username"))
-                .push(
-                    widget::text_input("Username", &self.settings.username)
-                        .on_input(Message::UsernameChanged),
-                )
-                .push(widget::text::body("Password"))
-                .push(
-                    widget::secure_input("Password", &self.settings.password, None, true)
-                        .on_input(Message::PasswordChanged),
-                )
-                .push(widget::text::body("Trusted CA certificate (PEM file, optional)"))
-                .push(
-                    widget::text_input("/home/user/.config/fritzbox-ca.pem", &self.settings.ca_cert_path)
-                        .on_input(Message::CaCertPathChanged),
-                )
-                .push(widget::text::caption("Leave empty to use the system certificate store"))
-                .push(
-                    widget::Row::new()
-                        .width(cosmic::iced::Length::Fill)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(
-                            widget::text::body("Allow invalid TLS certificates")
-                                .width(cosmic::iced::Length::Fill),
+                            content = content.push(settings_section_header("Panel", self.expanded_settings_sections.contains("panel"), "panel"));
+            if self.expanded_settings_sections.contains("panel") {
+                content = content
+                    .push(widget::text::body(format!("Panel text size: {} pt", self.settings.panel_text_size)))
+                    .push(
+                        widget::slider(
+                            10.0..=24.0,
+                            f32::from(self.settings.panel_text_size),
+                            |value| Message::PanelTextSizeChanged(value.round() as u8),
                         )
-                        .push(
-                            widget::toggler(self.settings.allow_invalid_certs)
-                                .on_toggle(Message::AllowInvalidCertsChanged),
-                        ),
-                )
-                .push(widget::divider::horizontal::default())
-                .push(widget::text::caption("DEVICE"))
-                .push(action_button("view-refresh-symbolic", "Load devices", Message::DiscoverDevices));
+                        .step(1.0),
+                    )
+                    .push(widget::text::caption("Adjusts the power and temperature text in the panel"))
+                    .push(widget::Row::new()
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::body("Show average temperature in panel")
+                            .width(cosmic::iced::Length::Fill))
+                        .push(widget::toggler(self.settings.panel_average_temperature)
+                            .on_toggle(Message::PanelAverageTemperatureChanged)))
+                    .push(widget::text::caption("Uses the mean temperature of all selected devices"))
+                    .push(widget::divider::horizontal::default())
+            }
 
-            if !self.devices.is_empty() {
-                content = content.push(widget::text::body("Select and order power-meter devices"));
-                if self.settings.total_power_first {
-                    content = content.push(total_power_sort_row(1));
-                }
-                let mut ordered_devices: Vec<&FritzDevice> = self.selected_ains.iter()
-                    .filter_map(|ain| self.devices.iter().find(|device|
-                        crate::fritz::normalize_ain_for_selection(&device.ain)
-                            == crate::fritz::normalize_ain_for_selection(ain)))
-                    .collect();
-                ordered_devices.extend(self.devices.iter().filter(|device|
-                    !self.selected_ains.iter().any(|ain|
-                        crate::fritz::normalize_ain_for_selection(ain)
-                            == crate::fritz::normalize_ain_for_selection(&device.ain))));
-                for (row_index, device) in ordered_devices.iter().enumerate() {
-                    let selected_index = self.selected_ains.iter().position(|ain|
-                        crate::fritz::normalize_ain_for_selection(ain)
-                            == crate::fritz::normalize_ain_for_selection(&device.ain));
-                    let selected = selected_index.is_some();
-                    let ain = device.ain.clone();
-                    let mut row = widget::Row::new()
-                        .spacing(6)
-                        .align_y(cosmic::iced::Alignment::Center);
-                    if selected {
-                        row = row.push(
-                            widget::mouse_area(widget::text("⠿").size(20))
-                                .on_press(Message::StartDeviceDrag(ain.clone())),
-                        );
-                    }
-                    row = row.push(widget::checkbox(selected)
-                            .label(device.name.clone())
-                            .on_toggle({
-                                let ain = ain.clone();
-                                move |checked| Message::ToggleDevice(ain.clone(), checked)
-                            }));
-                    if let Some(index) = selected_index {
-                        row = row.push(widget::text::caption(format!(
-                            "#{}",
-                            index + 1 + if self.settings.total_power_first { 1 } else { 0 },
-                        )));
-                    }
-                    let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
-                    let alert_thresholds = self.settings.temperature_alerts.get(&normalized_ain).copied();
-                    let is_input = self.settings.input_ains.contains(&normalized_ain);
-                    let mut device_row = widget::Column::new()
-                        .spacing(6)
-                        .push(row)
-                        .push(widget::Row::new()
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::text::caption("Input (subtract from total)"))
-                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(widget::toggler(is_input)
-                                .on_toggle({
-                                    let ain = ain.clone();
-                                    move |enabled| Message::ToggleDeviceInput(ain.clone(), enabled)
-                                })))
-                        .push(widget::Row::new()
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::text::caption("Temperature alerts"))
-                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(widget::toggler(alert_thresholds.is_some())
-                                .on_toggle({
-                                    let ain = ain.clone();
-                                    move |enabled| Message::ToggleTemperatureAlert(ain.clone(), enabled)
-                                })));
-                    if let Some(thresholds) = alert_thresholds {
-                        device_row = device_row
-                            .push(widget::text::caption(format!("Upper limit: {} °C", thresholds.high_c)))
-                            .push(widget::slider(
-                                0.0..=40.0,
-                                f32::from(thresholds.high_c),
-                                {
-                                    let ain = ain.clone();
-                                    move |value| Message::TemperatureAlertHighChanged(ain.clone(), value.round() as i16)
-                                },
-                            ).step(1.0))
-                            .push(widget::text::caption(format!("Lower limit: {} °C", thresholds.low_c)))
-                            .push(widget::slider(
-                                -10.0..=0.0,
-                                f32::from(thresholds.low_c),
-                                {
-                                    let ain = ain.clone();
-                                    move |value| Message::TemperatureAlertLowChanged(ain.clone(), value.round() as i16)
-                                },
-                            ).step(1.0))
-                            .push(widget::text::caption("Notify above the upper limit or below the lower limit"));
-                    }
-                    content = content.push(widget::mouse_area(
-                        widget::container(device_row)
-                        .padding(8)
-                        .style(move |theme| {
-                            let cosmic = theme.cosmic();
-                            let base = cosmic::iced::Color::from(cosmic.background(false).base);
-                            cosmic::iced::widget::container::Style {
-                                background: Some(device_background_color(base, row_index).into()),
-                                ..Default::default()
-                            }
-                        })
-                    ).on_enter(Message::DragOverDevice(ain.clone())));
-                    if self.dragging_device_ain.is_some()
-                        && self.drag_target_ain.as_deref().is_some_and(|target|
-                            crate::fritz::normalize_ain_for_selection(target)
-                                == crate::fritz::normalize_ain_for_selection(&ain))
-                    {
-                        let progress = self.drag_target_since
-                            .map(|started| (started.elapsed().as_secs_f32() / 0.18).clamp(0.0, 1.0))
-                            .unwrap_or(1.0);
-                        let gap_height = 18.0 * progress;
-                        content = content.push(
-                            widget::container(
-                                widget::text("Drop here").size(11)
-                            )
-                            .height(cosmic::iced::Length::Fixed(gap_height))
+            content = content.push(settings_section_header("Graph history", self.expanded_settings_sections.contains("graph"), "graph"));
+            if self.expanded_settings_sections.contains("graph") {
+    content = content
+        .push(widget::text::caption(format!(
+                        "GRAPH HISTORY: {}",
+                        format_graph_timespan(self.settings.graph_timespan_minutes)
+                    )))
+                    .push(
+                        widget::slider(
+                            5.0..=1440.0,
+                            f32::from(self.settings.graph_timespan_minutes),
+                            |value| Message::GraphTimespanChanged(value.round() as u16),
+                        )
+                        .step(5.0),
+                    )
+                    .push(widget::text::caption("5 minutes to 24 hours; samples are collected once per refresh"))
+                    .push(widget::divider::horizontal::default())
+            }
+
+            content = content.push(settings_section_header("Automatic refresh", self.expanded_settings_sections.contains("refresh"), "refresh"));
+            if self.expanded_settings_sections.contains("refresh") {
+    content = content
+        .push(widget::text::caption(format!(
+                        "AUTOMATIC REFRESH: {}",
+                        format_countdown(u64::from(self.settings.refresh_interval_seconds))
+                    )))
+                    .push(
+                        widget::slider(
+                            30.0..=3600.0,
+                            self.settings.refresh_interval_seconds as f32,
+                            |value| Message::RefreshIntervalChanged(value.round() as u32),
+                        )
+                        .step(30.0),
+                    )
+                    .push(widget::text::caption("30 seconds to 1 hour"))
+                    .push(widget::divider::horizontal::default())
+            }
+
+            content = content.push(settings_section_header("Weather", self.expanded_settings_sections.contains("weather"), "weather"));
+            if self.expanded_settings_sections.contains("weather") {
+                content = content
+                    .push(widget::Row::new()
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::body("Use current weather icon"))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(widget::toggler(self.settings.weather_enabled).on_toggle(Message::WeatherEnabledChanged)))
+                    .push(widget::text::body("OpenWeatherMap API key"))
+                    .push(widget::secure_input("API key", &self.settings.openweathermap_api_key, None, true)
+                        .on_input(Message::OpenWeatherMapApiKeyChanged))
+                    .push(widget::text::body("Location (city or latitude,longitude)"))
+                    .push(widget::text_input("e.g. Amsterdam or 52.37,4.90", &self.settings.weather_location)
+                        .on_input(Message::WeatherLocationChanged))
+                    .push(widget::text::caption(format!("Weather refresh: {} minutes", self.settings.weather_refresh_interval_minutes)))
+                    .push(widget::slider(5.0..=60.0, f32::from(self.settings.weather_refresh_interval_minutes),
+                        |value| Message::WeatherRefreshIntervalChanged(value.round() as u16)).step(5.0))
+                    .push(widget::text::caption("Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location."))
+                    .push(widget::divider::horizontal::default())
+            }
+
+            content = content.push(settings_section_header("Connection", self.expanded_settings_sections.contains("connection"), "connection"));
+            if self.expanded_settings_sections.contains("connection") {
+                content = content
+                    .push(widget::text::body("FRITZ!Box URL"))
+                    .push(
+                        widget::text_input("https://fritz.box", &self.settings.url)
+                            .on_input(Message::UrlChanged),
+                    )
+                    .push(widget::text::body("Username"))
+                    .push(
+                        widget::text_input("Username", &self.settings.username)
+                            .on_input(Message::UsernameChanged),
+                    )
+                    .push(widget::text::body("Password"))
+                    .push(
+                        widget::secure_input("Password", &self.settings.password, None, true)
+                            .on_input(Message::PasswordChanged),
+                    )
+                    .push(widget::text::body("Trusted CA certificate (PEM file, optional)"))
+                    .push(
+                        widget::text_input("/home/user/.config/fritzbox-ca.pem", &self.settings.ca_cert_path)
+                            .on_input(Message::CaCertPathChanged),
+                    )
+                    .push(widget::text::caption("Leave empty to use the system certificate store"))
+                    .push(
+                        widget::Row::new()
                             .width(cosmic::iced::Length::Fill)
-                            .padding([0, 8])
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::text::body("Allow invalid TLS certificates")
+                                    .width(cosmic::iced::Length::Fill),
+                            )
+                            .push(
+                                widget::toggler(self.settings.allow_invalid_certs)
+                                    .on_toggle(Message::AllowInvalidCertsChanged),
+                            ),
+                    )
+                    .push(widget::divider::horizontal::default())
+            }
+
+            content = content.push(settings_section_header("Devices", self.expanded_settings_sections.contains("device"), "device"));
+            if self.expanded_settings_sections.contains("device") {
+                content = content
+                    .push(action_button("view-refresh-symbolic", "Load devices", Message::DiscoverDevices));
+    
+                if !self.devices.is_empty() {
+                    content = content.push(widget::text::body("Select and order power-meter devices"));
+                    if self.settings.total_power_first {
+                        content = content.push(total_power_sort_row(1));
+                    }
+                    let mut ordered_devices: Vec<&FritzDevice> = self.selected_ains.iter()
+                        .filter_map(|ain| self.devices.iter().find(|device|
+                            crate::fritz::normalize_ain_for_selection(&device.ain)
+                                == crate::fritz::normalize_ain_for_selection(ain)))
+                        .collect();
+                    ordered_devices.extend(self.devices.iter().filter(|device|
+                        !self.selected_ains.iter().any(|ain|
+                            crate::fritz::normalize_ain_for_selection(ain)
+                                == crate::fritz::normalize_ain_for_selection(&device.ain))));
+                    for (row_index, device) in ordered_devices.iter().enumerate() {
+                        let selected_index = self.selected_ains.iter().position(|ain|
+                            crate::fritz::normalize_ain_for_selection(ain)
+                                == crate::fritz::normalize_ain_for_selection(&device.ain));
+                        let selected = selected_index.is_some();
+                        let ain = device.ain.clone();
+                        let mut row = widget::Row::new()
+                            .spacing(6)
+                            .align_y(cosmic::iced::Alignment::Center);
+                        if selected {
+                            row = row.push(
+                                widget::mouse_area(widget::text("⠿").size(20))
+                                    .on_press(Message::StartDeviceDrag(ain.clone())),
+                            );
+                        }
+                        row = row.push(widget::checkbox(selected)
+                                .label(device.name.clone())
+                                .on_toggle({
+                                    let ain = ain.clone();
+                                    move |checked| Message::ToggleDevice(ain.clone(), checked)
+                                }));
+                        if let Some(index) = selected_index {
+                            row = row.push(widget::text::caption(format!(
+                                "#{}",
+                                index + 1 + if self.settings.total_power_first { 1 } else { 0 },
+                            )));
+                        }
+                        let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
+                        let alert_thresholds = self.settings.temperature_alerts.get(&normalized_ain).copied();
+                        let is_input = self.settings.input_ains.contains(&normalized_ain);
+                        let mut device_row = widget::Column::new()
+                            .spacing(6)
+                            .push(row)
+                            .push(widget::Row::new()
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::text::caption("Input (subtract from total)"))
+                                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                .push(widget::toggler(is_input)
+                                    .on_toggle({
+                                        let ain = ain.clone();
+                                        move |enabled| Message::ToggleDeviceInput(ain.clone(), enabled)
+                                    })))
+                            .push(widget::Row::new()
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::text::caption("Temperature alerts"))
+                                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                .push(widget::toggler(alert_thresholds.is_some())
+                                    .on_toggle({
+                                        let ain = ain.clone();
+                                        move |enabled| Message::ToggleTemperatureAlert(ain.clone(), enabled)
+                                    })));
+                        if let Some(thresholds) = alert_thresholds {
+                            device_row = device_row
+                                .push(widget::text::caption(format!("Upper limit: {} °C", thresholds.high_c)))
+                                .push(widget::slider(
+                                    0.0..=40.0,
+                                    f32::from(thresholds.high_c),
+                                    {
+                                        let ain = ain.clone();
+                                        move |value| Message::TemperatureAlertHighChanged(ain.clone(), value.round() as i16)
+                                    },
+                                ).step(1.0))
+                                .push(widget::text::caption(format!("Lower limit: {} °C", thresholds.low_c)))
+                                .push(widget::slider(
+                                    -10.0..=0.0,
+                                    f32::from(thresholds.low_c),
+                                    {
+                                        let ain = ain.clone();
+                                        move |value| Message::TemperatureAlertLowChanged(ain.clone(), value.round() as i16)
+                                    },
+                                ).step(1.0))
+                                .push(widget::text::caption("Notify above the upper limit or below the lower limit"));
+                        }
+                        content = content.push(widget::mouse_area(
+                            widget::container(device_row)
+                            .padding(8)
+                            .style(move |theme| {
+                                let cosmic = theme.cosmic();
+                                let base = cosmic::iced::Color::from(cosmic.background(false).base);
+                                cosmic::iced::widget::container::Style {
+                                    background: Some(device_background_color(base, row_index).into()),
+                                    ..Default::default()
+                                }
+                            })
+                        ).on_enter(Message::DragOverDevice(ain.clone())));
+                        if self.dragging_device_ain.is_some()
+                            && self.drag_target_ain.as_deref().is_some_and(|target|
+                                crate::fritz::normalize_ain_for_selection(target)
+                                    == crate::fritz::normalize_ain_for_selection(&ain))
+                        {
+                            let progress = self.drag_target_since
+                                .map(|started| (started.elapsed().as_secs_f32() / 0.18).clamp(0.0, 1.0))
+                                .unwrap_or(1.0);
+                            let gap_height = 18.0 * progress;
+                            content = content.push(
+                                widget::container(
+                                    widget::text("Drop here").size(11)
+                                )
+                                .height(cosmic::iced::Length::Fixed(gap_height))
+                                .width(cosmic::iced::Length::Fill)
+                                .padding([0, 8])
+                            );
+                        }
+                    }
+                    if !self.settings.total_power_first {
+                        content = content.push(total_power_sort_row(self.selected_ains.len() + 1));
+                    }
+                    content = content.push(widget::text::caption("Drag the ⠿ handles to reorder devices and Total power. Move Total power to the top to show combined net watts in the panel; move it to the bottom to show the first device's power and temperature. Temperature alerts notify once when a device crosses its configured threshold."));
+                }
+            }
+
+            content = content.push(settings_section_header("Diagnostics", self.expanded_settings_sections.contains("diagnostics"), "diagnostics"));
+            if self.expanded_settings_sections.contains("diagnostics") {
+    content = content
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::caption("DIAGNOSTICS"));
+                if let Some(status) = &self.settings_status {
+                    if is_error_status(status) {
+                        let title = if status.starts_with("Weather unavailable:") {
+                            "WEATHER UNAVAILABLE"
+                        } else if status.starts_with("Could not save settings:") {
+                            "SETTINGS NOT SAVED"
+                        } else {
+                            "CONNECTION FAILED"
+                        };
+                        let message = status.split_once(':').map(|(_, message)| message.trim()).unwrap_or(status);
+                        content = content.push(error_notice(title, message));
+                    } else {
+                        content = content.push(
+                            widget::selectable_text::selectable_text(status.as_str())
+                                .width(cosmic::iced::Length::Fill),
                         );
                     }
-                }
-                if !self.settings.total_power_first {
-                    content = content.push(total_power_sort_row(self.selected_ains.len() + 1));
-                }
-                content = content.push(widget::text::caption("Drag the ⠿ handles to reorder devices and Total power. Move Total power to the top to show combined net watts in the panel; move it to the bottom to show the first device's power and temperature. Temperature alerts notify once when a device crosses its configured threshold."));
-            }
-
-            content = content
-                .push(widget::divider::horizontal::default())
-                .push(widget::text::caption("DIAGNOSTICS"));
-            if let Some(status) = &self.settings_status {
-                if is_error_status(status) {
-                    let title = if status.starts_with("Weather unavailable:") {
-                        "WEATHER UNAVAILABLE"
-                    } else if status.starts_with("Could not save settings:") {
-                        "SETTINGS NOT SAVED"
-                    } else {
-                        "CONNECTION FAILED"
-                    };
-                    let message = status.split_once(':').map(|(_, message)| message.trim()).unwrap_or(status);
-                    content = content.push(error_notice(title, message));
                 } else {
-                    content = content.push(
-                        widget::selectable_text::selectable_text(status.as_str())
-                            .width(cosmic::iced::Length::Fill),
-                    );
+                    content = content.push(widget::text::caption("No status messages yet"));
                 }
-            } else {
-                content = content.push(widget::text::caption("No status messages yet"));
+    
+                content = content
+                    .push(widget::divider::horizontal::default());
             }
-
-            content = content
-                .push(widget::divider::horizontal::default());
             if self.settings_saved_until.is_some_and(|deadline| Instant::now() < deadline) {
                 content = content.push(widget::text::caption("✓ Saved"));
             }
@@ -1515,6 +1596,11 @@ impl cosmic::Application for AppModel {
                 self.settings_open = !self.settings_open;
                 self.settings_status = None;
             }
+            Message::ToggleSettingsSection(section) => {
+                if !self.expanded_settings_sections.remove(section) {
+                    self.expanded_settings_sections.insert(section);
+                }
+            }
             Message::UrlChanged(value) => {
                 self.settings.url = value;
                 self.persist_settings();
@@ -1537,6 +1623,10 @@ impl cosmic::Application for AppModel {
             }
             Message::PanelTextSizeChanged(value) => {
                 self.settings.panel_text_size = value.clamp(10, 24);
+                self.persist_settings();
+            }
+            Message::PanelAverageTemperatureChanged(value) => {
+                self.settings.panel_average_temperature = value;
                 self.persist_settings();
             }
             Message::GraphTimespanChanged(value) => {
@@ -1783,6 +1873,28 @@ mod history_tests {
         move_sortable_entry(&mut ains, &mut total_first, "unselected", TOTAL_POWER_DRAG_ID);
         assert!(!total_first);
         assert_eq!(ains, vec!["111111111111"]);
+    }
+
+    #[test]
+    fn input_power_totals_include_only_input_devices_and_keep_the_negative_sign() {
+        let readings = vec![
+            FritzReading { ain: "111111".into(), name: "Load".into(), power_w: 400, temperature_c: 20.0, power_state: None },
+            FritzReading { ain: "222222".into(), name: "Solar".into(), power_w: 250, temperature_c: 21.0, power_state: None },
+            FritzReading { ain: "333333".into(), name: "Solar battery".into(), power_w: 100, temperature_c: 22.0, power_state: None },
+        ];
+        let inputs = HashSet::from(["222222".to_string(), "333333".to_string()]);
+        assert_eq!(input_power_w(&readings, &inputs), -350);
+        assert_eq!(input_power_w(&readings, &HashSet::new()), 0);
+    }
+
+    #[test]
+    fn average_temperature_uses_all_available_selected_readings() {
+        let readings = vec![
+            FritzReading { ain: "111111".into(), name: "First".into(), power_w: 100, temperature_c: 20.0, power_state: None },
+            FritzReading { ain: "222222".into(), name: "Second".into(), power_w: 200, temperature_c: 24.0, power_state: None },
+        ];
+        assert_eq!(average_temperature_c(&readings), Some(22.0));
+        assert_eq!(average_temperature_c(&[]), None);
     }
 
     #[test]
