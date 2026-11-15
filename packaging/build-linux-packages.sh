@@ -33,9 +33,13 @@ test -s "$ICON"
 test -s "$FLATPAK_MANIFEST"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
-TEMP_DIR="$(mktemp -d)"
 CARGO_SOURCES="$WORKSPACE/cargo-sources.json"
 FLATPAK_SOURCE="$WORKSPACE/flatpak-source"
+if [[ -e "$CARGO_SOURCES" || -e "$FLATPAK_SOURCE" ]]; then
+    echo "Refusing to overwrite existing Flatpak source inputs" >&2
+    exit 1
+fi
+TEMP_DIR="$(mktemp -d)"
 cleanup() {
     rm -rf "$TEMP_DIR" "$CARGO_SOURCES" "$FLATPAK_SOURCE"
 }
@@ -125,10 +129,6 @@ install -m0755 "$APPIMAGE_SOURCE" "$APPIMAGE_FILE"
 file "$APPIMAGE_FILE"
 
 # Generate offline Cargo sources and build a self-contained Flatpak bundle.
-if [[ -e "$CARGO_SOURCES" || -e "$FLATPAK_SOURCE" ]]; then
-    echo "Refusing to overwrite existing Flatpak source inputs" >&2
-    exit 1
-fi
 python3 -m venv "$TEMP_DIR/venv"
 "$TEMP_DIR/venv/bin/pip" install --disable-pip-version-check tomlkit aiohttp
 git clone --depth 1 https://github.com/flatpak/flatpak-builder-tools.git \
