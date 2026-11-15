@@ -2488,8 +2488,8 @@ impl cosmic::Application for AppModel {
                             device_corner_radius,
                         ));
                     let device_content = widget::Column::new().spacing(10).push(metrics).push(
-                        widget::Row::new()
-                            .spacing(12)
+                        widget::Column::new()
+                            .spacing(8)
                             .width(cosmic::iced::Length::Fill)
                             .push(
                                 widget::container(
