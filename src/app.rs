@@ -1521,14 +1521,20 @@ impl cosmic::Application for AppModel {
                     )
                 } else if let Some(remaining) = self.next_refresh_at.map(|deadline|
                     deadline.saturating_duration_since(Instant::now())
-                ).filter(|remaining| remaining.as_secs() < 10) {
-                    icon_action_button(
-                        format!("{}s", remaining.as_secs()),
-                        "Next automatic refresh",
-                        Message::Refresh,
+                ).filter(|remaining| !remaining.is_zero() && remaining < Duration::from_secs(10)) {
+                    // Keep the countdown as plain text: the icon button style can
+                    // suppress or visually clip text labels in some COSMIC themes.
+                    widget::container(
+                        widget::text(format!("{}s", remaining.as_secs().saturating_add(1)))
+                            .size(14)
                     )
+                    .width(cosmic::iced::Length::Fixed(36.0))
+                    .height(cosmic::iced::Length::Fixed(36.0))
+                    .center_x(36)
+                    .center_y(36)
+                    .into()
                 } else {
-                    icon_action_button("↻", "Reload now", Message::Refresh)
+                    icon_action_button("↻", "Reload now", Message::Refresh).into()
                 };
                 content = content.push(
                     widget::Row::new()
