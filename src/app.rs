@@ -393,16 +393,31 @@ fn move_sortable_entry(
 }
 
 fn settings_section_header<'a>(title: &'a str, expanded: bool, section: &'static str) -> cosmic::Element<'a, Message> {
-    widget::button::custom(
-        widget::Row::new()
-            .spacing(8)
-            .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::text(if expanded { "▾" } else { "▸" }).size(16))
-            .push(widget::text::body(title).width(cosmic::iced::Length::Fill)),
+    let row = widget::Row::new()
+        .spacing(10)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(widget::text::body(title).width(cosmic::iced::Length::Fill))
+        .push(widget::text(if expanded { "⌄" } else { "›" }).size(18));
+
+    widget::mouse_area(
+        widget::container(row)
+            .padding([10, 12])
+            .width(cosmic::iced::Length::Fill)
+            .style(|theme| {
+                let cosmic = theme.cosmic();
+                cosmic::iced::widget::container::Style {
+                    background: Some(
+                        cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
+                    ),
+                    border: cosmic::iced::Border {
+                        radius: 8.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }
+            }),
     )
     .on_press(Message::ToggleSettingsSection(section))
-    .padding([6, 8])
-    .width(cosmic::iced::Length::Fill)
     .into()
 }
 
