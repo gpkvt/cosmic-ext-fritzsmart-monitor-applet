@@ -53,6 +53,7 @@ pub struct AppModel {
     weather: Option<WeatherData>,
     weather_attribution_expanded: bool,
     quick_options_expanded: bool,
+    devices_expanded: bool,
     quick_refresh_interval: u32,
     quick_graph_timespan: u16,
     next_weather_refresh_at: Option<Instant>,
@@ -100,6 +101,7 @@ pub enum Message {
     ToggleWeatherAttribution,
     OpenCommonsPage(String),
     ToggleQuickOptions,
+    ToggleDevices,
     QuickRefreshIntervalPreview(u32),
     CommitQuickRefreshInterval,
     QuickGraphTimespanPreview(u16),
@@ -1554,18 +1556,29 @@ impl cosmic::Application for AppModel {
                             .push(widget::divider::horizontal::default());
                     }
                 }
-                content = content
-                    .push(widget::Row::new()
-                        .spacing(12)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::container(widget::icon::from_name("computer-symbolic").size(20))
-                            .center_x(32).center_y(36))
-                        .push(widget::Column::new()
-                            .spacing(3)
-                            .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::body("Devices"))
-                            .push(widget::text::caption("Live power and temperature readings")))
-                        .push(widget::text::caption(format!("{}", self.readings.len()))));
+                content = content.push(
+                    widget::button::custom(
+                        widget::Row::new()
+                            .spacing(12)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::container(widget::icon::from_name("computer-symbolic").size(20))
+                                .center_x(32).center_y(36))
+                            .push(widget::Column::new()
+                                .spacing(3)
+                                .width(cosmic::iced::Length::Fill)
+                                .push(widget::text::body("Devices"))
+                                .push(widget::text::caption("Live power and temperature readings")))
+                            .push(widget::text::caption(format!("{}", self.readings.len())))
+                            .push(widget::icon::from_name(
+                                if self.devices_expanded { "go-down-symbolic" } else { "go-next-symbolic" }
+                            ).size(16)),
+                    )
+                    .on_press(Message::ToggleDevices)
+                    .padding([8, 10])
+                    .width(cosmic::iced::Length::Fill)
+                    .class(cosmic::theme::Button::Standard),
+                );
+                if self.devices_expanded {
                 for (index, reading) in self.readings.iter().enumerate() {
                     let device_history = self.device_history.get(
                         &crate::fritz::normalize_ain_for_selection(&reading.ain),
@@ -1743,6 +1756,7 @@ impl cosmic::Application for AppModel {
                         }
                     });
                     content = content.push(device_card);
+                }
                 }
                 content = content.push(widget::divider::horizontal::default());
                 if !self.settings.total_power_first {
@@ -2058,6 +2072,9 @@ impl cosmic::Application for AppModel {
                 if url.starts_with("https://commons.wikimedia.org/wiki/File:") {
                     let _ = std::process::Command::new("xdg-open").arg(url).spawn();
                 }
+            }
+            Message::ToggleDevices => {
+                self.devices_expanded = !self.devices_expanded;
             }
             Message::ToggleQuickOptions => {
                 self.quick_options_expanded = !self.quick_options_expanded;
