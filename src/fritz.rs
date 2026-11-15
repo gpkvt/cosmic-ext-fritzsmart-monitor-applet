@@ -132,10 +132,10 @@ impl Default for FritzSettings {
             input_defaults_initialized: false,
             total_power_first: false,
             menu_order: vec![
+                "__WEATHER__".into(),
+                "__LIVE_SUMMARY__".into(),
                 "__TOTAL_POWER__".into(),
                 "__POWER_DIFFERENCE__".into(),
-                "__LIVE_SUMMARY__".into(),
-                "__WEATHER__".into(),
             ],
             weather_enabled: false,
             openweathermap_api_key: String::new(),
@@ -180,6 +180,8 @@ fn parse_menu_order(value: &str, selected_ains: &str, total_power_first: bool) -
             }
         }
     } else {
+        order.push(WEATHER.into());
+        order.push(SUMMARY.into());
         if total_power_first {
             order.push(TOTAL.into());
         }
