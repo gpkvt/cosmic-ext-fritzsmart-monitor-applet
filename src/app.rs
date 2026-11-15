@@ -96,6 +96,7 @@ pub enum Message {
     OpenCommonsPage(String),
     ToggleQuickOptions,
     ToggleDeviceDetails(String),
+    MoveMenuElement(&'static str, bool),
     QuickRefreshIntervalPreview(u32),
     CommitQuickRefreshInterval,
     QuickGraphTimespanPreview(u16),
@@ -941,6 +942,17 @@ fn power_difference_overview(
     Some(surface_card(column.into(), 14))
 }
 
+fn menu_element_label(id: &str) -> &'static str {
+    match id {
+        "summary" => "Live power summary",
+        "weather" => "Weather",
+        "devices" => "Devices",
+        "total-power" => "Total power output",
+        "power-difference" => "Power difference",
+        _ => "Unknown element",
+    }
+}
+
 fn settings_section_details(section: &'static str) -> (&'static str, &'static str) {
     match section {
         "panel" => ("Panel", "Appearance and live readings in the panel"),
@@ -955,6 +967,7 @@ fn settings_section_details(section: &'static str) -> (&'static str, &'static st
         "weather" => ("Weather", "Show local weather alongside power readings"),
         "connection" => ("Connection", "FRITZ!Box address and security settings"),
         "device" => ("Devices", "Select and configure monitored devices"),
+        "menu-order" => ("Menu order", "Choose the order of popup elements"),
         "diagnostics" => ("Diagnostics", "Connection and settings status"),
         _ => ("Settings", "Configure your power monitor"),
     }
@@ -980,6 +993,7 @@ fn settings_section_header<'a>(
         ),
         "connection" => ("network-server-symbolic", "FRITZ!Box access and security"),
         "device" => ("computer-symbolic", "Choose and configure devices"),
+        "menu-order" => ("view-list-symbolic", "Arrange popup sections"),
         "diagnostics" => ("dialog-information-symbolic", "Connection and save status"),
         _ => ("preferences-system-symbolic", "Applet preferences"),
     };
@@ -1501,6 +1515,7 @@ impl cosmic::Application for AppModel {
                     ("Weather", "weather"),
                     ("Connection", "connection"),
                     ("Devices", "device"),
+                    ("Menu order", "menu-order"),
                     ("Diagnostics", "diagnostics"),
                 ] {
                     content = content.push(settings_section_header(title, section));
@@ -1687,6 +1702,41 @@ impl cosmic::Application for AppModel {
                             ),
                     )
                     .push(widget::divider::horizontal::default())
+            }
+
+            if self.active_settings_section == Some("menu-order") {
+                content = content
+                    .push(widget::text::body("Popup element order"))
+                    .push(widget::text::caption("Move sections up or down. Changes are saved automatically."));
+                for (index, element) in self.settings.menu_order.iter().enumerate() {
+                    let id = match element.as_str() {
+                        "summary" => "summary",
+                        "weather" => "weather",
+                        "devices" => "devices",
+                        "total-power" => "total-power",
+                        "power-difference" => "power-difference",
+                        _ => continue,
+                    };
+                    let label = menu_element_label(id);
+                    let mut row = widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::body(label).width(cosmic::iced::Length::Fill));
+                    row = row.push(action_button(
+                        "go-up-symbolic",
+                        "Move up",
+                        Message::MoveMenuElement(id, true),
+                    ));
+                    row = row.push(action_button(
+                        "go-down-symbolic",
+                        "Move down",
+                        Message::MoveMenuElement(id, false),
+                    ));
+                    content = content.push(row);
+                    if index + 1 < self.settings.menu_order.len() {
+                        content = content.push(widget::divider::horizontal::default());
+                    }
+                }
             }
 
             if self.active_settings_section == Some("device") {
@@ -2598,8 +2648,25 @@ impl cosmic::Application for AppModel {
                 ) {
                     menu_cards.push(("4-power-difference".to_string(), difference));
                 }
-                // Use a stable device order; menu items cannot be manually rearranged.
-                menu_cards.sort_by(|(left, _), (right, _)| left.cmp(right));
+                // Sort popup sections by the user's saved order while preserving device order.
+                menu_cards.sort_by_key(|(key, _)| {
+                    let element = if key == "0-summary" {
+                        "summary"
+                    } else if key == "1-weather" {
+                        "weather"
+                    } else if key.starts_with("2-") {
+                        "devices"
+                    } else if key == "3-total-power" {
+                        "total-power"
+                    } else {
+                        "power-difference"
+                    };
+                    self.settings
+                        .menu_order
+                        .iter()
+                        .position(|candidate| candidate == element)
+                        .unwrap_or(usize::MAX)
+                });
                 let mut device_cards = widget::Column::new().spacing(0);
                 for (index, (_, card)) in menu_cards.into_iter().enumerate() {
                     if index > 0 {
@@ -3061,6 +3128,22 @@ impl cosmic::Application for AppModel {
             Message::OpenCommonsPage(url) => {
                 if url.starts_with("https://commons.wikimedia.org/wiki/File:") {
                     let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+                }
+            }
+            Message::MoveMenuElement(element, move_up) => {
+                let Some(index) = self.settings.menu_order.iter().position(|item| item == element) else {
+                    return Task::none();
+                };
+                let target = if move_up {
+                    index.checked_sub(1)
+                } else if index + 1 < self.settings.menu_order.len() {
+                    Some(index + 1)
+                } else {
+                    None
+                };
+                if let Some(target) = target {
+                    self.settings.menu_order.swap(index, target);
+                    self.persist_settings();
                 }
             }
             Message::ToggleDeviceDetails(ain) => {
