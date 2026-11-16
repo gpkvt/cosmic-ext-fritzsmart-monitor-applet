@@ -1408,7 +1408,7 @@ impl cosmic::Application for AppModel {
                 .center_y(24);
             item = item.push(icon_slot);
             let value_slot = widget::container(value)
-                .width(cosmic::iced::Length::Fixed(64.0))
+                .width(cosmic::iced::Length::Fixed(88.0))
                 .align_x(cosmic::iced::alignment::Horizontal::Right);
             self.core.applet.applet_tooltip(
                 item.push(value_slot),
@@ -1508,7 +1508,7 @@ impl cosmic::Application for AppModel {
                     .spacing(0)
                     .push(
                         widget::Row::new()
-                            .width(cosmic::iced::Length::Fixed(64.0))
+                            .width(cosmic::iced::Length::Fixed(88.0))
                             .spacing(3)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::icon::from_name("go-down-symbolic").size(10))
