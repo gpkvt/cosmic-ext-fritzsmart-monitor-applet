@@ -208,27 +208,6 @@ fn notify_temperature_alert(name: &str, temperature: f64, thresholds: Temperatur
         .show();
 }
 
-fn device_background_color(base: cosmic::iced::Color, index: usize) -> cosmic::iced::Color {
-    // Distinct, muted hues make adjacent devices easy to tell apart while
-    // retaining some of the active COSMIC theme's background color.
-    const TINTS: [(f32, f32, f32); 6] = [
-        (0.16, 0.42, 0.82), // blue
-        (0.08, 0.58, 0.48), // teal
-        (0.38, 0.58, 0.16), // green
-        (0.78, 0.48, 0.10), // amber
-        (0.76, 0.30, 0.20), // coral
-        (0.52, 0.32, 0.76), // purple
-    ];
-    let (red, green, blue) = TINTS[index % TINTS.len()];
-    let strength = 0.16;
-    cosmic::iced::Color::from_rgba(
-        base.r * (1.0 - strength) + red * strength,
-        base.g * (1.0 - strength) + green * strength,
-        base.b * (1.0 - strength) + blue * strength,
-        base.a,
-    )
-}
-
 fn format_graph_axis_start(minutes: u32) -> String {
     let days = minutes / 1440;
     if days >= 365 && days % 365 == 0 {
@@ -1959,7 +1938,7 @@ impl cosmic::Application for AppModel {
                         content =
                             content.push(widget::text::caption("No devices match your search"));
                     }
-                    for (row_index, device) in ordered_devices.iter().enumerate() {
+                    for device in ordered_devices.iter() {
                         let selected = self.selected_ains.iter().any(|selected_ain| {
                             crate::fritz::normalize_ain_for_selection(selected_ain)
                                 == crate::fritz::normalize_ain_for_selection(&device.ain)
@@ -2069,7 +2048,7 @@ impl cosmic::Application for AppModel {
                 let uses_https = endpoint.to_ascii_lowercase().starts_with("https://");
                 let (tls_status, tls_ok) = if uses_https {
                     if self.settings.allow_invalid_certs {
-                        ("Certificate validation disabled".to_string(), None)
+                        ("Certificate validation disabled".to_string(), Some(false))
                     } else if !self.settings.ca_cert_path.trim().is_empty() {
                         ("Custom CA certificate configured".to_string(), Some(true))
                     } else {
