@@ -1229,6 +1229,7 @@ impl AppModel {
         self.settings.expanded_devices.sort();
         self.settings.quick_options_expanded = self.quick_options_expanded;
         self.settings.weather_forecast_expanded = self.weather_forecast_expanded;
+        self.settings.settings_section = self.active_settings_section.unwrap_or_default().into();
         self.persist_settings();
     }
 
@@ -1304,6 +1305,19 @@ impl cosmic::Application for AppModel {
         let expanded_devices = settings.expanded_devices.iter().cloned().collect();
         let quick_options_expanded = settings.quick_options_expanded;
         let weather_forecast_expanded = settings.weather_forecast_expanded;
+        let active_settings_section = match settings.settings_section.as_str() {
+            "language" => Some("language"),
+            "panel" => Some("panel"),
+            "graph" => Some("graph"),
+            "refresh" => Some("refresh"),
+            "weather" => Some("weather"),
+            "connection" => Some("connection"),
+            "device" => Some("device"),
+            "menu-order" => Some("menu-order"),
+            "panel-order" => Some("panel-order"),
+            "diagnostics" => Some("diagnostics"),
+            _ => None,
+        };
         let quick_refresh_interval = settings.refresh_interval_seconds;
         let quick_graph_timespan = settings.graph_timespan_minutes;
         let restore_forecast = weather_forecast_expanded
@@ -1323,6 +1337,7 @@ impl cosmic::Application for AppModel {
             Self {
                 core,
                 settings,
+                active_settings_section,
                 history,
                 device_history,
                 collapsed_menu_sections,
@@ -4415,11 +4430,11 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleSettings => {
                 self.settings_open = !self.settings_open;
-                self.active_settings_section = None;
                 self.settings_status = None;
             }
             Message::ToggleSettingsSection(section) => {
                 self.active_settings_section = Some(section);
+                self.persist_layout_state();
                 if section == "device" && !self.devices_loaded && !self.devices_loading {
                     self.devices_loading = true;
                     let settings = self.settings.clone();
@@ -4431,6 +4446,7 @@ impl cosmic::Application for AppModel {
             }
             Message::BackToSettingsCategories => {
                 self.active_settings_section = None;
+                self.persist_layout_state();
             }
             Message::UrlChanged(value) => {
                 self.settings.url = value;
