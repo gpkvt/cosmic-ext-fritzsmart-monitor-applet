@@ -95,7 +95,7 @@ pub struct FritzSettings {
     pub panel_refresh_button: bool,
     pub panel_average_temperature: bool,
     pub panel_exclude_solar_temperature: bool,
-    pub graph_timespan_minutes: u16,
+    pub graph_timespan_minutes: u32,
     pub graph_style: String,
     pub refresh_interval_seconds: u32,
     pub temperature_alerts: HashMap<String, TemperatureAlertThresholds>,
@@ -150,8 +150,8 @@ fn parse_panel_item_spacing(value: &str) -> u8 {
     value.parse::<u8>().unwrap_or(3).clamp(0, 16)
 }
 
-fn parse_graph_timespan_minutes(value: &str) -> u16 {
-    value.parse::<u16>().unwrap_or(15).clamp(5, 1440)
+fn parse_graph_timespan_minutes(value: &str) -> u32 {
+    value.parse::<u32>().unwrap_or(15).clamp(5, 2_102_400)
 }
 
 fn parse_refresh_interval_seconds(value: &str) -> u32 {
@@ -421,7 +421,7 @@ impl FritzSettings {
             } else {
                 "false"
             },
-            self.graph_timespan_minutes.clamp(5, 1440),
+            self.graph_timespan_minutes.clamp(5, 2_102_400),
             if self.graph_style == "bar" {
                 "bar"
             } else {
