@@ -312,8 +312,8 @@ fn parse_device_order(value: &str) -> Vec<String> {
 
 fn parse_settings_section(value: &str) -> String {
     match value.trim() {
-        "language" | "panel" | "graph" | "refresh" | "weather" | "connection"
-        | "device" | "menu-order" | "panel-order" | "diagnostics" => value.trim().into(),
+        "language" | "panel" | "graph" | "refresh" | "weather" | "connection" | "device"
+        | "menu-order" | "panel-order" | "diagnostics" => value.trim().into(),
         _ => String::new(),
     }
 }
