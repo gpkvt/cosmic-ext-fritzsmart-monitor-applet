@@ -158,11 +158,12 @@ fn parse_refresh_interval_seconds(value: &str) -> u32 {
     value.parse::<u32>().unwrap_or(60).clamp(30, 3600)
 }
 
-const MENU_ELEMENT_IDS: [&str; 5] = [
+const MENU_ELEMENT_IDS: [&str; 6] = [
     "summary",
     "weather",
     "devices",
-    "total-power",
+    "total-power-output",
+    "total-power-input",
     "power-difference",
 ];
 
@@ -177,7 +178,14 @@ fn parse_menu_order(value: &str) -> Vec<String> {
     let mut order: Vec<String> = value
         .split(',')
         .map(str::trim)
-        .filter(|id| MENU_ELEMENT_IDS.contains(id) && !id.is_empty())
+        .filter(|id| !id.is_empty())
+        .map(|id| match id {
+            // Migrate the former shared entry to output; input gets its own
+            // adjacent position so existing custom ordering remains stable.
+            "total-power" => "total-power-output",
+            other => other,
+        })
+        .filter(|id| MENU_ELEMENT_IDS.contains(id))
         .map(str::to_string)
         .fold(Vec::new(), |mut order, id| {
             if !order.contains(&id) {
@@ -185,6 +193,15 @@ fn parse_menu_order(value: &str) -> Vec<String> {
             }
             order
         });
+    if order.iter().any(|id| id == "total-power-output")
+        && !order.iter().any(|id| id == "total-power-input")
+    {
+        let output_index = order
+            .iter()
+            .position(|id| id == "total-power-output")
+            .unwrap_or(order.len() - 1);
+        order.insert(output_index + 1, "total-power-input".to_string());
+    }
     for id in MENU_ELEMENT_IDS {
         if !order.iter().any(|existing| existing == id) {
             order.push(id.to_string());
