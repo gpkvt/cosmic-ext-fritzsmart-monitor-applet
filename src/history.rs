@@ -215,7 +215,10 @@ mod tests {
         std::env::temp_dir().join(format!(
             "fritz-power-monitor-history-{}-{}.json",
             std::process::id(),
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ))
     }
 
