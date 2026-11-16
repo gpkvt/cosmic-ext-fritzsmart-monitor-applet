@@ -391,31 +391,45 @@ fn commons_search_term(icon_code: &str, variant: usize) -> &'static str {
     terms[variant % terms.len()]
 }
 
-fn commons_search_offset() -> u64 {
-    // Rotate through different result pages on subsequent weather refreshes.
-    // Five-minute buckets avoid changing the search page during a single refresh.
-    use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| (duration.as_secs() / 300) % 80)
-        .unwrap_or(0)
+fn commons_title_matches_condition(icon_code: &str, title: &str) -> bool {
+    let words: Vec<String> = title
+        .to_ascii_lowercase()
+        .split(|character: char| !character.is_ascii_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_string)
+        .collect();
+    let has = |terms: &[&str]| words.iter().any(|word| terms.iter().any(|term| word == term || word.starts_with(term)));
+
+    match icon_code.get(..2).unwrap_or("") {
+        "01" => has(&["sun", "sunny", "sunshine", "sunlight", "cloudless", "clear"])
+            || title.to_ascii_lowercase().contains("blue sky"),
+        "02" | "03" | "04" => has(&["cloud", "cloudy", "overcast", "cumulus", "stratus"]),
+        "09" | "10" => has(&["rain", "raining", "rainy", "shower", "drizzle", "precipitation"]),
+        "11" => has(&["storm", "stormy", "thunder", "lightning"]),
+        "13" => has(&["snow", "snowfall", "snowy", "blizzard", "winter"]),
+        "50" => has(&["fog", "foggy", "mist", "misty", "haze", "hazy"]),
+        _ => false,
+    }
 }
+
 async fn fetch_commons_background(
     client: &Client,
     icon_code: &str,
 ) -> (Vec<Vec<u8>>, Option<CommonsAttribution>) {
-    let search_offset = commons_search_offset();
     let mut images = Vec::new();
+    let mut seen_titles = std::collections::HashSet::new();
     let mut attribution = None;
-    for variant in 0..3 {
-        let search = commons_search_term(icon_code, search_offset as usize + variant);
-        let offset = (search_offset + variant as u64 * 7).to_string();
+    // Search every condition-specific phrase. Avoid rotating through arbitrary
+    // result offsets, which admitted unrelated files into the slideshow.
+    for variant in 0..commons_search_terms(icon_code).len() {
+        let search = commons_search_term(icon_code, variant);
         let response = client.get("https://commons.wikimedia.org/w/api.php")
             .query(&[
                 ("action", "query"), ("generator", "search"),
                 ("gsrsearch", search), ("gsrnamespace", "6"),
-                ("gsrlimit", "12"), ("gsroffset", offset.as_str()),
-                ("prop", "imageinfo"), ("iiprop", "url|extmetadata"),
+                ("gsrlimit", "20"),
+                ("prop", "imageinfo|categories"), ("iiprop", "url|extmetadata"),
+                ("cllimit", "20"), ("clshow", "!hidden"),
                 ("iiurlwidth", "1200"), ("format", "json"),
             ]).send().await;
         let Ok(response) = response else { continue };
@@ -424,6 +438,16 @@ async fn fetch_commons_background(
         let Some(pages) = response["query"]["pages"].as_object() else { continue };
         for page in pages.values() {
             if images.len() >= 5 { break; }
+            let title = page["title"].as_str().unwrap_or("");
+            let categories = page["categories"].as_array().map(|items| {
+                items.iter().filter_map(|item| item["title"].as_str()).collect::<Vec<_>>().join(" ")
+            }).unwrap_or_default();
+            // Search rank alone is not evidence of relevance: require a
+            // condition-specific word in the file title or Commons categories.
+            if !commons_title_matches_condition(icon_code, &format!("{title} {categories}")) {
+                continue;
+            }
+            if !seen_titles.insert(title.to_string()) { continue; }
             let info = &page["imageinfo"][0];
             let Some(image_url) = info["thumburl"].as_str().or_else(|| info["url"].as_str()) else { continue };
             let Ok(response) = client.get(image_url).send().await else { continue };
@@ -639,6 +663,26 @@ mod tests {
         }
         assert_eq!(commons_search_term("01n", 1), "clear night sky over city skyline");
         assert_eq!(commons_search_term("01n", 2), "moon stars night mountain landscape");
+    }
+
+    #[test]
+    fn commons_images_must_match_the_reported_weather_condition() {
+        for (icon, title, expected) in [
+            ("01d", "Sunny blue sky over hills", true),
+            ("01n", "Clear starry night sky", true),
+            ("01d", "Rain clouds over city", false),
+            ("02d", "Cumulus clouds", true),
+            ("04d", "Overcast sky", true),
+            ("10d", "Heavy rain over a field", true),
+            ("10n", "Rainbow over the city", false),
+            ("11d", "Lightning during a thunderstorm", true),
+            ("11n", "Snowy mountain at night", false),
+            ("13d", "Snowfall in a winter forest", true),
+            ("50d", "Misty morning landscape", true),
+            ("50n", "Sunny city skyline", false),
+        ] {
+            assert_eq!(commons_title_matches_condition(icon, title), expected, "{icon}: {title}");
+        }
     }
 
     #[test]
