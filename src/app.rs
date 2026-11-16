@@ -2375,68 +2375,6 @@ impl cosmic::Application for AppModel {
                         }
                         card.into()
                     } else {
-                            Some(
-                                widget::container(weather_details)
-                                    .width(cosmic::iced::Length::Fill)
-                                    .height(cosmic::iced::Length::Fill)
-                                    .padding(10)
-                                    .style(|_| cosmic::iced::widget::container::Style {
-                                        background: Some(
-                                            cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.58).into(),
-                                        ),
-                                        text_color: Some(cosmic::iced::Color::WHITE),
-                                        ..Default::default()
-                                    }),
-                            )
-                        };
-                        let image_controls = widget::Column::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fill)
-                            .push(
-                                widget::Row::new()
-                                    .width(cosmic::iced::Length::Fill)
-                                    .push(widget::text::title3(weather.location_name.clone()))
-                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                    .push(widget::text::title2(format!("{:.0}°", weather.temperature_c)))
-                                    .push(
-                                        widget::button::custom(widget::icon::from_name(
-                                            if weather_info_collapsed { "go-next-symbolic" } else { "go-down-symbolic" }
-                                        ).size(16))
-                                        .on_press(Message::ToggleMenuSection("weather-info".into()))
-                                        .padding(7)
-                                        .class(cosmic::theme::Button::Standard),
-                                    )
-                                    .spacing(8)
-                                    .align_y(cosmic::iced::Alignment::Center),
-                            )
-                            .push(widget::Space::new().height(cosmic::iced::Length::Fill))
-                            .push(
-                                widget::Row::new()
-                                    .width(cosmic::iced::Length::Fill)
-                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                    .push(
-                                        widget::button::custom(
-                                            widget::icon::from_name("image-x-generic-symbolic").size(16),
-                                        )
-                                        .on_press(Message::OpenCommonsPage(
-                                            weather.image_attribution.as_ref()
-                                                .map(|credit| credit.page_url.clone())
-                                                .unwrap_or_default(),
-                                        ))
-                                        .padding(7)
-                                        .class(cosmic::theme::Button::Standard),
-                                    ),
-                            )
-                            .padding(8);
-                        let mut stack = cosmic::iced::widget::Stack::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(210.0))
-                            .push(photo);
-                        if let Some(details) = details {
-                            stack = stack.push(details);
-                        }
-                        stack.push(image_controls).into()
-                    } else {
                         let weather_info_collapsed =
                             self.collapsed_menu_sections.contains("weather-info");
                         let mut fallback = widget::Column::new().spacing(8).push(
