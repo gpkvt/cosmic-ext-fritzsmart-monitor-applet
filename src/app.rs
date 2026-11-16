@@ -1521,8 +1521,8 @@ impl cosmic::Application for AppModel {
             Subscription::run(regular_clock_ticks)
         };
 
-        if self.popup.is_some() && self.weather.as_ref().is_some_and(|weather| weather.slideshow_sequence.len() > 1) {
-            Subscription::batch(vec![clock, weather_slideshow_ticks()])
+        if self.popup.is_some() && self.weather.as_ref().is_some_and(|weather| weather.slideshow_frames.len() > 1 && weather.slideshow_sequence.len() > 1) {
+            Subscription::batch(vec![clock, Subscription::run(weather_slideshow_ticks)])
         } else {
             clock
         }
