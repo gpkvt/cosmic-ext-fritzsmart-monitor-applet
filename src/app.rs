@@ -300,6 +300,12 @@ fn quick_slider_anchor_labels(labels: [&'static str; 5]) -> cosmic::Element<'sta
     row.into()
 }
 
+fn format_panel_temperature(temperature_c: f64) -> String {
+    let value = format!("{temperature_c:.1}");
+    let value = value.strip_suffix(".0").unwrap_or(&value);
+    format!("{value} °C")
+}
+
 fn format_countdown(seconds: u64) -> String {
     let hours = seconds / 3600;
     let minutes = (seconds % 3600) / 60;
@@ -1415,13 +1421,13 @@ impl cosmic::Application for AppModel {
                     &self.readings,
                     self.settings.panel_exclude_solar_temperature,
                 )
-                .map(|value| format!("{value:.1} °C"))
+                .map(format_panel_temperature)
                 .unwrap_or_else(|| "-- °C".to_string()),
             )
         } else {
             Some(
                 primary_reading
-                    .map(|reading| format!("{:.1} °C", reading.temperature_c))
+                    .map(|reading| format_panel_temperature(reading.temperature_c))
                     .unwrap_or_else(|| "-- °C".to_string()),
             )
         };
@@ -4931,6 +4937,13 @@ mod history_tests {
         assert_eq!(input_power_w(&readings, &HashSet::new()), 0);
         assert_eq!(net_power_w(&readings, &inputs), 50);
         assert_eq!(net_power_w(&readings, &HashSet::new()), 750);
+    }
+
+    #[test]
+    fn panel_temperature_omits_trailing_decimal_zero() {
+        assert_eq!(format_panel_temperature(20.0), "20 °C");
+        assert_eq!(format_panel_temperature(20.5), "20.5 °C");
+        assert_eq!(format_panel_temperature(-3.0), "-3 °C");
     }
 
     #[test]
