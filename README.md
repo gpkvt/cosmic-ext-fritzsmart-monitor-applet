@@ -39,6 +39,8 @@ directly and does **not** execute or depend on `fritz_solar.sh`.
 ### Panel and popup
 
 - Configure panel text size (10–24 pt).
+- Show live FRITZ!Box internet download and upload rates in Mbps, with separate
+  down/up icons; enable this optional reading in Panel settings.
 - Show the average temperature across selected devices, with an option to
   exclude devices whose names contain `solar`.
 - Reorder popup sections (summary, weather, devices and power overviews) in Settings; the chosen order is saved across restarts.
@@ -174,15 +176,19 @@ Devices, Menu order and Diagnostics.
 ### Panel and device selection
 
 1. Set **Panel text size** (10–24 pt).
-2. Optionally enable **Show average temperature in panel**. This displays the
+2. Optionally enable **Show internet bandwidth** to add separate download and
+   upload rates (Mbps) with directional icons. Rates are read from the
+   FRITZ!Box WAN interface statistics; firmware that does not expose them leaves
+   the values unavailable without interrupting device monitoring.
+3. Optionally enable **Show average temperature in panel**. This displays the
    mean temperature across selected devices instead of the first device's
    temperature.
-3. If using the average, optionally enable **Exclude solar devices** to omit
+4. If using the average, optionally enable **Exclude solar devices** to omit
    devices whose names contain `solar`.
-4. Set the automatic refresh interval (30 seconds to 1 hour; default: 60
+5. Set the automatic refresh interval (30 seconds to 1 hour; default: 60
    seconds).
-5. Enter the FRITZ!Box URL, username and password, then choose **Load devices**.
-6. Select the devices to monitor.
+6. Enter the FRITZ!Box URL, username and password, then choose **Load devices**.
+7. Select the devices to monitor.
 
 Use **Menu order** in Settings to arrange the live power summary, weather, device cards, Total power out, Total power in and Power difference independently. Device cards retain their relative order. Device settings list available devices in the order returned by the FRITZ!Box.
 Each selected device appears separately in the popup with its own readings and
