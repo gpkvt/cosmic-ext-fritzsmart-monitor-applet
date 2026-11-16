@@ -277,9 +277,10 @@ The API key is stored in the owner-only configuration file.
 - Sparklines are evenly downsampled to 12 columns to fit their cards.
 - Graph samples are stored locally in
   `~/.local/share/fritz-power-monitor/history.json` and restored after restarting
-  the applet. The history file is owner-readable only. The configured history
-  window (5 minutes to 24 hours) is retained across restarts. It cannot show
-  daily yield, forecasts or inverter-specific statistics.
+  the applet. The history file is owner-readable only. The configured retention
+  window (5 minutes to 4 years) is retained across restarts. Long-term history
+  is sampled at up to 5-minute intervals; it cannot show daily yield, forecasts
+  or inverter-specific statistics.
 - The FRITZ!Box device must expose both `powermeter/power` and
   `temperature/celsius` in its device XML.
 
