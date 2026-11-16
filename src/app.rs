@@ -1826,19 +1826,19 @@ impl cosmic::Application for AppModel {
                         widget::Row::new()
                             .spacing(8)
                             .push(
-                                widget::button::text(if self.settings.graph_style == "line" {
+                                widget::button::text(crate::i18n::tr(&self.settings.language, if self.settings.graph_style == "line" {
                                     "✓ Line"
                                 } else {
                                     "Line"
-                                })
+                                }))
                                 .on_press(Message::GraphStyleChanged("line".into())),
                             )
                             .push(
-                                widget::button::text(if self.settings.graph_style == "bar" {
+                                widget::button::text(crate::i18n::tr(&self.settings.language, if self.settings.graph_style == "bar" {
                                     "✓ Bar"
                                 } else {
                                     "Bar"
-                                })
+                                }))
                                 .on_press(Message::GraphStyleChanged("bar".into())),
                             ),
                     )
@@ -1975,12 +1975,12 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::body(label).width(cosmic::iced::Length::Fill));
                     row = row.push(icon_action_button(
                         "+",
-                        "Move up",
+                        crate::i18n::tr(&self.settings.language, "Move up"),
                         Message::MoveMenuElement(id, true),
                     ));
                     row = row.push(icon_action_button(
                         "−",
-                        "Move down",
+                        crate::i18n::tr(&self.settings.language, "Move down"),
                         Message::MoveMenuElement(id, false),
                     ));
                     content = content.push(row);
@@ -2014,12 +2014,12 @@ impl cosmic::Application for AppModel {
                         );
                     row = row.push(icon_action_button(
                         "+",
-                        "Move up",
+                        crate::i18n::tr(&self.settings.language, "Move up"),
                         Message::MovePanelItem(id, true),
                     ));
                     row = row.push(icon_action_button(
                         "−",
-                        "Move down",
+                        crate::i18n::tr(&self.settings.language, "Move down"),
                         Message::MovePanelItem(id, false),
                     ));
                     content = content.push(row);
@@ -2032,7 +2032,7 @@ impl cosmic::Application for AppModel {
             if self.active_settings_section == Some("device") {
                 content = content.push(action_button(
                     "view-refresh-symbolic",
-                    "Load devices",
+                    crate::i18n::tr(&self.settings.language, "Load devices"),
                     Message::DiscoverDevices,
                 ));
 
@@ -2083,12 +2083,12 @@ impl cosmic::Application for AppModel {
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                             .push(icon_action_button(
                                 "+",
-                                "Move device up",
+                                crate::i18n::tr(&self.settings.language, "Move device up"),
                                 Message::MoveDevice(ain.clone(), true),
                             ))
                             .push(icon_action_button(
                                 "−",
-                                "Move device down",
+                                crate::i18n::tr(&self.settings.language, "Move device down"),
                                 Message::MoveDevice(ain.clone(), false),
                             ));
                         let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
@@ -3409,7 +3409,7 @@ impl cosmic::Application for AppModel {
                     } else {
                         icon_action_button("view-refresh-symbolic", "Reload now", Message::Refresh)
                     })
-                    .push(icon_action_button("⚙", "Settings", Message::ToggleSettings)),
+                    .push(icon_action_button("⚙", crate::i18n::tr(&self.settings.language, "Settings"), Message::ToggleSettings)),
             )
             .padding([8, 12])
             .width(cosmic::iced::Length::Fill);
