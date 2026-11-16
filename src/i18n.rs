@@ -201,6 +201,12 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Connected · device data loaded" => "Verbunden · Gerätedaten geladen",
         "Connection failed" => "Verbindung fehlgeschlagen",
         "Connection failed · {error}" => "Verbindung fehlgeschlagen · {error}",
+        "LAST" => "LETZTE",
+        "Base URL not configured" => "Basis-URL nicht konfiguriert",
+        "Configured devices" => "Konfigurierte Geräte",
+        "Request in progress" => "Anfrage läuft",
+        "Reload now" => "Jetzt neu laden",
+        "Refresh now" => "Jetzt aktualisieren",
         _ => key,
     }
 }
