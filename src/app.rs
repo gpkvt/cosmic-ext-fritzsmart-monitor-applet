@@ -179,31 +179,31 @@ fn clear_confirmed_power_changes(
     }
 }
 
-fn notify_missing_devices(names: &[String]) {
+fn notify_missing_devices(names: &[String], language: &str) {
     if names.is_empty() {
         return;
     }
     let body = names.join("\n");
     let _ = notify_rust::Notification::new()
         .summary(if names.len() == 1 {
-            "FRITZ!Box device unavailable"
+            crate::i18n::tr(language, "FRITZ!Box device unavailable")
         } else {
-            "FRITZ!Box devices unavailable"
+            crate::i18n::tr(language, "FRITZ!Box devices unavailable")
         })
         .body(&body)
         .show();
 }
 
-fn notify_temperature_alert(name: &str, temperature: f64, thresholds: TemperatureAlertThresholds) {
+fn notify_temperature_alert(name: &str, temperature: f64, thresholds: TemperatureAlertThresholds, language: &str) {
     let (summary, body) = if temperature > f64::from(thresholds.high_c) {
         (
-            format!("High temperature: {name}"),
-            format!("{temperature:.1} °C (maximum: {} °C)", thresholds.high_c),
+            format!("{}: {name}", crate::i18n::tr(language, "High temperature")),
+            format!("{temperature:.1} °C ({}: {} °C)", crate::i18n::tr(language, "maximum"), thresholds.high_c),
         )
     } else {
         (
-            format!("Low temperature: {name}"),
-            format!("{temperature:.1} °C (minimum: {} °C)", thresholds.low_c),
+            format!("{}: {name}", crate::i18n::tr(language, "Low temperature")),
+            format!("{temperature:.1} °C ({}: {} °C)", crate::i18n::tr(language, "minimum"), thresholds.low_c),
         )
     };
     // A missing notification service must never interrupt data refreshes.
@@ -1611,7 +1611,7 @@ impl cosmic::Application for AppModel {
                 true,
             )
             .on_press(Message::Refresh)
-            .name("Refresh now");
+            .name(crate::i18n::tr(&self.settings.language, "Refresh now"));
 
         let panel_controls = if self.settings.panel_refresh_button {
             widget::Row::new()
@@ -1724,7 +1724,7 @@ impl cosmic::Application for AppModel {
             }
             if self.active_settings_section == Some("panel") {
                 content = content
-                    .push(widget::text::body(format!("Panel text size: {} pt", self.settings.panel_text_size)))
+                    .push(widget::text::body(format!("{}: {} pt", crate::i18n::tr(&self.settings.language, "Panel text size"), self.settings.panel_text_size)))
                     .push(
                         widget::slider(
                             10.0..=24.0,
@@ -1734,7 +1734,7 @@ impl cosmic::Application for AppModel {
                         .step(1.0),
                     )
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Adjusts the power and temperature text in the panel")))
-                    .push(widget::text::body(format!("Panel item spacing: {} px", self.settings.panel_item_spacing)))
+                    .push(widget::text::body(format!("{}: {} px", crate::i18n::tr(&self.settings.language, "Panel item spacing"), self.settings.panel_item_spacing)))
                     .push(widget::slider(0.0..=16.0, f32::from(self.settings.panel_item_spacing),
                         |value| Message::PanelItemSpacingChanged(value.round() as u8)).step(1.0))
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Controls the gap between panel items")))
@@ -1826,25 +1826,26 @@ impl cosmic::Application for AppModel {
                         widget::Row::new()
                             .spacing(8)
                             .push(
-                                widget::button::text(if self.settings.graph_style == "line" {
+                                widget::button::text(crate::i18n::tr(&self.settings.language, if self.settings.graph_style == "line" {
                                     "✓ Line"
                                 } else {
                                     "Line"
-                                })
+                                }))
                                 .on_press(Message::GraphStyleChanged("line".into())),
                             )
                             .push(
-                                widget::button::text(if self.settings.graph_style == "bar" {
+                                widget::button::text(crate::i18n::tr(&self.settings.language, if self.settings.graph_style == "bar" {
                                     "✓ Bar"
                                 } else {
                                     "Bar"
-                                })
+                                }))
                                 .on_press(Message::GraphStyleChanged("bar".into())),
                             ),
                     )
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::caption(format!(
-                        "GRAPH HISTORY: {}",
+                        "{}: {}",
+                        crate::i18n::tr(&self.settings.language, "GRAPH HISTORY"),
                         format_graph_timespan(self.settings.graph_timespan_minutes)
                     )))
                     .push(
@@ -1870,7 +1871,7 @@ impl cosmic::Application for AppModel {
             if self.active_settings_section == Some("refresh") {
                 content = content
                     .push(widget::text::caption(format!(
-                        "AUTOMATIC REFRESH: {}",
+                        "{}: {},
                         format_countdown(u64::from(self.settings.refresh_interval_seconds))
                     )))
                     .push(
@@ -1898,7 +1899,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Location (city or latitude,longitude)")))
                     .push(widget::text_input(crate::i18n::tr(&self.settings.language, "e.g. Amsterdam or 52.37,4.90"), &self.settings.weather_location)
                         .on_input(Message::WeatherLocationChanged))
-                    .push(widget::text::caption(format!("Weather refresh: {} minutes", self.settings.weather_refresh_interval_minutes)))
+                    .push(widget::text::caption(format!("{}: {} minutes", crate::i18n::tr(&self.settings.language, "Weather refresh"), self.settings.weather_refresh_interval_minutes)))
                     .push(widget::slider(5.0..=60.0, f32::from(self.settings.weather_refresh_interval_minutes),
                         |value| Message::WeatherRefreshIntervalChanged(value.round() as u16)).step(5.0))
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.")))
@@ -1974,12 +1975,12 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::body(label).width(cosmic::iced::Length::Fill));
                     row = row.push(icon_action_button(
                         "+",
-                        "Move up",
+                        crate::i18n::tr(&self.settings.language, "Move up"),
                         Message::MoveMenuElement(id, true),
                     ));
                     row = row.push(icon_action_button(
                         "−",
-                        "Move down",
+                        crate::i18n::tr(&self.settings.language, "Move down"),
                         Message::MoveMenuElement(id, false),
                     ));
                     content = content.push(row);
@@ -2013,12 +2014,12 @@ impl cosmic::Application for AppModel {
                         );
                     row = row.push(icon_action_button(
                         "+",
-                        "Move up",
+                        crate::i18n::tr(&self.settings.language, "Move up"),
                         Message::MovePanelItem(id, true),
                     ));
                     row = row.push(icon_action_button(
                         "−",
-                        "Move down",
+                        crate::i18n::tr(&self.settings.language, "Move down"),
                         Message::MovePanelItem(id, false),
                     ));
                     content = content.push(row);
@@ -2031,7 +2032,7 @@ impl cosmic::Application for AppModel {
             if self.active_settings_section == Some("device") {
                 content = content.push(action_button(
                     "view-refresh-symbolic",
-                    "Load devices",
+                    crate::i18n::tr(&self.settings.language, "Load devices"),
                     Message::DiscoverDevices,
                 ));
 
@@ -2082,12 +2083,12 @@ impl cosmic::Application for AppModel {
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                             .push(icon_action_button(
                                 "+",
-                                "Move device up",
+                                crate::i18n::tr(&self.settings.language, "Move device up"),
                                 Message::MoveDevice(ain.clone(), true),
                             ))
                             .push(icon_action_button(
                                 "−",
-                                "Move device down",
+                                crate::i18n::tr(&self.settings.language, "Move device down"),
                                 Message::MoveDevice(ain.clone(), false),
                             ));
                         let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
@@ -2127,7 +2128,8 @@ impl cosmic::Application for AppModel {
                         if let Some(thresholds) = alert_thresholds {
                             device_row = device_row
                                 .push(widget::text::caption(format!(
-                                    "Upper limit: {} °C",
+                                    "{}: {} °C",
+                                    crate::i18n::tr(&self.settings.language, "Upper limit"),
                                     thresholds.high_c
                                 )))
                                 .push(
@@ -2143,7 +2145,8 @@ impl cosmic::Application for AppModel {
                                     .step(1.0),
                                 )
                                 .push(widget::text::caption(format!(
-                                    "Lower limit: {} °C",
+                                    "{}: {} °C",
+                                    crate::i18n::tr(&self.settings.language, "Lower limit"),
                                     thresholds.low_c
                                 )))
                                 .push(
@@ -2172,76 +2175,77 @@ impl cosmic::Application for AppModel {
                 let uses_https = endpoint.to_ascii_lowercase().starts_with("https://");
                 let (tls_status, tls_ok) = if uses_https {
                     if self.settings.allow_invalid_certs {
-                        ("Certificate validation disabled".to_string(), Some(false))
+                        (crate::i18n::tr(&self.settings.language, "Certificate validation disabled").to_string(), Some(false))
                     } else if !self.settings.ca_cert_path.trim().is_empty() {
-                        ("Custom CA certificate configured".to_string(), Some(true))
+                        (crate::i18n::tr(&self.settings.language, "Custom CA certificate configured").to_string(), Some(true))
                     } else {
-                        ("System certificate roots".to_string(), Some(true))
+                        (crate::i18n::tr(&self.settings.language, "System certificate roots").to_string(), Some(true))
                     }
                 } else if endpoint.to_ascii_lowercase().starts_with("http://") {
-                    ("Plain HTTP · TLS is not enabled".to_string(), Some(false))
+                    (crate::i18n::tr(&self.settings.language, "Plain HTTP · TLS is not enabled").to_string(), Some(false))
                 } else {
-                    ("URL is invalid or not configured".to_string(), None)
+                    (crate::i18n::tr(&self.settings.language, "URL is invalid or not configured").to_string(), None)
                 };
                 content = content
                     .push(widget::divider::horizontal::default())
-                    .push(widget::text::title3("Connection security"))
-                    .push(diagnostic_status_row("HTTPS / TLS", &tls_status, tls_ok))
+                    .push(widget::text::title3(crate::i18n::tr(&self.settings.language, "Connection security")))
+                    .push(diagnostic_status_row(crate::i18n::tr(&self.settings.language, "HTTPS / TLS"), &tls_status, tls_ok))
                     .push(widget::text::caption(format!(
-                        "FRITZ!Box: {}",
-                        if endpoint.is_empty() { "Not configured" } else { endpoint }
+                        "{}: {}",
+                        crate::i18n::tr(&self.settings.language, "FRITZ!Box"),
+                        if endpoint.is_empty() { crate::i18n::tr(&self.settings.language, "Not configured") } else { endpoint }
                     )))
                     .push(widget::divider::horizontal::default())
-                    .push(widget::text::title3("External resources"))
+                    .push(widget::text::title3(crate::i18n::tr(&self.settings.language, "External resources")))
                     .push(widget::text::caption(
                         "Status from the latest real request. Opening Diagnostics does not trigger network requests.",
                     ));
 
                 let weather_provider_status = if !self.settings.weather_enabled {
-                    ("Not configured", None)
+                    (crate::i18n::tr(&self.settings.language, "Not configured"), None)
                 } else if self.weather.is_some() {
-                    ("Latest request succeeded", Some(true))
+                    (crate::i18n::tr(&self.settings.language, "Latest request succeeded"), Some(true))
                 } else if self.weather_error.is_some() {
-                    ("Latest request failed", Some(false))
+                    (crate::i18n::tr(&self.settings.language, "Latest request failed"), Some(false))
                 } else {
-                    ("Not checked yet", None)
+                    (crate::i18n::tr(&self.settings.language, "Not checked yet"), None)
                 };
                 content = content.push(diagnostic_status_row(
-                    "OpenWeatherMap · current weather",
+                    crate::i18n::tr(&self.settings.language, "OpenWeatherMap · current weather"),
                     weather_provider_status.0,
                     weather_provider_status.1,
                 ));
 
                 let commons_status = if !self.settings.weather_enabled {
-                    ("Not configured", None)
+                    (crate::i18n::tr(&self.settings.language, "Not configured"), None)
                 } else if let Some(weather) = &self.weather {
                     if weather.background_image.is_some() {
-                        ("Image loaded", Some(true))
+                        (crate::i18n::tr(&self.settings.language, "Image loaded"), Some(true))
                     } else {
-                        ("No usable image loaded", Some(false))
+                        (crate::i18n::tr(&self.settings.language, "No usable image loaded"), Some(false))
                     }
                 } else if self.weather_error.is_some() {
-                    ("Weather request failed", Some(false))
+                    (crate::i18n::tr(&self.settings.language, "Weather request failed"), Some(false))
                 } else {
-                    ("Not checked yet", None)
+                    (crate::i18n::tr(&self.settings.language, "Not checked yet"), None)
                 };
                 content = content.push(diagnostic_status_row(
-                    "Wikimedia Commons · weather image",
+                    crate::i18n::tr(&self.settings.language, "Wikimedia Commons · weather image"),
                     commons_status.0,
                     commons_status.1,
                 ));
 
                 let forecast_status = if !self.settings.weather_enabled {
-                    ("Not configured", None)
+                    (crate::i18n::tr(&self.settings.language, "Not configured"), None)
                 } else if self.weather_forecast.is_some() {
-                    ("Forecast loaded", Some(true))
+                    (crate::i18n::tr(&self.settings.language, "Forecast loaded"), Some(true))
                 } else if self.weather_forecast_error.is_some() {
-                    ("Latest request failed", Some(false))
+                    (crate::i18n::tr(&self.settings.language, "Latest request failed"), Some(false))
                 } else {
-                    ("Not checked · request a forecast to test", None)
+                    (crate::i18n::tr(&self.settings.language, "Not checked · request a forecast to test"), None)
                 };
                 content = content.push(diagnostic_status_row(
-                    "Open-Meteo · forecast and geocoding",
+                    crate::i18n::tr(&self.settings.language, "Open-Meteo · forecast and geocoding"),
                     forecast_status.0,
                     forecast_status.1,
                 ));
@@ -2255,41 +2259,39 @@ impl cosmic::Application for AppModel {
                         .find(|request| request.path == path)
                         .map(|request| {
                             if (200..300).contains(&request.status) {
-                                (format!("HTTP {} · successful", request.status), Some(true))
+                                (format!("{} {} · {}", crate::i18n::tr(&self.settings.language, "HTTP"), request.status, crate::i18n::tr(&self.settings.language, "HTTP successful")), Some(true))
                             } else {
-                                (format!("HTTP {} · failed", request.status), Some(false))
+                                (format!("{} {} · {}", crate::i18n::tr(&self.settings.language, "HTTP"), request.status, crate::i18n::tr(&self.settings.language, "HTTP failed")), Some(false))
                             }
                         })
-                        .unwrap_or_else(|| ("Not checked yet".to_string(), None))
+                        .unwrap_or_else(|| (crate::i18n::tr(&self.settings.language, "Not checked yet").to_string(), None))
                 };
                 let fritz_base_status = if endpoint.is_empty() {
-                    ("Base URL not configured".to_string(), None)
+                    (crate::i18n::tr(&self.settings.language, "Base URL not configured").to_string(), None)
                 } else if self.error.is_none() && !self.readings.is_empty() {
-                    ("Connected · device data loaded".to_string(), Some(true))
+                    (crate::i18n::tr(&self.settings.language, "Connected · device data loaded").to_string(), Some(true))
                 } else if let Some(error) = &self.error {
-                    (format!("Connection failed · {error}"), Some(false))
+                    (format!("{} · {error}", crate::i18n::tr(&self.settings.language, "Connection failed")), Some(false))
                 } else {
                     ("Not checked yet".to_string(), None)
                 };
 
                 content = content
                     .push(widget::divider::horizontal::default())
-                    .push(widget::text::title3("FRITZ!Box API"))
-                    .push(diagnostic_status_row(
-                        "Connection",
+                    .push(widget::text::title3(crate::i18n::tr(&self.settings.language, "FRITZ!Box API")))
+                    .push(diagnostic_status_row(crate::i18n::tr(&self.settings.language, "Connection"),
                         &fritz_base_status.0,
                         fritz_base_status.1,
                     ))
                     .push(widget::text::caption(if endpoint.is_empty() {
-                        "Base URL not configured".to_string()
+                        crate::i18n::tr(&self.settings.language, "Base URL not configured").to_string()
                     } else {
                         endpoint.to_string()
                     }));
 
                 let auth = fritz_endpoint_status("/login_sid.lua");
                 content = content
-                    .push(diagnostic_status_row(
-                        "Session authentication",
+                    .push(diagnostic_status_row(crate::i18n::tr(&self.settings.language, "Session authentication"),
                         &auth.0,
                         auth.1,
                     ))
@@ -2303,7 +2305,7 @@ impl cosmic::Application for AppModel {
                     "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
                 );
                 content = content
-                    .push(diagnostic_status_row("Device list and meter readings", &device_list.0, device_list.1))
+                    .push(diagnostic_status_row(crate::i18n::tr(&self.settings.language, "Device list and meter readings"), &device_list.0, device_list.1))
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos".to_string()
                     } else {
@@ -2314,14 +2316,15 @@ impl cosmic::Application for AppModel {
                     "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
                 );
                 content = content
-                    .push(diagnostic_status_row("Per-device switch state", &switch_state.0, switch_state.1))
+                    .push(diagnostic_status_row(crate::i18n::tr(&self.settings.language, "Per-device switch state"), &switch_state.0, switch_state.1))
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>".to_string()
                     } else {
                         format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>")
                     }))
                     .push(widget::text::caption(format!(
-                        "Configured devices: {}",
+                        "{}: {}",
+                        crate::i18n::tr(&self.settings.language, "Configured devices"),
                         if self.settings.ains.is_empty() {
                             if self.settings.ain.trim().is_empty() { 0 } else { 1 }
                         } else {
@@ -2334,7 +2337,7 @@ impl cosmic::Application for AppModel {
                         self.refresh_started_at
                             .map(refresh_spinner_frame)
                             .unwrap_or_else(|| "◴".to_string()),
-                        "Request in progress",
+                        crate::i18n::tr(&self.settings.language, "Request in progress"),
                         Message::Refresh,
                     )
                 } else if let Some(remaining) = self
@@ -2346,7 +2349,7 @@ impl cosmic::Application for AppModel {
                 {
                     countdown_action_button(remaining.as_secs().saturating_add(1))
                 } else {
-                    icon_action_button("view-refresh-symbolic", "Reload now", Message::Refresh)
+                    icon_action_button("view-refresh-symbolic", crate::i18n::tr(&self.settings.language, "Reload now"), Message::Refresh)
                 };
                 content = content.push(
                     widget::Row::new()
@@ -2357,7 +2360,7 @@ impl cosmic::Application for AppModel {
                 );
 
                 if let Some(error) = &self.weather_error {
-                    content = content.push(error_notice("WEATHER UNAVAILABLE", error));
+                    content = content.push(error_notice(crate::i18n::tr(&self.settings.language, "WEATHER UNAVAILABLE"), error));
                 }
                 if let Some(status) = &self.settings_status {
                     if is_error_status(status) {
@@ -2372,7 +2375,7 @@ impl cosmic::Application for AppModel {
                             .split_once(':')
                             .map(|(_, message)| message.trim())
                             .unwrap_or(status);
-                        content = content.push(error_notice(title, message));
+                        content = content.push(error_notice(crate::i18n::tr(&self.settings.language, title), message));
                     } else {
                         content = content.push(
                             widget::selectable_text::selectable_text(status.as_str())
@@ -2451,7 +2454,8 @@ impl cosmic::Application for AppModel {
                                     .spacing(2)
                                     .push(widget::text::body(weather.description.clone()))
                                     .push(widget::text::caption(format!(
-                                        "Feels like {:.1} °C",
+                                        "{} {:.1} °C",
+                                        crate::i18n::tr(&self.settings.language, "Feels like"),
                                         weather.feels_like_c
                                     ))),
                             ),
@@ -2460,12 +2464,14 @@ impl cosmic::Application for AppModel {
                         widget::Row::new()
                             .spacing(8)
                             .push(widget::text::body(format!(
-                                "Humidity  {}%",
+                                "{}  {}%",
+                                crate::i18n::tr(&self.settings.language, "Humidity"),
                                 weather.humidity_percent
                             )))
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                             .push(widget::text::body(format!(
-                                "Clouds  {}%",
+                                "{}  {}%",
+                                crate::i18n::tr(&self.settings.language, "Clouds"),
                                 weather.cloudiness_percent
                             ))),
                     )
@@ -2498,13 +2504,13 @@ impl cosmic::Application for AppModel {
                         widget::Row::new()
                             .spacing(8)
                             .push(widget::text::body(format!(
-                                "Visibility  {:.1} km",
+                                "{}  {:.1} km",
                                 f64::from(weather.visibility_m) / 1000.0
                             )))
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(widget::text::body(format!("Sunrise  {sunrise}"))),
+                            .push(widget::text::body(format!("{}  {sunrise}", crate::i18n::tr(&self.settings.language, "Sunrise")))),
                     )
-                    .push(widget::text::body(format!("Sunset  {sunset}")));
+                    .push(widget::text::body(format!("{}  {sunset}", crate::i18n::tr(&self.settings.language, "Sunset"))));
                 let weather_heading = widget::button::custom(
                     widget::Row::new()
                         .spacing(8)
@@ -2514,7 +2520,7 @@ impl cosmic::Application for AppModel {
                             widget::Column::new()
                                 .spacing(1)
                                 .width(cosmic::iced::Length::Fill)
-                                .push(widget::text::title3("Weather"))
+                                .push(widget::text::title3(crate::i18n::tr(&self.settings.language, "Weather")))
                                 .push(widget::text::caption(weather.location_name.clone())),
                         )
                         .push(widget::text::title2(format!(
@@ -2633,9 +2639,7 @@ impl cosmic::Application for AppModel {
                             widget::Row::new()
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::text::title3(format!(
-                                    "{forecast_days}-day forecast"
-                                )))
+                                .push(widget::text::title3(if crate::i18n::language(&self.settings.language) == "de" { format!("{forecast_days}-Tage-Vorhersage") } else { format!("{forecast_days}-day forecast") }))
                                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                                 .push(forecast_range_selector),
                         )
@@ -2646,7 +2650,7 @@ impl cosmic::Application for AppModel {
                     }
                     if let Some(error) = &self.weather_forecast_error {
                         weather_section =
-                            weather_section.push(error_notice("FORECAST UNAVAILABLE", error));
+                            weather_section.push(error_notice(crate::i18n::tr(&self.settings.language, "FORECAST UNAVAILABLE"), error));
                     }
                     if let Some(forecast) = &self.weather_forecast {
                         for day in &forecast.days {
@@ -2685,8 +2689,9 @@ impl cosmic::Application for AppModel {
                                         .spacing(2)
                                         .align_x(cosmic::iced::Alignment::End)
                                         .push(widget::text::caption(format!(
-                                            "{}% rain",
-                                            day.precipitation_probability_percent
+                                            "{}% {}",
+                                            day.precipitation_probability_percent,
+                                            crate::i18n::tr(&self.settings.language, "rain")
                                         )))
                                         .push(widget::text::caption(format!(
                                             "{:.0} km/h",
@@ -2699,16 +2704,16 @@ impl cosmic::Application for AppModel {
                 }
                 if let Some(error) = &self.weather_error {
                     weather_section =
-                        weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
+                        weather_section.push(error_notice(crate::i18n::tr(&self.settings.language, "WEATHER UNAVAILABLE"), error));
                 }
                 weather_section = weather_section.push(widget::divider::horizontal::default());
                 weather_menu_card = Some(weather_section.into());
             } else if self.settings.weather_enabled {
                 let mut weather_section = widget::Column::new().spacing(8);
-                weather_section = weather_section.push(widget::text::title3("Weather"));
+                weather_section = weather_section.push(widget::text::title3(crate::i18n::tr(&self.settings.language, "Weather")));
                 if let Some(error) = &self.weather_error {
                     weather_section =
-                        weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
+                        weather_section.push(error_notice(crate::i18n::tr(&self.settings.language, "WEATHER UNAVAILABLE"), error));
                 } else {
                     weather_section =
                         weather_section.push(widget::text::body(crate::i18n::tr(&self.settings.language, "Weather data is loading…")));
@@ -2884,7 +2889,8 @@ impl cosmic::Application for AppModel {
                                     )
                                     .push(widget::text::caption(if is_expanded {
                                         format!(
-                                            "LAST {}",
+                                            "{} {}",
+                                            crate::i18n::tr(&self.settings.language, "LAST"),
                                             format_graph_timespan(
                                                 self.settings.graph_timespan_minutes
                                             )
@@ -3171,8 +3177,8 @@ impl cosmic::Application for AppModel {
                         continue;
                     }
                     let section = match key.as_str() {
-                        "0-summary" => ("summary", "CURRENT POWER"),
-                        "bandwidth" => ("bandwidth", "INTERNET BANDWIDTH"),
+                        "0-summary" => ("summary", crate::i18n::tr(&self.settings.language, "CURRENT POWER")),
+                        "bandwidth" => ("bandwidth", crate::i18n::tr(&self.settings.language, "INTERNET BANDWIDTH")),
                         _ => continue,
                     };
                     let collapsed = self.collapsed_menu_sections.contains(section.0);
@@ -3300,7 +3306,8 @@ impl cosmic::Application for AppModel {
                 const GRAPH_ANCHORS: [f32; 5] = [5.0, 60.0, 1440.0, 43200.0, 2102400.0];
                 content = content
                     .push(widget::text::caption(format!(
-                        "Refresh · {}",
+                        "{} · {}",
+                        crate::i18n::tr(&self.settings.language, "Refresh"),
                         format_countdown(u64::from(self.quick_refresh_interval))
                     )))
                     .push(
@@ -3323,7 +3330,7 @@ impl cosmic::Application for AppModel {
                         "30s", "5m", "15m", "30m", "60m",
                     ]))
                     .push(widget::text::caption(format!(
-                        "Graph · {}",
+                        "{} · {},
                         format_graph_timespan(self.quick_graph_timespan)
                     )))
                     .push(
@@ -3343,7 +3350,7 @@ impl cosmic::Application for AppModel {
             }
 
             if let Some(error) = &self.error {
-                content = content.push(error_notice("CONNECTION ERROR", error));
+                content = content.push(error_notice(crate::i18n::tr(&self.settings.language, "CONNECTION ERROR"), error));
             }
         }
 
@@ -3402,7 +3409,7 @@ impl cosmic::Application for AppModel {
                     } else {
                         icon_action_button("view-refresh-symbolic", "Reload now", Message::Refresh)
                     })
-                    .push(icon_action_button("⚙", "Settings", Message::ToggleSettings)),
+                    .push(icon_action_button("⚙", crate::i18n::tr(&self.settings.language, "Settings"), Message::ToggleSettings)),
             )
             .padding([8, 12])
             .width(cosmic::iced::Length::Fill);
@@ -3543,7 +3550,7 @@ impl cosmic::Application for AppModel {
                             &result.missing_devices,
                             &self.pending_power_changes,
                         );
-                        notify_missing_devices(&newly_missing);
+                        notify_missing_devices(&newly_missing, &self.settings.language);
                         let history_window =
                             graph_history_window(self.settings.graph_timespan_minutes);
                         if let Some(bandwidth) = result.internet_bandwidth.as_ref() {
@@ -3599,6 +3606,7 @@ impl cosmic::Application for AppModel {
                                             &reading.name,
                                             reading.temperature_c,
                                             thresholds,
+                                            &self.settings.language,
                                         );
                                     }
                                     // First observation establishes a baseline without
