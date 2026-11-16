@@ -1717,7 +1717,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::button::custom(widget::text::body(crate::i18n::tr(&self.settings.language, "English")))
                             .on_press(Message::LanguageChanged("en".into()))
                             .class(cosmic::theme::Button::Standard))
-                        .push(widget::button::custom(widget::text::body("Deutsch"))
+                        .push(widget::button::custom(widget::text::body(crate::i18n::tr(&self.settings.language, "Deutsch")))
                             .on_press(Message::LanguageChanged("de".into()))
                             .class(cosmic::theme::Button::Standard)))
                     .push(widget::divider::horizontal::default());
@@ -1733,19 +1733,19 @@ impl cosmic::Application for AppModel {
                         )
                         .step(1.0),
                     )
-                    .push(widget::text::caption("Adjusts the power and temperature text in the panel"))
+                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Adjusts the power and temperature text in the panel")))
                     .push(widget::text::body(format!("Panel item spacing: {} px", self.settings.panel_item_spacing)))
                     .push(widget::slider(0.0..=16.0, f32::from(self.settings.panel_item_spacing),
                         |value| Message::PanelItemSpacingChanged(value.round() as u8)).step(1.0))
-                    .push(widget::text::caption("Controls the gap between panel items"))
+                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Controls the gap between panel items")))
                     .push(
                         widget::Row::new()
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::Column::new()
                                 .spacing(3)
                                 .width(cosmic::iced::Length::Fill)
-                                .push(widget::text::body("Multiline panel values"))
-                                .push(widget::text::caption("Stack related readings vertically instead of placing them on one line.")))
+                                .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Multiline panel values")))
+                                .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Stack related readings vertically instead of placing them on one line."))))
                             .push(widget::container(
                                 widget::toggler(self.settings.panel_multiline)
                                     .on_toggle(Message::PanelMultilineChanged)
@@ -1756,8 +1756,8 @@ impl cosmic::Application for AppModel {
                         .push(widget::Column::new()
                             .spacing(3)
                             .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::body("Show panel refresh button"))
-                            .push(widget::text::caption("Display a separate refresh button beside the applet in the panel.")))
+                            .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Show panel refresh button")))
+                            .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Display a separate refresh button beside the applet in the panel."))))
                         .push(widget::container(
                             widget::toggler(self.settings.panel_refresh_button)
                                 .on_toggle(Message::PanelRefreshButtonChanged)
@@ -1768,7 +1768,7 @@ impl cosmic::Application for AppModel {
                                 widget::Column::new()
                                     .spacing(3)
                                     .width(cosmic::iced::Length::Fill)
-                                    .push(widget::text::body("Show internet bandwidth"))
+                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Show internet bandwidth")))
                                     .push(widget::text::caption(
                                         "Display the maximum download and upload link speeds reported by your FRITZ!Box connection in Mbps.",
                                     )),
@@ -1788,7 +1788,7 @@ impl cosmic::Application for AppModel {
                                 widget::Column::new()
                                     .spacing(3)
                                     .width(cosmic::iced::Length::Fill)
-                                    .push(widget::text::body("Average temperature"))
+                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Average temperature")))
                                     .push(widget::text::caption(
                                         "When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.",
                                     )),
@@ -1808,8 +1808,8 @@ impl cosmic::Application for AppModel {
                             .push(widget::Column::new()
                                 .spacing(3)
                                 .width(cosmic::iced::Length::Fill)
-                                .push(widget::text::body("Exclude solar devices"))
-                                .push(widget::text::caption("Ignore temperatures from devices whose name contains “solar” when calculating the average.")))
+                                .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Exclude solar devices")))
+                                .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Ignore temperatures from devices whose name contains “solar” when calculating the average."))))
                             .push(widget::container(
                                 widget::toggler(self.settings.panel_exclude_solar_temperature)
                                     .on_toggle(Message::PanelExcludeSolarTemperatureChanged)
@@ -1821,7 +1821,7 @@ impl cosmic::Application for AppModel {
 
             if self.active_settings_section == Some("graph") {
                 content = content
-                    .push(widget::text::caption("GRAPH STYLE"))
+                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "GRAPH STYLE")))
                     .push(
                         widget::Row::new()
                             .spacing(8)
@@ -1881,7 +1881,7 @@ impl cosmic::Application for AppModel {
                         )
                         .step(30.0),
                     )
-                    .push(widget::text::caption("30 seconds to 1 hour"))
+                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "30 seconds to 1 hour")))
                     .push(widget::divider::horizontal::default())
             }
 
@@ -1889,35 +1889,35 @@ impl cosmic::Application for AppModel {
                 content = content
                     .push(widget::Row::new()
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::body("Use current weather icon"))
+                        .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Use current weather icon")))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                         .push(widget::toggler(self.settings.weather_enabled).on_toggle(Message::WeatherEnabledChanged)))
-                    .push(widget::text::body("OpenWeatherMap API key"))
+                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "OpenWeatherMap API key")))
                     .push(widget::secure_input("API key", &self.settings.openweathermap_api_key, None, true)
                         .on_input(Message::OpenWeatherMapApiKeyChanged))
-                    .push(widget::text::body("Location (city or latitude,longitude)"))
+                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Location (city or latitude,longitude)")))
                     .push(widget::text_input("e.g. Amsterdam or 52.37,4.90", &self.settings.weather_location)
                         .on_input(Message::WeatherLocationChanged))
                     .push(widget::text::caption(format!("Weather refresh: {} minutes", self.settings.weather_refresh_interval_minutes)))
                     .push(widget::slider(5.0..=60.0, f32::from(self.settings.weather_refresh_interval_minutes),
                         |value| Message::WeatherRefreshIntervalChanged(value.round() as u16)).step(5.0))
-                    .push(widget::text::caption("Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location."))
+                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.")))
                     .push(widget::divider::horizontal::default())
             }
 
             if self.active_settings_section == Some("connection") {
                 content = content
-                    .push(widget::text::body("FRITZ!Box URL"))
+                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "FRITZ!Box URL")))
                     .push(
                         widget::text_input("https://fritz.box", &self.settings.url)
                             .on_input(Message::UrlChanged),
                     )
-                    .push(widget::text::body("Username"))
+                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Username")))
                     .push(
                         widget::text_input("Username", &self.settings.username)
                             .on_input(Message::UsernameChanged),
                     )
-                    .push(widget::text::body("Password"))
+                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Password")))
                     .push(
                         widget::secure_input("Password", &self.settings.password, None, true)
                             .on_input(Message::PasswordChanged),
@@ -1940,7 +1940,7 @@ impl cosmic::Application for AppModel {
                             .width(cosmic::iced::Length::Fill)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(
-                                widget::text::body("Allow invalid TLS certificates")
+                                widget::text::body(crate::i18n::tr(&self.settings.language, "Allow invalid TLS certificates"))
                                     .width(cosmic::iced::Length::Fill),
                             )
                             .push(
@@ -1953,7 +1953,7 @@ impl cosmic::Application for AppModel {
 
             if self.active_settings_section == Some("menu-order") {
                 content = content
-                    .push(widget::text::body("Popup element order"))
+                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Popup element order")))
                     .push(widget::text::caption(
                         "Move sections up or down. Changes are saved automatically.",
                     ));
@@ -1990,7 +1990,7 @@ impl cosmic::Application for AppModel {
             }
 
             if self.active_settings_section == Some("panel-order") {
-                content = content.push(widget::text::body("Panel item order")).push(
+                content = content.push(widget::text::body(crate::i18n::tr(&self.settings.language, "Panel item order"))).push(
                     widget::text::caption(
                         "Move each reading independently. Changes are saved automatically.",
                     ),
@@ -2037,7 +2037,7 @@ impl cosmic::Application for AppModel {
 
                 if !self.devices.is_empty() {
                     content = content
-                        .push(widget::text::body("Select power-meter devices"))
+                        .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Select power-meter devices")))
                         .push(
                             widget::text_input(
                                 "Search devices by name or AIN",
@@ -2060,7 +2060,7 @@ impl cosmic::Application for AppModel {
                         .retain(|device| device_matches_search(device, &self.device_search));
                     if ordered_devices.is_empty() {
                         content =
-                            content.push(widget::text::caption("No devices match your search"));
+                            content.push(widget::text::caption(crate::i18n::tr(&self.settings.language, "No devices match your search")));
                     }
                     for device in ordered_devices.iter() {
                         let selected = self.selected_ains.iter().any(|selected_ain| {
@@ -2103,7 +2103,7 @@ impl cosmic::Application for AppModel {
                             .push(
                                 widget::Row::new()
                                     .align_y(cosmic::iced::Alignment::Center)
-                                    .push(widget::text::caption("Input device (separate total)"))
+                                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Input device (separate total)")))
                                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                                     .push(widget::toggler(is_input).on_toggle({
                                         let ain = ain.clone();
@@ -2115,7 +2115,7 @@ impl cosmic::Application for AppModel {
                             .push(
                                 widget::Row::new()
                                     .align_y(cosmic::iced::Alignment::Center)
-                                    .push(widget::text::caption("Temperature alerts"))
+                                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Temperature alerts")))
                                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                                     .push(widget::toggler(alert_thresholds.is_some()).on_toggle({
                                         let ain = ain.clone();
@@ -2380,7 +2380,7 @@ impl cosmic::Application for AppModel {
                         );
                     }
                 } else {
-                    content = content.push(widget::text::caption("No status messages yet"));
+                    content = content.push(widget::text::caption(crate::i18n::tr(&self.settings.language, "No status messages yet")));
                 }
                 content = content.push(widget::divider::horizontal::default());
             }
@@ -2393,7 +2393,7 @@ impl cosmic::Application for AppModel {
                         .spacing(6)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::icon::from_name("emblem-ok-symbolic").size(16))
-                        .push(widget::text::caption("Settings saved")),
+                        .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Settings saved"))),
                 );
             }
         } else {
@@ -2475,19 +2475,19 @@ impl cosmic::Application for AppModel {
                             .push(
                                 widget::Column::new()
                                     .spacing(8)
-                                    .push(widget::text::body("Wind speed"))
+                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Wind speed")))
                                     .push(widget::text::body(format!(
                                         "{:.1} m/s",
                                         weather.wind_speed_mps
                                     )))
-                                    .push(widget::text::body("Direction"))
+                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Direction")))
                                     .push(widget::text::body(wind_direction)),
                             )
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                             .push(
                                 widget::Column::new()
                                     .spacing(8)
-                                    .push(widget::text::body("Pressure"))
+                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Pressure")))
                                     .push(widget::text::body(format!(
                                         "{} hPa",
                                         weather.pressure_hpa
@@ -2598,7 +2598,7 @@ impl cosmic::Application for AppModel {
                                         widget::icon::from_name("x-office-calendar-symbolic")
                                             .size(14),
                                     )
-                                    .push(widget::text::caption("7d")),
+                                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "7d"))),
                             )
                             .on_press(Message::SelectWeatherForecast(7))
                             .padding([4, 8])
@@ -2617,7 +2617,7 @@ impl cosmic::Application for AppModel {
                                         widget::icon::from_name("x-office-calendar-symbolic")
                                             .size(14),
                                     )
-                                    .push(widget::text::caption("14d")),
+                                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "14d"))),
                             )
                             .on_press(Message::SelectWeatherForecast(14))
                             .padding([4, 8])
@@ -2639,10 +2639,10 @@ impl cosmic::Application for AppModel {
                                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                                 .push(forecast_range_selector),
                         )
-                        .push(widget::text::caption("Forecast data by Open-Meteo"));
+                        .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Forecast data by Open-Meteo")));
                     if self.weather_forecast_loading {
                         weather_section =
-                            weather_section.push(widget::text::caption("Loading forecast…"));
+                            weather_section.push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Loading forecast…")));
                     }
                     if let Some(error) = &self.weather_forecast_error {
                         weather_section =
@@ -2711,7 +2711,7 @@ impl cosmic::Application for AppModel {
                         weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
                 } else {
                     weather_section =
-                        weather_section.push(widget::text::body("Weather data is loading…"));
+                        weather_section.push(widget::text::body(crate::i18n::tr(&self.settings.language, "Weather data is loading…")));
                 }
                 weather_section = weather_section.push(widget::divider::horizontal::default());
                 weather_menu_card = Some(weather_section.into());
@@ -2757,7 +2757,7 @@ impl cosmic::Application for AppModel {
                                 .align_y(cosmic::iced::Alignment::Center)
                                 .push(widget::icon::from_name("go-down-symbolic").size(16))
                                 .push(
-                                    widget::text::caption("DOWNLOAD")
+                                    widget::text::caption(crate::i18n::tr(&self.settings.language, "DOWNLOAD"))
                                         .width(cosmic::iced::Length::Fill),
                                 )
                                 .push(widget::text::body(format_bandwidth(
@@ -2770,7 +2770,7 @@ impl cosmic::Application for AppModel {
                                 .align_y(cosmic::iced::Alignment::Center)
                                 .push(widget::icon::from_name("go-up-symbolic").size(16))
                                 .push(
-                                    widget::text::caption("UPLOAD")
+                                    widget::text::caption(crate::i18n::tr(&self.settings.language, "UPLOAD"))
                                         .width(cosmic::iced::Length::Fill),
                                 )
                                 .push(widget::text::body(format_bandwidth(
@@ -2778,7 +2778,7 @@ impl cosmic::Application for AppModel {
                                 ))),
                         )
                         .push(widget::divider::horizontal::default())
-                        .push(widget::text::caption("DOWNLOAD HISTORY"))
+                        .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "DOWNLOAD HISTORY")))
                         .push(graph_visual(
                             self.bandwidth_history
                                 .iter()
@@ -2786,7 +2786,7 @@ impl cosmic::Application for AppModel {
                             &self.settings.graph_style,
                             "Mbps",
                         ))
-                        .push(widget::text::caption("UPLOAD HISTORY"))
+                        .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "UPLOAD HISTORY")))
                         .push(graph_visual(
                             self.bandwidth_history
                                 .iter()
@@ -2946,7 +2946,7 @@ impl cosmic::Application for AppModel {
                                             widget::Column::new()
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
-                                                .push(widget::text::caption("POWER (W)"))
+                                                .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "POWER (W)")))
                                                 .push(graph_visual(
                                                     device_history.into_iter().flat_map(
                                                         |samples| {
@@ -2971,7 +2971,7 @@ impl cosmic::Application for AppModel {
                                                             widget::Space::new()
                                                                 .width(cosmic::iced::Length::Fill),
                                                         )
-                                                        .push(widget::text::caption("Now")),
+                                                        .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Now"))),
                                                 ),
                                         )
                                         .padding([8, 0])
@@ -3020,7 +3020,7 @@ impl cosmic::Application for AppModel {
                                             widget::Column::new()
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
-                                                .push(widget::text::caption("TEMPERATURE (°C)"))
+                                                .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "TEMPERATURE (°C)")))
                                                 .push(graph_visual(
                                                     device_history.into_iter().flat_map(
                                                         |samples| {
@@ -3045,7 +3045,7 @@ impl cosmic::Application for AppModel {
                                                             widget::Space::new()
                                                                 .width(cosmic::iced::Length::Fill),
                                                         )
-                                                        .push(widget::text::caption("Now")),
+                                                        .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Now"))),
                                                 ),
                                         )
                                         .padding([8, 0])
@@ -3254,7 +3254,7 @@ impl cosmic::Application for AppModel {
                 content = content.push(device_list);
             } else {
                 content =
-                    content.push(widget::text::body("Select one or more devices in Settings"));
+                    content.push(widget::text::body(crate::i18n::tr(&self.settings.language, "Select one or more devices in Settings")));
             }
 
             if let Some(weather_card) = weather_menu_card.take() {
@@ -3271,7 +3271,7 @@ impl cosmic::Application for AppModel {
                             widget::Row::new()
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::text::caption("SETTINGS"))
+                                .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "SETTINGS")))
                                 .push(
                                     widget::icon::from_name("preferences-system-symbolic").size(20),
                                 ),
@@ -3286,7 +3286,7 @@ impl cosmic::Application for AppModel {
                             widget::Row::new()
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::text::caption("QUICK SETTINGS"))
+                                .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "QUICK SETTINGS")))
                                 .push(widget::text("⚙").size(20)),
                         )
                         .on_press(Message::ToggleQuickOptions)
@@ -3383,7 +3383,7 @@ impl cosmic::Application for AppModel {
                         .center_y(36),
                     )
                     .push(
-                        widget::text::body("FRITZ!Power Monitor").width(cosmic::iced::Length::Fill),
+                        widget::text::body(crate::i18n::tr(&self.settings.language, "FRITZ!Power Monitor")).width(cosmic::iced::Length::Fill),
                     )
                     .push(if self.refresh_started_at.is_some() {
                         icon_action_button(
