@@ -3033,7 +3033,7 @@ impl cosmic::Application for AppModel {
                         widget::slider(
                             0.0..=4.0,
                             quick_slider_position(
-                                f32::from(self.quick_graph_timespan),
+                                self.quick_graph_timespan as f32,
                                 GRAPH_ANCHORS,
                             ),
                             |position| {
