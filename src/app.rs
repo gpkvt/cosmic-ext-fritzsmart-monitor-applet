@@ -4163,7 +4163,7 @@ mod history_tests {
     }
 
     #[test]
-    fn device_history_keeps_only_recent_samples() {
+    fn device_history_keeps_recent_five_minute_samples() {
         let start = Instant::now();
         let mut history = HashMap::new();
         let reading = FritzReading {
@@ -4182,27 +4182,27 @@ mod history_tests {
             );
         }
         let samples = history.get("111111").unwrap();
-        assert_eq!(samples.len(), 16);
+        assert_eq!(samples.len(), 3);
         assert_eq!(samples.front().unwrap().1, 120);
         assert_eq!(samples.back().unwrap().2, 21.5);
     }
 
     #[test]
-    fn longer_graph_window_retains_more_minute_samples() {
+    fn longer_graph_window_retains_more_five_minute_samples() {
         let start = Instant::now();
         let mut history = VecDeque::new();
         let window = graph_history_window(60);
-        for minute in 0_u64..75 {
+        for sample in 0_u64..15 {
             record_power_sample(
                 &mut history,
-                minute as i64,
-                start + Duration::from_secs(minute * 60),
+                sample as i64,
+                start + Duration::from_secs(sample * 5 * 60),
                 window,
             );
         }
-        assert_eq!(history.len(), 61);
-        assert_eq!(history.front().unwrap().1, 14);
-        assert_eq!(history.back().unwrap().1, 74);
+        assert_eq!(history.len(), 13);
+        assert_eq!(history.front().unwrap().1, 2);
+        assert_eq!(history.back().unwrap().1, 14);
     }
 
     #[test]
@@ -4210,8 +4210,10 @@ mod history_tests {
         assert_eq!(graph_history_window(15), Duration::from_secs(900));
         assert_eq!(graph_history_window(60), Duration::from_secs(3600));
         assert_eq!(graph_history_window(0), Duration::from_secs(300));
-        assert_eq!(graph_history_window(2000), Duration::from_secs(86400));
-        assert_eq!(max_history_samples(graph_history_window(60)), 61);
+        assert_eq!(graph_history_window(2000), Duration::from_secs(120_000));
+        assert_eq!(graph_history_window(2_102_400), Duration::from_secs(126_144_000));
+        assert_eq!(max_history_samples(graph_history_window(60)), 13);
+        assert_eq!(max_history_samples(graph_history_window(2_102_400)), 420_481);
     }
 
     #[test]
