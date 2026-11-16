@@ -44,6 +44,9 @@
     <keyword>monitor</keyword>
   </keywords>
   <releases>
+    <release version="0.3.0" date="2026-11-16">
+      <description><p>Major feature and usability update.</p></description>
+    </release>
     <release version="0.2.10" date="2026-11-15">
       <description>
         <p>Improve reproducible Flatpak packaging and install complete AppStream metadata for COSMIC app discovery.</p>
