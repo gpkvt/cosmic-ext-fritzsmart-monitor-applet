@@ -91,7 +91,6 @@ pub enum Message {
     GraphTimespanChanged(u32),
     GraphStyleChanged(String),
     ShowGraph(String, Vec<f64>, String),
-    GraphWindowOpened,
     CloseGraph,
     RefreshIntervalChanged(u32),
     DiscoverDevices,
@@ -4044,38 +4043,35 @@ impl cosmic::Application for AppModel {
             Message::ShowGraph(title, values, unit) => {
                 self.expanded_graph = Some((title, values, unit));
                 if self.graph_window.is_none() {
-                    let mut settings = cosmic::iced::window::Settings {
-                        decorations: true,
-                        position: cosmic::iced::window::Position::Centered,
-                        size: cosmic::iced::Size::new(800.0, 600.0),
-                        min_size: Some(cosmic::iced::Size::new(640.0, 480.0)),
-                        resizable: true,
-                        transparent: false,
-                        ..Default::default()
+                    // Applets must create secondary surfaces through the
+                    // applet popup API. window::open() creates a local window
+                    // rather than a host-compositor popup and can resize the
+                    // panel's layer surface on Wayland.
+                    let Some(main_window_id) = self.core.main_window_id() else {
+                        self.expanded_graph = None;
+                        return Task::none();
                     };
-                    // Give the graph a regular desktop-window identity instead
-                    // of inheriting the applet's layer-surface identity. This
-                    // lets COSMIC and other Wayland compositors manage it as a
-                    // standalone, decorated window.
-                    #[cfg(target_os = "linux")]
-                    {
-                        settings.platform_specific.application_id =
-                            "com.gpkvt.FritzPowerMonitorGraph".to_string();
-                    }
-                    let (id, task) = cosmic::iced::window::open(settings);
+                    let id = Id::unique();
                     self.graph_window = Some(id);
-                    return task.map(|_: cosmic::iced::window::Id| cosmic::Action::App(Message::GraphWindowOpened));
-                } else if let Some(id) = self.graph_window {
-                    return cosmic::iced::window::gain_focus(id)
-                        .map(|_: ()| cosmic::Action::App(Message::GraphWindowOpened));
+                    let mut settings = self.core.applet.get_popup_settings(
+                        main_window_id,
+                        id,
+                        Some((800, 600)),
+                        None,
+                        None,
+                    );
+                    settings.positioner.size_limits = Limits::NONE
+                        .min_width(640.0)
+                        .min_height(480.0)
+                        .max_width(800.0)
+                        .max_height(600.0);
+                    return get_popup(settings);
                 }
             }
-            Message::GraphWindowOpened => {}
             Message::CloseGraph => {
                 self.expanded_graph = None;
                 if let Some(id) = self.graph_window.take() {
-                    return cosmic::iced::window::close(id)
-                        .map(move |_: ()| cosmic::Action::App(Message::PopupClosed(id)));
+                    return destroy_popup(id);
                 }
             }
             Message::Refresh => {
