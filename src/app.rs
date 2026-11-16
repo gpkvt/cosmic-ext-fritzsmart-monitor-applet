@@ -1020,8 +1020,7 @@ fn panel_item_label(id: &str) -> &'static str {
         "weather" => "Weather",
         "power-consumption" => "Power consumption",
         "solar-power" => "Solar power",
-        "internet-download" => "Internet download",
-        "internet-upload" => "Internet upload",
+        "internet-bandwidth" => "Internet bandwidth",
         "temperature" => "Temperature",
         _ => "Unknown item",
     }
@@ -1502,39 +1501,25 @@ impl cosmic::Application for AppModel {
                         format_bandwidth(bandwidth.upload_bits_per_second),
                     ))
                     .unwrap_or_else(|| ("-- Mbps".to_string(), "-- Mbps".to_string()));
-                panel_items.push((
-                    "internet-download",
-                    panel_item(
-                        "Internet download",
-                        Some(
-                            widget::icon::from_name("go-down-symbolic")
-                                .size(self.settings.panel_text_size.into())
-                                .into(),
-                        ),
-                        self.core
-                            .applet
-                            .text(download)
-                            .size(f32::from(self.settings.panel_text_size))
-                            .into(),
+                let bandwidth_rows = widget::Column::new()
+                    .spacing(0)
+                    .push(
+                        widget::Row::new()
+                            .spacing(3)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::icon::from_name("go-down-symbolic").size(10).into())
+                            .push(widget::text::body(download).size(10)),
                     )
-                    .into(),
-                ));
+                    .push(
+                        widget::Row::new()
+                            .spacing(3)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::icon::from_name("go-up-symbolic").size(10).into())
+                            .push(widget::text::body(upload).size(10)),
+                    );
                 panel_items.push((
-                    "internet-upload",
-                    panel_item(
-                        "Internet upload",
-                        Some(
-                            widget::icon::from_name("go-up-symbolic")
-                                .size(self.settings.panel_text_size.into())
-                                .into(),
-                        ),
-                        self.core
-                            .applet
-                            .text(upload)
-                            .size(f32::from(self.settings.panel_text_size))
-                            .into(),
-                    )
-                    .into(),
+                    "internet-bandwidth",
+                    panel_item("Internet bandwidth", None, bandwidth_rows.into()).into(),
                 ));
             }
             if let Some(temperature) = temperature {
@@ -1974,8 +1959,7 @@ impl cosmic::Application for AppModel {
                         "weather" => "weather",
                         "power-consumption" => "power-consumption",
                         "solar-power" => "solar-power",
-                        "internet-download" => "internet-download",
-                        "internet-upload" => "internet-upload",
+                        "internet-bandwidth" => "internet-bandwidth",
                         "temperature" => "temperature",
                         _ => continue,
                     };
