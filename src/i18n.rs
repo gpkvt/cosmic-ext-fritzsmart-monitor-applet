@@ -136,6 +136,8 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Load devices" => "Geräte laden",
         "Search devices" => "Geräte suchen",
         "Refresh" => "Aktualisieren",
+        "Visibility" => "Sichtweite",
+        "Graph" => "Diagramm",
         "Connection error" => "Verbindungsfehler",
         "On" => "Ein",
         "Off" => "Aus",

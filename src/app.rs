@@ -2084,7 +2084,8 @@ impl cosmic::Application for AppModel {
             if self.active_settings_section == Some("refresh") {
                 content = content
                     .push(widget::text::caption(format!(
-                        crate::i18n::tr(&self.settings.language, "Refresh · {}"),
+                        "{} · {}",
+                        crate::i18n::tr(&self.settings.language, "Refresh"),
                         format_countdown(u64::from(self.settings.refresh_interval_seconds))
                     )))
                     .push(
@@ -2904,7 +2905,8 @@ impl cosmic::Application for AppModel {
                         widget::Row::new()
                             .spacing(8)
                             .push(widget::text::body(format!(
-                                crate::i18n::tr(&self.settings.language, "Visibility  {:.1} km"),
+                                "{}  {:.1} km",
+                                crate::i18n::tr(&self.settings.language, "Visibility"),
                                 f64::from(weather.visibility_m) / 1000.0
                             )))
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
@@ -3830,7 +3832,8 @@ impl cosmic::Application for AppModel {
                         "30s", "5m", "15m", "30m", "60m",
                     ]))
                     .push(widget::text::caption(format!(
-                        crate::i18n::tr(&self.settings.language, "Graph · {}"),
+                        "{} · {}",
+                        crate::i18n::tr(&self.settings.language, "Graph"),
                         format_graph_timespan(self.quick_graph_timespan)
                     )))
                     .push(
@@ -4719,6 +4722,8 @@ mod history_tests {
                 power_w: 800,
                 temperature_c: 20.0,
                 power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
             },
             FritzReading {
                 ain: "222222".into(),
@@ -4726,6 +4731,8 @@ mod history_tests {
                 power_w: 250,
                 temperature_c: 21.0,
                 power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
             },
         ];
         let selected = vec!["222222".to_string(), "111111".to_string()];
@@ -4825,6 +4832,8 @@ mod history_tests {
                 power_w: 400,
                 temperature_c: 20.0,
                 power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
             },
             FritzReading {
                 ain: "222222".into(),
@@ -4832,6 +4841,8 @@ mod history_tests {
                 power_w: 250,
                 temperature_c: 21.0,
                 power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
             },
             FritzReading {
                 ain: "333333".into(),
@@ -4839,6 +4850,8 @@ mod history_tests {
                 power_w: 100,
                 temperature_c: 22.0,
                 power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
             },
         ];
         let inputs = HashSet::from(["222222".to_string(), "333333".to_string()]);
@@ -4862,6 +4875,8 @@ mod history_tests {
                 power_w: 100,
                 temperature_c: 20.0,
                 power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
             },
             FritzReading {
                 ain: "222222".into(),
@@ -4869,6 +4884,8 @@ mod history_tests {
                 power_w: 200,
                 temperature_c: 24.0,
                 power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
             },
         ];
         assert_eq!(average_temperature_c(&readings, false), Some(22.0));
@@ -4885,6 +4902,8 @@ mod history_tests {
                 power_w: 100,
                 temperature_c: 20.0,
                 power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
             },
             FritzReading {
                 ain: "222222".into(),
@@ -4892,6 +4911,8 @@ mod history_tests {
                 power_w: 200,
                 temperature_c: 40.0,
                 power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
             },
             FritzReading {
                 ain: "333333".into(),
@@ -4899,6 +4920,8 @@ mod history_tests {
                 power_w: 300,
                 temperature_c: 50.0,
                 power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
             },
         ];
         assert_eq!(average_temperature_c(&readings, false), Some(110.0 / 3.0));
@@ -4949,6 +4972,8 @@ mod history_tests {
                 power_w: 900,
                 temperature_c: 20.0,
                 power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
             },
             FritzReading {
                 ain: "22:22 22".into(),
@@ -4956,6 +4981,8 @@ mod history_tests {
                 power_w: 250,
                 temperature_c: 21.0,
                 power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
             },
         ];
         let inputs = HashSet::from(["222222".to_string()]);
@@ -4975,6 +5002,8 @@ mod history_tests {
             power_w: 120,
             temperature_c: 21.5,
             power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
         };
         for minute in 0_u64..18 {
             record_device_sample(
@@ -5098,6 +5127,8 @@ mod history_tests {
                 power_w: 100,
                 temperature_c: 20.0,
                 power_state: reported,
+                power_controllable: false,
+                power_toggle_allowed: false,
             }];
 
             clear_confirmed_power_changes(&mut pending_targets, &mut pending_changes, &readings);
