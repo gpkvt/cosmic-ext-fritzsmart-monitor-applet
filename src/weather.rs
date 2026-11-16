@@ -29,6 +29,7 @@ pub struct WeatherData {
     pub slideshow_frames: Vec<Vec<u8>>,
     pub slideshow_sequence: Vec<usize>,
     pub image_attribution: Option<CommonsAttribution>,
+    pub image_attributions: Vec<CommonsAttribution>,
 }
 
 impl WeatherData {
@@ -291,7 +292,8 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
     let location_name = payload["name"].as_str().unwrap_or(location).to_string();
     // Select photos using both the observed condition and OpenWeatherMap's
     // local day/night indicator. Image failures remain non-fatal.
-    let (mut background_images, image_attribution) = fetch_commons_background(&client, icon_code).await;
+    let (mut background_images, image_attributions) = fetch_commons_background(&client, icon_code).await;
+    let image_attribution = image_attributions.first().cloned();
     // At night, never substitute an unrelated image when Commons cannot
     // provide a credible match. Use a locally generated star field instead.
     if icon_code.ends_with('n') && background_images.is_empty() {
@@ -322,6 +324,7 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
         slideshow_frames,
         slideshow_sequence,
         image_attribution,
+        image_attributions,
     })
 }
 
@@ -450,10 +453,10 @@ fn commons_title_matches_condition(icon_code: &str, title: &str) -> bool {
 async fn fetch_commons_background(
     client: &Client,
     icon_code: &str,
-) -> (Vec<Vec<u8>>, Option<CommonsAttribution>) {
+) -> (Vec<Vec<u8>>, Vec<CommonsAttribution>) {
     let mut images = Vec::new();
     let mut seen_titles = std::collections::HashSet::new();
-    let mut attribution = None;
+    let mut attributions = Vec::new();
     // Search every condition-specific phrase. Avoid rotating through arbitrary
     // result offsets, which admitted unrelated files into the slideshow.
     for variant in 0..commons_search_terms(icon_code).len() {
@@ -487,21 +490,19 @@ async fn fetch_commons_background(
             if !response.status().is_success() { continue; }
             let Ok(bytes) = response.bytes().await else { continue };
             let Some(image) = blur_background_image(bytes.to_vec()) else { continue };
-            if attribution.is_none() {
-                let artist = info["extmetadata"]["Artist"]["value"].as_str().unwrap_or("Unknown author");
-                let license = info["extmetadata"]["LicenseShortName"]["value"].as_str().unwrap_or("See file page");
-                let title = page["title"].as_str().unwrap_or("Wikimedia Commons photograph");
-                let page_url = info["descriptionurl"].as_str().unwrap_or("https://commons.wikimedia.org/");
-                attribution = Some(CommonsAttribution {
-                    title: title.to_string(), artist: strip_html(artist), license: license.to_string(),
-                    page_url: commons_file_page_url(page_url),
-                });
-            }
+            let artist = info["extmetadata"]["Artist"]["value"].as_str().unwrap_or("Unknown author");
+            let license = info["extmetadata"]["LicenseShortName"]["value"].as_str().unwrap_or("See file page");
+            let title = page["title"].as_str().unwrap_or("Wikimedia Commons photograph");
+            let page_url = info["descriptionurl"].as_str().unwrap_or("https://commons.wikimedia.org/");
+            attributions.push(CommonsAttribution {
+                title: title.to_string(), artist: strip_html(artist), license: license.to_string(),
+                page_url: commons_file_page_url(page_url),
+            });
             images.push(image);
         }
         if images.len() >= 5 { break; }
     }
-    (images, attribution)
+    (images, attributions)
 }
 
 fn commons_file_page_url(value: &str) -> String {
@@ -725,6 +726,7 @@ mod tests {
                 slideshow_frames: Vec::new(),
                 slideshow_sequence: Vec::new(),
                 image_attribution: None,
+                image_attributions: Vec::new(),
             };
             assert_eq!(weather.icon_name(), expected);
         }
