@@ -1,7 +1,6 @@
 use crate::fritz::{
     FritzDevice, FritzFetchResult, FritzInternetBandwidth, FritzReading, FritzSettings,
-    TemperatureAlertThresholds,
-    discover_devices, fetch_fritz_data,
+    TemperatureAlertThresholds, discover_devices, fetch_fritz_data,
 };
 use crate::weather::{WeatherData, WeatherForecast, fetch_weather, fetch_weather_forecast};
 use cosmic::iced::{
@@ -860,7 +859,8 @@ fn total_power_overview(
                     .width(cosmic::iced::Length::Fill)
                     .push(widget::text::caption(axis_start))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                    .push(widget::text::caption("Now")),            );
+                    .push(widget::text::caption("Now")),
+            );
         let input_content = widget::Column::new()
             .spacing(8)
             .width(cosmic::iced::Length::Fill)
@@ -1313,11 +1313,7 @@ impl cosmic::Application for AppModel {
                     "weather",
                     panel_item(
                         "Weather",
-                        Some(
-                            widget::icon::from_name(weather.icon_name())
-                                .size(10)
-                                .into(),
-                        ),
+                        Some(widget::icon::from_name(weather.icon_name()).size(10).into()),
                         self.core
                             .applet
                             .text(format!("{:.0} °C", weather.temperature_c))
@@ -1382,10 +1378,12 @@ impl cosmic::Application for AppModel {
                 let (download, upload) = self
                     .internet_bandwidth
                     .as_ref()
-                    .map(|bandwidth| (
-                        format_bandwidth(bandwidth.download_bits_per_second),
-                        format_bandwidth(bandwidth.upload_bits_per_second),
-                    ))
+                    .map(|bandwidth| {
+                        (
+                            format_bandwidth(bandwidth.download_bits_per_second),
+                            format_bandwidth(bandwidth.upload_bits_per_second),
+                        )
+                    })
                     .unwrap_or_else(|| ("-- Mbps".to_string(), "-- Mbps".to_string()));
                 // Keep the Mbps values right-aligned in a compact column,
                 // with a modest gap after each direction icon.
@@ -1406,31 +1404,34 @@ impl cosmic::Application for AppModel {
                             .align_x(cosmic::iced::alignment::Horizontal::Right),
                         )
                 };
-                let bandwidth_rows: cosmic::Element<'static, Message> = if self.settings.panel_multiline {
-                    widget::Column::new()
-                        .spacing(0)
-                        .push(bandwidth_row("go-down-symbolic", download))
-                        .push(bandwidth_row("go-up-symbolic", upload))
-                        .into()
-                } else {
-                    widget::Row::new()
-                        .spacing(4)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(bandwidth_row("go-down-symbolic", download))
-                        .push(bandwidth_row("go-up-symbolic", upload))
-                        .into()
-                };
-                let bandwidth_item = widget::container(bandwidth_rows)
-                    .padding([0, 0, 0, 2]);
+                let bandwidth_rows: cosmic::Element<'static, Message> =
+                    if self.settings.panel_multiline {
+                        widget::Column::new()
+                            .spacing(0)
+                            .push(bandwidth_row("go-down-symbolic", download))
+                            .push(bandwidth_row("go-up-symbolic", upload))
+                            .into()
+                    } else {
+                        widget::Row::new()
+                            .spacing(4)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(bandwidth_row("go-down-symbolic", download))
+                            .push(bandwidth_row("go-up-symbolic", upload))
+                            .into()
+                    };
+                let bandwidth_item = widget::container(bandwidth_rows).padding([0, 0, 0, 2]);
                 panel_items.push((
                     "internet-bandwidth",
-                    self.core.applet.applet_tooltip(
-                        bandwidth_item,
-                        "Internet bandwidth",
-                        false,
-                        Message::TooltipSurfaceAction,
-                        self.core.main_window_id(),
-                    ).into(),
+                    self.core
+                        .applet
+                        .applet_tooltip(
+                            bandwidth_item,
+                            "Internet bandwidth",
+                            false,
+                            Message::TooltipSurfaceAction,
+                            self.core.main_window_id(),
+                        )
+                        .into(),
                 ));
             }
             if let Some(temperature) = temperature {
@@ -1477,13 +1478,23 @@ impl cosmic::Application for AppModel {
         if weather_item.is_some() || temperature_item.is_some() {
             let rows: cosmic::Element<'static, Message> = if self.settings.panel_multiline {
                 let mut rows = widget::Column::new().spacing(0);
-                if let Some(item) = weather_item { rows = rows.push(item); }
-                if let Some(item) = temperature_item { rows = rows.push(item); }
+                if let Some(item) = weather_item {
+                    rows = rows.push(item);
+                }
+                if let Some(item) = temperature_item {
+                    rows = rows.push(item);
+                }
                 rows.into()
             } else {
-                let mut rows = widget::Row::new().spacing(4).align_y(cosmic::iced::Alignment::Center);
-                if let Some(item) = weather_item { rows = rows.push(item); }
-                if let Some(item) = temperature_item { rows = rows.push(item); }
+                let mut rows = widget::Row::new()
+                    .spacing(4)
+                    .align_y(cosmic::iced::Alignment::Center);
+                if let Some(item) = weather_item {
+                    rows = rows.push(item);
+                }
+                if let Some(item) = temperature_item {
+                    rows = rows.push(item);
+                }
                 rows.into()
             };
             panel_groups.push((vec!["weather", "temperature"], rows));
@@ -1491,13 +1502,23 @@ impl cosmic::Application for AppModel {
         if power_item.is_some() || solar_item.is_some() {
             let rows: cosmic::Element<'static, Message> = if self.settings.panel_multiline {
                 let mut rows = widget::Column::new().spacing(0);
-                if let Some(item) = power_item { rows = rows.push(item); }
-                if let Some(item) = solar_item { rows = rows.push(item); }
+                if let Some(item) = power_item {
+                    rows = rows.push(item);
+                }
+                if let Some(item) = solar_item {
+                    rows = rows.push(item);
+                }
                 rows.into()
             } else {
-                let mut rows = widget::Row::new().spacing(4).align_y(cosmic::iced::Alignment::Center);
-                if let Some(item) = power_item { rows = rows.push(item); }
-                if let Some(item) = solar_item { rows = rows.push(item); }
+                let mut rows = widget::Row::new()
+                    .spacing(4)
+                    .align_y(cosmic::iced::Alignment::Center);
+                if let Some(item) = power_item {
+                    rows = rows.push(item);
+                }
+                if let Some(item) = solar_item {
+                    rows = rows.push(item);
+                }
                 rows.into()
             };
             panel_groups.push((vec!["power-consumption", "solar-power"], rows));
@@ -2579,7 +2600,8 @@ impl cosmic::Application for AppModel {
                     }
                     if let Some(error) = &self.weather_forecast_error {
                         weather_section =
-                            weather_section.push(error_notice("FORECAST UNAVAILABLE", error));                    }
+                            weather_section.push(error_notice("FORECAST UNAVAILABLE", error));
+                    }
                     if let Some(forecast) = &self.weather_forecast {
                         for day in &forecast.days {
                             let date_label =
@@ -2688,27 +2710,39 @@ impl cosmic::Application for AppModel {
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
                                 .push(widget::icon::from_name("go-down-symbolic").size(16))
-                                .push(widget::text::caption("DOWNLOAD").width(cosmic::iced::Length::Fill))
-                                .push(widget::text::body(format_bandwidth(bandwidth.download_bits_per_second))),
+                                .push(
+                                    widget::text::caption("DOWNLOAD")
+                                        .width(cosmic::iced::Length::Fill),
+                                )
+                                .push(widget::text::body(format_bandwidth(
+                                    bandwidth.download_bits_per_second,
+                                ))),
                         )
                         .push(
                             widget::Row::new()
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
                                 .push(widget::icon::from_name("go-up-symbolic").size(16))
-                                .push(widget::text::caption("UPLOAD").width(cosmic::iced::Length::Fill))
-                                .push(widget::text::body(format_bandwidth(bandwidth.upload_bits_per_second))),
+                                .push(
+                                    widget::text::caption("UPLOAD")
+                                        .width(cosmic::iced::Length::Fill),
+                                )
+                                .push(widget::text::body(format_bandwidth(
+                                    bandwidth.upload_bits_per_second,
+                                ))),
                         )
                 } else {
                     widget::Column::new()
                         .padding([8, 12])
-                        .push(widget::text::caption(if self.refresh_started_at.is_some() {
-                            "Waiting for bandwidth data…"
-                        } else if self.error.is_some() {
-                            "Bandwidth data unavailable"
-                        } else {
-                            "Waiting for bandwidth data…"
-                        }))
+                        .push(widget::text::caption(
+                            if self.refresh_started_at.is_some() {
+                                "Waiting for bandwidth data…"
+                            } else if self.error.is_some() {
+                                "Bandwidth data unavailable"
+                            } else {
+                                "Waiting for bandwidth data…"
+                            },
+                        ))
                 };
                 menu_cards.push(("bandwidth".to_string(), bandwidth_card.into()));
                 // The settings list is authoritative for popup device order.
@@ -3087,13 +3121,18 @@ impl cosmic::Application for AppModel {
                                 .weather
                                 .as_ref()
                                 .map(|weather| format!("{:.0} °C", weather.temperature_c)),
-                            "bandwidth" => Some(self.internet_bandwidth.as_ref().map(|bandwidth| {
-                                format!(
-                                    "↓{:.1} ↑{:.1}",
-                                    bandwidth.download_bits_per_second as f64 / 1_000_000.0,
-                                    bandwidth.upload_bits_per_second as f64 / 1_000_000.0,
-                                )
-                            }).unwrap_or_else(|| "…".to_string())),
+                            "bandwidth" => Some(
+                                self.internet_bandwidth
+                                    .as_ref()
+                                    .map(|bandwidth| {
+                                        format!(
+                                            "↓{:.1} ↑{:.1}",
+                                            bandwidth.download_bits_per_second as f64 / 1_000_000.0,
+                                            bandwidth.upload_bits_per_second as f64 / 1_000_000.0,
+                                        )
+                                    })
+                                    .unwrap_or_else(|| "…".to_string()),
+                            ),
                             _ => None,
                         }
                     } else {
@@ -3170,7 +3209,9 @@ impl cosmic::Application for AppModel {
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
                                 .push(widget::text::caption("SETTINGS"))
-                                .push(widget::icon::from_name("preferences-system-symbolic").size(20)),
+                                .push(
+                                    widget::icon::from_name("preferences-system-symbolic").size(20),
+                                ),
                         )
                         .on_press(Message::ToggleSettings)
                         .padding([8, 12])
@@ -3495,7 +3536,8 @@ impl cosmic::Application for AppModel {
                                 }
                             }
                             self.readings = readings;
-                            if let Err(error) =                                crate::history::save(&self.history, &self.device_history)
+                            if let Err(error) =
+                                crate::history::save(&self.history, &self.device_history)
                             {
                                 eprintln!("Could not persist graph history: {error}");
                             }
