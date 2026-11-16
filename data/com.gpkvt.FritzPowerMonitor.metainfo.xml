@@ -44,6 +44,9 @@
     <keyword>monitor</keyword>
   </keywords>
   <releases>
+    <release version="0.6.1" date="2026-11-16">
+      <description><p>Restore the weather menu layout to its pre-PR #143 design.</p></description>
+    </release>
     <release version="0.3.0" date="2026-11-16">
       <description><p>Major feature and usability update.</p></description>
     </release>
