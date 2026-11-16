@@ -2440,14 +2440,10 @@ impl cosmic::Application for AppModel {
                             }),
                         );
                     weather_section = weather_section
-                        .push(widget::divider::horizontal::default())
                         .push(
                             widget::Row::new()
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::text::title3(format!(
-                                    "{forecast_days}-day forecast"
-                                )))
                                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                                 .push(forecast_range_selector),
                         )
