@@ -39,6 +39,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Graph history" => "Diagrammverlauf",
         "Automatic refresh" => "Automatische Aktualisierung",
         "Weather" => "Wetter",
+        "Photo" => "Foto:",
         "Connection" => "Verbindung",
         "Devices" => "Geräte",
         "Menu order" => "Menüreihenfolge",
