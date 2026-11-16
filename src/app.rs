@@ -1437,7 +1437,7 @@ impl cosmic::Application for AppModel {
                         ),
                         self.core
                             .applet
-                            .text(format!("{:.0}°", weather.temperature_c))
+                            .text(format!("{:.0} °C", weather.temperature_c))
                             .size(f32::from(self.settings.panel_text_size))
                             .into(),
                     )
@@ -2546,7 +2546,7 @@ impl cosmic::Application for AppModel {
                                 .push(widget::text::caption(weather.location_name.clone())),
                         )
                         .push(widget::text::title2(format!(
-                            "{:.0}°",
+                            "{:.0} °C",
                             weather.temperature_c
                         )))
                         .push(
@@ -2703,7 +2703,7 @@ impl cosmic::Application for AppModel {
                                         .width(cosmic::iced::Length::Fixed(82.0))
                                         .align_x(cosmic::iced::Alignment::End)
                                         .push(widget::text::body(format!(
-                                            "{:.0}° / {:.0}°",
+                                            "{:.0} °C / {:.0} °C",
                                             day.max_temperature_c, day.min_temperature_c
                                         ))),
                                 )
@@ -3143,7 +3143,7 @@ impl cosmic::Application for AppModel {
                             "weather" => self
                                 .weather
                                 .as_ref()
-                                .map(|weather| format!("{:.0}°", weather.temperature_c)),
+                                .map(|weather| format!("{:.0} °C", weather.temperature_c)),
                             "power-difference" => {
                                 let has_inputs = self.readings.iter().any(|reading| {
                                     self.settings.input_ains.contains(
