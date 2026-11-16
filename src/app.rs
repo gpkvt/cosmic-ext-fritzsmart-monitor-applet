@@ -497,8 +497,7 @@ fn graph_visual_with_dimensions(
                 .push(widget::text::caption(format!("MIN {minimum:.1} {unit}")))
                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                 .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
-        )        .push(graph)
-        .into()
+        )        .push(graph)        .into()
 }
 
 fn interactive_graph(
@@ -511,7 +510,8 @@ fn interactive_graph(
     let graph = widget::Row::new()
         .align_y(cosmic::iced::Alignment::Center)
         .push(graph_visual(values.iter().copied(), style, unit))
-        .push(widget::icon::from_name("zoom-in-symbolic").size(16));
+        .push(widget::icon::from_name("zoom-in-symbolic").size(16))
+        .push(widget::text::caption(crate::i18n::tr("Open graph")));
     widget::button::custom(graph)
         .on_press(Message::ShowGraph(title.to_string(), values, unit.to_string()))
         .padding(0)
@@ -997,8 +997,7 @@ fn settings_section_details(section: &'static str) -> (&'static str, &'static st
             "Choose how much power history is displayed",
         ),
         "refresh" => (            "Automatic refresh",
-            "Control how often device readings update",
-        ),
+            "Control how often device readings update",        ),
         "weather" => ("Weather", "Show local weather alongside power readings"),
         "connection" => ("Connection", "FRITZ!Box address and security settings"),
         "device" => ("Devices", "Select and configure monitored devices"),
@@ -1497,8 +1496,7 @@ impl cosmic::Application for AppModel {
                 ));
             }
 
-            if self.settings.panel_internet_bandwidth {
-                let (download, upload) = self
+            if self.settings.panel_internet_bandwidth {                let (download, upload) = self
                     .internet_bandwidth
                     .as_ref()
                     .map(|bandwidth| {
@@ -1997,8 +1995,7 @@ impl cosmic::Application for AppModel {
                                 .on_press(Message::GraphStyleChanged("bar".into())),
                             ),
                     )
-                    .push(widget::divider::horizontal::default())
-                    .push(widget::text::caption(format!(
+                    .push(widget::divider::horizontal::default())                    .push(widget::text::caption(format!(
                         "{}: {}",
                         crate::i18n::tr(&self.settings.language, "GRAPH HISTORY"),
                         format_graph_timespan(self.settings.graph_timespan_minutes)
@@ -2497,8 +2494,7 @@ impl cosmic::Application for AppModel {
                 } else if let Some(remaining) = self
                     .next_refresh_at
                     .map(|deadline| deadline.saturating_duration_since(Instant::now()))
-                    .filter(|remaining| {
-                        !remaining.is_zero() && *remaining < Duration::from_secs(10)
+                    .filter(|remaining| {                        !remaining.is_zero() && *remaining < Duration::from_secs(10)
                     })
                 {
                     countdown_action_button(remaining.as_secs().saturating_add(1))
@@ -2997,8 +2993,7 @@ impl cosmic::Application for AppModel {
                         let toggle = widget::toggler(is_on);
                         if can_toggle {
                             toggle
-                                .on_toggle(move |requested| {
-                                    Message::SetDevicePower(ain.clone(), requested)
+                                .on_toggle(move |requested| {                                    Message::SetDevicePower(ain.clone(), requested)
                                 })
                                 .into()
                         } else {
@@ -3497,8 +3492,7 @@ impl cosmic::Application for AppModel {
                                 Message::QuickGraphTimespanPreview(
                                     quick_slider_value(position, GRAPH_ANCHORS).round() as u32,
                                 )
-                            },
-                        )
+                            },                        )
                         .step(0.01)
                         .on_release(Message::CommitQuickGraphTimespan),
                     )
@@ -3997,8 +3991,7 @@ impl cosmic::Application for AppModel {
                 match result {
                     Ok(weather) => {
                         self.weather = Some(weather);
-                        self.weather_error = None;
-                    }
+                        self.weather_error = None;                    }
                     Err(error) => {
                         self.weather_error = Some(error);
                     }
@@ -4497,8 +4490,7 @@ mod history_tests {
         assert_eq!(keep_value_unit_together("Unknown".into()), "Unknown");
     }
 
-    #[test]
-    fn average_temperature_uses_all_available_selected_readings() {
+    #[test]    fn average_temperature_uses_all_available_selected_readings() {
         let readings = vec![
             FritzReading {
                 ain: "111111".into(),
