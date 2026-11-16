@@ -14,7 +14,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  # A failed release workflow_run must not cancel a pending push deployment.
+  group: pages-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
