@@ -1313,7 +1313,6 @@ impl cosmic::Application for AppModel {
                 )
             });
 
-        let suggested = self.core.applet.suggested_size(true);
 
         // Keep a compact icon-to-value gap inside each item. The configured row
         // spacing is the only gap between items, including when it is set to zero.
