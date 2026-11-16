@@ -4221,7 +4221,8 @@ mod history_tests {
         assert_eq!(graph_history_window(2000), Duration::from_secs(120_000));
         assert_eq!(graph_history_window(2_102_400), Duration::from_secs(126_144_000));
         assert_eq!(max_history_samples(graph_history_window(60)), 13);
-        assert_eq!(max_history_samples(graph_history_window(2_102_400)), 420_481);
+        assert_eq!(graph_sample_interval(graph_history_window(2_102_400)), Duration::from_secs(2523));
+        assert_eq!(max_history_samples(graph_history_window(2_102_400)), 49_998);
     }
 
     #[test]
