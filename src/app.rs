@@ -1236,10 +1236,14 @@ impl cosmic::Application for AppModel {
         _flags: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
         let settings = FritzSettings::load().unwrap_or_default();
+        let (history, device_history) =
+            crate::history::load(graph_history_window(settings.graph_timespan_minutes));
         (
             Self {
                 core,
                 settings,
+                history,
+                device_history,
                 refresh_started_at: Some(Instant::now()),
                 ..Default::default()
             },
@@ -3212,6 +3216,11 @@ impl cosmic::Application for AppModel {
                                 }
                             }
                             self.readings = readings;
+                            if let Err(error) =
+                                crate::history::save(&self.history, &self.device_history)
+                            {
+                                eprintln!("Could not persist graph history: {error}");
+                            }
                             self.error = None;
                             self.updated =
                                 Some(chrono::Local::now().format("%H:%M:%S").to_string());
@@ -3405,6 +3414,11 @@ impl cosmic::Application for AppModel {
                         samples
                             .retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
                     }
+                    if let Err(error) =
+                        crate::history::save(&self.history, &self.device_history)
+                    {
+                        eprintln!("Could not persist graph history: {error}");
+                    }
                     self.persist_settings();
                 }
             }
@@ -3529,6 +3543,11 @@ impl cosmic::Application for AppModel {
                     .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
                 for samples in self.device_history.values_mut() {
                     samples.retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
+                }
+                if let Err(error) =
+                    crate::history::save(&self.history, &self.device_history)
+                {
+                    eprintln!("Could not persist graph history: {error}");
                 }
                 self.persist_settings();
             }
