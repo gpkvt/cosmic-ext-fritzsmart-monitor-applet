@@ -80,7 +80,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         }
         "Show internet bandwidth" => "Internet-Bandbreite anzeigen",
         "Combine consumption and solar power" => "Stromverbrauch und Solarleistung kombinieren",
-        "Show one net power value: total consumption minus solar generation." => "Einen Nettoleistungswert anzeigen: Gesamtverbrauch minus Solarerzeugung.",
+        "Show one net power value: total consumption minus solar generation." => {
+            "Einen Nettoleistungswert anzeigen: Gesamtverbrauch minus Solarerzeugung."
+        },
         "Average temperature" => "Durchschnittstemperatur",
         "Exclude solar devices" => "Solargeräte ausschließen",
         "Ignore temperatures from devices whose name contains “solar” when calculating the average." => {

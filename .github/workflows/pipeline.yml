@@ -362,6 +362,7 @@ jobs:
       issues: write
       actions: read
     steps:
+      - uses: actions/checkout@v7
       - name: Create or update pipeline failure issue
         env:
           GH_TOKEN: ${{ github.token }}
