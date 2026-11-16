@@ -2175,24 +2175,25 @@ impl cosmic::Application for AppModel {
                 let uses_https = endpoint.to_ascii_lowercase().starts_with("https://");
                 let (tls_status, tls_ok) = if uses_https {
                     if self.settings.allow_invalid_certs {
-                        ("Certificate validation disabled".to_string(), Some(false))
+                        (crate::i18n::tr(&self.settings.language, "Certificate validation disabled").to_string(), Some(false))
                     } else if !self.settings.ca_cert_path.trim().is_empty() {
-                        ("Custom CA certificate configured".to_string(), Some(true))
+                        (crate::i18n::tr(&self.settings.language, "Custom CA certificate configured").to_string(), Some(true))
                     } else {
-                        ("System certificate roots".to_string(), Some(true))
+                        (crate::i18n::tr(&self.settings.language, "System certificate roots").to_string(), Some(true))
                     }
                 } else if endpoint.to_ascii_lowercase().starts_with("http://") {
-                    ("Plain HTTP · TLS is not enabled".to_string(), Some(false))
+                    (crate::i18n::tr(&self.settings.language, "Plain HTTP · TLS is not enabled").to_string(), Some(false))
                 } else {
-                    ("URL is invalid or not configured".to_string(), None)
+                    (crate::i18n::tr(&self.settings.language, "URL is invalid or not configured").to_string(), None)
                 };
                 content = content
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::title3(crate::i18n::tr(&self.settings.language, "Connection security")))
                     .push(diagnostic_status_row(crate::i18n::tr(&self.settings.language, "HTTPS / TLS"), &tls_status, tls_ok))
                     .push(widget::text::caption(format!(
-                        "FRITZ!Box: {}",
-                        if endpoint.is_empty() { "Not configured" } else { endpoint }
+                        "{}: {}",
+                        crate::i18n::tr(&self.settings.language, "FRITZ!Box"),
+                        if endpoint.is_empty() { crate::i18n::tr(&self.settings.language, "Not configured") } else { endpoint }
                     )))
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::title3(crate::i18n::tr(&self.settings.language, "External resources")))
@@ -2219,12 +2220,12 @@ impl cosmic::Application for AppModel {
                     (crate::i18n::tr(&self.settings.language, "Not configured"), None)
                 } else if let Some(weather) = &self.weather {
                     if weather.background_image.is_some() {
-                        ("Image loaded", Some(true))
+                        (crate::i18n::tr(&self.settings.language, "Image loaded"), Some(true))
                     } else {
-                        ("No usable image loaded", Some(false))
+                        (crate::i18n::tr(&self.settings.language, "No usable image loaded"), Some(false))
                     }
                 } else if self.weather_error.is_some() {
-                    ("Weather request failed", Some(false))
+                    (crate::i18n::tr(&self.settings.language, "Weather request failed"), Some(false))
                 } else {
                     (crate::i18n::tr(&self.settings.language, "Not checked yet"), None)
                 };
@@ -2237,11 +2238,11 @@ impl cosmic::Application for AppModel {
                 let forecast_status = if !self.settings.weather_enabled {
                     (crate::i18n::tr(&self.settings.language, "Not configured"), None)
                 } else if self.weather_forecast.is_some() {
-                    ("Forecast loaded", Some(true))
+                    (crate::i18n::tr(&self.settings.language, "Forecast loaded"), Some(true))
                 } else if self.weather_forecast_error.is_some() {
                     (crate::i18n::tr(&self.settings.language, "Latest request failed"), Some(false))
                 } else {
-                    ("Not checked · request a forecast to test", None)
+                    (crate::i18n::tr(&self.settings.language, "Not checked · request a forecast to test"), None)
                 };
                 content = content.push(diagnostic_status_row(
                     crate::i18n::tr(&self.settings.language, "Open-Meteo · forecast and geocoding"),
@@ -2258,9 +2259,9 @@ impl cosmic::Application for AppModel {
                         .find(|request| request.path == path)
                         .map(|request| {
                             if (200..300).contains(&request.status) {
-                                (format!("HTTP {} · successful", request.status), Some(true))
+                                (format!("{} {} · {}", crate::i18n::tr(&self.settings.language, "HTTP"), request.status, crate::i18n::tr(&self.settings.language, "HTTP successful")), Some(true))
                             } else {
-                                (format!("HTTP {} · failed", request.status), Some(false))
+                                (format!("{} {} · {}", crate::i18n::tr(&self.settings.language, "HTTP"), request.status, crate::i18n::tr(&self.settings.language, "HTTP failed")), Some(false))
                             }
                         })
                         .unwrap_or_else(|| ("Not checked yet".to_string(), None))
@@ -2268,9 +2269,9 @@ impl cosmic::Application for AppModel {
                 let fritz_base_status = if endpoint.is_empty() {
                     ("Base URL not configured".to_string(), None)
                 } else if self.error.is_none() && !self.readings.is_empty() {
-                    ("Connected · device data loaded".to_string(), Some(true))
+                    (crate::i18n::tr(&self.settings.language, "Connected · device data loaded").to_string(), Some(true))
                 } else if let Some(error) = &self.error {
-                    (format!("Connection failed · {error}"), Some(false))
+                    (format!("{} · {error}", crate::i18n::tr(&self.settings.language, "Connection failed")), Some(false))
                 } else {
                     ("Not checked yet".to_string(), None)
                 };
