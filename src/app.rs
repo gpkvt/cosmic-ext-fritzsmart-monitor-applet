@@ -714,16 +714,8 @@ fn live_power_summary(
     power: String,
     temperature: Option<String>,
 ) -> cosmic::Element<'static, Message> {
-    let title = "CURRENT POWER";
-    // Keep the heading on its own full-width row so the power and
-    // temperature values share the same baseline beneath it.
-    let heading = widget::Row::new()
-        .spacing(8)
-        .width(cosmic::iced::Length::Fill)
-        .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(18))
-        .push(widget::text::caption(title));
-
+    // The section already identifies these readings; avoid repeating a
+    // separate "Current power" heading above the values.
     let mut values = widget::Row::new()
         .spacing(12)
         .width(cosmic::iced::Length::Fill)
@@ -742,9 +734,7 @@ fn live_power_summary(
     }
 
     let metrics = widget::Column::new()
-        .spacing(4)
         .width(cosmic::iced::Length::Fill)
-        .push(heading)
         .push(values);
 
     let content = widget::Column::new()
