@@ -788,20 +788,22 @@ fn total_power_section(
 ) -> cosmic::Element<'static, Message> {
     // Match the compact metric tiles used by Power difference, while keeping
     // input and output independently collapsible.
-    let heading = widget::Row::new()
+    let mut heading = widget::Row::new()
         .spacing(6)
         .align_y(cosmic::iced::Alignment::Center)
         .push(widget::text::caption(title))
-        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-        .push(widget::text::title3(keep_value_unit_together(format!("{value_w} W"))))
-        .push(
-            widget::icon::from_name(if collapsed {
-                "go-next-symbolic"
-            } else {
-                "go-down-symbolic"
-            })
-            .size(14),
-        );
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill));
+    if collapsed {
+        heading = heading.push(widget::text::title3(keep_value_unit_together(format!("{value_w} W"))));
+    }
+    let heading = heading.push(
+        widget::icon::from_name(if collapsed {
+            "go-next-symbolic"
+        } else {
+            "go-down-symbolic"
+        })
+        .size(14),
+    );
     let heading = widget::button::custom(heading)
         .on_press(Message::ToggleMenuSection(section_id.into()))
         .width(cosmic::iced::Length::Fill)
