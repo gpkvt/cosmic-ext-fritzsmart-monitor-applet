@@ -1398,12 +1398,12 @@ impl cosmic::Application for AppModel {
             let mut item = widget::Row::new()
                 .spacing(0)
                 .align_y(cosmic::iced::Alignment::Center);
-            // Keep a consistent, compact 20px leading slot for every reading.
-            // Items without an icon must not shift their value left.
+            // Keep the icon close to its value while preserving a consistent
+            // 16px leading slot, including for readings without an icon.
             let icon_slot = widget::container(icon.unwrap_or_else(|| widget::text("").into()))
-                .width(cosmic::iced::Length::Fixed(20.0))
+                .width(cosmic::iced::Length::Fixed(16.0))
                 .height(cosmic::iced::Length::Fixed(24.0))
-                .center_x(20)
+                .center_x(16)
                 .center_y(24);
             item = item.push(icon_slot);
             let value_slot = widget::container(value)
