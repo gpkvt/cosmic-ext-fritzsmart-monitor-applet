@@ -1376,9 +1376,12 @@ impl cosmic::Application for AppModel {
                 panel_item(
                     "Power consumption",
                     Some(
-                        widget::icon::from_name("electricity-symbolic")
-                            .size(self.settings.panel_text_size.into())
-                            .into(),
+                        widget::svg(widget::svg::Handle::from_memory(
+                            br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5M16 3v5"/><path d="M6 8h12v3a6 6 0 0 1-6 6h0a6 6 0 0 1-6-6V8Z"/><path d="M12 17v2a3 3 0 0 0 3 3h1"/></svg>"#.to_vec(),
+                        ))
+                        .width(16)
+                        .height(16)
+                        .into(),
                     ),
                     self.core
                         .applet
@@ -1393,7 +1396,14 @@ impl cosmic::Application for AppModel {
                     "solar-power",
                     panel_item(
                         "Solar power",
-                        None,
+                        Some(
+                            widget::svg(widget::svg::Handle::from_memory(
+                                br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2-5h14l2 5H3Z"/><path d="M4 9h16l-2 11H6L4 9Z"/><path d="M8 9l1 11M16 9l-1 11M5 13h14M6 17h12"/><path d="M12 1v2M2 5l2 1M22 5l-2 1"/></svg>"#.to_vec(),
+                            ))
+                            .width(16)
+                            .height(16)
+                            .into(),
+                        ),
                         self.core
                             .applet
                             .text(input_power)
@@ -1424,7 +1434,10 @@ impl cosmic::Application for AppModel {
             }
         }
         for item_id in &self.settings.panel_order {
-            if let Some(index) = panel_items.iter().position(|(id, _)| *id == item_id.as_str()) {
+            if let Some(index) = panel_items
+                .iter()
+                .position(|(id, _)| *id == item_id.as_str())
+            {
                 let (_, item) = panel_items.remove(index);
                 content = content.push(item);
             }
@@ -1791,11 +1804,11 @@ impl cosmic::Application for AppModel {
             }
 
             if self.active_settings_section == Some("panel-order") {
-                content = content
-                    .push(widget::text::body("Panel item order"))
-                    .push(widget::text::caption(
+                content = content.push(widget::text::body("Panel item order")).push(
+                    widget::text::caption(
                         "Move each reading independently. Changes are saved automatically.",
-                    ));
+                    ),
+                );
                 for (index, item) in self.settings.panel_order.iter().enumerate() {
                     let id = match item.as_str() {
                         "weather" => "weather",
@@ -1807,9 +1820,20 @@ impl cosmic::Application for AppModel {
                     let mut row = widget::Row::new()
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::body(panel_item_label(id)).width(cosmic::iced::Length::Fill));
-                    row = row.push(icon_action_button("+", "Move up", Message::MovePanelItem(id, true)));
-                    row = row.push(icon_action_button("−", "Move down", Message::MovePanelItem(id, false)));
+                        .push(
+                            widget::text::body(panel_item_label(id))
+                                .width(cosmic::iced::Length::Fill),
+                        );
+                    row = row.push(icon_action_button(
+                        "+",
+                        "Move up",
+                        Message::MovePanelItem(id, true),
+                    ));
+                    row = row.push(icon_action_button(
+                        "−",
+                        "Move down",
+                        Message::MovePanelItem(id, false),
+                    ));
                     content = content.push(row);
                     if index + 1 < self.settings.panel_order.len() {
                         content = content.push(widget::divider::horizontal::default());
