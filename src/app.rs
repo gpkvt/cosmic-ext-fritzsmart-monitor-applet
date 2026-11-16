@@ -497,8 +497,7 @@ fn rebuild_input_power_history(
             for (timestamp, power_w, _) in history {
                 *samples.entry(*timestamp).or_default() += signed_device_power(*power_w, true);
             }
-        }
-    }
+        }    }
     samples.into_iter().collect()
 }
 
@@ -997,8 +996,7 @@ fn power_difference_overview(
                         format!("{high} W"),
                         "go-up-symbolic",
                     ))
-                    .width(cosmic::iced::Length::Fill),
-                ),
+                    .width(cosmic::iced::Length::Fill),                ),
         );
     }
     let graph = widget::Column::new()
@@ -1497,8 +1495,7 @@ impl cosmic::Application for AppModel {
                 .position(|(id, _)| *id == item_id.as_str())
             {
                 let (_, item) = panel_items.remove(index);
-                content = content.push(item);
-            }
+                content = content.push(item);            }
         }
         // Keep connection health visible even when the popup is closed.
         if self.error.is_some() {
@@ -1997,8 +1994,7 @@ impl cosmic::Application for AppModel {
                                     })),
                             );
                         if let Some(thresholds) = alert_thresholds {
-                            device_row = device_row
-                                .push(widget::text::caption(format!(
+                            device_row = device_row                                .push(widget::text::caption(format!(
                                     "Upper limit: {} °C",
                                     thresholds.high_c
                                 )))
@@ -2291,106 +2287,95 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::body(format!("Sunset  {sunset}")));
                 let weather_info_collapsed =
                     self.collapsed_menu_sections.contains("weather-info");
+                let weather_header_row: cosmic::Element<'_, Message> = widget::Row::new()
+                    .width(cosmic::iced::Length::Fill)
+                    .align_y(cosmic::iced::Alignment::Start)
+                    .spacing(8)
+                    .push(widget::text::title3(weather.location_name.clone()))
+                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                    .push(widget::text::title2(format!("{:.0}°C", weather.temperature_c)))
+                    .push(
+                        widget::button::custom(
+                            widget::icon::from_name(if weather_info_collapsed {
+                                "go-next-symbolic"
+                            } else {
+                                "go-down-symbolic"
+                            })
+                            .size(16),
+                        )
+                        .on_press(Message::ToggleMenuSection("weather-info".into()))
+                        .padding(4)
+                        .class(cosmic::theme::Button::Standard),
+                    )
+                    .into();
+                let weather_details_panel: cosmic::Element<'_, Message> =
+                    widget::container(weather_details)
+                        .width(cosmic::iced::Length::Fill)
+                        .padding(10)
+                        .style(|_| cosmic::iced::widget::container::Style {
+                            background: Some(
+                                cosmic::iced::Color::from_rgba(0.025, 0.035, 0.05, 0.78).into(),
+                            ),
+                            text_color: Some(cosmic::iced::Color::WHITE),
+                            ..Default::default()
+                        })
+                        .into();
                 let weather_header_content: cosmic::Element<'_, Message> =
                     if let Some(image_bytes) = &weather.background_image {
+                        let expanded_height = if weather_info_collapsed { 112.0 } else { 390.0 };
                         let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
                             image_bytes.clone(),
                         ))
                         .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fixed(112.0))
+                        .height(cosmic::iced::Length::Fixed(expanded_height))
                         .content_fit(cosmic::iced::ContentFit::Cover);
-                        let header_overlay = widget::container(
-                            widget::Row::new()
-                                .width(cosmic::iced::Length::Fill)
-                                .align_y(cosmic::iced::Alignment::Center)
-                                .spacing(8)
-                                .push(widget::text::title3(weather.location_name.clone()))
-                                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                .push(widget::text::title2(format!("{:.0}°C", weather.temperature_c)))
-                                .push(
-                                    widget::button::custom(widget::icon::from_name(
-                                        if weather_info_collapsed {
-                                            "go-next-symbolic"
-                                        } else {
-                                            "go-down-symbolic"
-                                        },
-                                    ).size(16))
-                                    .on_press(Message::ToggleMenuSection("weather-info".into()))
-                                    .padding(7)
-                                    .class(cosmic::theme::Button::Standard),
+                        let mut overlay = widget::Column::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .spacing(8)
+                            .push(weather_header_row);
+                        if !weather_info_collapsed {
+                            overlay = overlay.push(weather_details_panel);
+                        }
+                        let overlay = widget::container(overlay)
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(expanded_height))
+                            .padding(8)
+                            .style(|_| cosmic::iced::widget::container::Style {
+                                background: Some(
+                                    cosmic::iced::Color::from_rgba(0.025, 0.035, 0.05, 0.38).into(),
                                 ),
-                        )
-                        .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fixed(112.0))
-                        .padding(12)
-                        .style(|_| cosmic::iced::widget::container::Style {
-                            background: Some(
-                                cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.48).into(),
-                            ),
-                            text_color: Some(cosmic::iced::Color::WHITE),
-                            ..Default::default()
-                        });
+                                text_color: Some(cosmic::iced::Color::WHITE),
+                                ..Default::default()
+                            });
                         cosmic::iced::widget::Stack::new()
                             .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(112.0))
+                            .height(cosmic::iced::Length::Fixed(expanded_height))
                             .push(photo)
-                            .push(header_overlay)
+                            .push(overlay)
                             .into()
                     } else {
-                        widget::container(
-                            widget::Row::new()
-                                .width(cosmic::iced::Length::Fill)
-                                .align_y(cosmic::iced::Alignment::Center)
-                                .spacing(8)
-                                .push(widget::text::title3(weather.location_name.clone()))
-                                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                .push(widget::text::title2(format!("{:.0}°C", weather.temperature_c)))
-                                .push(
-                                    widget::button::custom(widget::icon::from_name(
-                                        if weather_info_collapsed {
-                                            "go-next-symbolic"
-                                        } else {
-                                            "go-down-symbolic"
-                                        },
-                                    ).size(16))
-                                    .on_press(Message::ToggleMenuSection("weather-info".into()))
-                                    .padding(7)
-                                    .class(cosmic::theme::Button::Standard),
-                                ),
-                        )
-                        .width(cosmic::iced::Length::Fill)
-                        .padding(12)
-                        .style(|theme| {
-                            let cosmic = theme.cosmic();
-                            cosmic::iced::widget::container::Style {
-                                background: Some(
-                                    cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
-                                ),
-                                ..Default::default()
-                            }
-                        })
-                        .into()
+                        let mut content = widget::Column::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .spacing(8)
+                            .push(weather_header_row);
+                        if !weather_info_collapsed {
+                            content = content.push(weather_details_panel);
+                        }
+                        widget::container(content)
+                            .width(cosmic::iced::Length::Fill)
+                            .padding(8)
+                            .style(|theme| {
+                                let cosmic = theme.cosmic();
+                                cosmic::iced::widget::container::Style {
+                                    background: Some(
+                                        cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
+                                    ),
+                                    ..Default::default()
+                                }
+                            })
+                            .into()
                     };
-                let details_content: cosmic::Element<'_, Message> =
-                    widget::container(weather_details)
-                        .width(cosmic::iced::Length::Fill)
-                        .padding(10)
-                        .style(|theme| {
-                            let cosmic = theme.cosmic();
-                            cosmic::iced::widget::container::Style {
-                                background: Some(
-                                    cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
-                                ),
-                                ..Default::default()
-                            }
-                        })
-                        .into();
                 weather_section = weather_section.push(weather_header_content);
-                if !weather_info_collapsed {
-                    weather_section = weather_section
-                        .push(widget::divider::horizontal::default())
-                        .push(details_content);
-                }
                 let forecast_toggle = widget::button::custom(
                     widget::Row::new()
                         .width(cosmic::iced::Length::Fill)
@@ -2497,8 +2482,7 @@ impl cosmic::Application for AppModel {
                                     widget::Column::new()
                                         .width(cosmic::iced::Length::Fixed(82.0))
                                         .align_x(cosmic::iced::Alignment::End)
-                                        .push(widget::text::body(format!(
-                                            "{:.0}° / {:.0}°",
+                                        .push(widget::text::body(format!(                                            "{:.0}° / {:.0}°",
                                             day.max_temperature_c, day.min_temperature_c
                                         ))),
                                 )
@@ -2997,7 +2981,6 @@ impl cosmic::Application for AppModel {
             if let Some(weather_card) = weather_menu_card.take() {
                 content = content.push(weather_card);
             }
-
             let remaining = self
                 .next_refresh_at
                 .map(|deadline| deadline.saturating_duration_since(Instant::now()));
@@ -3497,8 +3480,7 @@ impl cosmic::Application for AppModel {
                 };
                 let target = if move_up {
                     index.checked_sub(1)
-                } else if index + 1 < order.len() {
-                    Some(index + 1)
+                } else if index + 1 < order.len() {                    Some(index + 1)
                 } else {
                     None
                 };
@@ -3997,8 +3979,7 @@ mod history_tests {
         assert!(!temperature_outside_limits(40.0, thresholds));
         assert!(temperature_outside_limits(40.1, thresholds));
         assert!(!temperature_outside_limits(-10.0, thresholds));
-        assert!(temperature_outside_limits(-10.1, thresholds));
-        assert!(!temperature_outside_limits(20.0, thresholds));
+        assert!(temperature_outside_limits(-10.1, thresholds));        assert!(!temperature_outside_limits(20.0, thresholds));
     }
 
     #[test]
