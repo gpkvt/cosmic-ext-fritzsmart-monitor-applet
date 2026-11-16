@@ -3073,7 +3073,30 @@ impl cosmic::Application for AppModel {
                     .push(date_row);
                 if self.weather_attribution_expanded {
                     for credit in current_attributions {
-                        weather_details = weather_details
+                        weather_details = weather_details.push(widget::text::caption(format!(
+                            "{} {} · {} · {}",
+                            crate::i18n::tr(&self.settings.language, "Photo"),
+                            credit.title,
+                            credit.artist,
+                            credit.license
+                        )));
+                        weather_details = weather_details.push(
+                            widget::button::custom(widget::text::caption("Wikimedia Commons file page ↗"))
+                                .on_press(Message::OpenCommonsPage(credit.page_url.clone()))
+                                .padding([2, 6])
+                                .class(cosmic::theme::Button::Text),
+                        );
+                        if let Some(license_url) = &credit.license_url {
+                            weather_details = weather_details.push(
+                                widget::button::custom(widget::text::caption("License terms ↗"))
+                                    .on_press(Message::OpenCommonsPage(license_url.clone()))
+                                    .padding([2, 6])
+                                    .class(cosmic::theme::Button::Text),
+                            );
+                        }
+                    }
+                }
+                weather_details = weather_details
                     .push(
                         widget::Row::new()
                             .spacing(10)
