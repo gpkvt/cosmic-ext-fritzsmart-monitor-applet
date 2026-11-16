@@ -80,14 +80,16 @@
     .hero-shot:nth-of-type(8){--card-index:7;--card-transform:rotate(25deg) translateY(15px)}
     @keyframes card-deal{from{opacity:0;transform:translateY(115px) scale(.78)}to{opacity:1;transform:var(--card-transform)}}
     .hero-shot:not(.is-revealed):hover,.hero-shot:not(.is-revealed):focus-visible{z-index:30!important;transform:translateY(-54px) rotate(0deg) scale(1.12);border-color:var(--mint);box-shadow:0 30px 60px #000c,0 0 0 2px #8be0c455}
+    .hero-gallery:has(.hero-shot.is-revealed){z-index:1001}
     .hero-shot.is-revealed{position:fixed;left:50%;top:50%;bottom:auto;width:min(82vw,960px);height:min(78vh,700px);z-index:1002;padding:14px;border-color:var(--mint);box-shadow:0 38px 120px #000e,0 0 0 1px #8be0c488;transform:translate(-50%,-50%) rotateY(360deg) scale(1);animation:card-magic-reveal .92s cubic-bezier(.2,.8,.2,1) both;cursor:pointer}
+    .hero-gallery.cards-dealt .hero-shot.is-revealed{animation:card-magic-reveal .92s cubic-bezier(.2,.8,.2,1) both}
     .hero-shot.is-revealed img{height:82%;object-fit:contain}
     .hero-shot.is-revealed .hero-card-title{font-size:17px;padding:13px 8px 3px}
     .hero-shot.is-revealed .hero-card-type{font-size:11px;padding:4px 8px}
     body.magic-card-open:before{content:"";position:fixed;inset:0;z-index:1000;background:#05080de8;backdrop-filter:blur(9px)}
     @keyframes card-magic-reveal{0%{opacity:1;transform:translate(-50%,-50%) rotateY(0deg) scale(.48)}42%{opacity:1;transform:translate(-50%,-50%) rotateY(180deg) scale(.82)}100%{opacity:1;transform:translate(-50%,-50%) rotateY(360deg) scale(1)}}
     @media(max-width:700px){.hero-shot.is-revealed{width:92vw;height:min(72vh,620px);padding:8px}.hero-shot.is-revealed .hero-card-title{font-size:13px}.hero-shot.is-revealed .hero-card-type{font-size:9px}}
-    @media(prefers-reduced-motion:reduce){.hero-gallery.cards-dealt .hero-shot{animation:none;opacity:1;transform:var(--card-transform)}.hero-shot{transition:none}.hero-shot.is-revealed{animation:none;transform:translate(-50%,-50%) scale(1)}}
+    @media(prefers-reduced-motion:reduce){.hero-gallery.cards-dealt .hero-shot{animation:none;opacity:1;transform:var(--card-transform)}.hero-gallery.cards-dealt .hero-shot.is-revealed{animation:none;transform:translate(-50%,-50%) scale(1)}.hero-shot{transition:none}}
   </style>
 </head>
 <body>
