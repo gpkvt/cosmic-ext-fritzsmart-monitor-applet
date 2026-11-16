@@ -175,7 +175,7 @@ impl Default for FritzSettings {
             menu_order: default_menu_order(),
             panel_order: default_panel_order(),
             device_order: Vec::new(),
-            collapsed_menu_sections: Vec::new(),
+            collapsed_menu_sections: vec!["internet-bandwidth".into()],
             expanded_devices: Vec::new(),
             quick_options_expanded: false,
             weather_forecast_expanded: false,
@@ -470,7 +470,11 @@ impl FritzSettings {
             menu_order: parse_menu_order(&get("MENU_ORDER")),
             panel_order: parse_panel_order(&get("PANEL_ORDER")),
             device_order: parse_device_order(&get("DEVICE_ORDER")),
-            collapsed_menu_sections: parse_collapsed_menu_sections(&get("COLLAPSED_MENU_SECTIONS")),
+            collapsed_menu_sections: if values.contains_key("COLLAPSED_MENU_SECTIONS") {
+                parse_collapsed_menu_sections(&get("COLLAPSED_MENU_SECTIONS"))
+            } else {
+                vec!["internet-bandwidth".into()]
+            },
             expanded_devices: parse_expanded_devices(&get("EXPANDED_DEVICES")),
             quick_options_expanded: get("QUICK_OPTIONS_EXPANDED").eq_ignore_ascii_case("true"),
             weather_forecast_expanded: get("WEATHER_FORECAST_EXPANDED")
@@ -1292,6 +1296,14 @@ mod tests {
         assert_eq!(parse_settings_section("diagnostics"), "diagnostics");
         assert!(parse_settings_section("unknown").is_empty());
         assert!(parse_settings_section("").is_empty());
+    }
+
+    #[test]
+    fn internet_bandwidth_is_collapsed_by_default() {
+        assert_eq!(
+            FritzSettings::default().collapsed_menu_sections,
+            vec!["internet-bandwidth".to_string()]
+        );
     }
 
     #[test]
