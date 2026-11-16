@@ -3751,9 +3751,13 @@ impl cosmic::Application for AppModel {
                                     .as_ref()
                                     .map(|bandwidth| {
                                         format!(
-                                            "↓{:.1} ↑{:.1}",
-                                            bandwidth.download_bits_per_second as f64 / 1_000_000.0,
-                                            bandwidth.upload_bits_per_second as f64 / 1_000_000.0,
+                                            "↓{} ↑{}",
+                                            format_compact_decimal(
+                                                bandwidth.download_bits_per_second as f64 / 1_000_000.0,
+                                            ),
+                                            format_compact_decimal(
+                                                bandwidth.upload_bits_per_second as f64 / 1_000_000.0,
+                                            ),
                                         )
                                     })
                                     .unwrap_or_else(|| "…".to_string()),
