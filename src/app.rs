@@ -1503,11 +1503,13 @@ impl cosmic::Application for AppModel {
                         format_bandwidth(bandwidth.upload_bits_per_second),
                     ))
                     .unwrap_or_else(|| ("-- Mbps".to_string(), "-- Mbps".to_string()));
+                // Bandwidth needs more room than a normal single-value item:
+                // each row contains a direction icon and a full Mbps value.
                 let bandwidth_rows = widget::Column::new()
                     .spacing(0)
                     .push(
                         widget::Row::new()
-                            .width(cosmic::iced::Length::Fixed(88.0))
+                            .width(cosmic::iced::Length::Fixed(144.0))
                             .spacing(3)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::icon::from_name("go-down-symbolic").size(10))
@@ -1519,7 +1521,7 @@ impl cosmic::Application for AppModel {
                     )
                     .push(
                         widget::Row::new()
-                            .width(cosmic::iced::Length::Fixed(88.0))
+                            .width(cosmic::iced::Length::Fixed(144.0))
                             .spacing(3)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::icon::from_name("go-up-symbolic").size(10))
@@ -1529,9 +1531,27 @@ impl cosmic::Application for AppModel {
                                     .align_x(cosmic::iced::alignment::Horizontal::Right),
                             ),
                     );
+                let bandwidth_item = widget::Row::new()
+                    .spacing(0)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(
+                        widget::container(widget::text(""))
+                            .width(cosmic::iced::Length::Fixed(20.0))
+                            .height(cosmic::iced::Length::Fixed(24.0)),
+                    )
+                    .push(
+                        widget::container(bandwidth_rows)
+                            .width(cosmic::iced::Length::Fixed(144.0)),
+                    );
                 panel_items.push((
                     "internet-bandwidth",
-                    panel_item("Internet bandwidth", None, bandwidth_rows.into()).into(),
+                    self.core.applet.applet_tooltip(
+                        bandwidth_item,
+                        "Internet bandwidth",
+                        false,
+                        Message::TooltipSurfaceAction,
+                        self.core.main_window_id(),
+                    ).into(),
                 ));
             }
             if let Some(temperature) = temperature {
