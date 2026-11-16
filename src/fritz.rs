@@ -213,6 +213,10 @@ fn default_menu_order() -> Vec<String> {
 }
 
 fn parse_menu_order(value: &str) -> Vec<String> {
+    if value.trim().is_empty() {
+        return default_menu_order();
+    }
+
     let mut order: Vec<String> = value
         .split(',')
         .map(str::trim)
