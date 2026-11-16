@@ -209,6 +209,12 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "rain" => "Regen",
         "Move device up" => "Gerät nach oben verschieben",
         "Move device down" => "Gerät nach unten verschieben",
+        "FRITZ!Box device unavailable" => "FRITZ!Box-Gerät nicht verfügbar",
+        "FRITZ!Box devices unavailable" => "FRITZ!Box-Geräte nicht verfügbar",
+        "High temperature" => "Hohe Temperatur",
+        "Low temperature" => "Niedrige Temperatur",
+        "maximum" => "Maximum",
+        "minimum" => "Minimum"
         _ => key,
     }
 }
