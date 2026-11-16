@@ -2347,20 +2347,6 @@ impl cosmic::Application for AppModel {
                         }
                     )));
 
-                let request_countdown = if self.refresh_started_at.is_some() {
-                    "Request in progress…".to_string()
-                } else {
-                    self.next_refresh_at
-                        .map(|deadline| {
-                            format!(
-                                "Next refresh in {}",
-                                format_countdown(
-                                    deadline.saturating_duration_since(Instant::now()).as_secs()
-                                )
-                            )
-                        })
-                        .unwrap_or_else(|| "Waiting for next refresh".to_string())
-                };
                 let refresh_indicator = if self.refresh_started_at.is_some() {
                     icon_action_button(
                         self.refresh_started_at
@@ -2384,10 +2370,7 @@ impl cosmic::Application for AppModel {
                     widget::Row::new()
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(
-                            widget::text::caption(request_countdown)
-                                .width(cosmic::iced::Length::Fill),
-                        )
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                         .push(refresh_indicator),
                 );
 
@@ -3241,19 +3224,10 @@ impl cosmic::Application for AppModel {
                 content = content.push(weather_card);
             }
 
-            let remaining = self
-                .next_refresh_at
-                .map(|deadline| deadline.saturating_duration_since(Instant::now()));
-            let countdown = remaining
-                .map(|duration| format_countdown(duration.as_secs()))
-                .unwrap_or_else(|| "Refreshing…".into());
-            let mut refresh_status = widget::Column::new().spacing(0).push(
+            content = content.push(
                 widget::Row::new()
                     .width(cosmic::iced::Length::Fill)
                     .align_y(cosmic::iced::Alignment::Center)
-                    .push(widget::text::caption(format!(
-                        "Next refresh in {countdown}"
-                    )))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                     .push(icon_action_button(
                         "⚙",
@@ -3261,13 +3235,6 @@ impl cosmic::Application for AppModel {
                         Message::ToggleQuickOptions,
                     )),
             );
-            if self.error.is_none() {
-                if let Some(updated) = &self.updated {
-                    refresh_status =
-                        refresh_status.push(widget::text::caption(format!("Updated at {updated}")));
-                }
-            }
-            content = content.push(refresh_status);
             if self.quick_options_expanded {
                 const REFRESH_ANCHORS: [f32; 5] = [30.0, 300.0, 900.0, 1800.0, 3600.0];
                 const GRAPH_ANCHORS: [f32; 5] = [5.0, 60.0, 1440.0, 43200.0, 2102400.0];
