@@ -3918,7 +3918,7 @@ mod history_tests {
     #[test]
     fn quick_setting_slider_maps_anchor_values_to_aligned_positions() {
         let refresh = [30.0, 300.0, 900.0, 1800.0, 3600.0];
-        let graph = [5.0, 60.0, 360.0, 720.0, 1440.0];
+        let graph = [5.0, 60.0, 1440.0, 43200.0, 2102400.0];
         for (position, value) in refresh.into_iter().enumerate() {
             assert!((quick_slider_position(value, refresh) - position as f32).abs() < 0.001);
             assert!((quick_slider_value(position as f32, refresh) - value).abs() < 0.001);
@@ -4240,6 +4240,7 @@ mod history_tests {
         assert_eq!(format_graph_timespan(60), "1 hour");
         assert_eq!(format_graph_timespan(90), "1h 30m");
         assert_eq!(format_graph_timespan(1440), "1 day");
+        assert_eq!(format_graph_timespan(2_102_400), "4 years");
     }
 
     #[test]
@@ -4248,22 +4249,23 @@ mod history_tests {
         assert_eq!(format_graph_axis_start(60), "1h ago");
         assert_eq!(format_graph_axis_start(90), "1h 30m ago");
         assert_eq!(format_graph_axis_start(1440), "1d ago");
+        assert_eq!(format_graph_axis_start(2_102_400), "4y ago");
     }
 
     #[test]
-    fn history_keeps_only_the_last_fifteen_minutes_and_sixteen_samples() {
+    fn history_keeps_five_minute_samples_within_the_last_fifteen_minutes() {
         let start = Instant::now();
         let mut history = VecDeque::new();
-        for minute in 0_u64..18 {
+        for sample in 0_u64..18 {
             record_power_sample(
                 &mut history,
-                minute as i64,
-                start + Duration::from_secs(minute * 60),
+                sample as i64,
+                start + Duration::from_secs(sample * 5 * 60),
                 Duration::from_secs(15 * 60),
             );
         }
-        assert_eq!(history.len(), 16);
-        assert_eq!(history.front().unwrap().1, 2);
+        assert_eq!(history.len(), 4);
+        assert_eq!(history.front().unwrap().1, 14);
         assert_eq!(history.back().unwrap().1, 17);
     }
 
