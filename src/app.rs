@@ -49,6 +49,7 @@ pub struct AppModel {
     weather_forecast_expanded: bool,
     quick_options_expanded: bool,
     expanded_devices: HashSet<String>,
+    collapsed_menu_sections: HashSet<String>,
     quick_refresh_interval: u32,
     quick_graph_timespan: u16,
     next_weather_refresh_at: Option<Instant>,
@@ -98,6 +99,7 @@ pub enum Message {
     OpenCommonsPage(String),
     ToggleQuickOptions,
     ToggleDeviceDetails(String),
+    ToggleMenuSection(String),
     MoveMenuElement(&'static str, bool),
     MovePanelItem(&'static str, bool),
     QuickRefreshIntervalPreview(u32),
@@ -2822,11 +2824,46 @@ impl cosmic::Application for AppModel {
                         .unwrap_or(usize::MAX)
                 });
                 let mut device_cards = widget::Column::new().spacing(0);
-                for (index, (_, card)) in menu_cards.into_iter().enumerate() {
+                for (index, (key, card)) in menu_cards.into_iter().enumerate() {
                     if index > 0 {
                         device_cards = device_cards.push(widget::divider::horizontal::default());
                     }
-                    device_cards = device_cards.push(card);
+                    if key.starts_with("2-") {
+                        // Device rows already use their own COSMIC disclosure control.
+                        device_cards = device_cards.push(card);
+                        continue;
+                    }
+                    let section = match key.as_str() {
+                        "0-summary" => ("summary", "Current power"),
+                        "1-weather" => ("weather", "Weather"),
+                        "3-total-power" => ("total-power", "Total power"),
+                        "4-power-difference" => ("power-difference", "Power difference"),
+                        _ => continue,
+                    };
+                    let collapsed = self.collapsed_menu_sections.contains(section.0);
+                    let heading = widget::button::custom(
+                        widget::Row::new()
+                            .spacing(8)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::text::body(section.1))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(widget::icon::from_name(if collapsed {
+                                "go-next-symbolic"
+                            } else {
+                                "go-down-symbolic"
+                            }).size(16)),
+                    )
+                    .on_press(Message::ToggleMenuSection(section.0.to_string()))
+                    .width(cosmic::iced::Length::Fill)
+                    .padding([8, 12])
+                    .class(cosmic::theme::Button::Text);
+                    let mut section_column = widget::Column::new()
+                        .spacing(0)
+                        .push(heading);
+                    if !collapsed {
+                        section_column = section_column.push(card);
+                    }
+                    device_cards = device_cards.push(section_column);
                 }
                 let device_list = widget::container(device_cards)
                     .width(cosmic::iced::Length::Fill)
@@ -3373,6 +3410,11 @@ impl cosmic::Application for AppModel {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
                 if !self.expanded_devices.remove(&key) {
                     self.expanded_devices.insert(key);
+                }
+            }
+            Message::ToggleMenuSection(section) => {
+                if !self.collapsed_menu_sections.remove(&section) {
+                    self.collapsed_menu_sections.insert(section);
                 }
             }
             Message::ToggleQuickOptions => {
