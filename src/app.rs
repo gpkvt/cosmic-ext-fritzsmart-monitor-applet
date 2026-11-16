@@ -753,6 +753,7 @@ fn total_power_overview(
     settings: &FritzSettings,
     history: &VecDeque<(Instant, i64)>,
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    collapsed_sections: &HashSet<String>,
 ) -> Option<cosmic::Element<'static, Message>> {
     let output_low = history.iter().map(|(_, value)| *value).min()?;
     let output_high = history.iter().map(|(_, value)| *value).max()?;
@@ -852,10 +853,33 @@ fn total_power_overview(
                 ),
         )
         .push(graph_panel(total_graph));
+    let output_collapsed = collapsed_sections.contains("total-power-output");
+    let output_heading = widget::button::custom(
+        widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::text::body("Total power out"))
+            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+            .push(widget::text::title3(format!("{total_power} W")))
+            .push(widget::icon::from_name(if output_collapsed {
+                "go-next-symbolic"
+            } else {
+                "go-down-symbolic"
+            }).size(16)),
+    )
+    .on_press(Message::ToggleMenuSection("total-power-output".into()))
+    .width(cosmic::iced::Length::Fill)
+    .padding([8, 12])
+    .class(cosmic::theme::Button::Text);
+    let mut output_section = widget::Column::new().spacing(0).push(output_heading);
+    if !output_collapsed {
+        output_section = output_section.push(output_column);
+    }
+
     let mut power_columns = widget::Column::new()
-        .spacing(12)
+        .spacing(8)
         .width(cosmic::iced::Length::Fill)
-        .push(output_column);
+        .push(output_section);
     if has_input_readings {
         let mut input_column = widget::Column::new()
             .spacing(8)
@@ -871,25 +895,41 @@ fn total_power_overview(
                     .spacing(8)
                     .width(cosmic::iced::Length::Fill)
                     .push(
-                        widget::container(range_metric_tile(
-                            "LOW",
-                            format!("{low} W"),
-                            "go-down-symbolic",
-                        ))
-                        .width(cosmic::iced::Length::Fill),
+                        widget::container(range_metric_tile("LOW", format!("{low} W"), "go-down-symbolic"))
+                            .width(cosmic::iced::Length::Fill),
                     )
                     .push(
-                        widget::container(range_metric_tile(
-                            "HIGH",
-                            format!("{high} W"),
-                            "go-up-symbolic",
-                        ))
-                        .width(cosmic::iced::Length::Fill),
+                        widget::container(range_metric_tile("HIGH", format!("{high} W"), "go-up-symbolic"))
+                            .width(cosmic::iced::Length::Fill),
                     ),
             );
         }
         input_column = input_column.push(graph_panel(input_graphs.into()));
-        power_columns = power_columns.push(input_column);
+        let input_collapsed = collapsed_sections.contains("total-power-input");
+        let input_heading = widget::button::custom(
+            widget::Row::new()
+                .spacing(8)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(widget::text::body("Total power in"))
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(widget::text::title3(format!("{} W", input_power_w(readings, &settings.input_ains))))
+                .push(widget::icon::from_name(if input_collapsed {
+                    "go-next-symbolic"
+                } else {
+                    "go-down-symbolic"
+                }).size(16)),
+        )
+        .on_press(Message::ToggleMenuSection("total-power-input".into()))
+        .width(cosmic::iced::Length::Fill)
+        .padding([8, 12])
+        .class(cosmic::theme::Button::Text);
+        let mut input_section = widget::Column::new().spacing(0).push(input_heading);
+        if !input_collapsed {
+            input_section = input_section.push(input_column);
+        }
+        power_columns = power_columns
+            .push(widget::divider::horizontal::default())
+            .push(input_section);
     }
     let content = widget::Column::new().spacing(10).push(power_columns);
     Some(surface_card(content.into(), 14))
@@ -2793,6 +2833,7 @@ impl cosmic::Application for AppModel {
                     &self.settings,
                     &self.history,
                     &self.device_history,
+                    &self.collapsed_menu_sections,
                 ) {
                     menu_cards.push(("3-total-power".to_string(), overview));
                 }
