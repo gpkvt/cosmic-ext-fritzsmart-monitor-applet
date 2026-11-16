@@ -75,7 +75,7 @@ for page in pages:
             fail(f"index.html: expected eight screenshot cards, found {hero_cards}")
         if '.hero-gallery .hero-shot{display:none}' in content:
             fail("index.html: screenshot deck must not be hidden")
-        for feature in ("card-deal", "openGallery(index)", "gallery-enter", "gallery-image-enter", ".hero-shot{", "border:1px solid #ffffff35"):
+        for feature in ("card-deal", "openGallery(index)", "gallery-enter", "gallery-image-enter", ".hero-shot:hover", "border-color:#8be0c4aa"):
             if feature not in content:
                 fail(f"index.html: screenshot gallery interaction or styling is missing {feature}")
         if ":hover" in re.search(r"\.hero-shot[^\n]*:hover[^\n]*", content).group(0) if re.search(r"\.hero-shot[^\n]*:hover[^\n]*", content) else False:
