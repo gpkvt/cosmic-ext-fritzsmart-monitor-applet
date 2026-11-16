@@ -133,6 +133,7 @@ pub struct FritzSettings {
     pub openweathermap_api_key: String,
     pub weather_location: String,
     pub weather_refresh_interval_minutes: u16,
+    pub weather_slideshow_interval_seconds: u16,
     pub menu_order: Vec<String>,
     pub hidden_menu_elements: Vec<String>,
     pub panel_order: Vec<String>,
@@ -173,6 +174,7 @@ impl Default for FritzSettings {
             openweathermap_api_key: String::new(),
             weather_location: String::new(),
             weather_refresh_interval_minutes: 10,
+            weather_slideshow_interval_seconds: 10,
             menu_order: default_menu_order(),
             hidden_menu_elements: Vec::new(),
             panel_order: default_panel_order(),
@@ -476,6 +478,10 @@ impl FritzSettings {
                 .parse::<u16>()
                 .unwrap_or(10)
                 .clamp(5, 60),
+            weather_slideshow_interval_seconds: get("WEATHER_SLIDESHOW_INTERVAL_SECONDS")
+                .parse::<u16>()
+                .unwrap_or(10)
+                .clamp(5, 300),
             menu_order: parse_menu_order(&get("MENU_ORDER")),
             hidden_menu_elements: parse_hidden_menu_elements(&get("HIDDEN_MENU_ELEMENTS")),
             panel_order: parse_panel_order(&get("PANEL_ORDER")),
@@ -548,7 +554,7 @@ impl FritzSettings {
             parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
         let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
-            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nSETTINGS_SECTION={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nSETTINGS_SECTION={}\n",
             match self.language.as_str() {
                 "de" => "de",
                 "en" => "en",
@@ -613,6 +619,7 @@ impl FritzSettings {
             self.openweathermap_api_key,
             self.weather_location,
             self.weather_refresh_interval_minutes.clamp(5, 60),
+            self.weather_slideshow_interval_seconds.clamp(5, 300),
             input_ains,
             if self.input_defaults_initialized {
                 "true"
