@@ -779,6 +779,43 @@ fn live_power_summary(
     surface_card(content.into(), 14)
 }
 
+fn total_power_section(
+    title: &'static str,
+    value_w: i64,
+    section_id: &'static str,
+    collapsed: bool,
+    content: cosmic::Element<'static, Message>,
+) -> cosmic::Element<'static, Message> {
+    let mut heading = widget::Row::new()
+        .spacing(8)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(widget::text::body(title))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill));
+    // Keep the live value visible in the compact row, but avoid duplicating it
+    // above the graph and range metrics while the section is expanded.
+    if collapsed {
+        heading = heading.push(widget::text::title3(format!("{value_w} W")));
+    }
+    heading = heading.push(
+        widget::icon::from_name(if collapsed {
+            "go-next-symbolic"
+        } else {
+            "go-down-symbolic"
+        })
+        .size(16),
+    );
+    let heading = widget::button::custom(heading)
+        .on_press(Message::ToggleMenuSection(section_id.into()))
+        .width(cosmic::iced::Length::Fill)
+        .padding([8, 12])
+        .class(cosmic::theme::Button::Text);
+    let mut section = widget::Column::new().spacing(0).push(heading);
+    if !collapsed {
+        section = section.push(content);
+    }
+    surface_card(section.into(), 14)
+}
+
 fn total_power_overview(
     readings: &[FritzReading],
     settings: &FritzSettings,
@@ -880,32 +917,16 @@ fn total_power_overview(
         )
         .push(graph_panel(total_graph));
     let output_collapsed = collapsed_sections.contains("total-power-output");
-    let output_heading = widget::button::custom(
-        widget::Row::new()
-            .spacing(8)
-            .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::text::body("Total power out"))
-            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-            .push(widget::text::title3(format!("{total_power} W")))
-            .push(widget::icon::from_name(if output_collapsed {
-                "go-next-symbolic"
-            } else {
-                "go-down-symbolic"
-            }).size(16)),
-    )
-    .on_press(Message::ToggleMenuSection("total-power-output".into()))
-    .width(cosmic::iced::Length::Fill)
-    .padding([8, 12])
-    .class(cosmic::theme::Button::Text);
-    let mut output_section = widget::Column::new().spacing(0).push(output_heading);
-    if !output_collapsed {
-        output_section = output_section.push(output_column);
-    }
-
-    let output_content = widget::Column::new().spacing(10).push(output_section);
+    let output_section = total_power_section(
+        "Total power out",
+        total_power,
+        "total-power-output",
+        output_collapsed,
+        output_column.into(),
+    );
     let mut sections = vec![(
         "3-total-power-output".to_string(),
-        surface_card(output_content.into(), 14),
+        output_section,
     )];
     if has_input_readings {
         let mut input_column = widget::Column::new()
@@ -922,26 +943,16 @@ fn total_power_overview(
         }
         input_column = input_column.push(graph_panel(input_graphs.into()));
         let input_collapsed = collapsed_sections.contains("total-power-input");
-        let input_heading = widget::button::custom(
-            widget::Row::new()
-                .spacing(8)
-                .align_y(cosmic::iced::Alignment::Center)
-                .push(widget::text::body("Total power in"))
-                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                .push(widget::text::title3(format!("{} W", input_power_w(readings, &settings.input_ains))))
-                .push(widget::icon::from_name(if input_collapsed { "go-next-symbolic" } else { "go-down-symbolic" }).size(16)),
-        )
-        .on_press(Message::ToggleMenuSection("total-power-input".into()))
-        .width(cosmic::iced::Length::Fill)
-        .padding([8, 12])
-        .class(cosmic::theme::Button::Text);
-        let mut input_section = widget::Column::new().spacing(0).push(input_heading);
-        if !input_collapsed {
-            input_section = input_section.push(input_column);
-        }
+        let input_section = total_power_section(
+            "Total power in",
+            input_power_w(readings, &settings.input_ains),
+            "total-power-input",
+            input_collapsed,
+            input_column.into(),
+        );
         sections.push((
             "4-total-power-input".to_string(),
-            surface_card(input_section.into(), 14),
+            input_section,
         ));
     }
     Some(sections)
