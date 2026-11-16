@@ -1050,7 +1050,9 @@ mod tests {
         assert_eq!(parse_graph_timespan_minutes("invalid"), 15);
         assert_eq!(parse_graph_timespan_minutes("1"), 5);
         assert_eq!(parse_graph_timespan_minutes("60"), 60);
-        assert_eq!(parse_graph_timespan_minutes("2000"), 1440);
+        assert_eq!(parse_graph_timespan_minutes("2000"), 2000);
+        assert_eq!(parse_graph_timespan_minutes("2102400"), 2_102_400);
+        assert_eq!(parse_graph_timespan_minutes("9999999"), 2_102_400);
     }
 
     #[test]
