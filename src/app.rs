@@ -2633,11 +2633,13 @@ impl cosmic::Application for AppModel {
                         None,
                     )
                 };
-                content = content.push(diagnostic_status_row(
-                    crate::i18n::tr(&self.settings.language, "OpenWeatherMap · current weather"),
-                    weather_provider_status.0,
-                    weather_provider_status.1,
-                ));
+                content = content
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "OpenWeatherMap · current weather"),
+                        weather_provider_status.0,
+                        weather_provider_status.1,
+                    ))
+                    .push(widget::text::caption("https://api.openweathermap.org/data/2.5/weather"));
 
                 let commons_status = if !self.settings.weather_enabled {
                     (
@@ -2673,7 +2675,7 @@ impl cosmic::Application for AppModel {
                         commons_status.0,
                         commons_status.1,
                     ))
-                    .push(widget::text::caption("https://commons.wikimedia.org/w/api.php"));
+                    .push(widget::text::caption("https://commons.wikimedia.org/w/api.php · thumbnail URL returned by the API"));
 
                 let forecast_status = if !self.settings.weather_enabled {
                     (
