@@ -497,7 +497,9 @@ fn graph_visual_with_dimensions(
                 .push(widget::text::caption(format!("MIN {minimum:.1} {unit}")))
                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                 .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
-        )        .push(graph)        .into()
+        )
+        .push(graph)
+        .into()
 }
 
 fn interactive_graph(
@@ -1499,7 +1501,8 @@ impl cosmic::Application for AppModel {
                 ));
             }
 
-            if self.settings.panel_internet_bandwidth {                let (download, upload) = self
+            if self.settings.panel_internet_bandwidth {
+                let (download, upload) = self
                     .internet_bandwidth
                     .as_ref()
                     .map(|bandwidth| {
@@ -1517,7 +1520,8 @@ impl cosmic::Application for AppModel {
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(
                             widget::container(widget::icon::from_name(icon).size(10))
-                                .width(cosmic::iced::Length::Fixed(12.0)),                        )
+                                .width(cosmic::iced::Length::Fixed(12.0)),
+                        )
                         .push(
                             // Keep the value and unit together at every configured
                             // font size; the panel row grows to fit instead of wrapping.
@@ -1920,7 +1924,8 @@ impl cosmic::Application for AppModel {
                         ).padding([8, 10])))
                     .push(
                         widget::Row::new()
-                            .align_y(cosmic::iced::Alignment::Center)                            .push(
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
                                 widget::Column::new()
                                     .spacing(3)
                                     .width(cosmic::iced::Length::Fill)
@@ -1998,7 +2003,8 @@ impl cosmic::Application for AppModel {
                                 .on_press(Message::GraphStyleChanged("bar".into())),
                             ),
                     )
-                    .push(widget::divider::horizontal::default())                    .push(widget::text::caption(format!(
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::caption(format!(
                         "{}: {}",
                         crate::i18n::tr(&self.settings.language, "GRAPH HISTORY"),
                         format_graph_timespan(self.settings.graph_timespan_minutes)
@@ -2497,7 +2503,8 @@ impl cosmic::Application for AppModel {
                 } else if let Some(remaining) = self
                     .next_refresh_at
                     .map(|deadline| deadline.saturating_duration_since(Instant::now()))
-                    .filter(|remaining| {                        !remaining.is_zero() && *remaining < Duration::from_secs(10)
+                    .filter(|remaining| {
+                        !remaining.is_zero() && *remaining < Duration::from_secs(10)
                     })
                 {
                     countdown_action_button(remaining.as_secs().saturating_add(1))
@@ -2998,7 +3005,8 @@ impl cosmic::Application for AppModel {
                         let toggle = widget::toggler(is_on);
                         if can_toggle {
                             toggle
-                                .on_toggle(move |requested| {                                    Message::SetDevicePower(ain.clone(), requested)
+                                .on_toggle(move |requested| {
+                                    Message::SetDevicePower(ain.clone(), requested)
                                 })
                                 .into()
                         } else {
@@ -3499,7 +3507,8 @@ impl cosmic::Application for AppModel {
                                 Message::QuickGraphTimespanPreview(
                                     quick_slider_value(position, GRAPH_ANCHORS).round() as u32,
                                 )
-                            },                        )
+                            },
+                        )
                         .step(0.01)
                         .on_release(Message::CommitQuickGraphTimespan),
                     )
@@ -3998,7 +4007,8 @@ impl cosmic::Application for AppModel {
                 match result {
                     Ok(weather) => {
                         self.weather = Some(weather);
-                        self.weather_error = None;                    }
+                        self.weather_error = None;
+                    }
                     Err(error) => {
                         self.weather_error = Some(error);
                     }
@@ -4515,7 +4525,8 @@ mod history_tests {
             },
         ];
         assert_eq!(average_temperature_c(&readings, false), Some(22.0));
-        assert_eq!(average_temperature_c(&readings, true), Some(22.0));        assert_eq!(average_temperature_c(&[], false), None);
+        assert_eq!(average_temperature_c(&readings, true), Some(22.0));
+        assert_eq!(average_temperature_c(&[], false), None);
     }
 
     #[test]
