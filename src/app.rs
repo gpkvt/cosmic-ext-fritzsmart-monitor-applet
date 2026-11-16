@@ -1523,28 +1523,30 @@ impl cosmic::Application for AppModel {
             if !self.settings.panel_net_power {
                 if let Some(input_power) = input_power {
                     panel_items.push((
-                    "solar-power",
-                    panel_item(
-                        "Solar power",
-                        Some(
-                            widget::svg(widget::svg::Handle::from_memory(
-                                br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2-5h14l2 5H3Z"/><path d="M4 9h16l-2 11H6L4 9Z"/><path d="M8 9l1 11M16 9l-1 11M5 13h14M6 17h12"/><path d="M12 1v2M2 5l2 1M22 5l-2 1"/></svg>"#.to_vec(),
-                            ))
-                            .width(10)
-                            .height(10)
-                            .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
-                            color: Some(theme.cosmic().on_bg_color().into()),
-                        }))
-                            .into(),
-                        ),
-                        self.core
-                            .applet
-                            .text(input_power)
-                            .size(f32::from(self.settings.panel_text_size))
-                            .into(),
-                    )
-                    .into(),
-                ));
+                        "solar-power",
+                        panel_item(
+                            "Solar power",
+                            Some(
+                                widget::svg(widget::svg::Handle::from_memory(
+                                    br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2-5h14l2 5H3Z"/><path d="M4 9h16l-2 11H6L4 9Z"/><path d="M8 9l1 11M16 9l-1 11M5 13h14M6 17h12"/><path d="M12 1v2M2 5l2 1M22 5l-2 1"/></svg>"#.to_vec(),
+                                ))
+                                .width(10)
+                                .height(10)
+                                .class(cosmic::theme::Svg::custom(|theme| {
+                                    cosmic::iced::widget::svg::Style {
+                                        color: Some(theme.cosmic().on_bg_color().into()),
+                                    }
+                                }))
+                                .into(),
+                            ),
+                            self.core
+                                .applet
+                                .text(input_power)
+                                .size(f32::from(self.settings.panel_text_size))
+                                .into(),
+                        )
+                        .into(),
+                    ));
                 }
             }
 
@@ -4913,6 +4915,8 @@ mod history_tests {
         let inputs = HashSet::from(["222222".to_string(), "333333".to_string()]);
         assert_eq!(input_power_w(&readings, &inputs), -350);
         assert_eq!(input_power_w(&readings, &HashSet::new()), 0);
+        assert_eq!(net_power_w(&readings, &inputs), 50);
+        assert_eq!(net_power_w(&readings, &HashSet::new()), 750);
     }
 
     #[test]
