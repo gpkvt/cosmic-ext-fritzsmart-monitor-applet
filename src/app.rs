@@ -1507,14 +1507,14 @@ impl cosmic::Application for AppModel {
                         widget::Row::new()
                             .spacing(3)
                             .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::icon::from_name("go-down-symbolic").size(10).into())
+                            .push(widget::icon::from_name("go-down-symbolic").size(10))
                             .push(widget::text::body(download).size(10)),
                     )
                     .push(
                         widget::Row::new()
                             .spacing(3)
                             .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::icon::from_name("go-up-symbolic").size(10).into())
+                            .push(widget::icon::from_name("go-up-symbolic").size(10))
                             .push(widget::text::body(upload).size(10)),
                     );
                 panel_items.push((
