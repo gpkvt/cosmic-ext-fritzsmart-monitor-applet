@@ -256,9 +256,9 @@ The API key is stored in the owner-only configuration file.
 - The popup shows net-power low/high values, per-device power and temperature
   sparklines, and a separate signed power graph for each input device.
 - Sparklines are evenly downsampled to 12 columns to fit their cards.
-- History is held in memory while the applet is running and is not persisted
-  across restarts. It cannot show production from before startup, daily yield,
-  forecasts or inverter-specific statistics.
+- Graph samples are stored locally and restored after restarting the applet. The
+  configured history window (5 minutes to 24 hours) is retained across restarts.
+  It cannot show daily yield, forecasts or inverter-specific statistics.
 - The FRITZ!Box device must expose both `powermeter/power` and
   `temperature/celsius` in its device XML.
 
