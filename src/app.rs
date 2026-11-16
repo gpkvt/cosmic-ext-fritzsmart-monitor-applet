@@ -3189,7 +3189,7 @@ impl cosmic::Application for AppModel {
                         ))
                         .width(cosmic::iced::Length::Fill)
                         .height(cosmic::iced::Length::Fixed(260.0))
-                        .content_fit(cosmic::iced::ContentFit::Cover);
+                        .content_fit(cosmic::iced::ContentFit::Contain);
                         let details = widget::container(weather_content)
                             .width(cosmic::iced::Length::Fill)
                             .height(cosmic::iced::Length::Fixed(260.0))
