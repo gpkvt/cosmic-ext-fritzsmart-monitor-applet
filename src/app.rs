@@ -470,6 +470,21 @@ fn average_temperature_c(readings: &[FritzReading], exclude_solar: bool) -> Opti
     (count > 0).then(|| sum / count as f64)
 }
 
+fn rebuild_input_power_history(
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    input_ains: &HashSet<String>,
+) -> VecDeque<(Instant, i64)> {
+    let mut samples = BTreeMap::<Instant, i64>::new();
+    for (ain, history) in device_history {
+        if input_ains.contains(ain) {
+            for (timestamp, power_w, _) in history {
+                *samples.entry(*timestamp).or_default() += signed_device_power(*power_w, true);
+            }
+        }
+    }
+    samples.into_iter().collect()
+}
+
 fn rebuild_output_power_history(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     input_ains: &HashSet<String>,
