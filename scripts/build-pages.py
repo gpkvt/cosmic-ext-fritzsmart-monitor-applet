@@ -26,8 +26,8 @@ def render(source: Path, destination: Path, title: str) -> None:
         extension_configs={"toc": {"permalink": True}},
         output_format="html5",
     )
+    body = converter.convert(text)
     body = re.sub(r"<h1\b[^>]*>.*?</h1>", "", body, count=1, flags=re.DOTALL)
-    body = re.sub(r"<h1\\b[^>]*>.*?</h1>", "", body, count=1, flags=re.DOTALL)
 
     # README images are written relative to the repository root, while the
     # generated page is served from docs/.
