@@ -204,6 +204,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "LAST" => "LETZTE",
         "Base URL not configured" => "Basis-URL nicht konfiguriert",
         "Configured devices" => "Konfigurierte Geräte",
+        "Panel text size" => "Panel-Schriftgröße",
+        "Panel item spacing" => "Abstand der Panel-Elemente",
+        "rain" => "Regen",
         _ => key,
     }
 }
