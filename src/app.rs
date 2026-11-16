@@ -2326,7 +2326,8 @@ impl cosmic::Application for AppModel {
                     .push(weather_summary)
                     .push(weather_details_toggle);
                 if !weather_details_collapsed {
-                    let details_panel = if let Some(image_bytes) = &weather.background_image {
+                    let details_panel: cosmic::Element<'_, Message> =
+                        if let Some(image_bytes) = &weather.background_image {
                         let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
                             image_bytes.clone(),
                         ))
