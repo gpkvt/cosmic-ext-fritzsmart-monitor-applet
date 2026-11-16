@@ -1738,7 +1738,7 @@ impl cosmic::Application for AppModel {
                     )
                     .push(quick_slider_anchor_labels(["5m", "1h", "1d", "30d", "4y"]))
                     .push(widget::text::caption(
-                        "5 minutes to 4 years. Samples are stored at up to 5-minute intervals.",
+                        "5 minutes to 4 years. Sampling adapts to retention, capped at about 50,000 samples per series.",
                     ))
                     .push(widget::divider::horizontal::default())
             }
