@@ -704,7 +704,6 @@ fn displayed_power_w(readings: &[FritzReading], selected_ains: &[String]) -> Opt
 
 fn live_power_summary(
     power: String,
-    input_power: Option<String>,
     temperature: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     let title = "CURRENT POWER";
@@ -740,13 +739,10 @@ fn live_power_summary(
         .push(heading)
         .push(values);
 
-    let mut content = widget::Column::new()
+    let content = widget::Column::new()
         .spacing(6)
         .width(cosmic::iced::Length::Fill)
         .push(metrics);
-    if let Some(input) = input_power {
-        content = content.push(metric_tile("TOTAL POWER INPUT", input, "go-down-symbolic"));
-    }
     surface_card(content.into(), 14)
 }
 
