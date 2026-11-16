@@ -359,9 +359,7 @@ async fn fetch_commons_background(
     // Do not let an unusable first search result hide valid photographs below it.
     for page in pages.values() {
         let info = &page["imageinfo"][0];
-        let image_url = info["thumburl"]
-            .as_str()
-            .or_else(|| info["url"].as_str());
+        let image_url = info["thumburl"].as_str().or_else(|| info["url"].as_str());
         let Some(image_url) = image_url else {
             continue;
         };
