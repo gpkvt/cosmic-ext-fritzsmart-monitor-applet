@@ -28,10 +28,6 @@ pub fn http_request_diagnostics() -> Vec<HttpRequestDiagnostic> {
         .unwrap_or_default()
 }
 
-fn record_http_response(url: &reqwest::Url, status: reqwest::StatusCode) {
-    record_http_response_with_method(url, status, "GET");
-}
-
 fn record_http_response_with_method(
     url: &reqwest::Url,
     status: reqwest::StatusCode,
@@ -646,11 +642,19 @@ fn is_complete_protocol_payload(bytes: &[u8]) -> bool {
 }
 
 async fn read_xml_response(
-    mut response: reqwest::Response,
+    response: reqwest::Response,
     context: &str,
 ) -> Result<String, String> {
+    read_xml_response_with_method(response, context, "GET").await
+}
+
+async fn read_xml_response_with_method(
+    mut response: reqwest::Response,
+    context: &str,
+    method: &'static str,
+) -> Result<String, String> {
     let status = response.status();
-    record_http_response(response.url(), status);
+    record_http_response_with_method(response.url(), status, method);
     if !status.is_success() {
         return Err(format!("{context}: HTTP {status}"));
     }
@@ -1069,7 +1073,13 @@ async fn fetch_internet_bandwidth(
     if !status.is_success() {
         return None;
     }
-    let xml = response.text().await.ok()?;
+    let xml = read_xml_response_with_method(
+        response,
+        "FRITZ!Box internet bandwidth request failed",
+        "POST",
+    )
+    .await
+    .ok()?;
     parse_internet_bandwidth(&xml)
 }
 
