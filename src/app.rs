@@ -1875,9 +1875,15 @@ impl cosmic::Application for AppModel {
                         values.len(),
                         format_graph_timespan(self.settings.graph_timespan_minutes)
                     )));
+                // Applet popup surfaces do not receive the normal desktop
+                // window background automatically. Apply COSMIC's window
+                // background style to the entire graph surface so it has a
+                // solid themed backdrop and the same rounded frame as native
+                // COSMIC application windows.
                 return widget::container(graph_page)
                     .width(cosmic::iced::Length::Fill)
                     .height(cosmic::iced::Length::Fill)
+                    .class(cosmic::theme::Container::WindowBackground)
                     .into();
             }
 
