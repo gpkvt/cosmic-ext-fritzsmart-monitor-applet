@@ -249,7 +249,7 @@ fn graph_history_window(minutes: u32) -> Duration {
 }
 
 const MAX_HISTORY_SAMPLES: u64 = 50_000;
-const MIN_HISTORY_SAMPLE_INTERVAL: Duration = Duration::from_secs(300);
+const MIN_HISTORY_SAMPLE_INTERVAL: Duration = Duration::from_secs(60);
 
 fn graph_sample_interval(window: Duration) -> Duration {
     let seconds = window.as_secs().div_ceil(MAX_HISTORY_SAMPLES);
@@ -4171,7 +4171,7 @@ mod history_tests {
     }
 
     #[test]
-    fn device_history_keeps_recent_five_minute_samples() {
+    fn device_history_keeps_recent_minute_samples() {
         let start = Instant::now();
         let mut history = HashMap::new();
         let reading = FritzReading {
@@ -4190,7 +4190,7 @@ mod history_tests {
             );
         }
         let samples = history.get("111111").unwrap();
-        assert_eq!(samples.len(), 3);
+        assert_eq!(samples.len(), 16);
         assert_eq!(samples.front().unwrap().1, 120);
         assert_eq!(samples.back().unwrap().2, 21.5);
     }
@@ -4220,7 +4220,7 @@ mod history_tests {
         assert_eq!(graph_history_window(0), Duration::from_secs(300));
         assert_eq!(graph_history_window(2000), Duration::from_secs(120_000));
         assert_eq!(graph_history_window(2_102_400), Duration::from_secs(126_144_000));
-        assert_eq!(max_history_samples(graph_history_window(60)), 13);
+        assert_eq!(max_history_samples(graph_history_window(60)), 61);
         assert_eq!(graph_sample_interval(graph_history_window(2_102_400)), Duration::from_secs(2523));
         assert_eq!(max_history_samples(graph_history_window(2_102_400)), 49_998);
     }
