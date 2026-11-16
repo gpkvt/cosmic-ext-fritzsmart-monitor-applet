@@ -93,6 +93,10 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Use current weather icon" => "Aktuelles Wettersymbol verwenden",
         "OpenWeatherMap API key" => "OpenWeatherMap-API-Schlüssel",
         "Location (city or latitude,longitude)" => "Standort (Stadt oder Breitengrad,Längengrad)",
+        "Slideshow image duration" => "Anzeigedauer je Diashow-Bild",
+        "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition." => {
+            "Jedes Foto wird vor dem Überblenden 5 Sekunden bis 5 Minuten angezeigt."
+        }
         "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location." => {
             "Unabhängig von der FRITZ!Box-Aktualisierung; Standard: 10 Minuten. API-Schlüssel und Standort erforderlich."
         }
