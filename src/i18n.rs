@@ -114,7 +114,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "On" => "Ein",
         "Off" => "Aus",
         "Enabled" => "Aktiviert",
-        "Disabled" => "Deaktiviert"
+        "Disabled" => "Deaktiviert",
         _ => key,
     }
 }
