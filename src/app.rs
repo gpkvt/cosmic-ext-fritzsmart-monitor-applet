@@ -519,13 +519,7 @@ fn graph_visual_with_dimensions(
                 .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
         )
         .push(graph)
-        .push(
-            widget::Row::new()
-                .width(cosmic::iced::Length::Fill)
-                .push(widget::text::caption(format!("CURRENT {current_value:.1} {unit}")))
-                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                .push(widget::text::caption(crate::i18n::tr("en", "Latest sample"))),
-        )
+        .push(widget::text::caption(format!("CURRENT {current_value:.1} {unit}")))
         .into()
 }
 
