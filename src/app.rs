@@ -1309,7 +1309,6 @@ impl cosmic::Application for AppModel {
                 )
             });
 
-
         // Keep a compact icon-to-value gap inside each item. The configured row
         // spacing is the only gap between items, including when it is set to zero.
         let panel_item = |label: &'static str,
