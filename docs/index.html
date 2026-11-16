@@ -310,7 +310,7 @@
           card.hidden=false;
           visiblePackages++;
         }
-        const archiveChecksum=release.assets.find(asset=>/^fritz-power-monitor-v.*-x86_64-unknown-linux-gnu\\.tar\\.gz\\.sha256$/.test(asset.name));
+        const archiveChecksum=release.assets.find(asset=>/^fritz-power-monitor-v.*-x86_64-unknown-linux-gnu\.tar\.gz\.sha256$/.test(asset.name));
         const archiveChecksumLink=document.getElementById('package-archive-checksum-link');
         if(archiveChecksum&&archiveChecksumLink){
           archiveChecksumLink.href=archiveChecksum.browser_download_url;
