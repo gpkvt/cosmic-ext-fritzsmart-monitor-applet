@@ -63,6 +63,7 @@ pub struct FritzReading {
     pub power_w: i64,
     pub temperature_c: f64,
     pub power_state: Option<bool>,
+    pub power_controllable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -848,6 +849,7 @@ fn parse_device_readings_xml(
             .unwrap_or("FRITZ!Box device")
             .trim()
             .to_string();
+        let power_controllable = device.children().any(|child| child.has_tag_name("switch"));
         let power_state =
             child_text(device, "switch", "state").and_then(|state| match state.trim() {
                 "1" => Some(true),
@@ -860,6 +862,7 @@ fn parse_device_readings_xml(
             power_w: power_mw / 1000,
             temperature_c,
             power_state,
+            power_controllable,
         });
     }
     readings.sort_by_key(|reading| {
@@ -986,15 +989,18 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
 
     // Query the dedicated switch-state endpoint: power-meter XML can lag behind
     // the actual actuator state on some FRITZ!Box devices.
-    let states = futures::future::join_all(
-        result
-            .readings
-            .iter()
-            .map(|reading| fetch_switch_state(&client, base, &sid, &reading.ain)),
-    )
+    let states = futures::future::join_all(result.readings.iter().map(|reading| async {
+        if reading.power_controllable {
+            fetch_switch_state(&client, base, &sid, &reading.ain).await
+        } else {
+            Ok(None)
+        }
+    }))
     .await;
     for (reading, state) in result.readings.iter_mut().zip(states) {
-        reading.power_state = state.unwrap_or(None);
+        if reading.power_controllable {
+            reading.power_state = state.unwrap_or(None);
+        }
     }
 
     Ok(result)
@@ -1363,6 +1369,7 @@ mod tests {
             );
             let reading = parse_device_xml(&xml, "123456789012").unwrap();
             assert_eq!(reading.power_state, expected);
+            assert!(reading.power_controllable);
         }
     }
 
