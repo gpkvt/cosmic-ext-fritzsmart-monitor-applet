@@ -172,7 +172,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "CONNECTION ERROR" => "VERBINDUNGSFEHLER",
         "Refresh · {}" => "Aktualisierung · {}",
         "Graph · {}" => "Diagramm · {}",
-        "FORECAST UNAVAILABLE" => "VORHERSAGE NICHT VERFÜGBAR"
+        "FORECAST UNAVAILABLE" => "VORHERSAGE NICHT VERFÜGBAR",
         "GRAPH HISTORY" => "DIAGRAMMVERLAUF",
         "AUTOMATIC REFRESH" => "AUTOMATISCHE AKTUALISIERUNG",
         "Graph" => "Diagramm",

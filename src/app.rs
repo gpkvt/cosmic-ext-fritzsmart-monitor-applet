@@ -501,6 +501,7 @@ fn graph_visual_with_dimensions(
 }
 
 fn interactive_graph(
+    language: &str,
     title: &str,
     values: impl Iterator<Item = f64>,
     style: &str,
@@ -511,7 +512,7 @@ fn interactive_graph(
         .align_y(cosmic::iced::Alignment::Center)
         .push(graph_visual(values.iter().copied(), style, unit))
         .push(widget::icon::from_name("zoom-in-symbolic").size(16))
-        .push(widget::text::caption(crate::i18n::tr("Open graph")));
+        .push(widget::text::caption(crate::i18n::tr(language, "Open graph")));
     widget::button::custom(graph)
         .on_press(Message::ShowGraph(title.to_string(), values, unit.to_string()))
         .padding(0)
@@ -855,6 +856,7 @@ fn total_power_overview(
         .spacing(4)
         .push(widget::text::caption("TOTAL POWER OUTPUT (W)"))
         .push(interactive_graph(
+            &settings.language,
             crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
             history.iter().map(|(_, value)| *value as f64),
             &settings.graph_style,
@@ -911,6 +913,7 @@ fn total_power_overview(
             .spacing(4)
             .push(widget::text::caption("TOTAL POWER INPUT (W)"))
             .push(interactive_graph(
+                &settings.language,
                 crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
                 input_history.iter().map(|(_, value)| *value as f64),
                 &settings.graph_style,
@@ -2934,6 +2937,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::divider::horizontal::default())
                         .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "DOWNLOAD HISTORY")))
                         .push(interactive_graph(
+                            &self.settings.language,
                             crate::i18n::tr(&self.settings.language, "DOWNLOAD HISTORY"),
                             self.bandwidth_history
                                 .iter()
@@ -2943,6 +2947,7 @@ impl cosmic::Application for AppModel {
                         ))
                         .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "UPLOAD HISTORY")))
                         .push(interactive_graph(
+                            &self.settings.language,
                             crate::i18n::tr(&self.settings.language, "UPLOAD HISTORY"),
                             self.bandwidth_history
                                 .iter()
@@ -3103,6 +3108,7 @@ impl cosmic::Application for AppModel {
                                                 .width(cosmic::iced::Length::Fill)
                                                 .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "POWER (W)")))
                                                 .push(interactive_graph(
+                                                    &self.settings.language,
                                                     &format!("{} · {}", reading.name, crate::i18n::tr(&self.settings.language, "POWER (W)")),
                                                     device_history.into_iter().flat_map(
                                                         |samples| {
@@ -3178,6 +3184,7 @@ impl cosmic::Application for AppModel {
                                                 .width(cosmic::iced::Length::Fill)
                                                 .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "TEMPERATURE (°C)")))
                                                 .push(interactive_graph(
+                                                    &self.settings.language,
                                                     &format!("{} · {}", reading.name, crate::i18n::tr(&self.settings.language, "TEMPERATURE (°C)")),
                                                     device_history.into_iter().flat_map(
                                                         |samples| {
