@@ -2196,7 +2196,9 @@ impl cosmic::Application for AppModel {
                     .push(widget::Row::new()
                         .spacing(8)
                         .push(widget::text::body("Session authentication").width(cosmic::iced::Length::Fill))
-                        .push(widget::text::caption(fritz_endpoint_status("/login_sid.lua"))))
+                        .push(widget::text::caption(fritz_endpoint_status(
+                            "/login_sid.lua",
+                        ))))
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "/login_sid.lua".to_string()
                     } else {
@@ -2205,7 +2207,9 @@ impl cosmic::Application for AppModel {
                     .push(widget::Row::new()
                         .spacing(8)
                         .push(widget::text::body("Device list and meter readings").width(cosmic::iced::Length::Fill))
-                        .push(widget::text::caption(fritz_endpoint_status("/webservices/homeautoswitch.lua"))))
+                        .push(widget::text::caption(fritz_endpoint_status(
+                            "/webservices/homeautoswitch.lua",
+                        ))))
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos".to_string()
                     } else {
@@ -2213,7 +2217,11 @@ impl cosmic::Application for AppModel {
                     }))
                     .push(widget::text::caption(format!(
                         "Configured devices: {}",
-                        self.settings.ains.len().max(usize::from(!self.settings.ain.trim().is_empty()))
+                        if self.settings.ains.is_empty() {
+                            if self.settings.ain.trim().is_empty() { 0 } else { 1 }
+                        } else {
+                            self.settings.ains.len()
+                        }
                     )))
                     .push(widget::text::caption(
                         "Per-device switch state uses the same endpoint with switchcmd=getswitchstate and an AIN parameter.",
