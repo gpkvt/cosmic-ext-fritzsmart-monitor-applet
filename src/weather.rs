@@ -758,7 +758,7 @@ mod tests {
             ("04d", "Overcast sky", true),
             ("04d", "Beautiful landscape at night", false),
             ("04d", "Rain clouds over the city", false),
-            ("02d", "Cloudy with a chance of meatballs", false),
+            ("02d", "Cloudy with a Chance of Meatballs movie poster", false),
             ("10d", "Heavy rain over a field", true),
             ("10d", "Cloudy sky over the coast", false),
             ("10d", "Thunderstorm with heavy rain", false),
