@@ -214,7 +214,8 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "High temperature" => "Hohe Temperatur",
         "Low temperature" => "Niedrige Temperatur",
         "maximum" => "Maximum",
-        "minimum" => "Minimum"
+        "minimum" => "Minimum",
+        "Close (Esc)" => "Schließen (Esc)",
         _ => key,
     }
 }
