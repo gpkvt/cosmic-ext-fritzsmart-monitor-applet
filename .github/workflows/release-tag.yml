@@ -126,28 +126,31 @@ jobs:
           set -euo pipefail
 
           if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
-            commit_message="$(jq -r '.head_commit.message // ""' "$GITHUB_EVENT_PATH")"
-            if [[ "$commit_message" == "chore(release): bump version to "* ]]; then
-              echo "The manual release run handles this version bump; skipping duplicate tag creation."
+            previous_version="$(git show "${GITHUB_SHA}^:Cargo.toml" 2>/dev/null | sed -n '/^\[package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' | head -n1 || true)"
+            event_version="$(git show "${GITHUB_SHA}:Cargo.toml" | sed -n '/^\[package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' | head -n1)"
+            if [[ -z "$event_version" || "$event_version" == "$previous_version" ]]; then
+              echo "Cargo.toml package version did not change; no release tag is needed."
               exit 0
             fi
           fi
 
-          version="$(sed -n '/^\[package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n1)"
+          # Tag the newest main commit that still carries this package version,
+          # not the older version-bump commit. This includes fixes merged while
+          # the tag workflow is queued.
+          git fetch origin main
+          version="$(git show origin/main:Cargo.toml | sed -n '/^\[package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' | head -n1)"
           if [[ -z "$version" ]]; then
-            echo "Could not read Cargo.toml package version" >&2
+            echo "Could not read Cargo.toml package version from main" >&2
             exit 1
+          fi
+
+          if [[ "${GITHUB_EVENT_NAME}" == "push" && "$version" != "$event_version" ]]; then
+            echo "main now contains version $version, superseding event version $event_version; skipping stale tag run."
+            exit 0
           fi
 
           tag="v${version}"
-          release_commit="$(git log --first-parent -G "^version = \"${version}\"" --format=%H -- Cargo.toml | head -n1)"
-          if [[ -z "$release_commit" ]]; then
-            echo "Could not find the commit that introduced $version" >&2
-            exit 1
-          fi
-
-          git config user.name "gpkvt"
-          git config user.email "git@21x9.org"
+          release_commit="$(git rev-parse origin/main)"
           if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
             git fetch origin "refs/tags/$tag:refs/tags/$tag"
             existing_commit="$(git rev-list -n1 "$tag")"
