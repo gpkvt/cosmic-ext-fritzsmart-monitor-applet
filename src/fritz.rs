@@ -1093,7 +1093,12 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     if settings.panel_internet_bandwidth {
         // WAN statistics are optional: unsupported firmware or a disabled UPnP
         // service must not interrupt Smart Home device monitoring.
-        result.internet_bandwidth = fetch_internet_bandwidth(&client, base).await;
+        result.internet_bandwidth = tokio::time::timeout(
+            Duration::from_secs(3),
+            fetch_internet_bandwidth(&client, base),
+        )
+        .await
+        .unwrap_or(None);
     }
 
     // Query the dedicated switch-state endpoint: power-meter XML can lag behind
