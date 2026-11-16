@@ -5002,8 +5002,8 @@ mod history_tests {
             power_w: 120,
             temperature_c: 21.5,
             power_state: None,
-                power_controllable: false,
-                power_toggle_allowed: false,
+            power_controllable: false,
+            power_toggle_allowed: false,
         };
         for minute in 0_u64..18 {
             record_device_sample(
