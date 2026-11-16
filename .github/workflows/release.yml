@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.tag_name || github.ref }}
+          ref: ${{ inputs.tag_name && 'main' || github.ref }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
