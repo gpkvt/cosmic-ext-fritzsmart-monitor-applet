@@ -1068,11 +1068,6 @@ async fn fetch_internet_bandwidth(
         .send()
         .await
         .ok()?;
-    let status = response.status();
-    record_http_response_with_method(response.url(), status, "POST");
-    if !status.is_success() {
-        return None;
-    }
     let xml = read_xml_response_with_method(
         response,
         "FRITZ!Box internet bandwidth request failed",
