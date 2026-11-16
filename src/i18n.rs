@@ -96,6 +96,26 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Select one or more devices in Settings" => "Wählen Sie ein oder mehrere Geräte in den Einstellungen aus",
         "SETTINGS" => "EINSTELLUNGEN",
         "QUICK SETTINGS" => "SCHNELLEINSTELLUNGEN"
+        "Power consumption" => "Stromverbrauch",
+        "Solar power" => "Solarleistung",
+        "Internet bandwidth" => "Internet-Bandbreite",
+        "Temperature" => "Temperatur",
+        "Live power summary" => "Aktuelle Leistungsübersicht",
+        "Total power out" => "Gesamte Leistungsabgabe",
+        "Total power in" => "Gesamte Leistungseinspeisung",
+        "Unknown item" => "Unbekanntes Element",
+        "Unknown element" => "Unbekanntes Element",
+        "Power consumption" => "Stromverbrauch",
+        "Move up" => "Nach oben",
+        "Move down" => "Nach unten",
+        "Load devices" => "Geräte laden",
+        "Search devices" => "Geräte suchen",
+        "Refresh" => "Aktualisieren",
+        "Connection error" => "Verbindungsfehler",
+        "On" => "Ein",
+        "Off" => "Aus",
+        "Enabled" => "Aktiviert",
+        "Disabled" => "Deaktiviert"
         _ => key,
     }
 }
