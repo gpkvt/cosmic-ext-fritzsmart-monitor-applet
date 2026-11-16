@@ -253,6 +253,16 @@
     const openGallery=index=>{showScreenshot(index??0);if(!screenshotDialog.open)screenshotDialog.showModal()};
     const heroGallery=document.querySelector('.hero-gallery');
     const heroCards=[...document.querySelectorAll('.hero-shot')];
+    const seenHeroImages=new Set();
+    heroCards.forEach(card=>{
+      const image=card.querySelector('img');
+      const source=image?.getAttribute('src')?.trim();
+      if(!source||seenHeroImages.has(source)){
+        card.remove();
+        return;
+      }
+      seenHeroImages.add(source);
+    });
     heroCards.forEach((card,index)=>{
       card.addEventListener('click',event=>{
         event.preventDefault();
