@@ -96,7 +96,6 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Select one or more devices in Settings" => "Wählen Sie ein oder mehrere Geräte in den Einstellungen aus",
         "SETTINGS" => "EINSTELLUNGEN",
         "QUICK SETTINGS" => "SCHNELLEINSTELLUNGEN"
-        "Power consumption" => "Stromverbrauch",
         "Solar power" => "Solarleistung",
         "Internet bandwidth" => "Internet-Bandbreite",
         "Temperature" => "Temperatur",
@@ -117,5 +116,21 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Enabled" => "Aktiviert",
         "Disabled" => "Deaktiviert"
         _ => key,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::tr;
+
+    #[test]
+    fn explicit_language_overrides_desktop_locale() {
+        assert_eq!(tr("de", "Settings"), "Einstellungen");
+        assert_eq!(tr("en", "Settings"), "Settings");
+    }
+
+    #[test]
+    fn unknown_translations_fall_back_to_source_text() {
+        assert_eq!(tr("de", "A newly added label"), "A newly added label");
     }
 }
