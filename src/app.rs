@@ -38,6 +38,7 @@ pub struct AppModel {
     selected_ains: Vec<String>,
     settings_status: Option<String>,
     settings_saved_until: Option<Instant>,
+    settings_save_at: Option<Instant>,
     history: VecDeque<(Instant, i64)>,
     device_history: HashMap<String, VecDeque<(Instant, i64, f64)>>,
     temperature_alert_state: HashMap<String, bool>,
@@ -1374,7 +1375,16 @@ impl AppModel {
         self.persist_settings();
     }
 
+    fn schedule_settings_save(&mut self) {
+        // Reordering can emit several updates during a drag. Persist once the
+        // user has stopped moving items instead of writing on every step.
+        self.settings_save_at = Some(Instant::now() + Duration::from_millis(600));
+        self.settings_saved_until = None;
+        self.settings_status = None;
+    }
+
     fn persist_settings(&mut self) {
+        self.settings_save_at = None;
         match self.settings.save() {
             Ok(()) => {
                 self.settings_saved_until = Some(Instant::now() + Duration::from_secs(2));
@@ -4307,6 +4317,12 @@ impl cosmic::Application for AppModel {
             }
             Message::ClockTick => {
                 if self
+                    .settings_save_at
+                    .is_some_and(|deadline| Instant::now() >= deadline)
+                {
+                    self.persist_settings();
+                }
+                if self
                     .settings_saved_until
                     .is_some_and(|deadline| Instant::now() >= deadline)
                 {
@@ -4581,7 +4597,7 @@ impl cosmic::Application for AppModel {
                 };
                 if let Some(target) = target {
                     self.settings.menu_order.swap(index, target);
-                    self.persist_settings();
+                    self.schedule_settings_save();
                 }
             }
             Message::ToggleMenuElementVisibility(element, visible) => {
@@ -4607,7 +4623,7 @@ impl cosmic::Application for AppModel {
                 };
                 if let Some(target) = target {
                     self.settings.panel_order.swap(index, target);
-                    self.persist_settings();
+                    self.schedule_settings_save();
                 }
             }
             Message::MoveDevice(ain, move_up) => {
@@ -4642,7 +4658,7 @@ impl cosmic::Application for AppModel {
                 if let Some(target) = target {
                     order.swap(index, target);
                     self.settings.device_order = order;
-                    self.persist_settings();
+                    self.schedule_settings_save();
                 }
             }
             Message::ToggleDeviceDetails(ain) => {
