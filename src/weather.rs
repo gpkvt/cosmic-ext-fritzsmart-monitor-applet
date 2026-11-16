@@ -652,7 +652,13 @@ fn strip_html(value: &str) -> String {
             _ => {}
         }
     }
-    output.split_whitespace().collect::<Vec<_>>().join(" ")
+    let output = output.split_whitespace().collect::<Vec<_>>().join(" ");
+    output.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'")
 }
 
 fn parse_coordinates(location: &str) -> Option<(f64, f64)> {
@@ -695,6 +701,14 @@ mod tests {
             };
             assert_eq!(day.icon_name(), icon);
         }
+    }
+
+    #[test]
+    fn commons_metadata_html_is_rendered_as_readable_text() {
+        assert_eq!(
+            strip_html("<a href='https://example.org'>A &amp; B</a> &#39;Photo&#39;"),
+            "A & B 'Photo'",
+        );
     }
 
     #[test]
