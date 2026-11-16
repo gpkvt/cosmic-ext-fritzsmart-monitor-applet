@@ -1439,7 +1439,10 @@ impl cosmic::Application for AppModel {
             })
             .or_else(|| self.readings.first());
         let power = if self.settings.panel_net_power {
-            format!("{} W", net_power_w(&self.readings, &self.settings.input_ains))
+            format!(
+                "{} W",
+                net_power_w(&self.readings, &self.settings.input_ains)
+            )
         } else {
             primary_reading
                 .map(|reading| format!("{} W", reading.power_w))
@@ -1870,7 +1873,6 @@ impl cosmic::Application for AppModel {
                     .class(cosmic::theme::Container::WindowBackground)
                     .into();
             }
-
         }
         // Only render applet content for the popup we created. Other
         // secondary surfaces (including native text context menus) must not
@@ -3751,10 +3753,12 @@ impl cosmic::Application for AppModel {
                                         format!(
                                             "↓{} ↑{}",
                                             format_compact_decimal(
-                                                bandwidth.download_bits_per_second as f64 / 1_000_000.0,
+                                                bandwidth.download_bits_per_second as f64
+                                                    / 1_000_000.0,
                                             ),
                                             format_compact_decimal(
-                                                bandwidth.upload_bits_per_second as f64 / 1_000_000.0,
+                                                bandwidth.upload_bits_per_second as f64
+                                                    / 1_000_000.0,
                                             ),
                                         )
                                     })
