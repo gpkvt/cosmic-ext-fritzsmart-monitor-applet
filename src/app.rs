@@ -826,11 +826,6 @@ fn total_power_overview(
     let output_column = widget::Column::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
-        .push(metric_tile(
-            "TOTAL POWER OUTPUT",
-            format!("{total_power} W"),
-            "go-up-symbolic",
-        ))
         .push(
             widget::Row::new()
                 .spacing(8)
@@ -883,12 +878,7 @@ fn total_power_overview(
     if has_input_readings {
         let mut input_column = widget::Column::new()
             .spacing(8)
-            .width(cosmic::iced::Length::Fill)
-            .push(metric_tile(
-                "TOTAL POWER INPUT",
-                format!("{} W", input_power_w(readings, &settings.input_ains)),
-                "go-down-symbolic",
-            ));
+            .width(cosmic::iced::Length::Fill);
         if let (Some(low), Some(high)) = (input_low, input_high) {
             input_column = input_column.push(
                 widget::Row::new()
