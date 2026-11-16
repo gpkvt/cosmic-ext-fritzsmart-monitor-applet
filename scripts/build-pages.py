@@ -77,7 +77,9 @@ def main() -> None:
         sources[source] = (DOCS / relative).with_suffix(".html")
 
     for source, destination in sources.items():
-        render(source, destination, source.stem.replace("-", " ").replace("_", " ").title())
+        default_title = source.stem.replace("-", " ").replace("_", " ").title()
+        title = {ROOT / "README.md": "Cosmic FRITZ!Power Monitor Applet", ROOT / "SECURITY.md": "Security Policy"}.get(source, default_title)
+        render(source, destination, title)
         print(f"Rendered {source.relative_to(ROOT)} -> {destination.relative_to(ROOT)}")
 
 
