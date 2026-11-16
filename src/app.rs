@@ -754,7 +754,7 @@ fn total_power_overview(
     history: &VecDeque<(Instant, i64)>,
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     collapsed_sections: &HashSet<String>,
-) -> Option<cosmic::Element<'static, Message>> {
+) -> Option<Vec<(String, cosmic::Element<'static, Message>)>> {
     let output_low = history.iter().map(|(_, value)| *value).min()?;
     let output_high = history.iter().map(|(_, value)| *value).max()?;
     let input_history = rebuild_input_power_history(device_history, &settings.input_ains);
@@ -871,10 +871,11 @@ fn total_power_overview(
         output_section = output_section.push(output_column);
     }
 
-    let mut power_columns = widget::Column::new()
-        .spacing(8)
-        .width(cosmic::iced::Length::Fill)
-        .push(output_section);
+    let output_content = widget::Column::new().spacing(10).push(output_section);
+    let mut sections = vec![(
+        "3-total-power-output".to_string(),
+        surface_card(output_content.into(), 14),
+    )];
     if has_input_readings {
         let mut input_column = widget::Column::new()
             .spacing(8)
@@ -884,14 +885,8 @@ fn total_power_overview(
                 widget::Row::new()
                     .spacing(8)
                     .width(cosmic::iced::Length::Fill)
-                    .push(
-                        widget::container(range_metric_tile("LOW", format!("{low} W"), "go-down-symbolic"))
-                            .width(cosmic::iced::Length::Fill),
-                    )
-                    .push(
-                        widget::container(range_metric_tile("HIGH", format!("{high} W"), "go-up-symbolic"))
-                            .width(cosmic::iced::Length::Fill),
-                    ),
+                    .push(widget::container(range_metric_tile("LOW", format!("{low} W"), "go-down-symbolic")).width(cosmic::iced::Length::Fill))
+                    .push(widget::container(range_metric_tile("HIGH", format!("{high} W"), "go-up-symbolic")).width(cosmic::iced::Length::Fill)),
             );
         }
         input_column = input_column.push(graph_panel(input_graphs.into()));
@@ -903,11 +898,7 @@ fn total_power_overview(
                 .push(widget::text::body("Total power in"))
                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                 .push(widget::text::title3(format!("{} W", input_power_w(readings, &settings.input_ains))))
-                .push(widget::icon::from_name(if input_collapsed {
-                    "go-next-symbolic"
-                } else {
-                    "go-down-symbolic"
-                }).size(16)),
+                .push(widget::icon::from_name(if input_collapsed { "go-next-symbolic" } else { "go-down-symbolic" }).size(16)),
         )
         .on_press(Message::ToggleMenuSection("total-power-input".into()))
         .width(cosmic::iced::Length::Fill)
@@ -917,12 +908,12 @@ fn total_power_overview(
         if !input_collapsed {
             input_section = input_section.push(input_column);
         }
-        power_columns = power_columns
-            .push(widget::divider::horizontal::default())
-            .push(input_section);
+        sections.push((
+            "4-total-power-input".to_string(),
+            surface_card(input_section.into(), 14),
+        ));
     }
-    let content = widget::Column::new().spacing(10).push(power_columns);
-    Some(surface_card(content.into(), 14))
+    Some(sections)
 }
 
 fn power_difference_overview(
@@ -2818,14 +2809,14 @@ impl cosmic::Application for AppModel {
                         });
                     menu_cards.push((format!("2-{device_key}"), device_card.into()));
                 }
-                if let Some(overview) = total_power_overview(
+                if let Some(power_sections) = total_power_overview(
                     &self.readings,
                     &self.settings,
                     &self.history,
                     &self.device_history,
                     &self.collapsed_menu_sections,
                 ) {
-                    menu_cards.push(("3-total-power".to_string(), overview));
+                    menu_cards.extend(power_sections);
                 }
                 if let Some(difference) = power_difference_overview(
                     &self.readings,
@@ -2833,7 +2824,7 @@ impl cosmic::Application for AppModel {
                     &self.history,
                     &self.device_history,
                 ) {
-                    menu_cards.push(("4-power-difference".to_string(), difference));
+                    menu_cards.push(("5-power-difference".to_string(), difference));
                 }
                 // Sort popup sections by the user's saved order while preserving device order.
                 menu_cards.sort_by_key(|(key, _)| {
@@ -2843,7 +2834,7 @@ impl cosmic::Application for AppModel {
                         "weather"
                     } else if key.starts_with("2-") {
                         "devices"
-                    } else if key == "3-total-power" {
+                    } else if key.starts_with("3-") || key.starts_with("4-") {
                         "total-power"
                     } else {
                         "power-difference"
@@ -2859,16 +2850,15 @@ impl cosmic::Application for AppModel {
                     if index > 0 {
                         device_cards = device_cards.push(widget::divider::horizontal::default());
                     }
-                    if key.starts_with("2-") {
-                        // Device rows already use their own COSMIC disclosure control.
+                    if key.starts_with("2-") || key.starts_with("3-") || key.starts_with("4-") {
+                        // Device and total-power rows already provide their own disclosure controls.
                         device_cards = device_cards.push(card);
                         continue;
                     }
                     let section = match key.as_str() {
                         "0-summary" => ("summary", "Current power"),
                         "1-weather" => ("weather", "Weather"),
-                        "3-total-power" => ("total-power", "Total power"),
-                        "4-power-difference" => ("power-difference", "Power difference"),
+                        "5-power-difference" => ("power-difference", "Power difference"),
                         _ => continue,
                     };
                     let collapsed = self.collapsed_menu_sections.contains(section.0);
@@ -2878,10 +2868,6 @@ impl cosmic::Application for AppModel {
                                 .map(|value| format!("{value} W")),
                             "weather" => self.weather.as_ref()
                                 .map(|weather| format!("{:.0}°", weather.temperature_c)),
-                            "total-power" => Some(format!(
-                                "{} W",
-                                output_power_w(&self.readings, &self.settings.input_ains)
-                            )),
                             "power-difference" => {
                                 let has_inputs = self.readings.iter().any(|reading| {
                                     self.settings.input_ains.contains(
