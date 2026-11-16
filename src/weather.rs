@@ -26,6 +26,7 @@ pub struct WeatherData {
     pub location_name: String,
     pub background_image: Option<Vec<u8>>,
     pub background_images: Vec<Vec<u8>>,
+    pub slideshow_frames: Vec<Vec<u8>>,
     pub image_attribution: Option<CommonsAttribution>,
 }
 
@@ -291,6 +292,7 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
     // local day/night indicator. Image failures remain non-fatal.
     let (background_images, image_attribution) = fetch_commons_background(&client, icon_code).await;
     let background_image = background_images.first().cloned();
+    let slideshow_frames = build_weather_slideshow_frames(&background_images);
     Ok(WeatherData {
         icon_code: icon_code.to_string(),
         description,
@@ -307,6 +309,7 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
         location_name,
         background_image,
         background_images,
+        slideshow_frames,
         image_attribution,
     })
 }
@@ -460,6 +463,50 @@ fn blur_background_image(bytes: Vec<u8>) -> Option<Vec<u8>> {
     Some(output.into_inner())
 }
 
+fn build_weather_slideshow_frames(images: &[Vec<u8>]) -> Vec<Vec<u8>> {
+    use image::{DynamicImage, ImageBuffer, Rgba};
+    if images.is_empty() { return Vec::new(); }
+    let decoded: Vec<_> = images.iter()
+        .filter_map(|bytes| image::load_from_memory(bytes).ok())
+        .map(|image| image.to_rgba8())
+        .collect();
+    if decoded.len() < 2 {
+        return decoded.first().map(|image| {
+            let mut output = std::io::Cursor::new(Vec::new());
+            DynamicImage::ImageRgba8(image.clone()).write_to(&mut output, image::ImageFormat::Jpeg).ok();
+            output.into_inner()
+        }).into_iter().collect();
+    }
+    let mut frames = Vec::new();
+    for index in 0..decoded.len() {
+        let current = &decoded[index];
+        // Hold each photograph for two seconds at a 250 ms frame interval.
+        for _ in 0..8 {
+            let mut output = std::io::Cursor::new(Vec::new());
+            DynamicImage::ImageRgba8(current.clone()).write_to(&mut output, image::ImageFormat::Jpeg).ok();
+            frames.push(output.into_inner());
+        }
+        let next = &decoded[(index + 1) % decoded.len()];
+        if current.dimensions() != next.dimensions() { continue; }
+        for step in 1..=3 {
+            let amount = step as f32 / 4.0;
+            let mut blended: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(current.width(), current.height());
+            for (x, y, pixel) in blended.enumerate_pixels_mut() {
+                let a = current.get_pixel(x, y).0;
+                let b = next.get_pixel(x, y).0;
+                *pixel = Rgba(std::array::from_fn(|channel| {
+                    (f32::from(a[channel]) * (1.0 - amount) + f32::from(b[channel]) * amount).round() as u8
+                }));
+            }
+            let mut output = std::io::Cursor::new(Vec::new());
+            if DynamicImage::ImageRgba8(blended).write_to(&mut output, image::ImageFormat::Jpeg).is_ok() {
+                frames.push(output.into_inner());
+            }
+        }
+    }
+    frames
+}
+
 fn strip_html(value: &str) -> String {
     let mut output = String::with_capacity(value.len());
     let mut inside_tag = false;
@@ -561,6 +608,7 @@ mod tests {
                 location_name: String::new(),
                 background_image: None,
                 background_images: Vec::new(),
+                slideshow_frames: Vec::new(),
                 image_attribution: None,
             };
             assert_eq!(weather.icon_name(), expected);
