@@ -82,6 +82,12 @@ directly and does **not** execute or depend on `fritz_solar.sh`.
 - Review connection and device information in the dedicated Diagnostics
   settings category.
 
+### Localization
+
+- English and German interface translations.
+- Follow the COSMIC desktop language automatically by default.
+- Override the detected language in Settings → Language; the choice is saved across restarts.
+
 ## Requirements
 
 - COSMIC desktop session with panel applet support.
