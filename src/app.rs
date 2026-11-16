@@ -1407,8 +1407,11 @@ impl cosmic::Application for AppModel {
                 .center_x(24)
                 .center_y(24);
             item = item.push(icon_slot);
+            let value_slot = widget::container(value)
+                .width(cosmic::iced::Length::Fixed(64.0))
+                .align_x(cosmic::iced::alignment::Horizontal::Right);
             self.core.applet.applet_tooltip(
-                item.push(value),
+                item.push(value_slot),
                 label,
                 false,
                 Message::TooltipSurfaceAction,
@@ -1505,17 +1508,27 @@ impl cosmic::Application for AppModel {
                     .spacing(0)
                     .push(
                         widget::Row::new()
+                            .width(cosmic::iced::Length::Fixed(64.0))
                             .spacing(3)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::icon::from_name("go-down-symbolic").size(10))
-                            .push(widget::text::body(download).size(10)),
+                            .push(
+                                widget::container(widget::text::body(download).size(10))
+                                    .width(cosmic::iced::Length::Fill)
+                                    .align_x(cosmic::iced::alignment::Horizontal::Right),
+                            ),
                     )
                     .push(
                         widget::Row::new()
+                            .width(cosmic::iced::Length::Fixed(64.0))
                             .spacing(3)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::icon::from_name("go-up-symbolic").size(10))
-                            .push(widget::text::body(upload).size(10)),
+                            .push(
+                                widget::container(widget::text::body(upload).size(10))
+                                    .width(cosmic::iced::Length::Fill)
+                                    .align_x(cosmic::iced::alignment::Horizontal::Right),
+                            ),
                     );
                 panel_items.push((
                     "internet-bandwidth",
