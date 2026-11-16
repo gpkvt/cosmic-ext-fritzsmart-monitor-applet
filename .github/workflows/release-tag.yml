@@ -83,9 +83,10 @@ jobs:
               raise SystemExit(f"Unsupported bump type: {bump}")
 
           new_version = f"{major}.{minor}.{patch}"
+          pattern = r'(?ms)(^\[package\]\s+.*?^version\s*=\s*")[0-9]+\.[0-9]+\.[0-9]+("\s*$)'
           updated, count = re.subn(
-              r'(?ms)(^\[package\]\s+.*?^version\s*=\s*")[0-9]+\.[0-9]+\.[0-9]+("\s*$)',
-              rf'\g<1>{new_version}\g<2>',
+              pattern,
+              lambda match: match.group(1) + new_version + match.group(2),
               text,
               count=1,
           )
@@ -96,8 +97,25 @@ jobs:
           PY
             )"
 
+            NEW_VERSION="$new_version" python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          path = Path("Cargo.lock")
+          text = path.read_text()
+          pattern = r'(?ms)(\[\[package\]\]\nname = "fritz-power-monitor"\nversion = ")[^"]+(")'
+          updated, count = re.subn(
+              pattern,
+              lambda match: match.group(1) + os.environ["NEW_VERSION"] + match.group(2),
+              text,
+              count=1,
+          )
+          if count != 1:
+              raise SystemExit("Could not update the root package version in Cargo.lock")
+          path.write_text(updated)
+          PY
             echo "Bumping package version to ${new_version} (attempt ${attempt}/5)"
-            cargo update --workspace
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add Cargo.toml Cargo.lock
