@@ -497,8 +497,7 @@ fn rebuild_input_power_history(
             for (timestamp, power_w, _) in history {
                 *samples.entry(*timestamp).or_default() += signed_device_power(*power_w, true);
             }
-        }    }
-    samples.into_iter().collect()
+        }    }    samples.into_iter().collect()
 }
 
 fn rebuild_power_difference_history(
@@ -997,8 +996,7 @@ fn power_difference_overview(
                         "go-up-symbolic",
                     ))
                     .width(cosmic::iced::Length::Fill),                ),
-        );
-    }
+        );    }
     let graph = widget::Column::new()
         .spacing(4)
         .push(widget::text::caption("POWER DIFFERENCE (W)"))
@@ -1497,8 +1495,7 @@ impl cosmic::Application for AppModel {
                 let (_, item) = panel_items.remove(index);
                 content = content.push(item);            }
         }
-        // Keep connection health visible even when the popup is closed.
-        if self.error.is_some() {
+        // Keep connection health visible even when the popup is closed.        if self.error.is_some() {
             content = content.push(panel_item(
                 "Connection error",
                 Some(
@@ -1997,8 +1994,7 @@ impl cosmic::Application for AppModel {
                             device_row = device_row                                .push(widget::text::caption(format!(
                                     "Upper limit: {} °C",
                                     thresholds.high_c
-                                )))
-                                .push(
+                                )))                                .push(
                                     widget::slider(0.0..=40.0, f32::from(thresholds.high_c), {
                                         let ain = ain.clone();
                                         move |value| {
@@ -2285,8 +2281,6 @@ impl cosmic::Application for AppModel {
                             .push(widget::text::body(format!("Sunrise  {sunrise}"))),
                     )
                     .push(widget::text::body(format!("Sunset  {sunset}")));
-                let weather_info_collapsed =
-                    self.collapsed_menu_sections.contains("weather-info");
                 let weather_header_row: cosmic::Element<'_, Message> = widget::Row::new()
                     .width(cosmic::iced::Length::Fill)
                     .align_y(cosmic::iced::Alignment::Start)
@@ -2294,19 +2288,6 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::title3(weather.location_name.clone()))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                     .push(widget::text::title2(format!("{:.0}°C", weather.temperature_c)))
-                    .push(
-                        widget::button::custom(
-                            widget::icon::from_name(if weather_info_collapsed {
-                                "go-next-symbolic"
-                            } else {
-                                "go-down-symbolic"
-                            })
-                            .size(16),
-                        )
-                        .on_press(Message::ToggleMenuSection("weather-info".into()))
-                        .padding(4)
-                        .class(cosmic::theme::Button::Standard),
-                    )
                     .into();
                 let weather_details_panel: cosmic::Element<'_, Message> =
                     widget::container(weather_details)
@@ -2322,58 +2303,55 @@ impl cosmic::Application for AppModel {
                         .into();
                 let weather_header_content: cosmic::Element<'_, Message> =
                     if let Some(image_bytes) = &weather.background_image {
-                        let expanded_height = if weather_info_collapsed { 112.0 } else { 390.0 };
                         let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
                             image_bytes.clone(),
                         ))
                         .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fixed(expanded_height))
+                        .height(cosmic::iced::Length::Fixed(390.0))
                         .content_fit(cosmic::iced::ContentFit::Cover);
-                        let mut overlay = widget::Column::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .spacing(8)
-                            .push(weather_header_row);
-                        if !weather_info_collapsed {
-                            overlay = overlay.push(weather_details_panel);
-                        }
-                        let overlay = widget::container(overlay)
-                            .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(expanded_height))
-                            .padding(8)
-                            .style(|_| cosmic::iced::widget::container::Style {
-                                background: Some(
-                                    cosmic::iced::Color::from_rgba(0.025, 0.035, 0.05, 0.38).into(),
-                                ),
-                                text_color: Some(cosmic::iced::Color::WHITE),
-                                ..Default::default()
-                            });
+                        let overlay = widget::container(
+                            widget::Column::new()
+                                .width(cosmic::iced::Length::Fill)
+                                .spacing(8)
+                                .push(weather_header_row)
+                                .push(weather_details_panel),
+                        )
+                        .width(cosmic::iced::Length::Fill)
+                        .height(cosmic::iced::Length::Fixed(390.0))
+                        .padding(8)
+                        .style(|_| cosmic::iced::widget::container::Style {
+                            background: Some(
+                                cosmic::iced::Color::from_rgba(0.025, 0.035, 0.05, 0.38).into(),
+                            ),
+                            text_color: Some(cosmic::iced::Color::WHITE),
+                            ..Default::default()
+                        });
                         cosmic::iced::widget::Stack::new()
                             .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(expanded_height))
+                            .height(cosmic::iced::Length::Fixed(390.0))
                             .push(photo)
                             .push(overlay)
                             .into()
                     } else {
-                        let mut content = widget::Column::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .spacing(8)
-                            .push(weather_header_row);
-                        if !weather_info_collapsed {
-                            content = content.push(weather_details_panel);
-                        }
-                        widget::container(content)
-                            .width(cosmic::iced::Length::Fill)
-                            .padding(8)
-                            .style(|theme| {
-                                let cosmic = theme.cosmic();
-                                cosmic::iced::widget::container::Style {
-                                    background: Some(
-                                        cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
-                                    ),
-                                    ..Default::default()
-                                }
-                            })
-                            .into()
+                        widget::container(
+                            widget::Column::new()
+                                .width(cosmic::iced::Length::Fill)
+                                .spacing(8)
+                                .push(weather_header_row)
+                                .push(weather_details_panel),
+                        )
+                        .width(cosmic::iced::Length::Fill)
+                        .padding(8)
+                        .style(|theme| {
+                            let cosmic = theme.cosmic();
+                            cosmic::iced::widget::container::Style {
+                                background: Some(
+                                    cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
+                                ),
+                                ..Default::default()
+                            }
+                        })
+                        .into()
                     };
                 weather_section = weather_section.push(weather_header_content);
                 let forecast_toggle = widget::button::custom(
@@ -2497,8 +2475,7 @@ impl cosmic::Application for AppModel {
                                         )))
                                         .push(widget::text::caption(format!(
                                             "{:.0} km/h",
-                                            day.wind_speed_kmh
-                                        ))),
+                                            day.wind_speed_kmh                                        ))),
                                 );
                             weather_section = weather_section.push(day_row);
                         }
@@ -2997,8 +2974,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                     .push(icon_action_button(
                         "⚙",
-                        "Quick settings",
-                        Message::ToggleQuickOptions,
+                        "Quick settings",                        Message::ToggleQuickOptions,
                     )),
             );
             if self.error.is_none() {
@@ -3497,8 +3473,7 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::ToggleMenuSection(section) => {
-                if !self.collapsed_menu_sections.remove(&section) {
-                    self.collapsed_menu_sections.insert(section);
+                if !self.collapsed_menu_sections.remove(&section) {                    self.collapsed_menu_sections.insert(section);
                 }
             }
             Message::ToggleQuickOptions => {
@@ -3997,8 +3972,7 @@ mod history_tests {
                 ain: "111111".into(),
                 name: "Load".into(),
                 power_w: 400,
-                temperature_c: 20.0,
-                power_state: None,
+                temperature_c: 20.0,                power_state: None,
             },
             FritzReading {
                 ain: "222222".into(),
