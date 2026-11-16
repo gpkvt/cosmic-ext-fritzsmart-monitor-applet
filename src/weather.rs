@@ -293,7 +293,9 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
     // local day/night indicator. Image failures remain non-fatal.
     let (background_images, image_attribution) = fetch_commons_background(&client, icon_code).await;
     let background_image = background_images.first().cloned();
-    let (slideshow_frames, slideshow_sequence) = build_weather_slideshow_frames(&background_images, 10);
+    // The applet builds its slideshow with the user's configured display duration.
+    let slideshow_frames = Vec::new();
+    let slideshow_sequence = Vec::new();
     Ok(WeatherData {
         icon_code: icon_code.to_string(),
         description,
