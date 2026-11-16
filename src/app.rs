@@ -91,7 +91,7 @@ pub enum Message {
     GraphTimespanChanged(u32),
     GraphStyleChanged(String),
     ShowGraph(String, Vec<f64>, String),
-    GraphWindowOpened(Id),
+    GraphWindowOpened,
     CloseGraph,
     RefreshIntervalChanged(u32),
     DiscoverDevices,
@@ -4052,13 +4052,13 @@ impl cosmic::Application for AppModel {
                     };
                     let (id, task) = cosmic::iced::window::open(settings);
                     self.graph_window = Some(id);
-                    return task.map(move |_| cosmic::Action::App(Message::GraphWindowOpened(id)));
+                    return task.map(|_: ()| cosmic::Action::App(Message::GraphWindowOpened));
                 } else if let Some(id) = self.graph_window {
                     return cosmic::iced::window::gain_focus(id)
-                        .map(move |_: ()| cosmic::Action::App(Message::GraphWindowOpened(id)));
+                        .map(|_: ()| cosmic::Action::App(Message::GraphWindowOpened));
                 }
             }
-            Message::GraphWindowOpened(_) => {}
+            Message::GraphWindowOpened => {}
             Message::CloseGraph => {
                 self.expanded_graph = None;
                 if let Some(id) = self.graph_window.take() {
