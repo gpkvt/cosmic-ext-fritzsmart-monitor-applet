@@ -2665,7 +2665,7 @@ impl cosmic::Application for AppModel {
                         let can_toggle = reading.power_controllable
                             && reading.power_state.is_some()
                             && !self.pending_power_changes.contains(&key);
-                        let toggle = widget::toggler(is_on).disabled(!can_toggle);
+                        let toggle = widget::toggler(is_on);
                         if can_toggle {
                             toggle
                                 .on_toggle(move |requested| {
@@ -2673,6 +2673,8 @@ impl cosmic::Application for AppModel {
                                 })
                                 .into()
                         } else {
+                            // A COSMIC toggler without an on_toggle handler is
+                            // non-interactive and is rendered with its disabled style.
                             toggle.into()
                         }
                     };
