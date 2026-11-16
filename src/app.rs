@@ -753,6 +753,7 @@ fn total_power_overview(
     settings: &FritzSettings,
     history: &VecDeque<(Instant, i64)>,
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    collapsed_sections: &HashSet<String>,
 ) -> Option<cosmic::Element<'static, Message>> {
     let output_low = history.iter().map(|(_, value)| *value).min()?;
     let output_high = history.iter().map(|(_, value)| *value).max()?;
