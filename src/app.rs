@@ -1423,7 +1423,7 @@ impl cosmic::Application for AppModel {
             }
         }
         for item_id in &self.settings.panel_order {
-            if let Some(index) = panel_items.iter().position(|(id, _)| id == item_id) {
+            if let Some(index) = panel_items.iter().position(|(id, _)| *id == item_id.as_str()) {
                 let (_, item) = panel_items.remove(index);
                 content = content.push(item);
             }
