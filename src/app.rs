@@ -3081,8 +3081,10 @@ impl cosmic::Application for AppModel {
 
             content = content.push(
                 widget::Row::new()
+                    .spacing(8)
                     .width(cosmic::iced::Length::Fill)
                     .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::text::caption("QUICK SETTINGS"))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                     .push(icon_action_button(
                         "⚙",
