@@ -2312,7 +2312,26 @@ impl cosmic::Application for AppModel {
                 let current_date = chrono::Local::now().format("%A, %d %B %Y").to_string();
                 let weather_details = widget::Column::new()
                     .spacing(6)
-                    .push(widget::text::caption(current_date))
+                    .push(
+                        widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::text::caption(current_date))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(
+                                widget::button::custom(
+                                    widget::icon::from_name("image-x-generic-symbolic").size(16),
+                                )
+                                .on_press(Message::OpenCommonsPage(
+                                    weather
+                                        .image_attribution
+                                        .as_ref()
+                                        .map(|credit| credit.page_url.clone())
+                                        .unwrap_or_default(),
+                                ))
+                                .padding(5)
+                                .class(cosmic::theme::Button::Standard),
+                            ),
+                    )
                     .push(
                         widget::Row::new()
                             .spacing(10)
@@ -2432,37 +2451,11 @@ impl cosmic::Application for AppModel {
                                 text_color: Some(cosmic::iced::Color::WHITE),
                                 ..Default::default()
                             });
-                        let image_credit_button = widget::Column::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fill)
-                            .push(widget::Space::new().height(cosmic::iced::Length::Fill))
-                            .push(
-                                widget::Row::new()
-                                    .width(cosmic::iced::Length::Fill)
-                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                    .push(
-                                        widget::button::custom(
-                                            widget::icon::from_name("image-x-generic-symbolic")
-                                                .size(16),
-                                        )
-                                        .on_press(Message::OpenCommonsPage(
-                                            weather
-                                                .image_attribution
-                                                .as_ref()
-                                                .map(|credit| credit.page_url.clone())
-                                                .unwrap_or_default(),
-                                        ))
-                                        .padding(7)
-                                        .class(cosmic::theme::Button::Standard),
-                                    ),
-                            )
-                            .padding(8);
                         cosmic::iced::widget::Stack::new()
                             .width(cosmic::iced::Length::Fill)
                             .height(cosmic::iced::Length::Fixed(260.0))
                             .push(photo)
                             .push(details)
-                            .push(image_credit_button)
                             .into()
                     } else {
                         widget::container(weather_content)
