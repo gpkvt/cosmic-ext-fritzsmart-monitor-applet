@@ -918,6 +918,7 @@ fn menu_element_label(id: &str) -> &'static str {
     match id {
         "summary" => "Live power summary",
         "weather" => "Weather",
+        "internet-bandwidth" => "Internet bandwidth",
         "devices" => "Devices",
         "total-power-output" => "Total power out",
         "total-power-input" => "Total power in",
@@ -1893,6 +1894,7 @@ impl cosmic::Application for AppModel {
                     let id = match element.as_str() {
                         "summary" => "summary",
                         "weather" => "weather",
+                        "internet-bandwidth" => "internet-bandwidth",
                         "devices" => "devices",
                         "total-power-output" => "total-power-output",
                         "total-power-input" => "total-power-input",
@@ -2677,6 +2679,28 @@ impl cosmic::Application for AppModel {
                 if let Some(weather_card) = weather_menu_card.take() {
                     menu_cards.push(("1-weather".to_string(), weather_card));
                 }
+                if let Some(bandwidth) = self.internet_bandwidth.as_ref() {
+                    let bandwidth_card = widget::Column::new()
+                        .spacing(8)
+                        .padding([8, 12])
+                        .push(
+                            widget::Row::new()
+                                .spacing(8)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::icon::from_name("go-down-symbolic").size(16))
+                                .push(widget::text::caption("DOWNLOAD").width(cosmic::iced::Length::Fill))
+                                .push(widget::text::body(format_bandwidth(bandwidth.download_bits_per_second))),
+                        )
+                        .push(
+                            widget::Row::new()
+                                .spacing(8)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::icon::from_name("go-up-symbolic").size(16))
+                                .push(widget::text::caption("UPLOAD").width(cosmic::iced::Length::Fill))
+                                .push(widget::text::body(format_bandwidth(bandwidth.upload_bits_per_second))),
+                        );
+                    menu_cards.push(("bandwidth".to_string(), bandwidth_card.into()));
+                }
                 // The settings list is authoritative for popup device order.
                 // Keep newly discovered devices after configured entries.
                 let mut ordered_readings: Vec<_> = self.readings.iter().collect();
@@ -3006,6 +3030,8 @@ impl cosmic::Application for AppModel {
                         "summary"
                     } else if key == "1-weather" {
                         "weather"
+                    } else if key == "bandwidth" {
+                        "internet-bandwidth"
                     } else if key.starts_with("2-") {
                         "devices"
                     } else if key.starts_with("3-") {
@@ -3039,6 +3065,7 @@ impl cosmic::Application for AppModel {
                     }
                     let section = match key.as_str() {
                         "0-summary" => ("summary", "CURRENT POWER"),
+                        "bandwidth" => ("bandwidth", "INTERNET BANDWIDTH"),
                         _ => continue,
                     };
                     let collapsed = self.collapsed_menu_sections.contains(section.0);
@@ -3050,6 +3077,13 @@ impl cosmic::Application for AppModel {
                                 .weather
                                 .as_ref()
                                 .map(|weather| format!("{:.0} °C", weather.temperature_c)),
+                            "bandwidth" => self.internet_bandwidth.as_ref().map(|bandwidth| {
+                                format!(
+                                    "↓ {} · ↑ {}",
+                                    format_bandwidth(bandwidth.download_bits_per_second),
+                                    format_bandwidth(bandwidth.upload_bits_per_second),
+                                )
+                            }),
                             _ => None,
                         }
                     } else {
