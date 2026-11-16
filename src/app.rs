@@ -2295,8 +2295,9 @@ impl cosmic::Application for AppModel {
                                     .push(widget::text::caption(credit.title.clone())),
                             )
                             .push(
-                                widget::button::text("Open image source")
+                                widget::button::custom(widget::text::caption("Open image source"))
                                     .on_press(Message::OpenCommonsPage(credit.page_url.clone()))
+                                    .padding(4)
                                     .class(cosmic::theme::Button::Text),
                             ),
                     );
