@@ -45,7 +45,10 @@ jobs:
             pkg-config \
             dpkg-dev \
             patchelf \
-            file
+            file \
+            python3-markdown
+      - name: Render Markdown documentation
+        run: python3 scripts/build-pages.py
       - name: Validate GitHub Pages documentation
         run: python3 scripts/validate-pages.py
       - name: Validate desktop entry and AppStream metadata
