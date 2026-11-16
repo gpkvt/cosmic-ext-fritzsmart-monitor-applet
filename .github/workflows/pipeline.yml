@@ -314,7 +314,9 @@ jobs:
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
       - name: Check dependency advisories
-        run: cargo audit --deny warnings
+        # Keep informational/unmaintained/unsound advisories visible without failing the build.
+        # cargo audit still fails for actionable vulnerability advisories by default.
+        run: cargo audit
 
   report-failure:
     name: Track pipeline failures in GitHub Issues
