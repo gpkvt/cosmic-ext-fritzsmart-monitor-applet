@@ -3544,11 +3544,6 @@ impl cosmic::Application for AppModel {
                 for samples in self.device_history.values_mut() {
                     samples.retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
                 }
-                if let Err(error) =
-                    crate::history::save(&self.history, &self.device_history)
-                {
-                    eprintln!("Could not persist graph history: {error}");
-                }
                 self.persist_settings();
             }
             Message::GraphStyleChanged(value) => {
