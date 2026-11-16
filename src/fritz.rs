@@ -1276,6 +1276,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parses_persisted_settings_section_safely() {
+        assert_eq!(parse_settings_section(" panel "), "panel");
+        assert_eq!(parse_settings_section("diagnostics"), "diagnostics");
+        assert!(parse_settings_section("unknown").is_empty());
+        assert!(parse_settings_section("").is_empty());
+    }
+
+    #[test]
     fn parses_persisted_collapsed_menu_sections_safely() {
         assert_eq!(
             parse_collapsed_menu_sections("weather,unknown,summary,weather,total-power-input"),
