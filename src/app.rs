@@ -1381,9 +1381,9 @@ impl cosmic::Application for AppModel {
                         ))
                         .width(16)
                         .height(16)
-                        .style(|theme: &cosmic::Theme, _| cosmic::iced::widget::svg::Style {
+                        .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
                             color: Some(theme.cosmic().on_bg_color().into()),
-                        })
+                        }))
                         .into(),
                     ),
                     self.core
@@ -1405,9 +1405,9 @@ impl cosmic::Application for AppModel {
                             ))
                             .width(16)
                             .height(16)
-                            .style(|theme: &cosmic::Theme, _| cosmic::iced::widget::svg::Style {
-                                color: Some(theme.cosmic().on_bg_color().into()),
-                            })
+                            .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
+                            color: Some(theme.cosmic().on_bg_color().into()),
+                        }))
                             .into(),
                         ),
                         self.core
