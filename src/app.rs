@@ -598,28 +598,6 @@ fn keep_value_unit_together(value: String) -> String {
         .unwrap_or(value)
 }
 
-fn metric_tile<'a>(
-    label: impl Into<String>,
-    value: impl Into<String>,
-    icon: &'static str,
-) -> cosmic::Element<'a, Message> {
-    let label = label.into();
-    let mut heading = widget::Row::new()
-        .spacing(6)
-        .align_y(cosmic::iced::Alignment::Start)
-        .push(widget::icon::from_name(icon).size(14));
-    if !label.is_empty() {
-        heading = heading.push(widget::text::caption(label));
-    }
-    let content = widget::Row::new()
-        .width(cosmic::iced::Length::Fill)
-        .align_y(cosmic::iced::Alignment::Start)
-        .push(heading)
-        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-        .push(widget::text::title3(keep_value_unit_together(value.into())));
-    surface_card(content.into(), 10)
-}
-
 fn device_corner_radius(index: usize, device_count: usize) -> cosmic::iced::border::Radius {
     let top = index == 0;
     let bottom = index + 1 == device_count;
