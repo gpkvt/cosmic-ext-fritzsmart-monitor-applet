@@ -208,27 +208,6 @@ fn notify_temperature_alert(name: &str, temperature: f64, thresholds: Temperatur
         .show();
 }
 
-fn device_background_color(base: cosmic::iced::Color, index: usize) -> cosmic::iced::Color {
-    // Distinct, muted hues make adjacent devices easy to tell apart while
-    // retaining some of the active COSMIC theme's background color.
-    const TINTS: [(f32, f32, f32); 6] = [
-        (0.16, 0.42, 0.82), // blue
-        (0.08, 0.58, 0.48), // teal
-        (0.38, 0.58, 0.16), // green
-        (0.78, 0.48, 0.10), // amber
-        (0.76, 0.30, 0.20), // coral
-        (0.52, 0.32, 0.76), // purple
-    ];
-    let (red, green, blue) = TINTS[index % TINTS.len()];
-    let strength = 0.16;
-    cosmic::iced::Color::from_rgba(
-        base.r * (1.0 - strength) + red * strength,
-        base.g * (1.0 - strength) + green * strength,
-        base.b * (1.0 - strength) + blue * strength,
-        base.a,
-    )
-}
-
 fn format_graph_axis_start(minutes: u32) -> String {
     let days = minutes / 1440;
     if days >= 365 && days % 365 == 0 {
@@ -1199,12 +1178,26 @@ fn error_notice<'a>(title: &'static str, message: &'a str) -> cosmic::Element<'a
     )
     .width(cosmic::iced::Length::Fill)
     .padding(12)
-    .style(|_| cosmic::iced::widget::container::Style {
-        background: Some(cosmic::iced::Color::from_rgba(0.58, 0.08, 0.10, 0.96).into()),
-        text_color: Some(cosmic::iced::Color::WHITE),
-        ..Default::default()
-    })
     .into()
+}
+
+fn diagnostic_status_row<'a>(
+    label: &'a str,
+    status: &'a str,
+    success: Option<bool>,
+) -> cosmic::Element<'a, Message> {
+    let icon = match success {
+        Some(true) => "emblem-ok-symbolic",
+        Some(false) => "dialog-error-symbolic",
+        None => "dialog-question-symbolic",
+    };
+    widget::Row::new()
+        .spacing(8)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(widget::icon::from_name(icon).size(16))
+        .push(widget::text::body(label).width(cosmic::iced::Length::Fill))
+        .push(widget::text::caption(status))
+        .into()
 }
 
 fn is_error_status(status: &str) -> bool {
@@ -1945,7 +1938,7 @@ impl cosmic::Application for AppModel {
                         content =
                             content.push(widget::text::caption("No devices match your search"));
                     }
-                    for (row_index, device) in ordered_devices.iter().enumerate() {
+                    for device in ordered_devices.iter() {
                         let selected = self.selected_ains.iter().any(|selected_ain| {
                             crate::fritz::normalize_ain_for_selection(selected_ain)
                                 == crate::fritz::normalize_ain_for_selection(&device.ain)
@@ -2045,18 +2038,7 @@ impl cosmic::Application for AppModel {
                                     "Notify above the upper limit or below the lower limit",
                                 ));
                         }
-                        content = content.push(widget::container(device_row).padding(8).style(
-                            move |theme| {
-                                let cosmic = theme.cosmic();
-                                let base = cosmic::iced::Color::from(cosmic.background(false).base);
-                                cosmic::iced::widget::container::Style {
-                                    background: Some(
-                                        device_background_color(base, row_index).into(),
-                                    ),
-                                    ..Default::default()
-                                }
-                            },
-                        ));
+                        content = content.push(surface_card(device_row.into(), 8));
                     }
                 }
             }
@@ -2064,95 +2046,82 @@ impl cosmic::Application for AppModel {
             if self.active_settings_section == Some("diagnostics") {
                 let endpoint = self.settings.url.trim();
                 let uses_https = endpoint.to_ascii_lowercase().starts_with("https://");
-                let tls_status = if uses_https {
+                let (tls_status, tls_ok) = if uses_https {
                     if self.settings.allow_invalid_certs {
-                        "HTTPS configured · certificate validation disabled"
+                        ("Certificate validation disabled".to_string(), Some(false))
                     } else if !self.settings.ca_cert_path.trim().is_empty() {
-                        "HTTPS configured · custom CA certificate configured"
+                        ("Custom CA certificate configured".to_string(), Some(true))
                     } else {
-                        "HTTPS configured · system certificate roots"
+                        ("System certificate roots".to_string(), Some(true))
                     }
                 } else if endpoint.to_ascii_lowercase().starts_with("http://") {
-                    "HTTPS not configured · using plain HTTP"
+                    ("Plain HTTP · TLS is not enabled".to_string(), Some(false))
                 } else {
-                    "HTTPS status unavailable · invalid or empty URL"
+                    ("URL is invalid or not configured".to_string(), None)
                 };
                 content = content
                     .push(widget::divider::horizontal::default())
-                    .push(widget::text::caption("DIAGNOSTICS"))
-                    .push(widget::text::title3("HTTPS / TLS"))
-                    .push(widget::text::body(tls_status))
+                    .push(widget::text::title3("Connection security"))
+                    .push(diagnostic_status_row("HTTPS / TLS", &tls_status, tls_ok))
                     .push(widget::text::caption(format!(
-                        "Endpoint: {}",
-                        if endpoint.is_empty() {
-                            "Not configured"
-                        } else {
-                            endpoint
-                        }
+                        "FRITZ!Box: {}",
+                        if endpoint.is_empty() { "Not configured" } else { endpoint }
                     )))
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::title3("External resources"))
                     .push(widget::text::caption(
-                        "Status reflects the latest real request; resources are not contacted just for opening Diagnostics.",
+                        "Status from the latest real request. Opening Diagnostics does not trigger network requests.",
                     ));
+
                 let weather_provider_status = if !self.settings.weather_enabled {
-                    "Not configured"
+                    ("Not configured", None)
                 } else if self.weather.is_some() {
-                    "Available · latest request succeeded"
+                    ("Latest request succeeded", Some(true))
                 } else if self.weather_error.is_some() {
-                    "Unavailable · latest request failed"
+                    ("Latest request failed", Some(false))
                 } else {
-                    "Not checked yet"
+                    ("Not checked yet", None)
                 };
-                content = content.push(
-                    widget::Row::new()
-                        .spacing(8)
-                        .push(
-                            widget::text::body("OpenWeatherMap · current weather")
-                                .width(cosmic::iced::Length::Fill),
-                        )
-                        .push(widget::text::caption(weather_provider_status)),
-                );
+                content = content.push(diagnostic_status_row(
+                    "OpenWeatherMap · current weather",
+                    weather_provider_status.0,
+                    weather_provider_status.1,
+                ));
+
                 let commons_status = if !self.settings.weather_enabled {
-                    "Not configured"
+                    ("Not configured", None)
                 } else if let Some(weather) = &self.weather {
                     if weather.background_image.is_some() {
-                        "Available · image loaded"
+                        ("Image loaded", Some(true))
                     } else {
-                        "Unavailable · no usable image loaded"
+                        ("No usable image loaded", Some(false))
                     }
                 } else if self.weather_error.is_some() {
-                    "Not checked · weather request failed"
+                    ("Weather request failed", Some(false))
                 } else {
-                    "Not checked yet"
+                    ("Not checked yet", None)
                 };
-                content = content.push(
-                    widget::Row::new()
-                        .spacing(8)
-                        .push(
-                            widget::text::body("Wikimedia Commons · weather image")
-                                .width(cosmic::iced::Length::Fill),
-                        )
-                        .push(widget::text::caption(commons_status)),
-                );
+                content = content.push(diagnostic_status_row(
+                    "Wikimedia Commons · weather image",
+                    commons_status.0,
+                    commons_status.1,
+                ));
+
                 let forecast_status = if !self.settings.weather_enabled {
-                    "Not configured"
+                    ("Not configured", None)
                 } else if self.weather_forecast.is_some() {
-                    "Available · forecast loaded"
+                    ("Forecast loaded", Some(true))
                 } else if self.weather_forecast_error.is_some() {
-                    "Unavailable · latest request failed"
+                    ("Latest request failed", Some(false))
                 } else {
-                    "Not checked · request a forecast to test"
+                    ("Not checked · request a forecast to test", None)
                 };
-                content = content.push(
-                    widget::Row::new()
-                        .spacing(8)
-                        .push(
-                            widget::text::body("Open-Meteo · forecast and geocoding")
-                                .width(cosmic::iced::Length::Fill),
-                        )
-                        .push(widget::text::caption(forecast_status)),
-                );
+                content = content.push(diagnostic_status_row(
+                    "Open-Meteo · forecast and geocoding",
+                    forecast_status.0,
+                    forecast_status.1,
+                ));
+
                 let requests = crate::fritz::http_request_diagnostics();
                 let fritz_base = endpoint.trim_end_matches('/');
                 let fritz_endpoint_status = |path: &str| {
@@ -2162,78 +2131,58 @@ impl cosmic::Application for AppModel {
                         .find(|request| request.path == path)
                         .map(|request| {
                             if (200..300).contains(&request.status) {
-                                format!("HTTP {} · successful", request.status)
+                                (format!("HTTP {} · successful", request.status), Some(true))
                             } else {
-                                format!("HTTP {} · failed", request.status)
+                                (format!("HTTP {} · failed", request.status), Some(false))
                             }
                         })
-                        .unwrap_or_else(|| "Not checked yet".to_string())
+                        .unwrap_or_else(|| ("Not checked yet".to_string(), None))
                 };
                 let fritz_base_status = if endpoint.is_empty() {
-                    "Not configured".to_string()
+                    ("Base URL not configured".to_string(), None)
                 } else if self.error.is_none() && !self.readings.is_empty() {
-                    "Connected · device data loaded".to_string()
+                    ("Connected · device data loaded".to_string(), Some(true))
                 } else if let Some(error) = &self.error {
-                    format!("Connection failed · {}", error)
+                    (format!("Connection failed · {error}"), Some(false))
                 } else {
-                    "Not checked yet".to_string()
+                    ("Not checked yet".to_string(), None)
                 };
+
                 content = content
                     .push(widget::divider::horizontal::default())
-                    .push(widget::text::title3("FRITZ!Box API endpoints"))
-                    .push(widget::text::caption(
-                        "Configured URLs and the latest HTTP response for each API operation. Session IDs and device identifiers are omitted.",
-                    ))
-                    .push(widget::text::body(format!(
-                        "FRITZ!Box · {}",
-                        if endpoint.is_empty() {
-                            "Base URL not configured".to_string()
-                        } else {
-                            endpoint.to_string()
-                        }
-                    )))
-                    .push(widget::text::caption(fritz_base_status))
-                    .push(
-                        widget::Row::new()
-                            .spacing(8)
-                            .push(
-                                widget::text::body("Session authentication")
-                                    .width(cosmic::iced::Length::Fill),
-                            )
-                            .push(widget::text::caption(fritz_endpoint_status("/login_sid.lua"))),
-                    )
+                    .push(widget::text::title3("FRITZ!Box API"))
+                    .push(diagnostic_status_row("Connection", &fritz_base_status.0, fritz_base_status.1))
+                    .push(widget::text::caption(if endpoint.is_empty() {
+                        "Base URL not configured".to_string()
+                    } else {
+                        endpoint.to_string()
+                    }));
+
+                let auth = fritz_endpoint_status("/login_sid.lua");
+                content = content
+                    .push(diagnostic_status_row("Session authentication", &auth.0, auth.1))
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "/login_sid.lua".to_string()
                     } else {
                         format!("{fritz_base}/login_sid.lua")
-                    }))
-                    .push(
-                        widget::Row::new()
-                            .spacing(8)
-                            .push(
-                                widget::text::body("Device list and meter readings")
-                                    .width(cosmic::iced::Length::Fill),
-                            )
-                            .push(widget::text::caption(fritz_endpoint_status(
-                                "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
-                            ))),
-                    )
+                    }));
+
+                let device_list = fritz_endpoint_status(
+                    "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
+                );
+                content = content
+                    .push(diagnostic_status_row("Device list and meter readings", &device_list.0, device_list.1))
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos".to_string()
                     } else {
                         format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos")
-                    }))
-                    .push(
-                        widget::Row::new()
-                            .spacing(8)
-                            .push(
-                                widget::text::body("Per-device switch state")
-                                    .width(cosmic::iced::Length::Fill),
-                            )
-                            .push(widget::text::caption(fritz_endpoint_status(
-                                "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
-                            ))),
-                    )
+                    }));
+
+                let switch_state = fritz_endpoint_status(
+                    "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
+                );
+                content = content
+                    .push(diagnostic_status_row("Per-device switch state", &switch_state.0, switch_state.1))
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>".to_string()
                     } else {
@@ -2247,89 +2196,41 @@ impl cosmic::Application for AppModel {
                             self.settings.ains.len()
                         }
                     )));
+
                 let request_countdown = if self.refresh_started_at.is_some() {
                     "Request in progress…".to_string()
                 } else {
                     self.next_refresh_at
                         .map(|deadline| {
                             format!(
-                                "Next request in {}",
-                                format_countdown(
-                                    deadline.saturating_duration_since(Instant::now()).as_secs()
-                                )
+                                "Next refresh in {}",
+                                format_countdown(deadline.saturating_duration_since(Instant::now()).as_secs())
                             )
                         })
-                        .unwrap_or_else(|| "Waiting for next request".to_string())
+                        .unwrap_or_else(|| "Waiting for next refresh".to_string())
                 };
                 let refresh_indicator = if self.refresh_started_at.is_some() {
                     icon_action_button(
-                        self.refresh_started_at
-                            .map(refresh_spinner_frame)
+                        self.refresh_started_at.map(refresh_spinner_frame)
                             .unwrap_or_else(|| "◴".to_string()),
                         "Request in progress",
                         Message::Refresh,
                     )
-                } else if let Some(remaining) = self
-                    .next_refresh_at
+                } else if let Some(remaining) = self.next_refresh_at
                     .map(|deadline| deadline.saturating_duration_since(Instant::now()))
-                    .filter(|remaining| {
-                        !remaining.is_zero() && *remaining < Duration::from_secs(10)
-                    })
+                    .filter(|remaining| !remaining.is_zero() && *remaining < Duration::from_secs(10))
                 {
                     countdown_action_button(remaining.as_secs().saturating_add(1))
                 } else {
                     icon_action_button("view-refresh-symbolic", "Reload now", Message::Refresh)
                 };
-                content = content
-                    .push(
-                        widget::Row::new()
-                            .spacing(8)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(
-                                widget::text::title3(format!("HTTP requests ({})", requests.len()))
-                                    .width(cosmic::iced::Length::Fill),
-                            )
-                            .push(widget::text::caption(request_countdown))
-                            .push(refresh_indicator),
-                    )
-                    .push(widget::text::caption(
-                        "Most recent responses · session IDs and device identifiers are omitted",
-                    ));
-                if requests.is_empty() {
-                    content = content.push(widget::text::caption("No HTTP responses recorded yet"));
-                } else {
-                    for request in requests.iter().rev() {
-                        let log_line = format!(
-                            "{}  {} {}  {} {}",
-                            request.timestamp,
-                            if request.https { "HTTPS" } else { "HTTP " },
-                            request.status,
-                            request.method,
-                            request.path,
-                        );
-                        content = content.push(
-                            widget::container(
-                                widget::text(log_line)
-                                    .font(cosmic::iced::Font::MONOSPACE)
-                                    .size(12),
-                            )
-                            .width(cosmic::iced::Length::Fill)
-                            .padding([5, 8])
-                            .style(|_| {
-                                cosmic::iced::widget::container::Style {
-                                    background: Some(
-                                        cosmic::iced::Color::from_rgb(0.10, 0.11, 0.12).into(),
-                                    ),
-                                    border: cosmic::iced::Border {
-                                        radius: 3.0.into(),
-                                        ..Default::default()
-                                    },
-                                    ..Default::default()
-                                }
-                            }),
-                        );
-                    }
-                }
+                content = content.push(
+                    widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::caption(request_countdown).width(cosmic::iced::Length::Fill))
+                        .push(refresh_indicator),
+                );
 
                 if let Some(error) = &self.weather_error {
                     content = content.push(error_notice("WEATHER UNAVAILABLE", error));
@@ -2343,8 +2244,7 @@ impl cosmic::Application for AppModel {
                         } else {
                             "CONNECTION FAILED"
                         };
-                        let message = status
-                            .split_once(':')
+                        let message = status.split_once(':')
                             .map(|(_, message)| message.trim())
                             .unwrap_or(status);
                         content = content.push(error_notice(title, message));
@@ -2357,14 +2257,19 @@ impl cosmic::Application for AppModel {
                 } else {
                     content = content.push(widget::text::caption("No status messages yet"));
                 }
-
                 content = content.push(widget::divider::horizontal::default());
             }
             if self
                 .settings_saved_until
                 .is_some_and(|deadline| Instant::now() < deadline)
             {
-                content = content.push(widget::text::caption("✓ Saved"));
+                content = content.push(
+                    widget::Row::new()
+                        .spacing(6)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::icon::from_name("emblem-ok-symbolic").size(16))
+                        .push(widget::text::caption("Settings saved")),
+                );
             }
         } else {
             let mut weather_menu_card: Option<cosmic::Element<'_, Message>> = None;
