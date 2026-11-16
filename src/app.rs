@@ -3042,7 +3042,13 @@ impl cosmic::Application for AppModel {
                     .align_y(cosmic::iced::Alignment::Center)
                     .push(widget::text::caption(current_date))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill));
-                if weather.image_attribution.is_some() {
+                let current_image_index = weather.slideshow_sequence
+                    .get(self.weather_slideshow_index)
+                    .copied()
+                    .unwrap_or(0) / 4;
+                let current_attribution = weather.image_attributions.get(current_image_index)
+                    .or_else(|| weather.image_attribution.as_ref());
+                if current_attribution.is_some() {
                     date_row = date_row.push(
                         widget::button::custom(
                             widget::icon::from_name(if self.weather_attribution_expanded {
@@ -3061,7 +3067,7 @@ impl cosmic::Application for AppModel {
                     .spacing(6)
                     .push(date_row);
                 if self.weather_attribution_expanded {
-                    if let Some(credit) = &weather.image_attribution {
+                    if let Some(credit) = current_attribution {
                         weather_details = weather_details.push(widget::text::caption(format!(
                             "{} {} · {} · {}",
                             crate::i18n::tr(&self.settings.language, "Photo"),
