@@ -3036,28 +3036,19 @@ impl cosmic::Application for AppModel {
                     })
                     .unwrap_or_else(|| "—".into());
                 let current_date = chrono::Local::now().format("%A, %d %B %Y").to_string();
-                let weather_details = widget::Column::new()
+                let mut weather_details = widget::Column::new()
                     .spacing(6)
-                    .push(
-                        widget::Row::new()
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::text::caption(current_date))
-                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(
-                                widget::button::custom(
-                                    widget::icon::from_name("image-x-generic-symbolic").size(16),
-                                )
-                                .on_press(Message::OpenCommonsPage(
-                                    weather
-                                        .image_attribution
-                                        .as_ref()
-                                        .map(|credit| credit.page_url.clone())
-                                        .unwrap_or_default(),
-                                ))
-                                .padding(5)
-                                .class(cosmic::theme::Button::Standard),
-                            ),
-                    )
+                    .push(widget::text::caption(current_date));
+                if let Some(credit) = &weather.image_attribution {
+                    weather_details = weather_details.push(widget::text::caption(format!(
+                        "{} {} · {} · {}",
+                        crate::i18n::tr(&self.settings.language, "Photo"),
+                        credit.title,
+                        credit.artist,
+                        credit.license
+                    )));
+                }
+                weather_details = weather_details
                     .push(
                         widget::Row::new()
                             .spacing(10)
