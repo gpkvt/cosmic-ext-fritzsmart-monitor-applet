@@ -286,8 +286,8 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
     let sunrise_unix = payload["sys"]["sunrise"].as_i64().unwrap_or(0);
     let sunset_unix = payload["sys"]["sunset"].as_i64().unwrap_or(0);
     let location_name = payload["name"].as_str().unwrap_or(location).to_string();
-    // Commons photos are selected by the observed condition. Image failures are
-    // deliberately non-fatal: weather readings remain available without a photo.
+    // Select photos using both the observed condition and OpenWeatherMap's
+    // local day/night indicator. Image failures remain non-fatal.
     let (background_image, image_attribution) = fetch_commons_background(&client, icon_code).await;
     Ok(WeatherData {
         icon_code: icon_code.to_string(),
@@ -308,23 +308,94 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
     })
 }
 
-fn commons_search_term(icon_code: &str) -> &'static str {
-    match icon_code.get(..2).unwrap_or("") {
-        "01" => "clear sunny sky",
-        "02" | "03" | "04" => "cloudy sky",
-        "09" | "10" => "rain clouds",
-        "11" => "thunderstorm clouds",
-        "13" => "snowfall",
-        "50" => "fog landscape",
-        _ => "weather sky",
+fn commons_search_terms(icon_code: &str) -> &'static [&'static str] {
+    let is_night = icon_code.ends_with('n');
+    match (icon_code.get(..2).unwrap_or(""), is_night) {
+        ("01", true) => &[
+            "clear starry night sky landscape",
+            "clear night sky over city skyline",
+            "moon stars night mountain landscape",
+        ],
+        ("01", false) => &[
+            "sunny blue sky landscape",
+            "bright sunshine over mountain landscape",
+            "sunlit blue sky countryside",
+        ],
+        ("02" | "03" | "04", true) => &[
+            "cloudy night sky moon city",
+            "dramatic clouds over city at night",
+            "moon behind clouds night landscape",
+        ],
+        ("02" | "03" | "04", false) => &[
+            "cloudy sky landscape daytime",
+            "dramatic overcast clouds mountain",
+            "cloud formations over countryside",
+        ],
+        ("09" | "10", true) => &[
+            "rainy night city street reflections",
+            "rain falling at night urban street",
+            "night rain illuminated street",
+        ],
+        ("09" | "10", false) => &[
+            "rain shower daytime landscape",
+            "rain falling over city daytime",
+            "rain clouds over green countryside",
+        ],
+        ("11", true) => &[
+            "lightning thunderstorm night city",
+            "lightning storm over landscape at night",
+            "dramatic thunderstorm night sky",
+        ],
+        ("11", false) => &[
+            "thunderstorm lightning dark clouds daytime",
+            "storm clouds over landscape",
+            "approaching thunderstorm countryside",
+        ],
+        ("13", true) => &[
+            "snowfall at night village lights",
+            "snowy night forest landscape",
+            "winter night snow covered street",
+        ],
+        ("13", false) => &[
+            "snowfall daytime forest",
+            "snow covered mountain winter landscape",
+            "snowy village in daylight",
+        ],
+        ("50", true) => &[
+            "foggy night street lights",
+            "misty night city landscape",
+            "fog over forest at night",
+        ],
+        ("50", false) => &[
+            "morning fog forest landscape",
+            "misty countryside morning",
+            "foggy city street daylight",
+        ],
+        (_, true) => &["night weather landscape", "night sky city lights"],
+        _ => &["weather sky landscape daytime", "dramatic sky landscape"],
     }
 }
 
+fn commons_search_term(icon_code: &str, variant: usize) -> &'static str {
+    let terms = commons_search_terms(icon_code);
+    terms[variant % terms.len()]
+}
+
+fn commons_search_offset() -> u64 {
+    // Rotate through different result pages on subsequent weather refreshes.
+    // Five-minute buckets avoid changing the search page during a single refresh.
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| (duration.as_secs() / 300) % 80)
+        .unwrap_or(0)
+}
 async fn fetch_commons_background(
     client: &Client,
     icon_code: &str,
 ) -> (Option<Vec<u8>>, Option<CommonsAttribution>) {
-    let search = commons_search_term(icon_code);
+    let search_offset = commons_search_offset();
+    let search = commons_search_term(icon_code, search_offset as usize);
     let response = client
         .get("https://commons.wikimedia.org/w/api.php")
         .query(&[
@@ -334,7 +405,8 @@ async fn fetch_commons_background(
             ("gsrnamespace", "6"),
             // Search several files: the first result can be a video, SVG, or
             // otherwise lack a usable thumbnail.
-            ("gsrlimit", "8"),
+            ("gsrlimit", "20"),
+            ("gsroffset", &search_offset.to_string()),
             ("prop", "imageinfo"),
             ("iiprop", "url|extmetadata"),
             ("iiurlwidth", "1200"),
@@ -531,12 +603,21 @@ mod tests {
     }
 
     #[test]
-    fn commons_photo_search_matches_current_weather_condition() {
-        assert_eq!(commons_search_term("01d"), "clear sunny sky");
-        assert_eq!(commons_search_term("10n"), "rain clouds");
-        assert_eq!(commons_search_term("11d"), "thunderstorm clouds");
-        assert_eq!(commons_search_term("13n"), "snowfall");
-        assert_eq!(commons_search_term("50d"), "fog landscape");
+    fn commons_photo_search_matches_condition_and_time_of_day() {
+        for (icon, expected) in [
+            ("01d", "sunny blue sky landscape"),
+            ("01n", "clear starry night sky landscape"),
+            ("10n", "rainy night city street reflections"),
+            ("10d", "rain shower daytime landscape"),
+            ("11n", "lightning thunderstorm night city"),
+            ("11d", "thunderstorm lightning dark clouds daytime"),
+            ("13n", "snowfall at night village lights"),
+            ("50d", "morning fog forest landscape"),
+        ] {
+            assert_eq!(commons_search_term(icon, 0), expected);
+        }
+        assert_eq!(commons_search_term("01n", 1), "clear night sky over city skyline");
+        assert_eq!(commons_search_term("01n", 2), "moon stars night mountain landscape");
     }
 
     #[test]
