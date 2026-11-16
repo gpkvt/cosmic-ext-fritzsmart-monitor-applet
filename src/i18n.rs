@@ -115,6 +115,12 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Off" => "Aus",
         "Enabled" => "Aktiviert",
         "Disabled" => "Deaktiviert",
+        "Loading forecast…" => "Vorhersage wird geladen…",
+        "API key" => "API-Schlüssel",
+        "https://fritz.box" => "https://fritz.box",
+        "e.g. Amsterdam or 52.37,4.90" => "z. B. Berlin oder 52.52,13.40",
+        "7d" => "7 T",
+        "14d" => "14 T",
         _ => key,
     }
 }
