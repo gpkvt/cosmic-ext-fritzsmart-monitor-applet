@@ -429,7 +429,7 @@ fn graph_visual_large(
     unit: &str,
 ) -> cosmic::Element<'static, Message> {
     // The enlarged graph should use a genuinely large canvas, not just a slightly taller compact card.
-    graph_visual_with_dimensions(values, style, unit, 420.0, 420)
+    graph_visual_with_dimensions(values, style, unit, 400.0, 400)
 }
 
 fn graph_visual_with_dimensions(
