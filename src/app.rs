@@ -1548,12 +1548,51 @@ impl cosmic::Application for AppModel {
                 ));
             }
         }
-        for item_id in &self.settings.panel_order {
-            if let Some(index) = panel_items
+        // Pair related readings into compact two-row panel groups. Either
+        // member's configured position controls where its group appears.
+        let mut take_panel_item = |id: &str| {
+            panel_items
                 .iter()
-                .position(|(id, _)| *id == item_id.as_str())
+                .position(|(item_id, _)| *item_id == id)
+                .map(|index| panel_items.remove(index).1)
+        };
+        let weather_item = take_panel_item("weather");
+        let temperature_item = take_panel_item("temperature");
+        let power_item = take_panel_item("power-consumption");
+        let solar_item = take_panel_item("solar-power");
+        drop(take_panel_item);
+
+        let mut panel_groups: Vec<(Vec<&str>, cosmic::Element<'static, Message>)> = Vec::new();
+        if weather_item.is_some() || temperature_item.is_some() {
+            let mut rows = widget::Column::new().spacing(0);
+            if let Some(item) = weather_item {
+                rows = rows.push(item);
+            }
+            if let Some(item) = temperature_item {
+                rows = rows.push(item);
+            }
+            panel_groups.push((vec!["weather", "temperature"], rows.into()));
+        }
+        if power_item.is_some() || solar_item.is_some() {
+            let mut rows = widget::Column::new().spacing(0);
+            if let Some(item) = power_item {
+                rows = rows.push(item);
+            }
+            if let Some(item) = solar_item {
+                rows = rows.push(item);
+            }
+            panel_groups.push((vec!["power-consumption", "solar-power"], rows.into()));
+        }
+        for (id, item) in panel_items.drain(..) {
+            panel_groups.push((vec![id], item));
+        }
+
+        for item_id in &self.settings.panel_order {
+            if let Some(index) = panel_groups
+                .iter()
+                .position(|(ids, _)| ids.contains(&item_id.as_str()))
             {
-                let (_, item) = panel_items.remove(index);
+                let (_, item) = panel_groups.remove(index);
                 content = content.push(item);
             }
         }
