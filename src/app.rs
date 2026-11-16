@@ -897,8 +897,7 @@ fn total_power_overview(
                     .width(cosmic::iced::Length::Fill)
                     .push(widget::text::caption(axis_start))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                    .push(widget::text::caption("Now")),
-            );
+                    .push(widget::text::caption("Now")),            );
         let input_content = widget::Column::new()
             .spacing(8)
             .width(cosmic::iced::Length::Fill)
@@ -1390,27 +1389,24 @@ impl cosmic::Application for AppModel {
                 )
             });
 
-        // Keep a compact icon-to-value gap inside each item. The configured row
-        // spacing is the only gap between items, including when it is set to zero.
+        // Keep each panel item content-sized: fixed-width value slots create
+        // large empty gaps between the icon and its reading on compact panels.
         let panel_item = |label: &'static str,
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>| {
             let mut item = widget::Row::new()
-                .spacing(0)
+                .spacing(2)
                 .align_y(cosmic::iced::Alignment::Center);
-            // Add a small left inset to panel icons without increasing the
-            // gap between each icon and its value. Keep empty slots aligned.
-            let icon_slot = widget::container(icon.unwrap_or_else(|| widget::text("").into()))
-                .width(cosmic::iced::Length::Fixed(12.0))
-                .height(cosmic::iced::Length::Fixed(24.0))
-                .padding([0, 0, 0, 2])
-                .center_y(24);
-            item = item.push(icon_slot);
-            let value_slot = widget::container(value)
-                .width(cosmic::iced::Length::Fixed(88.0))
-                .align_x(cosmic::iced::alignment::Horizontal::Right);
+            if let Some(icon) = icon {
+                item = item.push(
+                    widget::container(icon)
+                        .height(cosmic::iced::Length::Fixed(24.0))
+                        .padding([0, 0, 0, 2])
+                        .center_y(24),
+                );
+            }
             self.core.applet.applet_tooltip(
-                item.push(value_slot),
+                item.push(value),
                 label,
                 false,
                 Message::TooltipSurfaceAction,
@@ -1503,46 +1499,26 @@ impl cosmic::Application for AppModel {
                         format_bandwidth(bandwidth.upload_bits_per_second),
                     ))
                     .unwrap_or_else(|| ("-- Mbps".to_string(), "-- Mbps".to_string()));
-                // Bandwidth needs more room than a normal single-value item:
-                // each row contains a direction icon and a full Mbps value.
+                // Keep both directional readings content-sized as well; a
+                // fixed 144px column needlessly separates the arrows and values.
                 let bandwidth_rows = widget::Column::new()
                     .spacing(0)
                     .push(
                         widget::Row::new()
-                            .width(cosmic::iced::Length::Fixed(144.0))
-                            .spacing(3)
+                            .spacing(2)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::icon::from_name("go-down-symbolic").size(10))
-                            .push(
-                                widget::container(widget::text::body(download).size(f32::from(self.settings.panel_text_size)))
-                                    .width(cosmic::iced::Length::Fill)
-                                    .align_x(cosmic::iced::alignment::Horizontal::Right),
-                            ),
+                            .push(widget::text::body(download).size(f32::from(self.settings.panel_text_size))),
                     )
                     .push(
                         widget::Row::new()
-                            .width(cosmic::iced::Length::Fixed(144.0))
-                            .spacing(3)
+                            .spacing(2)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::icon::from_name("go-up-symbolic").size(10))
-                            .push(
-                                widget::container(widget::text::body(upload).size(f32::from(self.settings.panel_text_size)))
-                                    .width(cosmic::iced::Length::Fill)
-                                    .align_x(cosmic::iced::alignment::Horizontal::Right),
-                            ),
+                            .push(widget::text::body(upload).size(f32::from(self.settings.panel_text_size))),
                     );
-                let bandwidth_item = widget::Row::new()
-                    .spacing(0)
-                    .align_y(cosmic::iced::Alignment::Center)
-                    .push(
-                        widget::container(widget::text(""))
-                            .width(cosmic::iced::Length::Fixed(12.0))
-                            .height(cosmic::iced::Length::Fixed(24.0)),
-                    )
-                    .push(
-                        widget::container(bandwidth_rows)
-                            .width(cosmic::iced::Length::Fixed(144.0)),
-                    );
+                let bandwidth_item = widget::container(bandwidth_rows)
+                    .padding([0, 0, 0, 2]);
                 panel_items.push((
                     "internet-bandwidth",
                     self.core.applet.applet_tooltip(
@@ -1797,8 +1773,7 @@ impl cosmic::Application for AppModel {
                         ).padding([8, 10])))
                     .push(
                         widget::Row::new()
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(
+                            .align_y(cosmic::iced::Alignment::Center)                            .push(
                                 widget::Column::new()
                                     .spacing(3)
                                     .width(cosmic::iced::Length::Fill)
@@ -2697,8 +2672,7 @@ impl cosmic::Application for AppModel {
                     }
                     if let Some(error) = &self.weather_forecast_error {
                         weather_section =
-                            weather_section.push(error_notice("FORECAST UNAVAILABLE", error));
-                    }
+                            weather_section.push(error_notice("FORECAST UNAVAILABLE", error));                    }
                     if let Some(forecast) = &self.weather_forecast {
                         for day in &forecast.days {
                             let date_label =
@@ -3597,8 +3571,7 @@ impl cosmic::Application for AppModel {
                                 }
                             }
                             self.readings = readings;
-                            if let Err(error) =
-                                crate::history::save(&self.history, &self.device_history)
+                            if let Err(error) =                                crate::history::save(&self.history, &self.device_history)
                             {
                                 eprintln!("Could not persist graph history: {error}");
                             }
