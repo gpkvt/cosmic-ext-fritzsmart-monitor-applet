@@ -3089,11 +3089,11 @@ impl cosmic::Application for AppModel {
                                 .map(|weather| format!("{:.0} °C", weather.temperature_c)),
                             "bandwidth" => Some(self.internet_bandwidth.as_ref().map(|bandwidth| {
                                 format!(
-                                    "↓ {} · ↑ {}",
-                                    format_bandwidth(bandwidth.download_bits_per_second),
-                                    format_bandwidth(bandwidth.upload_bits_per_second),
+                                    "↓{:.1} ↑{:.1}",
+                                    bandwidth.download_bits_per_second as f64 / 1_000_000.0,
+                                    bandwidth.upload_bits_per_second as f64 / 1_000_000.0,
                                 )
-                            }).unwrap_or_else(|| "Waiting…".to_string())),
+                            }).unwrap_or_else(|| "…".to_string())),
                             _ => None,
                         }
                     } else {
@@ -3105,7 +3105,11 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::body(section.1))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
                     let heading_row = if let Some(value) = collapsed_value {
-                        heading_row.push(widget::text::title3(value))
+                        if section.0 == "bandwidth" {
+                            heading_row.push(widget::text::caption(value))
+                        } else {
+                            heading_row.push(widget::text::title3(value))
+                        }
                     } else {
                         heading_row
                     };
