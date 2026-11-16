@@ -4867,7 +4867,7 @@ impl cosmic::Application for AppModel {
             Message::WeatherSlideshowDurationChanged(value) => {
                 self.settings.weather_slideshow_interval_seconds = value.clamp(5, 300);
                 if let Some(weather) = &mut self.weather {
-                    let (frames, sequence) = build_weather_slideshow_frames(
+                    let (frames, sequence, frame_sources) = build_weather_slideshow_frames(
                         &weather.background_images,
                         self.settings.weather_slideshow_interval_seconds,
                     );
