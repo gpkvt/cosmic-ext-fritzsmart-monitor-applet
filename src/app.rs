@@ -618,6 +618,27 @@ fn rebuild_output_power_history(
     samples.into_iter().collect()
 }
 
+fn rebuild_temperature_history(
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    input_ains: &HashSet<String>,
+    include_inputs: bool,
+) -> VecDeque<(Instant, f64)> {
+    let mut samples = BTreeMap::<Instant, (f64, usize)>::new();
+    for (ain, history) in device_history {
+        if input_ains.contains(ain) == include_inputs {
+            for (timestamp, _, temperature) in history {
+                let entry = samples.entry(*timestamp).or_default();
+                entry.0 += *temperature;
+                entry.1 += 1;
+            }
+        }
+    }
+    samples
+        .into_iter()
+        .map(|(timestamp, (sum, count))| (timestamp, sum / count as f64))
+        .collect()
+}
+
 fn record_device_sample(
     history: &mut HashMap<String, VecDeque<(Instant, i64, f64)>>,
     reading: &FritzReading,
@@ -802,6 +823,7 @@ fn live_power_summary(
     power: String,
     temperature: Option<String>,
     history: Vec<f64>,
+    temperature_history: Vec<f64>,
     graph_style: &str,
     language: &str,
     axis_start: String,
@@ -840,6 +862,14 @@ fn live_power_summary(
             history.into_iter(),
             graph_style,
             "W",
+        ))
+        .push(widget::text::caption(crate::i18n::tr(language, "AVERAGE TEMPERATURE HISTORY (°C)")))
+        .push(interactive_graph(
+            language,
+            crate::i18n::tr(language, "AVERAGE TEMPERATURE"),
+            temperature_history.into_iter(),
+            graph_style,
+            "°C",
         ))
         .push(
             widget::Row::new()
@@ -904,6 +934,10 @@ fn total_power_overview(
     let output_low = history.iter().map(|(_, value)| *value).min()?;
     let output_high = history.iter().map(|(_, value)| *value).max()?;
     let input_history = rebuild_input_power_history(device_history, &settings.input_ains);
+    let output_temperature_history =
+        rebuild_temperature_history(device_history, &settings.input_ains, false);
+    let input_temperature_history =
+        rebuild_temperature_history(device_history, &settings.input_ains, true);
     let input_low = input_history
         .iter()
         .map(|(_, value)| *value)
@@ -927,6 +961,14 @@ fn total_power_overview(
             history.iter().map(|(_, value)| *value as f64),
             &settings.graph_style,
             "W",
+        ))
+        .push(widget::text::caption("AVERAGE TEMPERATURE (°C)"))
+        .push(interactive_graph(
+            &settings.language,
+            crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
+            output_temperature_history.iter().map(|(_, value)| *value),
+            &settings.graph_style,
+            "°C",
         ))
         .push(
             widget::Row::new()
@@ -984,6 +1026,14 @@ fn total_power_overview(
                 input_history.iter().map(|(_, value)| *value as f64),
                 &settings.graph_style,
                 "W",
+            ))
+            .push(widget::text::caption("AVERAGE TEMPERATURE (°C)"))
+            .push(interactive_graph(
+                &settings.language,
+                crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
+                input_temperature_history.iter().map(|(_, value)| *value),
+                &settings.graph_style,
+                "°C",
             ))
             .push(
                 widget::Row::new()
@@ -3246,6 +3296,10 @@ impl cosmic::Application for AppModel {
                     summary_power,
                     summary_temperature,
                     self.history.iter().map(|(_, value)| *value as f64).collect(),
+                    rebuild_temperature_history(&self.device_history, &self.settings.input_ains, false)
+                        .iter()
+                        .map(|(_, value)| *value)
+                        .collect(),
                     &self.settings.graph_style,
                     &self.settings.language,
                     format_graph_axis_start(self.settings.graph_timespan_minutes),
