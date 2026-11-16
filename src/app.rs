@@ -1315,8 +1315,8 @@ impl cosmic::Application for AppModel {
 
         let suggested = self.core.applet.suggested_size(true);
         // Keep a comfortable pointer/touch target with a compact icon-to-value gap.
-        let vertical_padding = 8_u16;
-        let horizontal_padding = 10_u16;
+        let vertical_padding = 0_u16;
+        let horizontal_padding = 0_u16;
 
         // Keep a compact icon-to-value gap inside each item. The configured row
         // spacing is the only gap between items, including when it is set to zero.
