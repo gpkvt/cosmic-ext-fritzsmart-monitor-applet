@@ -166,7 +166,7 @@ fn save_to_path(
     let temporary = parent.join(format!(
         ".history.{}.{}.tmp",
         std::process::id(),
-        format!("{}-{}", now_epoch, now.elapsed().as_nanos())
+        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
     ));
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
@@ -199,7 +199,7 @@ mod tests {
         std::env::temp_dir().join(format!(
             "fritz-power-monitor-history-{}-{}.json",
             std::process::id(),
-            epoch_now().unwrap()
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
         ))
     }
 
