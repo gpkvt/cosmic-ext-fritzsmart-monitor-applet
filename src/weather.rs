@@ -27,6 +27,7 @@ pub struct WeatherData {
     pub background_image: Option<Vec<u8>>,
     pub background_images: Vec<Vec<u8>>,
     pub slideshow_frames: Vec<Vec<u8>>,
+    pub slideshow_sequence: Vec<usize>,
     pub image_attribution: Option<CommonsAttribution>,
 }
 
@@ -292,7 +293,9 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
     // local day/night indicator. Image failures remain non-fatal.
     let (background_images, image_attribution) = fetch_commons_background(&client, icon_code).await;
     let background_image = background_images.first().cloned();
-    let slideshow_frames = build_weather_slideshow_frames(&background_images);
+    // The applet builds its slideshow with the user's configured display duration.
+    let slideshow_frames = Vec::new();
+    let slideshow_sequence = Vec::new();
     Ok(WeatherData {
         icon_code: icon_code.to_string(),
         description,
@@ -310,6 +313,7 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
         background_image,
         background_images,
         slideshow_frames,
+        slideshow_sequence,
         image_attribution,
     })
 }
@@ -463,29 +467,29 @@ fn blur_background_image(bytes: Vec<u8>) -> Option<Vec<u8>> {
     Some(output.into_inner())
 }
 
-fn build_weather_slideshow_frames(images: &[Vec<u8>]) -> Vec<Vec<u8>> {
+pub fn build_weather_slideshow_frames(
+    images: &[Vec<u8>],
+    display_seconds: u16,
+) -> (Vec<Vec<u8>>, Vec<usize>) {
     use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba};
-    if images.is_empty() { return Vec::new(); }
     let decoded: Vec<_> = images.iter()
         .filter_map(|bytes| image::load_from_memory(bytes).ok())
         .map(|image| image.to_rgba8())
         .collect();
-    if decoded.len() < 2 {
-        return decoded.first().map(|image| {
-            let mut output = std::io::Cursor::new(Vec::new());
-            DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(image.clone()).to_rgb8()).write_to(&mut output, image::ImageFormat::Jpeg).ok();
-            output.into_inner()
-        }).into_iter().collect();
-    }
+    if decoded.is_empty() { return (Vec::new(), Vec::new()); }
+
     let mut frames = Vec::new();
-    for index in 0..decoded.len() {
-        let current = &decoded[index];
-        // Hold each photograph for three seconds at a 250 ms frame interval.
-        for _ in 0..12 {
-            let mut output = std::io::Cursor::new(Vec::new());
-            DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(current.clone()).to_rgb8()).write_to(&mut output, image::ImageFormat::Jpeg).ok();
+    let mut sequence = Vec::new();
+    let hold_ticks = usize::from(display_seconds.clamp(5, 300)) * 4;
+    for (index, current) in decoded.iter().enumerate() {
+        let mut output = std::io::Cursor::new(Vec::new());
+        if DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(current.clone()).to_rgb8())
+            .write_to(&mut output, image::ImageFormat::Jpeg).is_ok()
+        {
             frames.push(output.into_inner());
+            sequence.extend(std::iter::repeat(frames.len() - 1).take(hold_ticks));
         }
+        if decoded.len() < 2 { continue; }
         let next = &decoded[(index + 1) % decoded.len()];
         if current.dimensions() != next.dimensions() { continue; }
         for step in 1..=3 {
@@ -499,12 +503,15 @@ fn build_weather_slideshow_frames(images: &[Vec<u8>]) -> Vec<Vec<u8>> {
                 }));
             }
             let mut output = std::io::Cursor::new(Vec::new());
-            if DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(blended).to_rgb8()).write_to(&mut output, image::ImageFormat::Jpeg).is_ok() {
+            if DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(blended).to_rgb8())
+                .write_to(&mut output, image::ImageFormat::Jpeg).is_ok()
+            {
                 frames.push(output.into_inner());
+                sequence.push(frames.len() - 1);
             }
         }
     }
-    frames
+    (frames, sequence)
 }
 
 fn strip_html(value: &str) -> String {
@@ -609,6 +616,7 @@ mod tests {
                 background_image: None,
                 background_images: Vec::new(),
                 slideshow_frames: Vec::new(),
+                slideshow_sequence: Vec::new(),
                 image_attribution: None,
             };
             assert_eq!(weather.icon_name(), expected);
@@ -646,8 +654,9 @@ mod tests {
             image.write_to(&mut output, image::ImageFormat::Jpeg).unwrap();
             output.into_inner()
         };
-        let frames = build_weather_slideshow_frames(&[encode(first), encode(second)]);
-        assert_eq!(frames.len(), 30);
+        let (frames, sequence) = build_weather_slideshow_frames(&[encode(first), encode(second)], 5);
+        assert_eq!(frames.len(), 8);
+        assert_eq!(sequence.len(), 46);
         for frame in frames {
             assert!(image::load_from_memory(&frame).is_ok());
         }
