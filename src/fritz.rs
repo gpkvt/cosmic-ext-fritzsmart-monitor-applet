@@ -329,6 +329,7 @@ fn parse_expanded_devices(value: &str) -> Vec<String> {
     value
         .split(',')
         .map(normalize_ain_for_selection)
+        .map(|ain| ain.to_ascii_uppercase())
         .filter(|ain| !ain.is_empty())
         .fold(Vec::new(), |mut devices, ain| {
             if !devices.contains(&ain) {
@@ -1301,7 +1302,7 @@ mod tests {
     #[test]
     fn parses_tr064_maximum_wan_link_rates_in_bits_per_second() {
         let xml = r#"<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-          <s:Body><u:GetCommonLinkPropertiesResponse>
+          <s:Body><u:GetCommonLinkPropertiesResponse xmlns:u="urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1">
             <NewLayer1UpstreamMaxBitRate>50000000</NewLayer1UpstreamMaxBitRate>
             <NewLayer1DownstreamMaxBitRate>1000000000</NewLayer1DownstreamMaxBitRate>
             <NewPhysicalLinkStatus>Up</NewPhysicalLinkStatus>
@@ -1749,6 +1750,7 @@ mod tests {
             vec![
                 "summary",
                 "weather",
+                "internet-bandwidth",
                 "devices",
                 "total-power-output",
                 "total-power-input"
@@ -1764,6 +1766,7 @@ mod tests {
         assert_eq!(
             parse_menu_order("devices,summary,devices,unknown"),
             vec![
+                "internet-bandwidth",
                 "devices",
                 "summary",
                 "weather",
@@ -1778,6 +1781,7 @@ mod tests {
         assert_eq!(
             parse_menu_order("devices,total-power,summary"),
             vec![
+                "internet-bandwidth",
                 "devices",
                 "total-power-output",
                 "total-power-input",
@@ -1794,6 +1798,7 @@ mod tests {
                 "total-power-input",
                 "summary",
                 "total-power-output",
+                "internet-bandwidth",
                 "weather",
                 "devices",
             ]
