@@ -2154,6 +2154,99 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::caption(forecast_status)),
                 );
                 let requests = crate::fritz::http_request_diagnostics();
+                let fritz_base = endpoint.trim_end_matches('/');
+                let fritz_endpoint_status = |path: &str| {
+                    requests
+                        .iter()
+                        .rev()
+                        .find(|request| request.path == path)
+                        .map(|request| {
+                            if (200..300).contains(&request.status) {
+                                format!("HTTP {} · successful", request.status)
+                            } else {
+                                format!("HTTP {} · failed", request.status)
+                            }
+                        })
+                        .unwrap_or_else(|| "Not checked yet".to_string())
+                };
+                let fritz_base_status = if endpoint.is_empty() {
+                    "Not configured".to_string()
+                } else if self.error.is_none() && !self.readings.is_empty() {
+                    "Connected · device data loaded".to_string()
+                } else if let Some(error) = &self.error {
+                    format!("Connection failed · {}", error)
+                } else {
+                    "Not checked yet".to_string()
+                };
+                content = content
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3("FRITZ!Box API endpoints"))
+                    .push(widget::text::caption(
+                        "Configured URLs and the latest HTTP response for each API operation. Session IDs and device identifiers are omitted.",
+                    ))
+                    .push(widget::text::body(format!(
+                        "FRITZ!Box · {}",
+                        if endpoint.is_empty() {
+                            "Base URL not configured".to_string()
+                        } else {
+                            endpoint.to_string()
+                        }
+                    )))
+                    .push(widget::text::caption(fritz_base_status))
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .push(
+                                widget::text::body("Session authentication")
+                                    .width(cosmic::iced::Length::Fill),
+                            )
+                            .push(widget::text::caption(fritz_endpoint_status("/login_sid.lua"))),
+                    )
+                    .push(widget::text::caption(if endpoint.is_empty() {
+                        "/login_sid.lua".to_string()
+                    } else {
+                        format!("{fritz_base}/login_sid.lua")
+                    }))
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .push(
+                                widget::text::body("Device list and meter readings")
+                                    .width(cosmic::iced::Length::Fill),
+                            )
+                            .push(widget::text::caption(fritz_endpoint_status(
+                                "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
+                            ))),
+                    )
+                    .push(widget::text::caption(if endpoint.is_empty() {
+                        "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos".to_string()
+                    } else {
+                        format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos")
+                    }))
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .push(
+                                widget::text::body("Per-device switch state")
+                                    .width(cosmic::iced::Length::Fill),
+                            )
+                            .push(widget::text::caption(fritz_endpoint_status(
+                                "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
+                            ))),
+                    )
+                    .push(widget::text::caption(if endpoint.is_empty() {
+                        "/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>".to_string()
+                    } else {
+                        format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>")
+                    }))
+                    .push(widget::text::caption(format!(
+                        "Configured devices: {}",
+                        if self.settings.ains.is_empty() {
+                            if self.settings.ain.trim().is_empty() { 0 } else { 1 }
+                        } else {
+                            self.settings.ains.len()
+                        }
+                    )));
                 let request_countdown = if self.refresh_started_at.is_some() {
                     "Request in progress…".to_string()
                 } else {
@@ -2200,7 +2293,7 @@ impl cosmic::Application for AppModel {
                             .push(refresh_indicator),
                     )
                     .push(widget::text::caption(
-                        "Most recent responses · query parameters and session IDs are omitted",
+                        "Most recent responses · session IDs and device identifiers are omitted",
                     ));
                 if requests.is_empty() {
                     content = content.push(widget::text::caption("No HTTP responses recorded yet"));
