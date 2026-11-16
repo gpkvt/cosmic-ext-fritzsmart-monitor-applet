@@ -92,6 +92,7 @@ pub enum Message {
     GraphStyleChanged(String),
     ShowGraph(String, Vec<f64>, String),
     CloseGraph,
+    EscapePressed(Id),
     RefreshIntervalChanged(u32),
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
@@ -1404,19 +1405,18 @@ impl cosmic::Application for AppModel {
         };
 
         if self.expanded_graph.is_some() {
-            // Match the standard dialog interaction: Escape closes the
-            // enlarged graph without requiring pointer interaction.
-            // Listen through iced's keyboard subscription so key presses
-            // from the focused popup surface are routed to the app as well.
-            // The generic event listener can miss Escape when the popup owns
-            // keyboard focus.
-            let escape = cosmic::iced::keyboard::listen().filter_map(|event| match event {
-                cosmic::iced::keyboard::Event::KeyPressed {
-                    key: cosmic::iced::keyboard::Key::Named(
-                        cosmic::iced::keyboard::key::Named::Escape,
-                    ),
-                    ..
-                } => Some(Message::CloseGraph),
+            // Observe raw events: the normal keyboard subscription drops
+            // events already captured by a popup widget or the compositor.
+            // Keep the originating surface ID so Escape only closes this graph.
+            let escape = cosmic::iced::event::listen_raw(|event, _status, window| match event {
+                cosmic::iced::Event::Keyboard(
+                    cosmic::iced::keyboard::Event::KeyPressed {
+                        key: cosmic::iced::keyboard::Key::Named(
+                            cosmic::iced::keyboard::key::Named::Escape,
+                        ),
+                        ..
+                    },
+                ) => Some(Message::EscapePressed(window)),
                 _ => None,
             });
             Subscription::batch([clock, escape])
@@ -4059,6 +4059,13 @@ impl cosmic::Application for AppModel {
             Message::CloseGraph => {
                 self.expanded_graph = None;
                 if let Some(id) = self.graph_window.take() {
+                    return destroy_popup(id);
+                }
+            }
+            Message::EscapePressed(id) => {
+                if self.graph_window == Some(id) {
+                    self.expanded_graph = None;
+                    self.graph_window = None;
                     return destroy_popup(id);
                 }
             }
