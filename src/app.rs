@@ -497,7 +497,9 @@ fn rebuild_input_power_history(
             for (timestamp, power_w, _) in history {
                 *samples.entry(*timestamp).or_default() += signed_device_power(*power_w, true);
             }
-        }    }    samples.into_iter().collect()
+        }
+    }
+    samples.into_iter().collect()
 }
 
 fn rebuild_power_difference_history(
@@ -995,8 +997,10 @@ fn power_difference_overview(
                         format!("{high} W"),
                         "go-up-symbolic",
                     ))
-                    .width(cosmic::iced::Length::Fill),                ),
-        );    }
+                    .width(cosmic::iced::Length::Fill),
+                ),
+        );
+    }
     let graph = widget::Column::new()
         .spacing(4)
         .push(widget::text::caption("POWER DIFFERENCE (W)"))
@@ -1493,9 +1497,11 @@ impl cosmic::Application for AppModel {
                 .position(|(id, _)| *id == item_id.as_str())
             {
                 let (_, item) = panel_items.remove(index);
-                content = content.push(item);            }
+                content = content.push(item);
+            }
         }
-        // Keep connection health visible even when the popup is closed.        if self.error.is_some() {
+        // Keep connection health visible even when the popup is closed.
+        if self.error.is_some() {
             content = content.push(panel_item(
                 "Connection error",
                 Some(
@@ -1991,10 +1997,12 @@ impl cosmic::Application for AppModel {
                                     })),
                             );
                         if let Some(thresholds) = alert_thresholds {
-                            device_row = device_row                                .push(widget::text::caption(format!(
+                            device_row = device_row
+                                .push(widget::text::caption(format!(
                                     "Upper limit: {} °C",
                                     thresholds.high_c
-                                )))                                .push(
+                                )))
+                                .push(
                                     widget::slider(0.0..=40.0, f32::from(thresholds.high_c), {
                                         let ain = ain.clone();
                                         move |value| {
@@ -2295,7 +2303,7 @@ impl cosmic::Application for AppModel {
                         .padding(10)
                         .style(|_| cosmic::iced::widget::container::Style {
                             background: Some(
-                                cosmic::iced::Color::from_rgba(0.025, 0.035, 0.05, 0.78).into(),
+                                cosmic::iced::Color::from_rgba(0.025, 0.035, 0.05, 0.82).into(),
                             ),
                             text_color: Some(cosmic::iced::Color::WHITE),
                             ..Default::default()
@@ -2460,7 +2468,8 @@ impl cosmic::Application for AppModel {
                                     widget::Column::new()
                                         .width(cosmic::iced::Length::Fixed(82.0))
                                         .align_x(cosmic::iced::Alignment::End)
-                                        .push(widget::text::body(format!(                                            "{:.0}° / {:.0}°",
+                                        .push(widget::text::body(format!(
+                                            "{:.0}° / {:.0}°",
                                             day.max_temperature_c, day.min_temperature_c
                                         ))),
                                 )
@@ -2475,7 +2484,8 @@ impl cosmic::Application for AppModel {
                                         )))
                                         .push(widget::text::caption(format!(
                                             "{:.0} km/h",
-                                            day.wind_speed_kmh                                        ))),
+                                            day.wind_speed_kmh
+                                        ))),
                                 );
                             weather_section = weather_section.push(day_row);
                         }
@@ -2958,6 +2968,7 @@ impl cosmic::Application for AppModel {
             if let Some(weather_card) = weather_menu_card.take() {
                 content = content.push(weather_card);
             }
+
             let remaining = self
                 .next_refresh_at
                 .map(|deadline| deadline.saturating_duration_since(Instant::now()));
@@ -2974,7 +2985,8 @@ impl cosmic::Application for AppModel {
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                     .push(icon_action_button(
                         "⚙",
-                        "Quick settings",                        Message::ToggleQuickOptions,
+                        "Quick settings",
+                        Message::ToggleQuickOptions,
                     )),
             );
             if self.error.is_none() {
@@ -3456,7 +3468,8 @@ impl cosmic::Application for AppModel {
                 };
                 let target = if move_up {
                     index.checked_sub(1)
-                } else if index + 1 < order.len() {                    Some(index + 1)
+                } else if index + 1 < order.len() {
+                    Some(index + 1)
                 } else {
                     None
                 };
@@ -3473,7 +3486,8 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::ToggleMenuSection(section) => {
-                if !self.collapsed_menu_sections.remove(&section) {                    self.collapsed_menu_sections.insert(section);
+                if !self.collapsed_menu_sections.remove(&section) {
+                    self.collapsed_menu_sections.insert(section);
                 }
             }
             Message::ToggleQuickOptions => {
@@ -3954,7 +3968,8 @@ mod history_tests {
         assert!(!temperature_outside_limits(40.0, thresholds));
         assert!(temperature_outside_limits(40.1, thresholds));
         assert!(!temperature_outside_limits(-10.0, thresholds));
-        assert!(temperature_outside_limits(-10.1, thresholds));        assert!(!temperature_outside_limits(20.0, thresholds));
+        assert!(temperature_outside_limits(-10.1, thresholds));
+        assert!(!temperature_outside_limits(20.0, thresholds));
     }
 
     #[test]
@@ -3972,7 +3987,8 @@ mod history_tests {
                 ain: "111111".into(),
                 name: "Load".into(),
                 power_w: 400,
-                temperature_c: 20.0,                power_state: None,
+                temperature_c: 20.0,
+                power_state: None,
             },
             FritzReading {
                 ain: "222222".into(),
