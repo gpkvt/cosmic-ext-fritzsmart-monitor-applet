@@ -2,7 +2,7 @@ use crate::fritz::{
     FritzDevice, FritzFetchResult, FritzInternetBandwidth, FritzReading, FritzSettings,
     TemperatureAlertThresholds, discover_devices, fetch_fritz_data,
 };
-use crate::weather::{WeatherData, WeatherForecast, fetch_weather, fetch_weather_forecast};
+use crate::weather::{WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather, fetch_weather_forecast};
 use cosmic::iced::{
     Limits, Subscription, futures,
     platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
@@ -126,6 +126,7 @@ pub enum Message {
     OpenWeatherMapApiKeyChanged(String),
     WeatherLocationChanged(String),
     WeatherRefreshIntervalChanged(u16),
+    WeatherSlideshowDurationChanged(u16),
 }
 
 fn device_matches_search(device: &FritzDevice, query: &str) -> bool {
@@ -1520,7 +1521,7 @@ impl cosmic::Application for AppModel {
             Subscription::run(regular_clock_ticks)
         };
 
-        if self.popup.is_some() && self.weather.as_ref().is_some_and(|weather| weather.slideshow_frames.len() > 1) {
+        if self.popup.is_some() && self.weather.as_ref().is_some_and(|weather| weather.slideshow_sequence.len() > 1) {
             Subscription::batch(vec![clock, weather_slideshow_ticks()])
         } else {
             clock
@@ -2283,6 +2284,9 @@ impl cosmic::Application for AppModel {
                         |value| Message::WeatherRefreshIntervalChanged(value.round() as u16)).step(5.0_f32))
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.")))
                     .push(widget::divider::horizontal::default())
+                    .push(widget::text::caption(format!("{} · {}", crate::i18n::tr(&self.settings.language, "Slideshow image duration"), format_countdown(u64::from(self.settings.weather_slideshow_interval_seconds)))))
+                    .push(widget::slider(5.0..=300.0, f32::from(self.settings.weather_slideshow_interval_seconds), |value| Message::WeatherSlideshowDurationChanged(value.round() as u16)).step(5.0_f32))
+                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.")))
             }
 
             if self.active_settings_section == Some("connection") {
@@ -3205,7 +3209,9 @@ impl cosmic::Application for AppModel {
                     .push(weather_heading)
                     .push(weather_details);
                 let weather_card: cosmic::Element<'_, Message> =
-                    if let Some(image_bytes) = weather.slideshow_frames.get(self.weather_slideshow_index).or(weather.background_image.as_ref()) {
+                    if let Some(image_bytes) = weather.slideshow_sequence.get(self.weather_slideshow_index)
+                        .and_then(|frame| weather.slideshow_frames.get(*frame))
+                        .or(weather.background_image.as_ref()) {
                         let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
                             image_bytes.clone(),
                         ))
@@ -4697,15 +4703,21 @@ impl cosmic::Application for AppModel {
             Message::WeatherSlideshowTick => {
                 if self.popup.is_some() {
                     if let Some(weather) = &self.weather {
-                        if !weather.slideshow_frames.is_empty() {
-                            self.weather_slideshow_index = (self.weather_slideshow_index + 1) % weather.slideshow_frames.len();
+                        if !weather.slideshow_sequence.is_empty() {
+                            self.weather_slideshow_index = (self.weather_slideshow_index + 1) % weather.slideshow_sequence.len();
                         }
                     }
                 }
             }
             Message::WeatherUpdated(result) => {
                 match result {
-                    Ok(weather) => {
+                    Ok(mut weather) => {
+                        let (frames, sequence) = build_weather_slideshow_frames(
+                            &weather.background_images,
+                            self.settings.weather_slideshow_interval_seconds,
+                        );
+                        weather.slideshow_frames = frames;
+                        weather.slideshow_sequence = sequence;
                         self.weather = Some(weather);
                         self.weather_slideshow_index = 0;
                         self.weather_error = None;
@@ -4756,6 +4768,19 @@ impl cosmic::Application for AppModel {
             Message::WeatherRefreshIntervalChanged(value) => {
                 self.settings.weather_refresh_interval_minutes = value.clamp(5, 60);
                 self.next_weather_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::WeatherSlideshowDurationChanged(value) => {
+                self.settings.weather_slideshow_interval_seconds = value.clamp(5, 300);
+                if let Some(weather) = &mut self.weather {
+                    let (frames, sequence) = build_weather_slideshow_frames(
+                        &weather.background_images,
+                        self.settings.weather_slideshow_interval_seconds,
+                    );
+                    weather.slideshow_frames = frames;
+                    weather.slideshow_sequence = sequence;
+                    self.weather_slideshow_index = 0;
+                }
                 self.persist_settings();
             }
             Message::LanguageChanged(language) => {
