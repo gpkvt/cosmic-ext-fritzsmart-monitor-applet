@@ -2084,7 +2084,7 @@ impl cosmic::Application for AppModel {
             if self.active_settings_section == Some("refresh") {
                 content = content
                     .push(widget::text::caption(format!(
-                        "{}: {}",
+                        crate::i18n::tr(&self.settings.language, "Refresh · {}"),
                         format_countdown(u64::from(self.settings.refresh_interval_seconds))
                     )))
                     .push(
@@ -2904,7 +2904,7 @@ impl cosmic::Application for AppModel {
                         widget::Row::new()
                             .spacing(8)
                             .push(widget::text::body(format!(
-                                "{}  {:.1} km",
+                                crate::i18n::tr(&self.settings.language, "Visibility  {:.1} km"),
                                 f64::from(weather.visibility_m) / 1000.0
                             )))
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
@@ -3830,7 +3830,7 @@ impl cosmic::Application for AppModel {
                         "30s", "5m", "15m", "30m", "60m",
                     ]))
                     .push(widget::text::caption(format!(
-                        "{} · {}",
+                        crate::i18n::tr(&self.settings.language, "Graph · {}"),
                         format_graph_timespan(self.quick_graph_timespan)
                     )))
                     .push(
