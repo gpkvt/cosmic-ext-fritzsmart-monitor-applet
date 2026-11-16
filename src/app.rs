@@ -1512,7 +1512,7 @@ impl cosmic::Application for AppModel {
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::icon::from_name("go-down-symbolic").size(10))
                             .push(
-                                widget::container(widget::text::body(download).size(10))
+                                widget::container(widget::text::body(download).size(f32::from(self.settings.panel_text_size)))
                                     .width(cosmic::iced::Length::Fill)
                                     .align_x(cosmic::iced::alignment::Horizontal::Right),
                             ),
@@ -1524,7 +1524,7 @@ impl cosmic::Application for AppModel {
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::icon::from_name("go-up-symbolic").size(10))
                             .push(
-                                widget::container(widget::text::body(upload).size(10))
+                                widget::container(widget::text::body(upload).size(f32::from(self.settings.panel_text_size)))
                                     .width(cosmic::iced::Length::Fill)
                                     .align_x(cosmic::iced::alignment::Horizontal::Right),
                             ),
