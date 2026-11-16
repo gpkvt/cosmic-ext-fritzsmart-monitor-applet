@@ -125,6 +125,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          event_version=""
           if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
             previous_version="$(git show "${GITHUB_SHA}^:Cargo.toml" 2>/dev/null | sed -n '/^\[package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' | head -n1 || true)"
             event_version="$(git show "${GITHUB_SHA}:Cargo.toml" | sed -n '/^\[package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' | head -n1)"
