@@ -2798,10 +2798,23 @@ impl cosmic::Application for AppModel {
                 if let Some(weather_card) = weather_menu_card.take() {
                     menu_cards.push(("1-weather".to_string(), weather_card));
                 }
-                for (index, reading) in self.readings.iter().enumerate() {
+                // The settings list is authoritative for popup device order.
+                // Keep newly discovered devices after configured entries.
+                let mut ordered_readings: Vec<_> = self.readings.iter().collect();
+                ordered_readings.sort_by_key(|reading| {
+                    self.settings
+                        .device_order
+                        .iter()
+                        .position(|ain| {
+                            crate::fritz::normalize_ain_for_selection(ain)
+                                == crate::fritz::normalize_ain_for_selection(&reading.ain)
+                        })
+                        .unwrap_or(usize::MAX)
+                });
+                for (index, reading) in ordered_readings.iter().enumerate() {
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                     let is_expanded = self.expanded_devices.contains(&device_key);
-                    let device_corner_radius = device_corner_radius(index, self.readings.len());
+                    let device_corner_radius = device_corner_radius(index, ordered_readings.len());
                     let device_history = self.device_history.get(&device_key);
                     let power_toggle: cosmic::Element<'_, Message> = {
                         let is_on = reading.power_state.unwrap_or(false);
