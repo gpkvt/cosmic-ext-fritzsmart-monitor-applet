@@ -866,7 +866,10 @@ fn live_power_summary(
             graph_style,
             "W",
         ))
-        .push(widget::text::caption(crate::i18n::tr(language, "AVERAGE TEMPERATURE HISTORY (°C)")))
+        .push(widget::text::caption(crate::i18n::tr(
+            language,
+            "AVERAGE TEMPERATURE HISTORY (°C)",
+        )))
         .push(interactive_graph(
             language,
             crate::i18n::tr(language, "AVERAGE TEMPERATURE"),
