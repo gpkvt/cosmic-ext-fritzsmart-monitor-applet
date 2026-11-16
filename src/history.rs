@@ -163,13 +163,6 @@ fn save_to_path(
     let parent = path.parent().ok_or("Invalid graph history path")?;
     fs::create_dir_all(parent).map_err(|error| error.to_string())?;
 
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(parent, fs::Permissions::from_mode(0o700))
-            .map_err(|error| error.to_string())?;
-    }
-
     let temporary = parent.join(format!(
         ".history.{}.{}.tmp",
         std::process::id(),
