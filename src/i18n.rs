@@ -195,21 +195,12 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Weather request failed" => "Wetteranfrage fehlgeschlagen",
         "Forecast loaded" => "Vorhersage geladen",
         "Not checked · request a forecast to test" => "Nicht geprüft · Vorhersage zum Testen abrufen",
+        "HTTP" => "HTTP",
         "HTTP successful" => "HTTP erfolgreich",
         "HTTP failed" => "HTTP fehlgeschlagen",
         "Connected · device data loaded" => "Verbunden · Gerätedaten geladen",
         "Connection failed" => "Verbindung fehlgeschlagen",
         "Connection failed · {error}" => "Verbindung fehlgeschlagen · {error}",
-        "Connection security" => "Verbindungssicherheit",
-        "External resources" => "Externe Dienste",
-        "Refresh" => "Aktualisieren",
-        "Graph" => "Diagramm",
-        "Feels like" => "Gefühlt",
-        "Humidity" => "Luftfeuchtigkeit",
-        "Clouds" => "Bewölkung",
-        "Visibility" => "Sichtweite",
-        "Sunrise" => "Sonnenaufgang",
-        "Sunset" => "Sonnenuntergang"
         _ => key,
     }
 }
