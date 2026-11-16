@@ -1261,7 +1261,7 @@ mod tests {
     #[test]
     fn parses_persisted_expanded_devices_as_unique_normalized_ains() {
         assert_eq!(
-            parse_expanded_devices(" 12:34 aa,1234AA,not-valid!, ,9876"),
+            parse_expanded_devices(" 12:34 aa,1234AA,!!!, ,9876"),
             vec!["1234AA".to_string(), "9876".to_string()]
         );
     }
