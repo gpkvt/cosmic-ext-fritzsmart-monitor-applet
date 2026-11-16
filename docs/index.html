@@ -42,26 +42,18 @@
     .shot{position:relative;padding:15px;border-radius:25px;background:linear-gradient(145deg,#273447,#111722);border:1px solid #ffffff20;box-shadow:0 28px 80px #0007;overflow:hidden}.shot:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,#ffffff08,transparent 35%,transparent 70%,#8be0c408)}.shot-top{display:flex;align-items:center;justify-content:space-between;padding:3px 5px 14px;color:#9caabd;font:10px "DM Mono",monospace;letter-spacing:.1em}.shot-window{border-radius:15px;background:#111824;border:1px solid #ffffff13;padding:17px}.shot-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.shot-title strong{font-size:14px}.shot-title span{font:10px "DM Mono",monospace;color:#91a0b4}.metric-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{padding:12px;border:1px solid #ffffff12;background:#ffffff06;border-radius:12px}.metric small{display:block;color:#91a0b4;font-size:9px;letter-spacing:.1em}.metric b{font:22px "DM Mono",monospace}.graph{margin-top:12px;padding:12px;border-radius:12px;background:#ffffff05;border:1px solid #ffffff0e}.graph-head{display:flex;justify-content:space-between;color:#aab6c7;font-size:10px}.graph svg{display:block;width:100%;height:80px;margin-top:6px}.device-card{margin-top:10px;padding:12px;border-radius:12px;background:#ffffff06;border:1px solid #ffffff12}.device-card-head{display:flex;justify-content:space-between;font-size:11px}.device-card-head b{color:var(--mint);font:12px "DM Mono",monospace}.mini-bars{display:flex;gap:4px;align-items:end;height:30px;margin-top:8px}.mini-bars i{display:block;flex:1;background:#8be0c477;border-radius:3px 3px 0 0}.mini-bars i:nth-child(3n){background:#8bb9ff88}
     .settings-shot{display:grid;grid-template-columns:120px 1fr;gap:12px}.settings-menu{display:grid;gap:6px}.settings-menu span{padding:9px 8px;border-radius:8px;color:#a6b2c2;font-size:9px}.settings-menu span:first-child{background:#8be0c41a;color:var(--mint)}.setting-panel{padding:13px;border-radius:12px;background:#ffffff06;border:1px solid #ffffff12}.setting-panel h4{font-size:12px;margin:0 0 10px}.setting-line{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid #ffffff0d;color:#aebaca;font-size:9px}.toggle{width:27px;height:15px;border-radius:20px;background:#8be0c4;position:relative}.toggle:after{content:"";position:absolute;right:2px;top:2px;width:11px;height:11px;border-radius:50%;background:#14251f}
 
-    .screenshot-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
-    .screenshot-card{margin:0;min-width:0;padding:12px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(145deg,#192231aa,#121722aa);transition:transform .2s,border-color .2s}
-    .screenshot-card:hover{transform:translateY(-3px);border-color:#8be0c477}
-    .screenshot-card a{display:block;overflow:hidden;border-radius:12px;background:#090d13}
-    .screenshot-card img{display:block;width:100%;height:auto;max-height:620px;object-fit:contain;transition:transform .25s}
-    .screenshot-card a:hover img{transform:scale(1.015)}
-    .screenshot-card figcaption{padding:12px 5px 3px;color:var(--muted);font-size:13px}
-    .screenshot-card figcaption strong{display:block;color:var(--text);font-size:14px;margin-bottom:3px}
-    @media(max-width:700px){.screenshot-gallery{grid-template-columns:1fr}}
-
-    .gallery-invite{margin-top:24px}
-    .screenshot-dialog{width:min(1080px,calc(100% - 32px));max-width:none;max-height:min(88vh,900px);padding:26px;border:1px solid #ffffff24;border-radius:24px;background:#111722;color:var(--text);box-shadow:0 35px 110px #000c;overflow:auto}
-    .screenshot-dialog::backdrop{background:#05080dcc;backdrop-filter:blur(8px)}
-    .gallery-dialog-head{position:sticky;top:-26px;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:18px;margin:-26px -26px 22px;padding:18px 22px;background:#111722ed;border-bottom:1px solid var(--line);backdrop-filter:blur(14px)}
-    .gallery-dialog-head h2{margin:0;font-size:22px;letter-spacing:-.04em}
-    .gallery-close{display:grid;place-items:center;width:40px;height:40px;flex:0 0 40px;border:1px solid var(--line);border-radius:50%;background:#ffffff08;color:var(--text);font-size:25px;line-height:1;cursor:pointer}
-    .gallery-close:hover{border-color:var(--mint);color:var(--mint)}
-    .screenshot-dialog .screenshot-gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-    .screenshot-dialog .screenshot-card img{max-height:460px}
-    @media(max-width:650px){.screenshot-dialog{padding:16px;border-radius:18px}.gallery-dialog-head{top:-16px;margin:-16px -16px 16px;padding:14px 16px}.screenshot-dialog .screenshot-gallery{grid-template-columns:1fr}}
+    .gallery-viewer{display:grid;grid-template-columns:52px minmax(0,1fr) 52px;align-items:center;gap:18px}
+    .gallery-stage{min-width:0;margin:0;padding:14px;border:1px solid var(--line);border-radius:18px;background:#090d13}
+    .gallery-stage img{display:block;width:100%;height:min(62vh,620px);object-fit:contain}
+    .gallery-stage figcaption{padding:14px 4px 2px;color:var(--muted);font-size:13px;text-align:center}
+    .gallery-stage figcaption strong{display:block;color:var(--text);font-size:15px;margin-bottom:3px}
+    .gallery-control{display:grid;place-items:center;width:48px;height:48px;border:1px solid var(--line);border-radius:50%;background:#ffffff08;color:var(--text);font-size:28px;line-height:1;cursor:pointer;transition:background .2s,border-color .2s,color .2s}
+    .gallery-control:hover{border-color:var(--mint);background:#8be0c41a;color:var(--mint)}
+    .gallery-control:disabled{opacity:.35;cursor:not-allowed}
+    .gallery-dialog-foot{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:16px;color:var(--muted);font:12px "DM Mono",monospace}
+    .gallery-dialog-foot kbd{padding:3px 7px;border:1px solid var(--line);border-radius:6px;background:#ffffff08;color:var(--text);font:11px "DM Mono",monospace}
+    @media(max-width:650px){.screenshot-dialog{padding:16px;border-radius:18px}.gallery-dialog-head{top:-16px;margin:-16px -16px 16px;padding:14px 16px}.gallery-viewer{grid-template-columns:38px minmax(0,1fr) 38px;gap:7px}.gallery-control{width:36px;height:36px;font-size:22px}.gallery-stage{padding:7px}.gallery-stage img{height:min(58vh,480px)}.gallery-dialog-foot{flex-wrap:wrap;font-size:10px}}
+    @media(prefers-reduced-motion:reduce){.gallery-control{transition:none}}
     .install-band{display:grid;grid-template-columns:1fr .95fr;gap:50px;align-items:center;padding:40px;border-radius:30px;background:linear-gradient(130deg,#172c2a,#172130 65%,#211e31);border:1px solid #8be0c433}.install-band h2{font-size:clamp(34px,4.5vw,52px);line-height:1.05;letter-spacing:-.06em;margin:14px 0}.terminal{background:#090d13;border:1px solid #ffffff1b;border-radius:16px;overflow:hidden}.terminal-head{padding:12px 15px;border-bottom:1px solid #ffffff12;color:#8695a9;font:10px "DM Mono",monospace}.terminal pre{margin:0;padding:18px;color:#d6e4e2;font:12px/2 "DM Mono",monospace;white-space:pre-wrap}.terminal .prompt{color:var(--mint)}
     .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;counter-reset:step}.step{padding:25px;border:1px solid var(--line);border-radius:20px;background:var(--surface);counter-increment:step}.step:before{content:"0" counter(step);font:12px "DM Mono",monospace;color:var(--mint)}.step h3{font-size:18px;margin:16px 0 8px}.step p{color:var(--muted);font-size:14px;margin:0}
     .details-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.detail{padding:26px;border:1px solid var(--line);border-radius:20px;background:var(--surface)}.detail h3{font-size:18px;margin:0 0 10px}.detail p{font-size:14px;color:var(--muted);margin:0}.detail code{color:var(--mint);font:12px "DM Mono",monospace}
@@ -74,13 +66,18 @@
     @media(max-width:850px){.hero{grid-template-columns:1fr;padding:70px 0;gap:28px}.hero-gallery{max-width:680px;width:100%;margin:auto;min-height:470px}.hero-shot:nth-child(3){display:block}.hero-visual{max-width:600px;margin:auto;width:100%}.feature-grid{grid-template-columns:repeat(2,1fr)}.showcase,.showcase:nth-of-type(even){grid-template-columns:1fr;gap:30px}.showcase:nth-of-type(even) .showcase-copy{order:0}.install-band{grid-template-columns:1fr}.navlinks{gap:14px}.navlinks a:not(.nav-cta){display:none}}
     @media(max-width:560px){.wrap{width:calc(100% - 32px)}.hero-gallery{min-height:370px}.hero-shot{width:40%;height:64%;padding:5px}.hero-card-title{font-size:8px;padding-top:5px}.hero-card-type{font-size:7px}.hero-shot{padding:4px;border-radius:12px}.hero-shot img{border-radius:8px}.nav{height:66px}.brand{font-size:14px}.brand img{width:30px}.hero h1{font-size:53px}.hero-copy{font-size:16px}.hero-visual{padding:10px 0}.applet{margin-right:0;width:100%}.float-tag{left:-5px;bottom:-5px}.feature-grid,.steps,.details-grid{grid-template-columns:1fr}.feature{min-height:0}.section-head{margin-bottom:30px}section{padding:78px 0}.showcase{margin:58px 0}.install-band{padding:25px}.settings-shot{grid-template-columns:92px 1fr}.settings-menu span{font-size:8px;padding:7px 5px}.metric b{font-size:18px}.trust-inner{gap:12px}.footer-inner{align-items:flex-start;flex-direction:column}}
     @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.reveal{opacity:1;transform:none;transition:none}*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+    /* Keep the hero preview focused on one screenshot; the dialog is the full gallery. */
+    .hero-gallery .hero-shot{display:none}
+    .hero-gallery .hero-shot:first-child{display:flex;position:relative;left:auto;bottom:auto;width:100%;height:100%;min-height:420px;transform:none;z-index:1}
+    .hero-gallery .hero-shot:first-child img{height:78%;object-fit:contain}
+    @media(max-width:700px){.hero-gallery{min-height:390px}.hero-gallery .hero-shot:first-child{min-height:360px}}
   </style>
 </head>
 <body>
   <div id="scroll-progress" aria-hidden="true"></div>
   <div class="topbar"><div class="wrap nav">
     <a class="brand" href="#top"><img src="logo.svg" alt=""><span>FRITZ!Power Monitor</span></a>
-    <nav class="navlinks" aria-label="Main navigation"><a href="#features">Features</a><a href="#tour">Interface</a><a href="#install">Install</a><a href="#faq">FAQ</a><a class="nav-cta" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet">GitHub ↗</a></nav>
+    <nav class="navlinks" aria-label="Main navigation"><a href="#features">Features</a><a href="#tour">Gallery</a><a href="guide.html">Documentation</a><a href="#install">Install</a><a href="#faq">FAQ</a><a class="nav-cta" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet">GitHub ↗</a></nav>
   </div></div>
   <main id="top">
     <div class="wrap hero">
@@ -91,7 +88,7 @@
         <div class="actions"><a class="btn" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases">Get the applet <span>↗</span></a><a class="btn secondary" href="#tour">Explore the interface ↓</a></div>
         <div class="hero-meta"><span><i class="dot"></i> Open source · MIT</span><span>Built for COSMIC</span><span>FRITZ!Box Smart Home</span></div>
       </div>
-      <div class="hero-gallery" aria-label="All eight FRITZ!Power Monitor screenshots arranged like a hand of trading cards">
+      <div class="hero-gallery" aria-label="Featured FRITZ!Power Monitor screenshot; open the gallery to browse all eight">
         <a class="hero-shot" href="fritz-power-monitor-overview.png" data-open-gallery aria-label="Open live overview screenshot in gallery"><img src="fritz-power-monitor-overview.png" alt="Live FRITZ!Power Monitor overview with current power readings" fetchpriority="high"><span class="hero-card-title">Live overview</span><span class="hero-card-type">Power · Live</span></a>
         <a class="hero-shot" href="fritz-power-monitor-weather-forecast.png" data-open-gallery aria-label="Open weather forecast screenshot in gallery"><img src="fritz-power-monitor-weather-forecast.png" alt="Weather and forecast view" loading="lazy"><span class="hero-card-title">Weather forecast</span><span class="hero-card-type">Weather · 7 day</span></a>
         <a class="hero-shot" href="fritz-power-monitor-power-history.png" data-open-gallery aria-label="Open power history screenshot in gallery"><img src="fritz-power-monitor-power-history.png" alt="Power readings and history graphs" loading="lazy"><span class="hero-card-title">Power history</span><span class="hero-card-type">Monitoring · Graphs</span></a>
@@ -117,7 +114,7 @@
     </div></section>
 
     <section id="tour"><div class="wrap">
-      <div class="section-head reveal"><div class="eyebrow">A closer look</div><h2>The applet, as it really looks.</h2><p>Eight actual screenshots captured from FRITZ!Power Monitor running on the COSMIC desktop, covering the live overview, expanded panel, device list, connection and general settings, and detailed monitoring views. Select any image to view it at full size.</p></div>
+      <div class="section-head reveal"><div class="eyebrow">A closer look</div><h2>The applet, as it really looks.</h2><p>Browse eight actual screenshots captured from FRITZ!Power Monitor on the COSMIC desktop. The gallery displays one image at a time; use the previous and next controls or your keyboard arrow keys to move through the views.</p></div>
       <div class="gallery-invite"><button class="btn secondary" type="button" data-open-gallery>View all eight screenshots <span>↗</span></button></div>
     </div></section>
 
@@ -168,16 +165,15 @@
 
   <dialog class="screenshot-dialog" id="screenshot-dialog" aria-labelledby="gallery-title">
     <div class="gallery-dialog-head"><h2 id="gallery-title">FRITZ!Power Monitor screenshots</h2><button class="gallery-close" type="button" aria-label="Close screenshot gallery" data-close-gallery>×</button></div>
-      <div class="screenshot-gallery">
-        <figure class="screenshot-card reveal"><a href="fritz-power-monitor-overview.png" target="_blank" rel="noopener"><img src="fritz-power-monitor-overview.png" alt="FRITZ!Power Monitor showing live power and weather overview" loading="lazy"></a><figcaption><strong>Live overview</strong>Current household power and weather at a glance</figcaption></figure>
-        <figure class="screenshot-card reveal"><a href="fritz-power-monitor-weather-forecast.png" target="_blank" rel="noopener"><img src="fritz-power-monitor-weather-forecast.png" alt="FRITZ!Power Monitor weather card with a seven-day forecast" loading="lazy"></a><figcaption><strong>Weather forecast</strong>Current conditions and the seven-day forecast</figcaption></figure>
-        <figure class="screenshot-card reveal"><a href="fritz-power-monitor-power-history.png" target="_blank" rel="noopener"><img src="fritz-power-monitor-power-history.png" alt="FRITZ!Power Monitor power readings and history graphs" loading="lazy"></a><figcaption><strong>Power history</strong>Power output, input and device history details</figcaption></figure>
-        <figure class="screenshot-card reveal"><a href="fritz-power-monitor-device-settings.png" target="_blank" rel="noopener"><img src="fritz-power-monitor-device-settings.png" alt="FRITZ!Power Monitor device selection and configuration settings" loading="lazy"></a><figcaption><strong>Device settings</strong>Select devices and configure input and temperature alerts</figcaption></figure>
-        <figure class="screenshot-card reveal"><a href="fritz-power-monitor-device-list.png" target="_blank" rel="noopener"><img src="fritz-power-monitor-device-list.png" alt="FRITZ!Power Monitor expanded device list with live power and temperature readings" loading="lazy"></a><figcaption><strong>Device list</strong>Expanded devices with live power and temperature readings</figcaption></figure>
-        <figure class="screenshot-card reveal"><a href="fritz-power-monitor-settings-overview.png" target="_blank" rel="noopener"><img src="fritz-power-monitor-settings-overview.png" alt="FRITZ!Power Monitor settings overview showing panel, graph, refresh, weather, connection, device and diagnostics options" loading="lazy"></a><figcaption><strong>Settings overview</strong>All configuration areas in one place</figcaption></figure>
-        <figure class="screenshot-card reveal"><a href="fritz-power-monitor-expanded-panel.png" target="_blank" rel="noopener"><img src="fritz-power-monitor-expanded-panel.png" alt="Expanded FRITZ!Power Monitor panel showing total power, input, output and device power and temperature history" loading="lazy"></a><figcaption><strong>Expanded panel</strong>Live power totals and per-device history in the panel popup</figcaption></figure>
-        <figure class="screenshot-card reveal"><a href="fritz-power-monitor-connection-settings.png" target="_blank" rel="noopener"><img src="fritz-power-monitor-connection-settings.png" alt="FRITZ!Power Monitor connection settings for router URL, username, password and trusted CA certificate" loading="lazy"></a><figcaption><strong>Connection settings</strong>FRITZ!Box credentials and TLS certificate configuration</figcaption></figure>
-      </div>
+    <div class="gallery-viewer" aria-label="Screenshot gallery">
+      <button class="gallery-control" id="gallery-previous" type="button" aria-label="Previous screenshot">‹</button>
+      <figure class="gallery-stage">
+        <img id="gallery-image" src="fritz-power-monitor-overview.png" alt="FRITZ!Power Monitor showing live power and weather overview">
+        <figcaption id="gallery-caption"><strong>Live overview</strong>Current household power and weather at a glance</figcaption>
+      </figure>
+      <button class="gallery-control" id="gallery-next" type="button" aria-label="Next screenshot">›</button>
+    </div>
+    <div class="gallery-dialog-foot"><span id="gallery-count" aria-live="polite">1 / 8</span><span>Use <kbd>←</kbd> and <kbd>→</kbd> to navigate · <kbd>Esc</kbd> to close</span></div>
   </dialog>
   <footer><div class="wrap footer-inner"><a class="footer-brand" href="#top"><img src="logo.svg" alt="">FRITZ!Power Monitor</a><span>Open source under the MIT License.</span><div class="footer-links"><a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet">Source</a><a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues">Issues</a><a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases">Releases</a><a href="#top">Back to top ↑</a></div></div>
   <div class="wrap legal-notice"><p><strong>Independent project; not affiliated with or endorsed by FRITZ!.</strong> FRITZ!Power Monitor is an independent, community-developed project. It is not affiliated with, sponsored, authorized, or endorsed by FRITZ! GmbH (formerly AVM GmbH), or any of its subsidiaries. AVM, FRITZ! and FRITZ!Box are trademarks or registered trademarks of FRITZ! GmbH and are used here only to identify compatible products. All trademarks remain the property of their respective owners. See the <a href="https://fritz.com/en/policies/legal-notice" target="_blank" rel="noopener">official FRITZ! legal notice</a>.</p></div>
@@ -188,15 +184,50 @@
     addEventListener('scroll',updateProgress,{passive:true});updateProgress();
     const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('visible');observer.unobserve(entry.target)}}),{threshold:.08});
     document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+
     const screenshotDialog=document.getElementById('screenshot-dialog');
-    const openGallery=()=>{if(!screenshotDialog.open)screenshotDialog.showModal()};
-    document.querySelectorAll('.hero-shot').forEach(card=>{
+    const galleryImage=document.getElementById('gallery-image');
+    const galleryCaption=document.getElementById('gallery-caption');
+    const galleryCount=document.getElementById('gallery-count');
+    const previousButton=document.getElementById('gallery-previous');
+    const nextButton=document.getElementById('gallery-next');
+    const screenshots=[
+      {src:'fritz-power-monitor-overview.png',alt:'FRITZ!Power Monitor showing live power and weather overview',title:'Live overview',description:'Current household power and weather at a glance'},
+      {src:'fritz-power-monitor-weather-forecast.png',alt:'FRITZ!Power Monitor weather card with a seven-day forecast',title:'Weather forecast',description:'Current conditions and the seven-day forecast'},
+      {src:'fritz-power-monitor-power-history.png',alt:'FRITZ!Power Monitor power readings and history graphs',title:'Power history',description:'Power output, input and device history details'},
+      {src:'fritz-power-monitor-device-settings.png',alt:'FRITZ!Power Monitor device selection and configuration settings',title:'Device settings',description:'Select devices and configure input and temperature alerts'},
+      {src:'fritz-power-monitor-device-list.png',alt:'FRITZ!Power Monitor expanded device list with live power and temperature readings',title:'Device list',description:'Expanded devices with live power and temperature readings'},
+      {src:'fritz-power-monitor-settings-overview.png',alt:'FRITZ!Power Monitor settings overview',title:'Settings overview',description:'All configuration areas in one place'},
+      {src:'fritz-power-monitor-expanded-panel.png',alt:'Expanded FRITZ!Power Monitor panel showing total power, input, output and device power and temperature history',title:'Expanded panel',description:'Live power totals and per-device history in the panel popup'},
+      {src:'fritz-power-monitor-connection-settings.png',alt:'FRITZ!Power Monitor connection settings for router URL, username, password and trusted CA certificate',title:'Connection settings',description:'FRITZ!Box credentials and TLS certificate configuration'}
+    ];
+    let currentScreenshot=0;
+    const showScreenshot=index=>{
+      currentScreenshot=(index+screenshots.length)%screenshots.length;
+      const shot=screenshots[currentScreenshot];
+      galleryImage.src=shot.src;
+      galleryImage.alt=shot.alt;
+      galleryCaption.replaceChildren();
+      const title=document.createElement('strong');
+      title.textContent=shot.title;
+      galleryCaption.append(title,document.createTextNode(shot.description));
+      galleryCount.textContent=(currentScreenshot+1)+' / '+screenshots.length;
+    };
+    const openGallery=index=>{showScreenshot(index??0);if(!screenshotDialog.open)screenshotDialog.showModal()};
+    document.querySelectorAll('.hero-shot').forEach((card,index)=>{
       card.setAttribute('aria-label','Open '+(card.querySelector('.hero-card-title')?.textContent||'screenshot')+' in screenshot gallery');
-      card.addEventListener('click',event=>{event.preventDefault();openGallery()});
+      card.addEventListener('click',event=>{event.preventDefault();openGallery(index)});
     });
-    document.querySelectorAll('[data-open-gallery]:not(.hero-shot)').forEach(el=>el.addEventListener('click',openGallery));
+    document.querySelectorAll('[data-open-gallery]:not(.hero-shot)').forEach(el=>el.addEventListener('click',()=>openGallery(0)));
+    previousButton.addEventListener('click',()=>showScreenshot(currentScreenshot-1));
+    nextButton.addEventListener('click',()=>showScreenshot(currentScreenshot+1));
     document.querySelectorAll('[data-close-gallery]').forEach(el=>el.addEventListener('click',()=>screenshotDialog.close()));
     screenshotDialog.addEventListener('click',event=>{if(event.target===screenshotDialog)screenshotDialog.close()});
+    screenshotDialog.addEventListener('keydown',event=>{
+      if(event.key==='ArrowLeft'){event.preventDefault();showScreenshot(currentScreenshot-1)}
+      else if(event.key==='ArrowRight'){event.preventDefault();showScreenshot(currentScreenshot+1)}
+    });
+    showScreenshot(0);
   </script>
 </body>
 </html>
