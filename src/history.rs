@@ -139,11 +139,7 @@ fn timestamp_for(instant: Instant, now: Instant, now_epoch: i64) -> i64 {
     now_epoch.saturating_sub(age)
 }
 
-fn save_to_path(
-    path: &Path,
-    power: &PowerHistory,
-    devices: &DeviceHistory,
-) -> Result<(), String> {
+fn save_to_path(path: &Path, power: &PowerHistory, devices: &DeviceHistory) -> Result<(), String> {
     let now = Instant::now();
     let now_epoch = epoch_now()?;
     let power_samples: Vec<Value> = power
@@ -181,7 +177,10 @@ fn save_to_path(
     let temporary = parent.join(format!(
         ".history.{}.{}.tmp",
         std::process::id(),
-        SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
     ));
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
@@ -190,7 +189,9 @@ fn save_to_path(
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    let mut file = options.open(&temporary).map_err(|error| error.to_string())?;
+    let mut file = options
+        .open(&temporary)
+        .map_err(|error| error.to_string())?;
     let result = file
         .write_all(&contents)
         .and_then(|_| file.sync_all())
@@ -225,10 +226,7 @@ mod tests {
         let power = VecDeque::from([(now - Duration::from_secs(30), 850), (now, 900)]);
         let devices = HashMap::from([(
             "123456".to_string(),
-            VecDeque::from([
-                (now - Duration::from_secs(30), 200, 21.5),
-                (now, 220, 22.0),
-            ]),
+            VecDeque::from([(now - Duration::from_secs(30), 200, 21.5), (now, 220, 22.0)]),
         )]);
 
         save_to_path(&path, &power, &devices).unwrap();
@@ -256,8 +254,10 @@ mod tests {
                     {"timestamp": now - 10, "power_w": 30}
                 ],
                 "devices": {}
-            }).to_string(),
-        ).unwrap();
+            })
+            .to_string(),
+        )
+        .unwrap();
         let (loaded, _) = load_from_path(&path, Duration::from_secs(60));
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].1, 30);
