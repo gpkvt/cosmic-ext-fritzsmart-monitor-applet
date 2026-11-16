@@ -38,6 +38,10 @@ pages = sorted(ROOT.glob("*.html"))
 if not pages:
     fail("no HTML pages found")
 
+for generated in ("readme.html", "security.html"):
+    if not (ROOT / generated).is_file():
+        fail(f"missing generated Markdown page: {generated}")
+
 for page in pages:
     parser = PageParser()
     content = page.read_text(encoding="utf-8")
