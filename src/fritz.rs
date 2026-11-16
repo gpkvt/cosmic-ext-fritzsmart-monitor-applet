@@ -236,7 +236,7 @@ fn parse_menu_order(value: &str) -> Vec<String> {
     order
 }
 
-const PANEL_ITEM_IDS: [&str; 6] = [
+const PANEL_ITEM_IDS: [&str; 5] = [
     "weather",
     "power-consumption",
     "solar-power",
