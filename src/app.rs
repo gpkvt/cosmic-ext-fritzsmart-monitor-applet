@@ -1477,15 +1477,13 @@ impl cosmic::Application for AppModel {
             ));
         }
 
-        // Keep the readings in their own popup button so the refresh action
-        // can be shown or hidden independently in the applet's Panel settings.
-        // Use COSMIC's applet button helper: it applies the panel's
-        // configured applet dimensions and centers the content in that area.
-        let button = self
-            .core
-            .applet
-            .button_from_element(content, true)
-            .on_press(Message::TogglePopup);
+        // Keep the full readings row in its own popup button so every
+        // configured panel item can use its natural width. button_from_element
+        // is intended for single applet icons and constrains the row to icon size.
+        let button = widget::button::custom(content)
+            .on_press(Message::TogglePopup)
+            .padding(0)
+            .class(cosmic::theme::Button::AppletIcon);
 
         let refresh_button = self
             .core
