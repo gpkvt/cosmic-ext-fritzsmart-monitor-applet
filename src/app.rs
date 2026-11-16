@@ -419,7 +419,13 @@ fn graph_visual(
     style: &str,
     unit: &str,
 ) -> cosmic::Element<'static, Message> {
-    graph_visual_with_dimensions(\n        values,\n        style,\n        unit,\n        48.0,\n        cosmic::iced::Length::Fixed(56.0),\n    )
+    graph_visual_with_dimensions(
+        values,
+        style,
+        unit,
+        48.0,
+        cosmic::iced::Length::Fixed(56.0),
+    )
 }
 
 fn graph_visual_large(
