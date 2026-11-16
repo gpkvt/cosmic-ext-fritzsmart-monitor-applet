@@ -3228,7 +3228,7 @@ impl cosmic::Application for AppModel {
                         ))
                         .width(cosmic::iced::Length::Fill)
                         .height(cosmic::iced::Length::Fixed(260.0))
-                        .content_fit(cosmic::iced::ContentFit::Contain);
+                        .content_fit(cosmic::iced::ContentFit::Fill);
                         let details = widget::container(weather_content)
                             .width(cosmic::iced::Length::Fill)
                             .height(cosmic::iced::Length::Fixed(260.0))
@@ -3267,7 +3267,7 @@ impl cosmic::Application for AppModel {
                                     widget::image::Image::new(widget::image::Handle::from_bytes(stars))
                                         .width(cosmic::iced::Length::Fill)
                                         .height(cosmic::iced::Length::Fixed(260.0))
-                                        .content_fit(cosmic::iced::ContentFit::Contain),
+                                        .content_fit(cosmic::iced::ContentFit::Fill),
                                 )
                                 .width(cosmic::iced::Length::Fill)
                                 .height(cosmic::iced::Length::Fixed(260.0))
