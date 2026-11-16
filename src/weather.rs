@@ -471,7 +471,7 @@ pub fn build_weather_slideshow_frames(
     images: &[Vec<u8>],
     display_seconds: u16,
 ) -> (Vec<Vec<u8>>, Vec<usize>) {
-    use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba};
+    use image::{DynamicImage, ImageBuffer, Rgba};
     let decoded: Vec<_> = images.iter()
         .filter_map(|bytes| image::load_from_memory(bytes).ok())
         .map(|image| image.to_rgba8())
