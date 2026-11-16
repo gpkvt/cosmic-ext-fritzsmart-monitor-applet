@@ -3,13 +3,6 @@ name: Publish GitHub Pages to gh-pages
 on:
   push:
     branches: [main]
-    paths:
-      - "docs/**"
-      - "README.md"
-      - "SECURITY.md"
-      - "scripts/build-pages.py"
-      - "scripts/validate-pages.py"
-      - ".github/workflows/gh-pages.yml"
   workflow_dispatch:
 
 permissions:
