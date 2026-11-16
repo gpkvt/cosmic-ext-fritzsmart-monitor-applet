@@ -131,3 +131,14 @@ jobs:
           else
             gh release create "$RELEASE_TAG" "${files[@]}" --generate-notes --verify-tag
           fi
+
+          # Confirm the release actually exposes every required asset before
+          # allowing the Pages workflow to publish the new download links.
+          release_assets="$(gh release view "$RELEASE_TAG" --json assets --jq '[.assets[].name]')"
+          for file in "${files[@]}"; do
+            asset_name="${file##*/}"
+            if ! jq -e --arg name "$asset_name" 'index($name) != null' <<<"$release_assets" >/dev/null; then
+              echo "Release asset was not published: $asset_name" >&2
+              exit 1
+            fi
+          done
