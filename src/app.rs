@@ -1320,8 +1320,9 @@ impl cosmic::Application for AppModel {
                         .center_y(24),
                 );
             }
+            // Let each value reserve its natural width. A fixed 52px column
+            // wraps larger readings when the panel text size is increased.
             let value = widget::container(value)
-                .width(cosmic::iced::Length::Fixed(52.0))
                 .align_x(cosmic::iced::alignment::Horizontal::Right);
             self.core.applet.applet_tooltip(
                 item.push(value),
@@ -1426,11 +1427,12 @@ impl cosmic::Application for AppModel {
                                 .width(cosmic::iced::Length::Fixed(12.0)),
                         )
                         .push(
+                            // Keep the value and unit together at every configured
+                            // font size; the panel row grows to fit instead of wrapping.
                             widget::container(
                                 widget::text::body(keep_value_unit_together(value))
                                     .size(f32::from(self.settings.panel_text_size)),
                             )
-                            .width(cosmic::iced::Length::Fixed(76.0))
                             .align_x(cosmic::iced::alignment::Horizontal::Right),
                         )
                 };
