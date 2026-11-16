@@ -1027,8 +1027,8 @@ fn panel_item_label(id: &str) -> &'static str {
     }
 }
 
-fn format_bandwidth(bytes_per_second: u64) -> String {
-    let megabits_per_second = bytes_per_second as f64 * 8.0 / 1_000_000.0;
+fn format_bandwidth(bits_per_second: u64) -> String {
+    let megabits_per_second = bits_per_second as f64 / 1_000_000.0;
     format!("{megabits_per_second:.1} Mbps")
 }
 
@@ -1498,8 +1498,8 @@ impl cosmic::Application for AppModel {
                     .internet_bandwidth
                     .as_ref()
                     .map(|bandwidth| (
-                        format_bandwidth(bandwidth.download_bytes_per_second),
-                        format_bandwidth(bandwidth.upload_bytes_per_second),
+                        format_bandwidth(bandwidth.download_bits_per_second),
+                        format_bandwidth(bandwidth.upload_bits_per_second),
                     ))
                     .unwrap_or_else(|| ("-- Mbps".to_string(), "-- Mbps".to_string()));
                 panel_items.push((
@@ -1744,7 +1744,7 @@ impl cosmic::Application for AppModel {
                                     .width(cosmic::iced::Length::Fill)
                                     .push(widget::text::body("Show internet bandwidth"))
                                     .push(widget::text::caption(
-                                        "Display current FRITZ!Box internet download and upload rates in Mbps in the panel.",
+                                        "Display the maximum download and upload link speeds reported by your FRITZ!Box connection in Mbps.",
                                     )),
                             )
                             .push(
