@@ -1967,7 +1967,7 @@ impl cosmic::Application for AppModel {
                         "total-power-input" => "total-power-input",
                         _ => continue,
                     };
-                    let label = menu_element_label(id);
+                    let label = crate::i18n::tr(&self.settings.language, menu_element_label(id));
                     let mut row = widget::Row::new()
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
@@ -2008,7 +2008,7 @@ impl cosmic::Application for AppModel {
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(
-                            widget::text::body(panel_item_label(id))
+                            widget::text::body(crate::i18n::tr(&self.settings.language, panel_item_label(id)))
                                 .width(cosmic::iced::Length::Fill),
                         );
                     row = row.push(icon_action_button(
