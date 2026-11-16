@@ -135,6 +135,10 @@ pub struct FritzSettings {
     pub menu_order: Vec<String>,
     pub panel_order: Vec<String>,
     pub device_order: Vec<String>,
+    pub collapsed_menu_sections: Vec<String>,
+    pub expanded_devices: Vec<String>,
+    pub quick_options_expanded: bool,
+    pub weather_forecast_expanded: bool,
 }
 
 impl Default for FritzSettings {
@@ -168,6 +172,10 @@ impl Default for FritzSettings {
             menu_order: default_menu_order(),
             panel_order: default_panel_order(),
             device_order: Vec::new(),
+            collapsed_menu_sections: Vec::new(),
+            expanded_devices: Vec::new(),
+            quick_options_expanded: false,
+            weather_forecast_expanded: false,
         }
     }
 }
@@ -296,6 +304,40 @@ fn parse_device_order(value: &str) -> Vec<String> {
         })
 }
 
+fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
+    const SECTION_IDS: [&str; 5] = [
+        "summary",
+        "weather",
+        "internet-bandwidth",
+        "total-power-output",
+        "total-power-input",
+    ];
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|id| SECTION_IDS.contains(id))
+        .map(str::to_string)
+        .fold(Vec::new(), |mut sections, id| {
+            if !sections.contains(&id) {
+                sections.push(id);
+            }
+            sections
+        })
+}
+
+fn parse_expanded_devices(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(normalize_ain_for_selection)
+        .filter(|ain| !ain.is_empty())
+        .fold(Vec::new(), |mut devices, ain| {
+            if !devices.contains(&ain) {
+                devices.push(ain);
+            }
+            devices
+        })
+}
+
 fn parse_input_ains(value: &str) -> HashSet<String> {
     value
         .split(',')
@@ -406,6 +448,10 @@ impl FritzSettings {
             menu_order: parse_menu_order(&get("MENU_ORDER")),
             panel_order: parse_panel_order(&get("PANEL_ORDER")),
             device_order: parse_device_order(&get("DEVICE_ORDER")),
+            collapsed_menu_sections: parse_collapsed_menu_sections(&get("COLLAPSED_MENU_SECTIONS")),
+            expanded_devices: parse_expanded_devices(&get("EXPANDED_DEVICES")),
+            quick_options_expanded: get("QUICK_OPTIONS_EXPANDED").eq_ignore_ascii_case("true"),
+            weather_forecast_expanded: get("WEATHER_FORECAST_EXPANDED").eq_ignore_ascii_case("true"),
         };
         Ok(settings)
     }
@@ -459,8 +505,10 @@ impl FritzSettings {
         let menu_order = parse_menu_order(&self.menu_order.join(",")).join(",");
         let panel_order = parse_panel_order(&self.panel_order.join(",")).join(",");
         let device_order = parse_device_order(&self.device_order.join(",")).join(",");
+        let collapsed_menu_sections = parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
+        let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
-            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\n",
             match self.language.as_str() { "de" => "de", "en" => "en", _ => "system" },
             self.url,
             self.username,
@@ -525,6 +573,10 @@ impl FritzSettings {
             menu_order,
             panel_order,
             device_order,
+            collapsed_menu_sections,
+            expanded_devices,
+            if self.quick_options_expanded { "true" } else { "false" },
+            if self.weather_forecast_expanded { "true" } else { "false" },
         );
         #[cfg(unix)]
         let mut file = {
@@ -1190,6 +1242,29 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_persisted_collapsed_menu_sections_safely() {
+        assert_eq!(
+            parse_collapsed_menu_sections(
+                "weather,unknown,summary,weather,total-power-input"
+            ),
+            vec![
+                "weather".to_string(),
+                "summary".to_string(),
+                "total-power-input".to_string(),
+            ]
+        );
+        assert!(parse_collapsed_menu_sections("").is_empty());
+    }
+
+    #[test]
+    fn parses_persisted_expanded_devices_as_unique_normalized_ains() {
+        assert_eq!(
+            parse_expanded_devices(" 12:34 aa,1234AA,!!!, ,9876"),
+            vec!["1234AA".to_string(), "9876".to_string()]
+        );
+    }
 
     #[test]
     fn wan_common_interface_url_uses_local_tr064_ports() {

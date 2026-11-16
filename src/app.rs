@@ -1155,6 +1155,17 @@ fn action_button<'a>(
 }
 
 impl AppModel {
+    fn persist_layout_state(&mut self) {
+        self.settings.collapsed_menu_sections =
+            self.collapsed_menu_sections.iter().cloned().collect();
+        self.settings.collapsed_menu_sections.sort();
+        self.settings.expanded_devices = self.expanded_devices.iter().cloned().collect();
+        self.settings.expanded_devices.sort();
+        self.settings.quick_options_expanded = self.quick_options_expanded;
+        self.settings.weather_forecast_expanded = self.weather_forecast_expanded;
+        self.persist_settings();
+    }
+
     fn persist_settings(&mut self) {
         match self.settings.save() {
             Ok(()) => {
@@ -1223,18 +1234,43 @@ impl cosmic::Application for AppModel {
         let settings = FritzSettings::load().unwrap_or_default();
         let (history, device_history) =
             crate::history::load(graph_history_window(settings.graph_timespan_minutes));
+        let collapsed_menu_sections = settings.collapsed_menu_sections.iter().cloned().collect();
+        let expanded_devices = settings.expanded_devices.iter().cloned().collect();
+        let quick_options_expanded = settings.quick_options_expanded;
+        let weather_forecast_expanded = settings.weather_forecast_expanded;
+        let quick_refresh_interval = settings.refresh_interval_seconds;
+        let quick_graph_timespan = settings.graph_timespan_minutes;
+        let restore_forecast = weather_forecast_expanded
+            && settings.weather_enabled
+            && !settings.weather_location.trim().is_empty();
+        let forecast_location = settings.weather_location.clone();
+        let mut tasks = vec![Task::perform(fetch_fritz_data(), |result| {
+            cosmic::Action::App(Message::Updated(result))
+        })];
+        if restore_forecast {
+            tasks.push(Task::perform(
+                fetch_weather_forecast(forecast_location, 7),
+                |result| cosmic::Action::App(Message::WeatherForecastUpdated(7, result)),
+            ));
+        }
         (
             Self {
                 core,
                 settings,
                 history,
                 device_history,
+                collapsed_menu_sections,
+                expanded_devices,
+                quick_options_expanded,
+                weather_forecast_expanded,
+                quick_refresh_interval,
+                quick_graph_timespan,
+                weather_forecast_days: restore_forecast.then_some(7),
+                weather_forecast_loading: restore_forecast,
                 refresh_started_at: Some(Instant::now()),
                 ..Default::default()
             },
-            Task::perform(fetch_fritz_data(), |result| {
-                cosmic::Action::App(Message::Updated(result))
-            }),
+            Task::batch(tasks),
         )
     }
 
@@ -3645,6 +3681,7 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleWeatherForecast => {
                 self.weather_forecast_expanded = !self.weather_forecast_expanded;
+                self.persist_layout_state();
                 if self.weather_forecast_expanded
                     && self.weather_forecast.is_none()
                     && !self.weather_forecast_loading
@@ -3771,11 +3808,13 @@ impl cosmic::Application for AppModel {
                 if !self.expanded_devices.remove(&key) {
                     self.expanded_devices.insert(key);
                 }
+                self.persist_layout_state();
             }
             Message::ToggleMenuSection(section) => {
                 if !self.collapsed_menu_sections.remove(&section) {
                     self.collapsed_menu_sections.insert(section);
                 }
+                self.persist_layout_state();
             }
             Message::OpenCommonsPage(url) => {
                 if url.starts_with("https://commons.wikimedia.org/wiki/File:") {
@@ -3788,6 +3827,7 @@ impl cosmic::Application for AppModel {
                     self.quick_refresh_interval = self.settings.refresh_interval_seconds;
                     self.quick_graph_timespan = self.settings.graph_timespan_minutes;
                 }
+                self.persist_layout_state();
             }
             Message::QuickRefreshIntervalPreview(value) => {
                 self.quick_refresh_interval = value.clamp(30, 3600);
