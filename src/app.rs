@@ -3042,13 +3042,18 @@ impl cosmic::Application for AppModel {
                     .align_y(cosmic::iced::Alignment::Center)
                     .push(widget::text::caption(current_date))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill));
-                let current_image_index = weather.slideshow_sequence
+                let current_frame = weather.slideshow_sequence
                     .get(self.weather_slideshow_index)
                     .copied()
-                    .unwrap_or(0) / 4;
-                let current_attribution = weather.image_attributions.get(current_image_index)
-                    .or_else(|| weather.image_attribution.as_ref());
-                if current_attribution.is_some() {
+                    .unwrap_or(0);
+                let current_sources = weather.slideshow_frame_sources
+                    .get(current_frame)
+                    .cloned()
+                    .unwrap_or_else(|| vec![0]);
+                let current_attributions: Vec<_> = current_sources.iter()
+                    .filter_map(|index| weather.image_attributions.get(*index))
+                    .collect();
+                if !current_attributions.is_empty() {
                     date_row = date_row.push(
                         widget::button::custom(
                             widget::icon::from_name(if self.weather_attribution_expanded {
@@ -3067,8 +3072,31 @@ impl cosmic::Application for AppModel {
                     .spacing(6)
                     .push(date_row);
                 if self.weather_attribution_expanded {
-                    if let Some(credit) = current_attribution {
+                    for credit in current_attributions {
                         weather_details = weather_details.push(widget::text::caption(format!(
+                            "{} {} · {} · {}",
+                            crate::i18n::tr(&self.settings.language, "Photo"),
+                            credit.title,
+                            credit.artist,
+                            credit.license
+                        )));
+                        weather_details = weather_details.push(
+                            widget::button::custom(widget::text::caption("Wikimedia Commons file page ↗"))
+                                .on_press(Message::OpenCommonsPage(credit.page_url.clone()))
+                                .padding([2, 6])
+                                .class(cosmic::theme::Button::Text),
+                        );
+                        if let Some(license_url) = &credit.license_url {
+                            weather_details = weather_details.push(
+                                widget::button::custom(widget::text::caption("License terms ↗"))
+                                    .on_press(Message::OpenCommonsPage(license_url.clone()))
+                                    .padding([2, 6])
+                                    .class(cosmic::theme::Button::Text),
+                            );
+                        }
+                    }
+                }
+                weather_details = weather_details.push(widget::text::caption(format!(
                             "{} {} · {} · {}",
                             crate::i18n::tr(&self.settings.language, "Photo"),
                             credit.title,
@@ -4784,12 +4812,13 @@ impl cosmic::Application for AppModel {
             Message::WeatherUpdated(result) => {
                 match result {
                     Ok(mut weather) => {
-                        let (frames, sequence) = build_weather_slideshow_frames(
+                        let (frames, sequence, frame_sources) = build_weather_slideshow_frames(
                             &weather.background_images,
                             self.settings.weather_slideshow_interval_seconds,
                         );
                         weather.slideshow_frames = frames;
                         weather.slideshow_sequence = sequence;
+                        weather.slideshow_frame_sources = frame_sources;
                         self.weather = Some(weather);
                         self.weather_slideshow_index = 0;
                         self.weather_error = None;
@@ -4851,6 +4880,7 @@ impl cosmic::Application for AppModel {
                     );
                     weather.slideshow_frames = frames;
                     weather.slideshow_sequence = sequence;
+                    weather.slideshow_frame_sources = frame_sources;
                     self.weather_slideshow_index = 0;
                 }
                 self.persist_settings();
