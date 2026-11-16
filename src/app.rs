@@ -2246,8 +2246,7 @@ impl cosmic::Application for AppModel {
                         } else {
                             self.settings.ains.len()
                         }
-                    )))
-                    ;
+                    )));
                 let request_countdown = if self.refresh_started_at.is_some() {
                     "Request in progress…".to_string()
                 } else {
