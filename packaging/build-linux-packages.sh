@@ -11,6 +11,7 @@ ICON="$WORKSPACE/data/com.gpkvt.FritzPowerMonitor.svg"
 APP_ID="com.gpkvt.FritzPowerMonitor"
 FLATPAK_MANIFEST="$WORKSPACE/$APP_ID.yml"
 LINUXDEPLOY_VERSION="1-alpha-20251107-1"
+APPIMAGE_PLUGIN_VERSION="1-alpha-20250213-1"
 FLATPAK_RUNTIME_VERSION="26.08"
 FLATPAK_BRANCH="${FLATPAK_BRANCH:-stable}"
 
@@ -108,6 +109,10 @@ curl --fail --location --retry 3 \
     "https://github.com/linuxdeploy/linuxdeploy/releases/download/$LINUXDEPLOY_VERSION/linuxdeploy-x86_64.AppImage" \
     --output "$TEMP_DIR/linuxdeploy-x86_64.AppImage"
 chmod +x "$TEMP_DIR/linuxdeploy-x86_64.AppImage"
+curl --fail --location --retry 3 \
+    "https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/$APPIMAGE_PLUGIN_VERSION/linuxdeploy-plugin-appimage-x86_64.AppImage" \
+    --output "$TEMP_DIR/linuxdeploy-plugin-appimage-x86_64.AppImage"
+chmod +x "$TEMP_DIR/linuxdeploy-plugin-appimage-x86_64.AppImage"
 (
     cd "$TEMP_DIR"
     APPIMAGE_EXTRACT_AND_RUN=1 ./linuxdeploy-x86_64.AppImage \
@@ -134,10 +139,13 @@ git clone --depth 1 https://github.com/flatpak/flatpak-builder-tools.git \
     "$TEMP_DIR/flatpak-builder-tools"
 "$TEMP_DIR/venv/bin/python" \
     "$TEMP_DIR/flatpak-builder-tools/cargo/flatpak-cargo-generator.py" \
-    "$WORKSPACE/Cargo.lock" -o "$CARGO_SOURCES"
+    "$WORKSPACE/Cargo.lock" -o "$CARGO_SOURCES" \
+    --output-dir "$FLATPAK_SOURCE"
 mkdir -p "$FLATPAK_SOURCE"
 cp "$WORKSPACE/Cargo.toml" "$WORKSPACE/Cargo.lock" "$WORKSPACE/build.rs" "$FLATPAK_SOURCE/"
 cp -r "$WORKSPACE/src" "$WORKSPACE/data" "$FLATPAK_SOURCE/"
+test -s "$FLATPAK_SOURCE/cargo/config"
+test -s "$CARGO_SOURCES"
 
 flatpak remote-add --user --if-not-exists flathub \
     https://dl.flathub.org/repo/flathub.flatpakrepo
