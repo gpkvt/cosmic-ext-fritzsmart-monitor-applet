@@ -1417,9 +1417,15 @@ impl cosmic::Application for AppModel {
                     panel_item(
                         "Temperature",
                         Some(
-                            widget::icon::from_name("thermometer-symbolic")
-                                .size(self.settings.panel_text_size.into())
-                                .into(),
+                            widget::svg(widget::svg::Handle::from_memory(
+                                br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z"/><path d="M12 11v6"/></svg>"#.to_vec(),
+                            ))
+                            .width(16)
+                            .height(16)
+                            .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
+                                color: Some(theme.cosmic().on_bg_color().into()),
+                            }))
+                            .into(),
                         ),
                         self.core
                             .applet
