@@ -1381,6 +1381,9 @@ impl cosmic::Application for AppModel {
                         ))
                         .width(16)
                         .height(16)
+                        .style(|theme, _| cosmic::iced::widget::svg::Style {
+                            color: Some(theme.cosmic().on_bg_color().into()),
+                        })
                         .into(),
                     ),
                     self.core
@@ -1402,6 +1405,9 @@ impl cosmic::Application for AppModel {
                             ))
                             .width(16)
                             .height(16)
+                            .style(|theme, _| cosmic::iced::widget::svg::Style {
+                                color: Some(theme.cosmic().on_bg_color().into()),
+                            })
                             .into(),
                         ),
                         self.core
