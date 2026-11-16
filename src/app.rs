@@ -3305,14 +3305,7 @@ impl cosmic::Application for AppModel {
                         .iter()
                         .map(|(_, value)| *value as f64)
                         .collect(),
-                    rebuild_temperature_history(
-                        &self.device_history,
-                        &self.settings.input_ains,
-                        false,
-                    )
-                    .iter()
-                    .map(|(_, value)| *value)
-                    .collect()
+                    rebuild_temperature_history(&self.device_history, &self.settings.input_ains, false)
                         .iter()
                         .map(|(_, value)| *value)
                         .collect(),
