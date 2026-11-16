@@ -2841,11 +2841,44 @@ impl cosmic::Application for AppModel {
                         _ => continue,
                     };
                     let collapsed = self.collapsed_menu_sections.contains(section.0);
+                    let collapsed_value = if collapsed {
+                        match section.0 {
+                            "summary" => displayed_power_w(&self.readings, &self.selected_ains)
+                                .map(|value| format!("{value} W")),
+                            "weather" => self.weather.as_ref()
+                                .map(|weather| format!("{:.0}°", weather.temperature_c)),
+                            "total-power" => Some(format!(
+                                "{} W",
+                                output_power_w(&self.readings, &self.settings.input_ains)
+                            )),
+                            "power-difference" => {
+                                let has_inputs = self.readings.iter().any(|reading| {
+                                    self.settings.input_ains.contains(
+                                        &crate::fritz::normalize_ain_for_selection(&reading.ain)
+                                    )
+                                });
+                                has_inputs.then(|| {
+                                    format!(
+                                        "{} W",
+                                        output_power_w(&self.readings, &self.settings.input_ains)
+                                            + input_power_w(&self.readings, &self.settings.input_ains)
+                                    )
+                                })
+                            }
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    };
+                    let mut heading_row = widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::body(section.1));
+                    if let Some(value) = collapsed_value {
+                        heading_row = heading_row.push(widget::text::title3(value));
+                    }
                     let heading = widget::button::custom(
-                        widget::Row::new()
-                            .spacing(8)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::text::body(section.1))
+                        heading_row
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                             .push(widget::icon::from_name(if collapsed {
                                 "go-next-symbolic"
