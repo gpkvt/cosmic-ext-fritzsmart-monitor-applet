@@ -4748,6 +4748,8 @@ impl cosmic::Application for AppModel {
             }
             Message::OpenCommonsPage(url) => {
                 if url.starts_with("https://commons.wikimedia.org/wiki/File:")
+                    || url.starts_with("https://creativecommons.org/licenses/")
+                    || url.starts_with("https://www.gnu.org/licenses/")
                     || url == "https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet"
                 {
                     let _ = std::process::Command::new("xdg-open").arg(url).spawn();
