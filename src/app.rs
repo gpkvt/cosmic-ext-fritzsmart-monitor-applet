@@ -3732,7 +3732,7 @@ impl cosmic::Application for AppModel {
                             crate::i18n::tr(&self.settings.language, "CURRENT POWER"),
                         ),
                         "bandwidth" => (
-                            "bandwidth",
+                            "internet-bandwidth",
                             crate::i18n::tr(&self.settings.language, "INTERNET BANDWIDTH"),
                         ),
                         _ => continue,
@@ -3746,7 +3746,7 @@ impl cosmic::Application for AppModel {
                                 .weather
                                 .as_ref()
                                 .map(|weather| format!("{:.0} °C", weather.temperature_c)),
-                            "bandwidth" => Some(
+                            "internet-bandwidth" => Some(
                                 self.internet_bandwidth
                                     .as_ref()
                                     .map(|bandwidth| {
@@ -3769,7 +3769,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::body(section.1))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
                     let heading_row = if let Some(value) = collapsed_value {
-                        if section.0 == "bandwidth" {
+                        if section.0 == "internet-bandwidth" {
                             heading_row.push(widget::text::caption(value))
                         } else {
                             heading_row.push(widget::text::title3(value))
