@@ -137,11 +137,13 @@ python3 -m venv "$TEMP_DIR/venv"
 "$TEMP_DIR/venv/bin/pip" install --disable-pip-version-check tomlkit aiohttp
 git clone --depth 1 https://github.com/flatpak/flatpak-builder-tools.git \
     "$TEMP_DIR/flatpak-builder-tools"
-"$TEMP_DIR/venv/bin/python" \
-    "$TEMP_DIR/flatpak-builder-tools/cargo/flatpak-cargo-generator.py" \
-    "$WORKSPACE/Cargo.lock" -o "$CARGO_SOURCES" \
-    --output-dir "$FLATPAK_SOURCE"
 mkdir -p "$FLATPAK_SOURCE"
+(
+    cd "$FLATPAK_SOURCE"
+    "$TEMP_DIR/venv/bin/python" \
+        "$TEMP_DIR/flatpak-builder-tools/cargo/flatpak-cargo-generator.py" \
+        "$WORKSPACE/Cargo.lock" -o "$CARGO_SOURCES"
+)
 cp "$WORKSPACE/Cargo.toml" "$WORKSPACE/Cargo.lock" "$WORKSPACE/build.rs" "$FLATPAK_SOURCE/"
 cp -r "$WORKSPACE/src" "$WORKSPACE/data" "$FLATPAK_SOURCE/"
 test -s "$FLATPAK_SOURCE/cargo/config"
