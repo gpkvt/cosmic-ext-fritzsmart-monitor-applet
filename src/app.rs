@@ -497,8 +497,7 @@ fn graph_visual_with_dimensions(
                 .push(widget::text::caption(format!("MIN {minimum:.1} {unit}")))
                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                 .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
-        )
-        .push(graph)
+        )        .push(graph)
         .into()
 }
 
@@ -997,8 +996,7 @@ fn settings_section_details(section: &'static str) -> (&'static str, &'static st
             "Graph history",
             "Choose how much power history is displayed",
         ),
-        "refresh" => (
-            "Automatic refresh",
+        "refresh" => (            "Automatic refresh",
             "Control how often device readings update",
         ),
         "weather" => ("Weather", "Show local weather alongside power readings"),
@@ -1320,7 +1318,7 @@ impl cosmic::Application for AppModel {
         // Use non-capturing function pointers: this libcosmic iced version's
         // Subscription::run accepts a fn pointer rather than a closure.
         // Refreshing gets frame-rate ticks for the spinner; otherwise a one-second tick updates countdowns and deadlines.
-        if self.refresh_started_at.is_some() {
+        let clock = if self.refresh_started_at.is_some() {
             Subscription::run(animation_ticks)
         } else if self.active_settings_section == Some("diagnostics") {
             // Refresh the diagnostics view frequently so newly recorded HTTP
@@ -1328,6 +1326,27 @@ impl cosmic::Application for AppModel {
             Subscription::run(diagnostics_clock_ticks)
         } else {
             Subscription::run(regular_clock_ticks)
+        };
+
+        if self.expanded_graph.is_some() {
+            // Match the standard dialog interaction: Escape closes the
+            // enlarged graph without requiring pointer interaction.
+            let escape = cosmic::iced::event::listen_with(
+                |event, _status, _window| match event {
+                    cosmic::iced::Event::Keyboard(
+                        cosmic::iced::keyboard::Event::KeyPressed {
+                            key: cosmic::iced::keyboard::Key::Named(
+                                cosmic::iced::keyboard::key::Named::Escape,
+                            ),
+                            ..
+                        },
+                    ) => Some(Message::CloseGraph),
+                    _ => None,
+                },
+            );
+            Subscription::batch([clock, escape])
+        } else {
+            clock
         }
     }
 
@@ -1497,8 +1516,7 @@ impl cosmic::Application for AppModel {
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(
                             widget::container(widget::icon::from_name(icon).size(10))
-                                .width(cosmic::iced::Length::Fixed(12.0)),
-                        )
+                                .width(cosmic::iced::Length::Fixed(12.0)),                        )
                         .push(
                             // Keep the value and unit together at every configured
                             // font size; the panel row grows to fit instead of wrapping.
@@ -1742,7 +1760,13 @@ impl cosmic::Application for AppModel {
                         )
                         .push(widget::text::title2(title.clone()).width(cosmic::iced::Length::Fill))
                         .push(
-                            widget::button::custom(widget::icon::from_name("window-close-symbolic").size(18))
+                            widget::button::custom(
+                                widget::Row::new()
+                                    .spacing(6)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(widget::icon::from_name("window-close-symbolic").size(18))
+                                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Close (Esc)"))),
+                            )
                                 .on_press(Message::CloseGraph)
                                 .padding(8)
                                 .class(cosmic::theme::Button::Text),
@@ -1998,7 +2022,6 @@ impl cosmic::Application for AppModel {
                     ))
                     .push(widget::divider::horizontal::default())
             }
-
             if self.active_settings_section == Some("refresh") {
                 content = content
                     .push(widget::text::caption(format!(
@@ -2497,8 +2520,7 @@ impl cosmic::Application for AppModel {
                     if is_error_status(status) {
                         let title = if status.starts_with("Weather unavailable:") {
                             "WEATHER UNAVAILABLE"
-                        } else if status.starts_with("Could not save settings:") {
-                            "SETTINGS NOT SAVED"
+                        } else if status.starts_with("Could not save settings:") {                            "SETTINGS NOT SAVED"
                         } else {
                             "CONNECTION FAILED"
                         };
@@ -2997,8 +3019,7 @@ impl cosmic::Application for AppModel {
                         },
                         if is_expanded {
                             0.0
-                        } else {
-                            device_corner_radius.bottom_left
+                        } else {                            device_corner_radius.bottom_left
                         },
                     ];
                     let device_heading_button = widget::button::custom(
@@ -3497,7 +3518,6 @@ impl cosmic::Application for AppModel {
             .width(cosmic::iced::Length::Fill)
             .center_x(cosmic::iced::Length::Fill),
         );
-
         // Keep the popup content transparent so COSMIC can render its
         // compositor-backed frosted-glass surface behind the complete menu.
         // Only the main-menu title bar stays outside the scrollable area.
@@ -3997,8 +4017,7 @@ impl cosmic::Application for AppModel {
             Message::WeatherEnabledChanged(enabled) => {
                 self.settings.weather_enabled = enabled;
                 self.next_weather_refresh_at = None;
-                if !enabled {
-                    self.weather = None;
+                if !enabled {                    self.weather = None;
                     self.weather_error = None;
                     self.weather_forecast = None;
                     self.weather_forecast_error = None;
@@ -4497,8 +4516,7 @@ mod history_tests {
             },
         ];
         assert_eq!(average_temperature_c(&readings, false), Some(22.0));
-        assert_eq!(average_temperature_c(&readings, true), Some(22.0));
-        assert_eq!(average_temperature_c(&[], false), None);
+        assert_eq!(average_temperature_c(&readings, true), Some(22.0));        assert_eq!(average_temperature_c(&[], false), None);
     }
 
     #[test]
