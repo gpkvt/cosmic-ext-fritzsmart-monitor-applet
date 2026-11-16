@@ -277,10 +277,10 @@
       const checksumActions=document.getElementById('package-checksums-actions');
       const releaseLink=document.getElementById('package-release-link');
       const packageCards={
-        deb:{pattern:/^fritz-power-monitor_.*_amd64\\.deb$/,link:'package-deb-link',command:'package-deb-command',prefix:'sudo apt install ./',label:'Debian package'},
-        appimage:{pattern:/^fritz-power-monitor-.*-x86_64\\.AppImage$/,link:'package-appimage-link',command:'package-appimage-command',prefix:'chmod +x ',label:'AppImage'},
-        flatpak:{pattern:/^fritz-power-monitor-.*\\.flatpak$/,link:'package-flatpak-link',command:'package-flatpak-command',prefix:'flatpak install --user ./',label:'Flatpak bundle'},
-        archive:{pattern:/^fritz-power-monitor-v.*-x86_64-unknown-linux-gnu\\.tar\\.gz$/,link:'package-archive-link',command:'package-archive-command',prefix:'tar -xzf ',label:'Portable archive'}
+        deb:{pattern:/^fritz-power-monitor_.*_amd64\.deb$/,link:'package-deb-link',command:'package-deb-command',prefix:'sudo apt install ./',label:'Debian package'},
+        appimage:{pattern:/^fritz-power-monitor-.*-x86_64\.AppImage$/,link:'package-appimage-link',command:'package-appimage-command',prefix:'chmod +x ',label:'AppImage'},
+        flatpak:{pattern:/^fritz-power-monitor-.*\.flatpak$/,link:'package-flatpak-link',command:'package-flatpak-command',prefix:'flatpak install --user ./',label:'Flatpak bundle'},
+        archive:{pattern:/^fritz-power-monitor-v.*-x86_64-unknown-linux-gnu\.tar\.gz$/,link:'package-archive-link',command:'package-archive-command',prefix:'tar -xzf ',label:'Portable archive'}
       };
       try{
         const response=await fetch('https://api.github.com/repos/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/latest',{
