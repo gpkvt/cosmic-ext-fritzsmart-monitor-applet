@@ -106,6 +106,7 @@ pub struct FritzSettings {
     pub weather_location: String,
     pub weather_refresh_interval_minutes: u16,
     pub menu_order: Vec<String>,
+    pub panel_order: Vec<String>,
     pub device_order: Vec<String>,
 }
 
@@ -135,6 +136,7 @@ impl Default for FritzSettings {
             weather_location: String::new(),
             weather_refresh_interval_minutes: 10,
             menu_order: default_menu_order(),
+            panel_order: default_panel_order(),
             device_order: Vec::new(),
         }
     }
@@ -184,6 +186,32 @@ fn parse_menu_order(value: &str) -> Vec<String> {
             order
         });
     for id in MENU_ELEMENT_IDS {
+        if !order.iter().any(|existing| existing == id) {
+            order.push(id.to_string());
+        }
+    }
+    order
+}
+
+const PANEL_ITEM_IDS: [&str; 4] = ["weather", "power-consumption", "solar-power", "temperature"];
+
+fn default_panel_order() -> Vec<String> {
+    PANEL_ITEM_IDS.iter().map(|id| (*id).to_string()).collect()
+}
+
+fn parse_panel_order(value: &str) -> Vec<String> {
+    let mut order: Vec<String> = value
+        .split(',')
+        .map(str::trim)
+        .filter(|id| PANEL_ITEM_IDS.contains(id) && !id.is_empty())
+        .map(str::to_string)
+        .fold(Vec::new(), |mut order, id| {
+            if !order.contains(&id) {
+                order.push(id);
+            }
+            order
+        });
+    for id in PANEL_ITEM_IDS {
         if !order.iter().any(|existing| existing == id) {
             order.push(id.to_string());
         }
@@ -308,6 +336,7 @@ impl FritzSettings {
                 .unwrap_or(10)
                 .clamp(5, 60),
             menu_order: parse_menu_order(&get("MENU_ORDER")),
+            panel_order: parse_panel_order(&get("PANEL_ORDER")),
             device_order: parse_device_order(&get("DEVICE_ORDER")),
         };
         Ok(settings)
@@ -360,9 +389,10 @@ impl FritzSettings {
         input_ains.sort_unstable();
         let input_ains = input_ains.join(",");
         let menu_order = parse_menu_order(&self.menu_order.join(",")).join(",");
+        let panel_order = parse_panel_order(&self.panel_order.join(",")).join(",");
         let device_order = parse_device_order(&self.device_order.join(",")).join(",");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nDEVICE_ORDER={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\n",
             self.url,
             self.username,
             self.password,
@@ -414,6 +444,7 @@ impl FritzSettings {
                 "false"
             },
             menu_order,
+            panel_order,
             device_order,
         );
         #[cfg(unix)]
@@ -1333,6 +1364,29 @@ mod tests {
         assert!(settings.openweathermap_api_key.is_empty());
         assert!(settings.weather_location.is_empty());
         assert_eq!(settings.weather_refresh_interval_minutes, 10);
+    }
+
+    #[test]
+    fn panel_order_defaults_to_all_individual_panel_items() {
+        assert_eq!(
+            FritzSettings::default().panel_order,
+            vec!["weather", "power-consumption", "solar-power", "temperature"]
+                .into_iter()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn panel_order_parser_preserves_custom_order_and_repairs_invalid_entries() {
+        assert_eq!(
+            parse_panel_order("solar-power,power-consumption,solar-power,unknown"),
+            vec!["solar-power", "power-consumption", "weather", "temperature"]
+                .into_iter()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(parse_panel_order(""), default_panel_order());
     }
 
     #[test]
