@@ -1278,31 +1278,35 @@ fn diagnostic_status_row(
     status: impl ToString,
     success: Option<bool>,
 ) -> cosmic::Element<'static, Message> {
-    let icon = match success {
-        Some(true) => "emblem-ok-symbolic",
-        Some(false) => "dialog-error-symbolic",
-        None => "dialog-question-symbolic",
+    let (symbol, color) = match success {
+        Some(true) => ("●", cosmic::iced::Color::from_rgb(0.20, 0.68, 0.40)),
+        Some(false) => ("●", cosmic::iced::Color::from_rgb(0.86, 0.27, 0.27)),
+        None => ("●", cosmic::iced::Color::from_rgb(0.82, 0.60, 0.20)),
     };
-    // Keep diagnostics in a predictable three-column layout. Fixed label
-    // and value widths prevent rows from shifting as status text changes.
-    const LABEL_WIDTH: f32 = 132.0;
-    const STATUS_WIDTH: f32 = 140.0;
-    widget::Row::new()
-        .spacing(8)
-        .align_y(cosmic::iced::Alignment::Center)
-        .width(cosmic::iced::Length::Fill)
-        .push(
-            widget::container(widget::icon::from_name(icon).size(16))
-                .width(cosmic::iced::Length::Fixed(16.0))
-                .center_x(16),
-        )
-        .push(widget::text::body(label).width(cosmic::iced::Length::Fixed(LABEL_WIDTH)))
-        .push(
-            widget::container(widget::text::caption(status.to_string()))
-                .width(cosmic::iced::Length::Fixed(STATUS_WIDTH))
-                .align_x(cosmic::iced::alignment::Horizontal::Right),
-        )
-        .into()
+    let status = status.to_string();
+    let indicator = widget::container(widget::text(symbol).size(18))
+        .width(cosmic::iced::Length::Fixed(24.0))
+        .center_x(24)
+        .style(move |_| cosmic::iced::widget::container::Style {
+            text_color: Some(color),
+            ..Default::default()
+        });
+    surface_card(
+        widget::Row::new()
+            .spacing(12)
+            .align_y(cosmic::iced::Alignment::Center)
+            .width(cosmic::iced::Length::Fill)
+            .push(indicator)
+            .push(
+                widget::Column::new()
+                    .spacing(4)
+                    .width(cosmic::iced::Length::Fill)
+                    .push(widget::text::body(label))
+                    .push(widget::text::caption(status)),
+            )
+            .into(),
+        10,
+    )
 }
 
 fn is_error_status(status: &str) -> bool {
@@ -2663,11 +2667,13 @@ impl cosmic::Application for AppModel {
                         None,
                     )
                 };
-                content = content.push(diagnostic_status_row(
-                    crate::i18n::tr(&self.settings.language, "Wikimedia Commons · weather image"),
-                    commons_status.0,
-                    commons_status.1,
-                ));
+                content = content
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "Wikimedia Commons · image search and download"),
+                        commons_status.0,
+                        commons_status.1,
+                    ))
+                    .push(widget::text::caption("https://commons.wikimedia.org/w/api.php"));
 
                 let forecast_status = if !self.settings.weather_enabled {
                     (
@@ -2693,14 +2699,19 @@ impl cosmic::Application for AppModel {
                         None,
                     )
                 };
-                content = content.push(diagnostic_status_row(
-                    crate::i18n::tr(
-                        &self.settings.language,
-                        "Open-Meteo · forecast and geocoding",
-                    ),
-                    forecast_status.0,
-                    forecast_status.1,
-                ));
+                content = content
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "Open-Meteo · geocoding"),
+                        forecast_status.0,
+                        forecast_status.1,
+                    ))
+                    .push(widget::text::caption("https://geocoding-api.open-meteo.com/v1/search"))
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "Open-Meteo · forecast"),
+                        forecast_status.0,
+                        forecast_status.1,
+                    ))
+                    .push(widget::text::caption("https://api.open-meteo.com/v1/forecast"));
 
                 let requests = crate::fritz::http_request_diagnostics();
                 let fritz_base = endpoint.trim_end_matches('/');
