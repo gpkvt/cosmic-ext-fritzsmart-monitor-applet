@@ -1645,6 +1645,8 @@ impl cosmic::Application for AppModel {
         if self.settings_open {
             if let Some(section) = self.active_settings_section {
                 let (title, description) = settings_section_details(section);
+                let title = crate::i18n::tr(&self.settings.language, title);
+                let description = crate::i18n::tr(&self.settings.language, description);
                 content = content
                     .push(widget::Row::new()
                         .spacing(10)
@@ -1680,14 +1682,14 @@ impl cosmic::Application for AppModel {
                     .push(widget::icon::from_name("preferences-system-symbolic").size(24))
                     .push(widget::Column::new()
                         .spacing(2)
-                        .push(widget::text::title2("Settings"))
-                        .push(widget::text::caption("Configure your power monitor")));
+                        .push(widget::text::title2(crate::i18n::tr(&self.settings.language, "Settings")))
+                        .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Configure your power monitor"))));
                 content = content
                     .push(settings_heading)
                     .push(widget::divider::horizontal::default())
-                    .push(widget::text::caption("GENERAL"));
+                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "GENERAL")));
                 for (title, section) in [
-                    ("Language", "language"),
+                    (crate::i18n::tr(&self.settings.language, "Language"), "language"),
                     ("Panel", "panel"),
                     ("Graph history", "graph"),
                     ("Automatic refresh", "refresh"),
@@ -1704,13 +1706,13 @@ impl cosmic::Application for AppModel {
 
             if self.active_settings_section == Some("language") {
                 content = content
-                    .push(widget::text::body("Interface language"))
-                    .push(widget::text::caption("System follows your desktop language. English and German are currently available."))
+                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Interface language")))
+                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "System follows your desktop language. English and German are currently available.")))
                     .push(widget::Row::new().spacing(8)
-                        .push(widget::button::custom(widget::text::body("System default"))
+                        .push(widget::button::custom(widget::text::body(crate::i18n::tr(&self.settings.language, "System default")))
                             .on_press(Message::LanguageChanged("system".into()))
                             .class(cosmic::theme::Button::Standard))
-                        .push(widget::button::custom(widget::text::body("English"))
+                        .push(widget::button::custom(widget::text::body(crate::i18n::tr(&self.settings.language, "English")))
                             .on_press(Message::LanguageChanged("en".into()))
                             .class(cosmic::theme::Button::Standard))
                         .push(widget::button::custom(widget::text::body("Deutsch"))
