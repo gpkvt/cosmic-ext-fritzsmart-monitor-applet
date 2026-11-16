@@ -2030,7 +2030,7 @@ impl cosmic::Application for AppModel {
                                     thresholds.low_c
                                 )))
                                 .push(
-                                    widget::slider(-10.0..=0.0, f32::from(thresholds.low_c), {
+                                    widget::slider(-10.0..=10.0, f32::from(thresholds.low_c), {
                                         let ain = ain.clone();
                                         move |value| {
                                             Message::TemperatureAlertLowChanged(
@@ -3793,7 +3793,7 @@ impl cosmic::Application for AppModel {
                     .temperature_alerts
                     .entry(key)
                     .or_default()
-                    .low_c = low_c.clamp(-10, 0);
+                    .low_c = low_c.clamp(-10, 10);
                 self.persist_settings();
             }
             Message::TogglePopup => {
