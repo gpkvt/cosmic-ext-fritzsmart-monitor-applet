@@ -4044,12 +4044,24 @@ impl cosmic::Application for AppModel {
             Message::ShowGraph(title, values, unit) => {
                 self.expanded_graph = Some((title, values, unit));
                 if self.graph_window.is_none() {
-                    let settings = cosmic::iced::window::Settings {
+                    let mut settings = cosmic::iced::window::Settings {
+                        decorations: true,
+                        position: cosmic::iced::window::Position::Centered,
                         size: cosmic::iced::Size::new(800.0, 600.0),
                         min_size: Some(cosmic::iced::Size::new(640.0, 480.0)),
                         resizable: true,
+                        transparent: false,
                         ..Default::default()
                     };
+                    // Give the graph a regular desktop-window identity instead
+                    // of inheriting the applet's layer-surface identity. This
+                    // lets COSMIC and other Wayland compositors manage it as a
+                    // standalone, decorated window.
+                    #[cfg(target_os = "linux")]
+                    {
+                        settings.platform_specific.application_id =
+                            "com.gpkvt.FritzPowerMonitorGraph".to_string();
+                    }
                     let (id, task) = cosmic::iced::window::open(settings);
                     self.graph_window = Some(id);
                     return task.map(|_: cosmic::iced::window::Id| cosmic::Action::App(Message::GraphWindowOpened));
