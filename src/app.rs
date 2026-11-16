@@ -3085,12 +3085,17 @@ impl cosmic::Application for AppModel {
                     .width(cosmic::iced::Length::Fill)
                     .align_y(cosmic::iced::Alignment::Center)
                     .push(
-                        action_button(
-                            "preferences-system-symbolic",
-                            "Settings",
-                            Message::ToggleSettings,
+                        widget::button::custom(
+                            widget::Row::new()
+                                .spacing(8)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::text::caption("SETTINGS"))
+                                .push(widget::icon::from_name("preferences-system-symbolic").size(20)),
                         )
-                        .width(cosmic::iced::Length::Fill),
+                        .on_press(Message::ToggleSettings)
+                        .padding([8, 12])
+                        .width(cosmic::iced::Length::Fill)
+                        .class(cosmic::theme::Button::Text),
                     )
                     .push(
                         widget::button::custom(
