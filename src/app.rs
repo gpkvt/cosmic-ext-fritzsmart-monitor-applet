@@ -2679,8 +2679,8 @@ impl cosmic::Application for AppModel {
                 if let Some(weather_card) = weather_menu_card.take() {
                     menu_cards.push(("1-weather".to_string(), weather_card));
                 }
-                if let Some(bandwidth) = self.internet_bandwidth.as_ref() {
-                    let bandwidth_card = widget::Column::new()
+                let bandwidth_card = if let Some(bandwidth) = self.internet_bandwidth.as_ref() {
+                    widget::Column::new()
                         .spacing(8)
                         .padding([8, 12])
                         .push(
@@ -2698,9 +2698,19 @@ impl cosmic::Application for AppModel {
                                 .push(widget::icon::from_name("go-up-symbolic").size(16))
                                 .push(widget::text::caption("UPLOAD").width(cosmic::iced::Length::Fill))
                                 .push(widget::text::body(format_bandwidth(bandwidth.upload_bits_per_second))),
-                        );
-                    menu_cards.push(("bandwidth".to_string(), bandwidth_card.into()));
-                }
+                        )
+                } else {
+                    widget::Column::new()
+                        .padding([8, 12])
+                        .push(widget::text::caption(if self.refresh_started_at.is_some() {
+                            "Waiting for bandwidth data…"
+                        } else if self.error.is_some() {
+                            "Bandwidth data unavailable"
+                        } else {
+                            "Waiting for bandwidth data…"
+                        }))
+                };
+                menu_cards.push(("bandwidth".to_string(), bandwidth_card.into()));
                 // The settings list is authoritative for popup device order.
                 // Keep newly discovered devices after configured entries.
                 let mut ordered_readings: Vec<_> = self.readings.iter().collect();
@@ -3077,13 +3087,13 @@ impl cosmic::Application for AppModel {
                                 .weather
                                 .as_ref()
                                 .map(|weather| format!("{:.0} °C", weather.temperature_c)),
-                            "bandwidth" => self.internet_bandwidth.as_ref().map(|bandwidth| {
+                            "bandwidth" => Some(self.internet_bandwidth.as_ref().map(|bandwidth| {
                                 format!(
                                     "↓ {} · ↑ {}",
                                     format_bandwidth(bandwidth.download_bits_per_second),
                                     format_bandwidth(bandwidth.upload_bits_per_second),
                                 )
-                            }),
+                            }).unwrap_or_else(|| "Waiting…".to_string())),
                             _ => None,
                         }
                     } else {
@@ -3818,7 +3828,6 @@ impl cosmic::Application for AppModel {
                         cosmic::Action::App(Message::Updated(result))
                     });
                 }
-                self.internet_bandwidth = None;
             }
             Message::GraphTimespanChanged(value) => {
                 self.settings.graph_timespan_minutes = value.clamp(5, 2_102_400);
