@@ -392,17 +392,32 @@ fn commons_search_term(icon_code: &str, variant: usize) -> &'static str {
 }
 
 fn commons_title_matches_condition(icon_code: &str, title: &str) -> bool {
-    let words: Vec<String> = title
-        .to_ascii_lowercase()
+    let normalized = title.to_ascii_lowercase();
+    let words: Vec<String> = normalized
         .split(|character: char| !character.is_ascii_alphanumeric())
         .filter(|word| !word.is_empty())
         .map(str::to_string)
         .collect();
     let has = |terms: &[&str]| words.iter().any(|word| terms.iter().any(|term| word == term || word.starts_with(term)));
 
+    // Commons search also returns books, films, posters and illustrations
+    // whose titles merely mention weather (for example, "Cloudy with a
+    // Chance of Meatballs"). Never let broad category metadata make these
+    // editorial assets look like weather photographs.
+    let non_photo_terms = [
+        "book", "novel", "film", "movie", "cover", "poster", "illustration",
+        "drawing", "painting", "cartoon", "comic", "manga", "album", "song",
+        "soundtrack", "game", "logo", "advertisement", "advert", "theatre",
+        "theater", "fiction", "character", "sculpture", "statue", "map",
+        "diagram", "chart", "screenshot",
+    ];
+    if has(&non_photo_terms) {
+        return false;
+    }
+
     match icon_code.get(..2).unwrap_or("") {
         "01" => has(&["sun", "sunny", "sunshine", "sunlight", "cloudless", "clear"])
-            || title.to_ascii_lowercase().contains("blue sky"),
+            || normalized.contains("blue sky"),
         "02" | "03" | "04" => has(&["cloud", "cloudy", "overcast", "cumulus", "stratus"]),
         "09" | "10" => has(&["rain", "raining", "rainy", "shower", "drizzle", "precipitation"]),
         "11" => has(&["storm", "stormy", "thunder", "lightning"]),
@@ -439,12 +454,10 @@ async fn fetch_commons_background(
         for page in pages.values() {
             if images.len() >= 5 { break; }
             let title = page["title"].as_str().unwrap_or("");
-            let categories = page["categories"].as_array().map(|items| {
-                items.iter().filter_map(|item| item["title"].as_str()).collect::<Vec<_>>().join(" ")
-            }).unwrap_or_default();
-            // Search rank alone is not evidence of relevance: require a
-            // condition-specific word in the file title or Commons categories.
-            if !commons_title_matches_condition(icon_code, &format!("{title} {categories}")) {
+            // Use the file title itself as the relevance signal. Categories
+            // are often broad or inherited and can incorrectly admit unrelated
+            // editorial material into a weather-photo slideshow.
+            if !commons_title_matches_condition(icon_code, title) {
                 continue;
             }
             if !seen_titles.insert(title.to_string()) { continue; }
@@ -683,6 +696,25 @@ mod tests {
         ] {
             assert_eq!(commons_title_matches_condition(icon, title), expected, "{icon}: {title}");
         }
+    }
+
+    #[test]
+    fn rejects_editorial_assets_that_only_mention_weather() {
+        for title in [
+            "Cloudy with a Chance of Meatballs book cover",
+            "Cloudy Storms movie poster",
+            "Thunderstorm illustrated children's book",
+            "Rainy Day cartoon character",
+            "Snowstorm album cover",
+        ] {
+            let icon = if title.to_ascii_lowercase().contains("thunderstorm") { "11d" }
+                else if title.to_ascii_lowercase().contains("rainy") { "10d" }
+                else if title.to_ascii_lowercase().contains("snowstorm") { "13d" }
+                else { "04d" };
+            assert!(!commons_title_matches_condition(icon, title), "{title}");
+        }
+        assert!(commons_title_matches_condition("04d", "Cumulus clouds over the coast"));
+        assert!(commons_title_matches_condition("11d", "Lightning over the mountains"));
     }
 
     #[test]
