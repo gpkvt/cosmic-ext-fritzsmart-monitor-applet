@@ -2294,7 +2294,7 @@ impl cosmic::Application for AppModel {
                     if let Some(image_bytes) = &weather.background_image {
                         let weather_info_collapsed =
                             self.collapsed_menu_sections.contains("weather-info");
-                        let image_height = if weather_info_collapsed { 210.0 } else { 390.0 };
+                        let image_height = if weather_info_collapsed { 120.0 } else { 390.0 };
                         let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
                             image_bytes.clone(),
                         ))
@@ -2545,7 +2545,6 @@ impl cosmic::Application for AppModel {
                 weather_menu_card = Some(weather_section.into());
             } else if self.settings.weather_enabled {
                 let mut weather_section = widget::Column::new().spacing(8);
-                weather_section = weather_section.push(widget::text::title3("Weather"));
                 if let Some(error) = &self.weather_error {
                     weather_section =
                         weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
