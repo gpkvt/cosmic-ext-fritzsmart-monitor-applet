@@ -13,7 +13,7 @@
     a{color:var(--mint);text-underline-offset:3px}.wrap{width:min(var(--max),calc(100% - 40px));margin:auto}
     .topbar{position:sticky;top:0;z-index:5;border-bottom:1px solid #ffffff18;background:#0b0e14ed;backdrop-filter:blur(16px)}.nav{height:68px;display:flex;align-items:center;justify-content:space-between;gap:20px}.brand{display:flex;align-items:center;gap:10px;color:var(--text);font-weight:800;text-decoration:none}.brand img{width:32px;height:32px}.nav a:last-child{font-size:14px}
     main{padding:64px 0 100px}.eyebrow{color:var(--mint);font:12px monospace;letter-spacing:.14em;text-transform:uppercase}.intro{max-width:760px;margin-bottom:48px}.intro h1{font-size:clamp(38px,6vw,64px);line-height:1.05;letter-spacing:-.06em;margin:16px 0}.intro p{font-size:18px;color:var(--muted)}
-    .layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:56px;align-items:start}.toc{position:sticky;top:92px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}.toc strong{display:block;margin-bottom:10px}.toc a{display:block;padding:5px 0;color:var(--muted);font-size:13px;text-decoration:none}.toc a:hover{color:var(--mint)}
+    .layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:56px;align-items:start}.toc{position:sticky;top:92px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}.toc strong{display:block;margin-bottom:10px}.toc a{display:block;padding:5px 9px;border-left:2px solid transparent;border-radius:0 6px 6px 0;color:var(--muted);font-size:13px;text-decoration:none;transition:color .18s ease,background .18s ease,border-color .18s ease}.toc a:hover{color:var(--mint)}.toc a[aria-current="location"]{border-left-color:var(--mint);background:#8be0c414;color:var(--mint);font-weight:650}
     article section{padding:0 0 34px;margin:0 0 36px;border-bottom:1px solid var(--line);scroll-margin-top:100px}h2{font-size:27px;letter-spacing:-.04em;margin:0 0 14px}h3{font-size:18px;margin:25px 0 8px}p,li{color:#c5ceda}ul,ol{padding-left:23px}li{margin:7px 0}code{padding:2px 6px;border-radius:5px;background:#ffffff12;color:#d7e8e2;font: .9em monospace}pre{overflow:auto;padding:18px;border:1px solid var(--line);border-radius:12px;background:#080c12;color:#d7e8e2;line-height:1.6}pre code{padding:0;background:none}.note{padding:14px 17px;border-left:3px solid var(--mint);border-radius:0 10px 10px 0;background:#8be0c40d;color:var(--muted)}.back{display:inline-block;margin-top:18px;color:var(--mint)}
     @media(max-width:760px){.layout{grid-template-columns:1fr;gap:28px}.toc{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 14px}.toc strong{grid-column:1/-1}.nav{height:60px}}
   </style>
@@ -44,5 +44,27 @@ cargo build --release</code></pre><p>For the complete package prerequisites and 
     </div>
     <a class="back" href="index.html">← Back to project overview</a>
   </main>
+  <script>
+    const tocLinks=[...document.querySelectorAll('.toc a[href^="#"]')];
+    const tocSections=tocLinks.map(link=>document.getElementById(decodeURIComponent(link.hash.slice(1)))).filter(Boolean);
+    const updateActiveChapter=()=>{
+      const activationLine=innerHeight*.32;
+      let active=tocSections[0];
+      for(const section of tocSections){
+        if(section.getBoundingClientRect().top<=activationLine) active=section;
+        else break;
+      }
+      if(!active)return;
+      tocLinks.forEach(link=>{
+        if(decodeURIComponent(link.hash.slice(1))===active.id) link.setAttribute('aria-current','location');
+        else link.removeAttribute('aria-current');
+      });
+    };
+    const chapterObserver=new IntersectionObserver(updateActiveChapter,{rootMargin:'-10% 0px -75% 0px',threshold:0});
+    tocSections.forEach(section=>chapterObserver.observe(section));
+    addEventListener('scroll',updateActiveChapter,{passive:true});
+    addEventListener('resize',updateActiveChapter);
+    updateActiveChapter();
+  </script>
 </body>
 </html>

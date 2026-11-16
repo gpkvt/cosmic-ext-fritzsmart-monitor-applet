@@ -2870,21 +2870,22 @@ impl cosmic::Application for AppModel {
                     } else {
                         None
                     };
-                    let mut heading_row = widget::Row::new()
+                    let heading_row = widget::Row::new()
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::body(section.1));
-                    if let Some(value) = collapsed_value {
-                        heading_row = heading_row.push(widget::text::title3(value));
-                    }
-                    let heading = widget::button::custom(
+                        .push(widget::text::body(section.1))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill));
+                    let heading_row = if let Some(value) = collapsed_value {
+                        heading_row.push(widget::text::title3(value))
+                    } else {
                         heading_row
-                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(widget::icon::from_name(if collapsed {
-                                "go-next-symbolic"
-                            } else {
-                                "go-down-symbolic"
-                            }).size(16)),
+                    };
+                    let heading = widget::button::custom(
+                        heading_row.push(widget::icon::from_name(if collapsed {
+                            "go-next-symbolic"
+                        } else {
+                            "go-down-symbolic"
+                        }).size(16)),
                     )
                     .on_press(Message::ToggleMenuSection(section.0.to_string()))
                     .width(cosmic::iced::Length::Fill)
