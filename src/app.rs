@@ -1994,43 +1994,9 @@ impl cosmic::Application for AppModel {
                 let (title, description) = settings_section_details(section);
                 let title = crate::i18n::tr(&self.settings.language, title);
                 let description = crate::i18n::tr(&self.settings.language, description);
-                content = content
-                    .push(widget::Row::new()
-                        .spacing(10)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::button::custom(
-                            widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
-                                br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 18 9 12l6-6" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"##.to_vec(),
-                            ))
-                            .width(16)
-                            .height(16),
-                        )
-                            .on_press(Message::BackToSettingsCategories)
-                            .padding([8, 4])
-                            .class(cosmic::theme::Button::Text))
-                        .push(widget::Column::new()
-                            .spacing(2)
-                            .push(widget::text::title2(title))
-                            .push(widget::text::caption(description))));
+
             } else {
-                let settings_heading = widget::Row::new()
-                    .spacing(12)
-                    .align_y(cosmic::iced::Alignment::Center)
-                    .push(widget::button::custom(
-                        widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
-                            br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 18 9 12l6-6" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"##.to_vec(),
-                        ))
-                        .width(16)
-                        .height(16),
-                    )
-                        .on_press(Message::ToggleSettings)
-                        .padding([8, 4])
-                        .class(cosmic::theme::Button::Text))
-                    .push(widget::icon::from_name("preferences-system-symbolic").size(24))
-                    .push(widget::Column::new()
-                        .spacing(2)
-                        .push(widget::text::title2(crate::i18n::tr(&self.settings.language, "Settings")))
-                        .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Configure your power monitor"))));
+
                 content = content
                     .push(settings_heading)
                     .push(widget::divider::horizontal::default())
@@ -4172,9 +4138,50 @@ impl cosmic::Application for AppModel {
             .height(cosmic::iced::Length::Fill);
 
         let popup_content = if self.settings_open {
+            let sticky_header = if let Some(section) = self.active_settings_section {
+                let (title, description) = settings_section_details(section);
+                widget::Row::new()
+                    .spacing(10)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::button::custom(
+                        widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
+                            br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 18 9 12l6-6" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"##.to_vec(),
+                        ))
+                        .width(16)
+                        .height(16),
+                    )
+                        .on_press(Message::BackToSettingsCategories)
+                        .padding([8, 4])
+                        .class(cosmic::theme::Button::Text))
+                    .push(widget::Column::new()
+                        .spacing(2)
+                        .push(widget::text::title2(crate::i18n::tr(&self.settings.language, title)))
+                        .push(widget::text::caption(crate::i18n::tr(&self.settings.language, description))))
+            } else {
+                widget::Row::new()
+                    .spacing(12)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::button::custom(
+                        widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
+                            br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 18 9 12l6-6" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"##.to_vec(),
+                        ))
+                        .width(16)
+                        .height(16),
+                    )
+                        .on_press(Message::ToggleSettings)
+                        .padding([8, 4])
+                        .class(cosmic::theme::Button::Text))
+                    .push(widget::icon::from_name("preferences-system-symbolic").size(24))
+                    .push(widget::Column::new()
+                        .spacing(2)
+                        .push(widget::text::title2(crate::i18n::tr(&self.settings.language, "Settings")))
+                        .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Configure your power monitor"))))
+            };
             widget::Column::new()
                 .width(cosmic::iced::Length::Fill)
                 .height(cosmic::iced::Length::Fill)
+                .push(widget::container(sticky_header).padding([8, 12]))
+                .push(widget::divider::horizontal::default())
                 .push(scrollable_content)
         } else {
             let title_bar = widget::container(
