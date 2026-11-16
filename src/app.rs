@@ -426,7 +426,8 @@ fn graph_visual_large(
     style: &str,
     unit: &str,
 ) -> cosmic::Element<'static, Message> {
-    graph_visual_with_dimensions(values, style, unit, 180.0, 220)
+    // The enlarged graph should use a genuinely large canvas, not just a slightly taller compact card.
+    graph_visual_with_dimensions(values, style, unit, 560.0, 560)
 }
 
 fn graph_visual_with_dimensions(
@@ -1881,7 +1882,7 @@ impl cosmic::Application for AppModel {
                 .applet
                 .popup_container(
                     widget::container(graph_page)
-                        .width(cosmic::iced::Length::Fixed(640.0))
+                        .width(cosmic::iced::Length::Fixed(840.0))
                         .height(cosmic::iced::Length::Fill),
                 )
                 .max_height(800.0)
