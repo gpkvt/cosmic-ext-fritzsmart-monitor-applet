@@ -1624,9 +1624,9 @@ mod tests {
                 "internet-bandwidth",
                 "temperature"
             ]
-                .into_iter()
-                .map(str::to_string)
-                .collect::<Vec<_>>()
+            .into_iter()
+            .map(str::to_string)
+            .collect::<Vec<_>>()
         );
         assert_eq!(parse_panel_order(""), default_panel_order());
         let migrated = parse_panel_order("internet-download,internet-upload");
