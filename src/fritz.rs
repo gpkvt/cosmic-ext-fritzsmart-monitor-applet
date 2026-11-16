@@ -1034,7 +1034,6 @@ fn parse_fetch_result_xml(xml: &str, selected_ains: &[String]) -> Result<FritzFe
     })
 }
 
-
 fn parse_internet_bandwidth(xml: &str) -> Option<FritzInternetBandwidth> {
     let document = Document::parse(xml).ok()?;
     let read_rate = |name: &str| {

@@ -3282,7 +3282,6 @@ impl cosmic::Application for AppModel {
             if let Some(error) = &self.error {
                 content = content.push(error_notice("CONNECTION ERROR", error));
             }
-
         }
 
         content = content.push(
