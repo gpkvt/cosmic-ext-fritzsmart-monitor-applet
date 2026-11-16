@@ -3236,7 +3236,12 @@ impl cosmic::Application for AppModel {
                             .clip(true)
                             .style(|_| cosmic::iced::widget::container::Style {
                                 background: Some(
-                                    cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.58).into(),
+                                    cosmic::iced::Color::from_rgba(
+                                        0.04,
+                                        0.05,
+                                        0.07,
+                                        if weather.icon_code.ends_with('n') { 0.32 } else { 0.58 },
+                                    ).into(),
                                 ),
                                 text_color: Some(cosmic::iced::Color::WHITE),
                                 ..Default::default()

@@ -493,7 +493,10 @@ async fn fetch_commons_background(
             let Ok(response) = client.get(image_url).send().await else { continue };
             if !response.status().is_success() { continue; }
             let Ok(bytes) = response.bytes().await else { continue };
-            let Some(image) = blur_background_image(bytes.to_vec()) else { continue };
+            // Keep nighttime scenes noticeably clearer so the stars and original photo
+            // remain visible beneath the translucent weather details.
+            let blur_radius = if icon_code.ends_with('n') { 1.5 } else { 6.0 };
+            let Some(image) = blur_background_image(bytes.to_vec(), blur_radius) else { continue };
             let metadata = &info["extmetadata"];
             let artist = metadata["Artist"]["value"].as_str()
                 .or_else(|| metadata["Credit"]["value"].as_str())
@@ -627,9 +630,9 @@ fn generate_starry_night_background() -> Option<Vec<u8>> {
     Some(output.into_inner())
 }
 
-fn blur_background_image(bytes: Vec<u8>) -> Option<Vec<u8>> {
+fn blur_background_image(bytes: Vec<u8>, blur_radius: f32) -> Option<Vec<u8>> {
     let decoded = image::load_from_memory(&bytes).ok()?;
-    let blurred = decoded.blur(6.0).to_rgb8();
+    let blurred = decoded.blur(blur_radius).to_rgb8();
     let mut output = std::io::Cursor::new(Vec::new());
     image::DynamicImage::ImageRgb8(blurred)
         .write_to(&mut output, image::ImageFormat::Jpeg)
@@ -918,7 +921,7 @@ mod tests {
             .write_to(&mut encoded, image::ImageFormat::Png)
             .unwrap();
 
-        let blurred = blur_background_image(encoded.into_inner()).unwrap();
+        let blurred = blur_background_image(encoded.into_inner(), 6.0).unwrap();
         let decoded = image::load_from_memory(&blurred).unwrap();
         assert_eq!((decoded.width(), decoded.height()), (16, 12));
     }
