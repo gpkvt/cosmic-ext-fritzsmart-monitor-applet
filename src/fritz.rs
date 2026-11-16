@@ -264,6 +264,14 @@ fn parse_panel_order(value: &str) -> Vec<String> {
             }
             order
         });
+    for id in PANEL_ITEM_IDS {
+        if !order.iter().any(|existing| existing == id) {
+            order.push(id.to_string());
+        }
+    }
+    order
+}
+
 fn parse_device_order(value: &str) -> Vec<String> {
     value
         .split(',')
@@ -1600,6 +1608,14 @@ mod tests {
                 .collect::<Vec<_>>()
         );
         assert_eq!(parse_panel_order(""), default_panel_order());
+        let migrated = parse_panel_order("internet-download,internet-upload");
+        assert_eq!(
+            migrated
+                .iter()
+                .filter(|id| id.as_str() == "internet-bandwidth")
+                .count(),
+            1
+        );
     }
 
     #[test]
