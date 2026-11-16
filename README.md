@@ -184,7 +184,7 @@ Devices, Menu order and Diagnostics.
 5. Enter the FRITZ!Box URL, username and password, then choose **Load devices**.
 6. Select the devices to monitor.
 
-Use **Menu order** in Settings to arrange the live power summary, weather, device cards, Total power output and Power difference. Device cards retain their relative order. Device settings list available devices in the order returned by the FRITZ!Box.
+Use **Menu order** in Settings to arrange the live power summary, weather, device cards, Total power out, Total power in and Power difference independently. Device cards retain their relative order. Device settings list available devices in the order returned by the FRITZ!Box.
 Each selected device appears separately in the popup with its own readings and
 history graphs.
 

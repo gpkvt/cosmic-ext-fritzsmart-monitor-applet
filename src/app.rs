@@ -1041,7 +1041,8 @@ fn menu_element_label(id: &str) -> &'static str {
         "summary" => "Live power summary",
         "weather" => "Weather",
         "devices" => "Devices",
-        "total-power" => "Total power output",
+        "total-power-output" => "Total power out",
+        "total-power-input" => "Total power in",
         "power-difference" => "Power difference",
         _ => "Unknown element",
     }
@@ -1838,7 +1839,8 @@ impl cosmic::Application for AppModel {
                         "summary" => "summary",
                         "weather" => "weather",
                         "devices" => "devices",
-                        "total-power" => "total-power",
+                        "total-power-output" => "total-power-output",
+                        "total-power-input" => "total-power-input",
                         "power-difference" => "power-difference",
                         _ => continue,
                     };
@@ -2871,8 +2873,10 @@ impl cosmic::Application for AppModel {
                         "weather"
                     } else if key.starts_with("2-") {
                         "devices"
-                    } else if key.starts_with("3-") || key.starts_with("4-") {
-                        "total-power"
+                    } else if key.starts_with("3-") {
+                        "total-power-output"
+                    } else if key.starts_with("4-") {
+                        "total-power-input"
                     } else {
                         "power-difference"
                     };
