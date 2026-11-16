@@ -179,31 +179,31 @@ fn clear_confirmed_power_changes(
     }
 }
 
-fn notify_missing_devices(names: &[String]) {
+fn notify_missing_devices(names: &[String], language: &str) {
     if names.is_empty() {
         return;
     }
     let body = names.join("\n");
     let _ = notify_rust::Notification::new()
         .summary(if names.len() == 1 {
-            "FRITZ!Box device unavailable"
+            crate::i18n::tr(language, "FRITZ!Box device unavailable")
         } else {
-            "FRITZ!Box devices unavailable"
+            crate::i18n::tr(language, "FRITZ!Box devices unavailable")
         })
         .body(&body)
         .show();
 }
 
-fn notify_temperature_alert(name: &str, temperature: f64, thresholds: TemperatureAlertThresholds) {
+fn notify_temperature_alert(name: &str, temperature: f64, thresholds: TemperatureAlertThresholds, language: &str) {
     let (summary, body) = if temperature > f64::from(thresholds.high_c) {
         (
-            format!("High temperature: {name}"),
-            format!("{temperature:.1} °C (maximum: {} °C)", thresholds.high_c),
+            format!("{}: {name}", crate::i18n::tr(language, "High temperature")),
+            format!("{temperature:.1} °C ({}: {} °C)", crate::i18n::tr(language, "maximum"), thresholds.high_c),
         )
     } else {
         (
-            format!("Low temperature: {name}"),
-            format!("{temperature:.1} °C (minimum: {} °C)", thresholds.low_c),
+            format!("{}: {name}", crate::i18n::tr(language, "Low temperature")),
+            format!("{temperature:.1} °C ({}: {} °C)", crate::i18n::tr(language, "minimum"), thresholds.low_c),
         )
     };
     // A missing notification service must never interrupt data refreshes.
@@ -3550,7 +3550,7 @@ impl cosmic::Application for AppModel {
                             &result.missing_devices,
                             &self.pending_power_changes,
                         );
-                        notify_missing_devices(&newly_missing);
+                        notify_missing_devices(&newly_missing, &self.settings.language);
                         let history_window =
                             graph_history_window(self.settings.graph_timespan_minutes);
                         if let Some(bandwidth) = result.internet_bandwidth.as_ref() {
@@ -3606,6 +3606,7 @@ impl cosmic::Application for AppModel {
                                             &reading.name,
                                             reading.temperature_c,
                                             thresholds,
+                                            &self.settings.language,
                                         );
                                     }
                                     // First observation establishes a baseline without
