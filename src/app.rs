@@ -1277,7 +1277,7 @@ fn error_notice<'a>(title: &'static str, message: &'a str) -> cosmic::Element<'a
 }
 
 fn diagnostic_url_button(url: String) -> cosmic::Element<'static, Message> {
-    const MAX_VISIBLE_CHARS: usize = 46;
+    const MAX_VISIBLE_CHARS: usize = 24;
     let visible = if url.chars().count() > MAX_VISIBLE_CHARS {
         format!("{}…", url.chars().take(MAX_VISIBLE_CHARS - 1).collect::<String>())
     } else {
