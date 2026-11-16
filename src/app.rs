@@ -783,7 +783,6 @@ fn total_power_section(
     title: &'static str,
     value_w: i64,
     section_id: &'static str,
-    icon: &'static str,
     collapsed: bool,
     content: cosmic::Element<'static, Message>,
 ) -> cosmic::Element<'static, Message> {
@@ -792,7 +791,6 @@ fn total_power_section(
     let heading = widget::Row::new()
         .spacing(6)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::icon::from_name(icon).size(14))
         .push(widget::text::caption(title))
         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
         .push(widget::text::title3(keep_value_unit_together(format!("{value_w} W"))))
@@ -881,7 +879,6 @@ fn total_power_overview(
         "TOTAL POWER OUTPUT",
         total_power,
         "total-power-output",
-        "go-up-symbolic",
         collapsed_sections.contains("total-power-output"),
         output_content.into(),
     );
@@ -937,7 +934,6 @@ fn total_power_overview(
             "TOTAL POWER INPUT",
             input_power,
             "total-power-input",
-            "go-down-symbolic",
             collapsed_sections.contains("total-power-input"),
             input_content.into(),
         );
@@ -2898,7 +2894,7 @@ impl cosmic::Application for AppModel {
                     let section = match key.as_str() {
                         "0-summary" => ("summary", "Current power"),
                         "1-weather" => ("weather", "Weather"),
-                        "5-power-difference" => ("power-difference", "Power difference"),
+                        "5-power-difference" => ("power-difference", "POWER DIFFERENCE"),
                         _ => continue,
                     };
                     let collapsed = self.collapsed_menu_sections.contains(section.0);
