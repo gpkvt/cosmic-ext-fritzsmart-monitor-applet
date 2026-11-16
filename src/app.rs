@@ -2294,13 +2294,14 @@ impl cosmic::Application for AppModel {
                     if let Some(image_bytes) = &weather.background_image {
                         let weather_info_collapsed =
                             self.collapsed_menu_sections.contains("weather-info");
+                        let image_height = if weather_info_collapsed { 210.0 } else { 390.0 };
                         let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
                             image_bytes.clone(),
                         ))
                         .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fixed(210.0))
+                        .height(cosmic::iced::Length::Fixed(image_height))
                         .content_fit(cosmic::iced::ContentFit::Cover);
-                        let image_controls = widget::Column::new()
+                        let mut image_controls = widget::Column::new()
                             .width(cosmic::iced::Length::Fill)
                             .height(cosmic::iced::Length::Fill)
                             .push(
@@ -2323,57 +2324,57 @@ impl cosmic::Application for AppModel {
                                     )
                                     .spacing(8)
                                     .align_y(cosmic::iced::Alignment::Center),
-                            )
-                            .push(widget::Space::new().height(cosmic::iced::Length::Fill))
-                            .push(
-                                widget::Row::new()
-                                    .width(cosmic::iced::Length::Fill)
-                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                    .push(
-                                        widget::button::custom(
-                                            widget::icon::from_name("image-x-generic-symbolic").size(16),
-                                        )
-                                        .on_press(Message::OpenCommonsPage(
-                                            weather.image_attribution.as_ref()
-                                                .map(|credit| credit.page_url.clone())
-                                                .unwrap_or_default(),
-                                        ))
-                                        .padding(7)
-                                        .class(cosmic::theme::Button::Standard),
-                                    ),
-                            )
-                            .padding(8);
-                        let image_header = cosmic::iced::widget::Stack::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(210.0))
-                            .push(photo)
-                            .push(
-                                widget::container(image_controls)
-                                    .width(cosmic::iced::Length::Fill)
-                                    .height(cosmic::iced::Length::Fill)
-                                    .style(|_| cosmic::iced::widget::container::Style {
-                                        text_color: Some(cosmic::iced::Color::WHITE),
-                                        ..Default::default()
-                                    }),
                             );
-                        let mut card = widget::Column::new()
-                            .spacing(0)
-                            .push(image_header);
                         if !weather_info_collapsed {
-                            card = card.push(
+                            image_controls = image_controls.push(
                                 widget::container(weather_details)
                                     .width(cosmic::iced::Length::Fill)
                                     .padding(10)
                                     .style(|_| cosmic::iced::widget::container::Style {
                                         background: Some(
-                                            cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.88).into(),
+                                            cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.78).into(),
                                         ),
                                         text_color: Some(cosmic::iced::Color::WHITE),
                                         ..Default::default()
                                     }),
                             );
                         }
-                        card.into()
+                        image_controls = image_controls
+                            .push(widget::Space::new().height(cosmic::iced::Length::Fill));
+                        if let Some(credit) = &weather.image_attribution {
+                            image_controls = image_controls.push(
+                                widget::Row::new()
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                    .push(
+                                        widget::button::custom(
+                                            widget::Row::new()
+                                                .spacing(5)
+                                                .align_y(cosmic::iced::Alignment::Center)
+                                                .push(widget::icon::from_name("image-x-generic-symbolic").size(14))
+                                                .push(widget::text::caption("Wikimedia Commons")),
+                                        )
+                                        .on_press(Message::OpenCommonsPage(credit.page_url.clone()))
+                                        .padding(7)
+                                        .class(cosmic::theme::Button::Standard),
+                                    ),
+                            );
+                        }
+                        let image_card = cosmic::iced::widget::Stack::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(image_height))
+                            .push(photo)
+                            .push(
+                                widget::container(image_controls)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .height(cosmic::iced::Length::Fill)
+                                    .padding(8)
+                                    .style(|_| cosmic::iced::widget::container::Style {
+                                        text_color: Some(cosmic::iced::Color::WHITE),
+                                        ..Default::default()
+                                    }),
+                            );
+                        image_card.into()
                     } else {
                         let weather_info_collapsed =
                             self.collapsed_menu_sections.contains("weather-info");
