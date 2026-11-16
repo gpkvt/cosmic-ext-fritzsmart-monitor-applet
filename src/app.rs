@@ -105,6 +105,7 @@ pub enum Message {
     WeatherUpdated(Result<WeatherData, String>),
     ToggleWeatherForecast,
     TestNotification,
+    CopyDiagnosticUrl(String),
     FetchForecastFromDiagnostics,
     SelectWeatherForecast(u8),
     WeatherForecastUpdated(u8, Result<WeatherForecast, String>),
@@ -1272,6 +1273,28 @@ fn error_notice<'a>(title: &'static str, message: &'a str) -> cosmic::Element<'a
     )
     .width(cosmic::iced::Length::Fill)
     .padding(12)
+    .into()
+}
+
+fn diagnostic_url_button(url: String) -> cosmic::Element<'static, Message> {
+    const MAX_VISIBLE_CHARS: usize = 46;
+    let visible = if url.chars().count() > MAX_VISIBLE_CHARS {
+        format!("{}…", url.chars().take(MAX_VISIBLE_CHARS - 1).collect::<String>())
+    } else {
+        url.clone()
+    };
+    widget::button::custom(
+        widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .width(cosmic::iced::Length::Fill)
+            .push(widget::text::caption(visible).width(cosmic::iced::Length::Fill))
+            .push(widget::icon::from_name("edit-copy-symbolic").size(14)),
+    )
+    .on_press(Message::CopyDiagnosticUrl(url))
+    .padding([2, 0])
+    .width(cosmic::iced::Length::Fill)
+    .class(cosmic::theme::Button::Text)
     .into()
 }
 
@@ -2655,7 +2678,7 @@ impl cosmic::Application for AppModel {
                         weather_provider_status.0,
                         weather_provider_status.1,
                     ))
-                    .push(widget::text::caption("https://api.openweathermap.org/data/2.5/weather"));
+                    .push(diagnostic_url_button("https://api.openweathermap.org/data/2.5/weather".into()));
 
                 let commons_status = if !self.settings.weather_enabled {
                     (
@@ -2691,7 +2714,8 @@ impl cosmic::Application for AppModel {
                         commons_status.0,
                         commons_status.1,
                     ))
-                    .push(widget::text::caption("https://commons.wikimedia.org/w/api.php · thumbnail URL returned by the API"));
+                    .push(diagnostic_url_button("https://commons.wikimedia.org/w/api.php".into()))
+                    .push(widget::text::caption("Thumbnail URL is returned by the API."));
 
                 let forecast_status = if self.settings.weather_location.trim().is_empty() {
                     (
@@ -2728,13 +2752,13 @@ impl cosmic::Application for AppModel {
                         forecast_status.0,
                         forecast_status.1,
                     ))
-                    .push(widget::text::caption("https://geocoding-api.open-meteo.com/v1/search"))
+                    .push(diagnostic_url_button("https://geocoding-api.open-meteo.com/v1/search".into()))
                     .push(diagnostic_status_row(
                         crate::i18n::tr(&self.settings.language, "Open-Meteo · forecast"),
                         forecast_status.0,
                         forecast_status.1,
                     ))
-                    .push(widget::text::caption("https://api.open-meteo.com/v1/forecast"))
+                    .push(diagnostic_url_button("https://api.open-meteo.com/v1/forecast".into()))
                     .push(action_button(
                         "view-refresh-symbolic",
                         crate::i18n::tr(&self.settings.language, "Get 7-day forecast"),
@@ -2849,12 +2873,11 @@ impl cosmic::Application for AppModel {
                         &fritz_base_status.0,
                         fritz_base_status.1,
                     ))
-                    .push(widget::text::caption(if endpoint.is_empty() {
-                        crate::i18n::tr(&self.settings.language, "Base URL not configured")
-                            .to_string()
+                    .push(if endpoint.is_empty() {
+                        widget::text::caption(crate::i18n::tr(&self.settings.language, "Base URL not configured")).into()
                     } else {
-                        endpoint.to_string()
-                    }));
+                        diagnostic_url_button(endpoint.to_string())
+                    });
 
                 let auth = fritz_endpoint_status("/login_sid.lua");
                 content = content
@@ -2863,7 +2886,7 @@ impl cosmic::Application for AppModel {
                         &auth.0,
                         auth.1,
                     ))
-                    .push(widget::text::caption(if endpoint.is_empty() {
+                    .push(diagnostic_url_button(if endpoint.is_empty() {
                         "/login_sid.lua".to_string()
                     } else {
                         format!("{fritz_base}/login_sid.lua")
@@ -2874,7 +2897,7 @@ impl cosmic::Application for AppModel {
                 );
                 content = content
                     .push(diagnostic_status_row(crate::i18n::tr(&self.settings.language, "Device list and meter readings"), &device_list.0, device_list.1))
-                    .push(widget::text::caption(if endpoint.is_empty() {
+                    .push(diagnostic_url_button(if endpoint.is_empty() {
                         "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos".to_string()
                     } else {
                         format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos")
@@ -2885,7 +2908,7 @@ impl cosmic::Application for AppModel {
                 );
                 content = content
                     .push(diagnostic_status_row(crate::i18n::tr(&self.settings.language, "Per-device switch state"), &switch_state.0, switch_state.1))
-                    .push(widget::text::caption(if endpoint.is_empty() {
+                    .push(diagnostic_url_button(if endpoint.is_empty() {
                         "/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>".to_string()
                     } else {
                         format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>")
@@ -4437,6 +4460,9 @@ impl cosmic::Application for AppModel {
                             self.settings.refresh_interval_seconds.clamp(30, 3600),
                         )),
                 );
+            }
+            Message::CopyDiagnosticUrl(url) => {
+                return cosmic::iced::clipboard::write(url);
             }
             Message::TestNotification => {
                 let _ = notify_rust::Notification::new()
