@@ -83,7 +83,7 @@ jobs:
               raise SystemExit(f"Unsupported bump type: {bump}")
 
           new_version = f"{major}.{minor}.{patch}"
-          updated, count = re.subn(pattern, rf'\g<1>{os.environ["NEW_VERSION"]}\g<2>', text, count=1)
+          updated, count = re.subn(pattern, lambda match: match.group(1) + os.environ["NEW_VERSION"] + match.group(2), text, count=1)
               r'(?ms)(^\[package\]\s+.*?^version\s*=\s*")[0-9]+\.[0-9]+\.[0-9]+("\s*$)',
               rf'\g<1>{new_version}\g<2>',
               text,
