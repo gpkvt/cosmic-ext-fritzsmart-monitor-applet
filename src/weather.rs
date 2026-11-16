@@ -6,6 +6,7 @@ pub struct CommonsAttribution {
     pub title: String,
     pub artist: String,
     pub license: String,
+    pub license_url: Option<String>,
     pub page_url: String,
 }
 
@@ -28,6 +29,7 @@ pub struct WeatherData {
     pub background_images: Vec<Vec<u8>>,
     pub slideshow_frames: Vec<Vec<u8>>,
     pub slideshow_sequence: Vec<usize>,
+    pub slideshow_frame_sources: Vec<Vec<usize>>,
     pub image_attribution: Option<CommonsAttribution>,
     pub image_attributions: Vec<CommonsAttribution>,
 }
@@ -325,6 +327,7 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
         slideshow_sequence,
         image_attribution,
         image_attributions,
+        slideshow_frame_sources: Vec::new(),
     })
 }
 
@@ -490,12 +493,24 @@ async fn fetch_commons_background(
             if !response.status().is_success() { continue; }
             let Ok(bytes) = response.bytes().await else { continue };
             let Some(image) = blur_background_image(bytes.to_vec()) else { continue };
-            let artist = info["extmetadata"]["Artist"]["value"].as_str().unwrap_or("Unknown author");
-            let license = info["extmetadata"]["LicenseShortName"]["value"].as_str().unwrap_or("See file page");
+            let metadata = &info["extmetadata"];
+            let artist = metadata["Artist"]["value"].as_str()
+                .or_else(|| metadata["Credit"]["value"].as_str())
+                .filter(|value| !strip_html(value).is_empty())
+                .map(strip_html)
+                .unwrap_or_else(|| "Author not provided by Wikimedia Commons".to_string());
+            let license = metadata["LicenseShortName"]["value"].as_str()
+                .or_else(|| metadata["UsageTerms"]["value"].as_str())
+                .map(strip_html)
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| "License details on Wikimedia Commons file page".to_string());
+            let license_url = metadata["LicenseUrl"]["value"].as_str()
+                .filter(|url| url.starts_with("https://") && !url.chars().any(char::is_control))
+                .map(str::to_string);
             let title = page["title"].as_str().unwrap_or("Wikimedia Commons photograph");
             let page_url = info["descriptionurl"].as_str().unwrap_or("https://commons.wikimedia.org/");
             attributions.push(CommonsAttribution {
-                title: title.to_string(), artist: strip_html(artist), license: license.to_string(),
+                title: title.to_string(), artist, license, license_url,
                 page_url: commons_file_page_url(page_url),
             });
             images.push(image);
@@ -578,16 +593,17 @@ fn blur_background_image(bytes: Vec<u8>) -> Option<Vec<u8>> {
 pub fn build_weather_slideshow_frames(
     images: &[Vec<u8>],
     display_seconds: u16,
-) -> (Vec<Vec<u8>>, Vec<usize>) {
+) -> (Vec<Vec<u8>>, Vec<usize>, Vec<Vec<usize>>) {
     use image::{DynamicImage, ImageBuffer, Rgba};
     let decoded: Vec<_> = images.iter()
         .filter_map(|bytes| image::load_from_memory(bytes).ok())
         .map(|image| image.to_rgba8())
         .collect();
-    if decoded.is_empty() { return (Vec::new(), Vec::new()); }
+    if decoded.is_empty() { return (Vec::new(), Vec::new(), Vec::new()); }
 
     let mut frames = Vec::new();
     let mut sequence = Vec::new();
+    let mut frame_sources = Vec::new();
     let hold_ticks = usize::from(display_seconds.clamp(5, 300)) * 4;
     for (index, current) in decoded.iter().enumerate() {
         let mut output = std::io::Cursor::new(Vec::new());
@@ -595,7 +611,9 @@ pub fn build_weather_slideshow_frames(
             .write_to(&mut output, image::ImageFormat::Jpeg).is_ok()
         {
             frames.push(output.into_inner());
-            sequence.extend(std::iter::repeat(frames.len() - 1).take(hold_ticks));
+            let frame_index = frames.len() - 1;
+            sequence.extend(std::iter::repeat(frame_index).take(hold_ticks));
+            frame_sources.push(vec![index]);
         }
         if decoded.len() < 2 { continue; }
         let next = &decoded[(index + 1) % decoded.len()];
@@ -616,10 +634,11 @@ pub fn build_weather_slideshow_frames(
             {
                 frames.push(output.into_inner());
                 sequence.push(frames.len() - 1);
+                frame_sources.push(vec![index, (index + 1) % decoded.len()]);
             }
         }
     }
-    (frames, sequence)
+    (frames, sequence, frame_sources)
 }
 
 fn strip_html(value: &str) -> String {
@@ -725,6 +744,7 @@ mod tests {
                 background_images: Vec::new(),
                 slideshow_frames: Vec::new(),
                 slideshow_sequence: Vec::new(),
+                slideshow_frame_sources: Vec::new(),
                 image_attribution: None,
                 image_attributions: Vec::new(),
             };
@@ -807,9 +827,12 @@ mod tests {
             image.write_to(&mut output, image::ImageFormat::Jpeg).unwrap();
             output.into_inner()
         };
-        let (frames, sequence) = build_weather_slideshow_frames(&[encode(first), encode(second)], 5);
+        let (frames, sequence, frame_sources) = build_weather_slideshow_frames(&[encode(first), encode(second)], 5);
         assert_eq!(frames.len(), 8);
         assert_eq!(sequence.len(), 46);
+        assert_eq!(frame_sources.len(), frames.len());
+        assert_eq!(frame_sources[0], vec![0]);
+        assert_eq!(frame_sources[1], vec![0, 1]);
         for frame in frames {
             assert!(image::load_from_memory(&frame).is_ok());
         }
