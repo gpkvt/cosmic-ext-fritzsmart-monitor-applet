@@ -2278,8 +2278,7 @@ impl cosmic::Application for AppModel {
                 content = content
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::title3(crate::i18n::tr(&self.settings.language, "FRITZ!Box API")))
-                    .push(diagnostic_status_row(
-                        "Connection",
+                    .push(diagnostic_status_row(crate::i18n::tr(&self.settings.language, "Connection"),
                         &fritz_base_status.0,
                         fritz_base_status.1,
                     ))
@@ -2291,8 +2290,7 @@ impl cosmic::Application for AppModel {
 
                 let auth = fritz_endpoint_status("/login_sid.lua");
                 content = content
-                    .push(diagnostic_status_row(
-                        "Session authentication",
+                    .push(diagnostic_status_row(crate::i18n::tr(&self.settings.language, "Session authentication"),
                         &auth.0,
                         auth.1,
                     ))
@@ -2306,7 +2304,7 @@ impl cosmic::Application for AppModel {
                     "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
                 );
                 content = content
-                    .push(diagnostic_status_row("Device list and meter readings", &device_list.0, device_list.1))
+                    .push(diagnostic_status_row(crate::i18n::tr(&self.settings.language, "Device list and meter readings"), &device_list.0, device_list.1))
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos".to_string()
                     } else {
@@ -2317,7 +2315,7 @@ impl cosmic::Application for AppModel {
                     "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
                 );
                 content = content
-                    .push(diagnostic_status_row("Per-device switch state", &switch_state.0, switch_state.1))
+                    .push(diagnostic_status_row(crate::i18n::tr(&self.settings.language, "Per-device switch state"), &switch_state.0, switch_state.1))
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>".to_string()
                     } else {
@@ -2639,9 +2637,7 @@ impl cosmic::Application for AppModel {
                             widget::Row::new()
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::text::title3(format!(
-                                    "{forecast_days}-day forecast"
-                                )))
+                                .push(widget::text::title3(if crate::i18n::language(&self.settings.language) == "de" { format!("{forecast_days}-Tage-Vorhersage") } else { format!("{forecast_days}-day forecast") }))
                                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                                 .push(forecast_range_selector),
                         )
@@ -2652,7 +2648,7 @@ impl cosmic::Application for AppModel {
                     }
                     if let Some(error) = &self.weather_forecast_error {
                         weather_section =
-                            weather_section.push(error_notice("FORECAST UNAVAILABLE", error));
+                            weather_section.push(error_notice(crate::i18n::tr(&self.settings.language, "FORECAST UNAVAILABLE"), error));
                     }
                     if let Some(forecast) = &self.weather_forecast {
                         for day in &forecast.days {
@@ -2705,7 +2701,7 @@ impl cosmic::Application for AppModel {
                 }
                 if let Some(error) = &self.weather_error {
                     weather_section =
-                        weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
+                        weather_section.push(error_notice(crate::i18n::tr(&self.settings.language, "WEATHER UNAVAILABLE"), error));
                 }
                 weather_section = weather_section.push(widget::divider::horizontal::default());
                 weather_menu_card = Some(weather_section.into());
@@ -2714,7 +2710,7 @@ impl cosmic::Application for AppModel {
                 weather_section = weather_section.push(widget::text::title3(crate::i18n::tr(&self.settings.language, "Weather")));
                 if let Some(error) = &self.weather_error {
                     weather_section =
-                        weather_section.push(error_notice("WEATHER UNAVAILABLE", error));
+                        weather_section.push(error_notice(crate::i18n::tr(&self.settings.language, "WEATHER UNAVAILABLE"), error));
                 } else {
                     weather_section =
                         weather_section.push(widget::text::body(crate::i18n::tr(&self.settings.language, "Weather data is loading…")));
@@ -3351,7 +3347,7 @@ impl cosmic::Application for AppModel {
             }
 
             if let Some(error) = &self.error {
-                content = content.push(error_notice("CONNECTION ERROR", error));
+                content = content.push(error_notice(crate::i18n::tr(&self.settings.language, "CONNECTION ERROR"), error));
             }
         }
 
