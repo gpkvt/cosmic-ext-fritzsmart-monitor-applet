@@ -248,8 +248,16 @@ fn graph_history_window(minutes: u32) -> Duration {
     Duration::from_secs(u64::from(minutes.clamp(5, 2_102_400)) * 60)
 }
 
+const MAX_HISTORY_SAMPLES: u64 = 50_000;
+const MIN_HISTORY_SAMPLE_INTERVAL: Duration = Duration::from_secs(300);
+
+fn graph_sample_interval(window: Duration) -> Duration {
+    let seconds = window.as_secs().div_ceil(MAX_HISTORY_SAMPLES);
+    Duration::from_secs(seconds.max(MIN_HISTORY_SAMPLE_INTERVAL.as_secs()))
+}
+
 fn max_history_samples(window: Duration) -> usize {
-    (window.as_secs() / 300) as usize + 1
+    (window.as_secs() / graph_sample_interval(window).as_secs()) as usize + 1
 }
 
 fn quick_slider_snap_position(position: f32) -> f32 {
@@ -327,9 +335,9 @@ fn record_power_sample(
     now: Instant,
     window: Duration,
 ) {
-    const SAMPLE_INTERVAL: Duration = Duration::from_secs(300);
+    let sample_interval = graph_sample_interval(window);
     if let Some((timestamp, value)) = history.back_mut() {
-        if now.duration_since(*timestamp) < SAMPLE_INTERVAL {
+        if now.duration_since(*timestamp) < sample_interval {
             *value = power_w;
         } else {
             history.push_back((now, power_w));
@@ -534,9 +542,9 @@ fn record_device_sample(
     let samples = history
         .entry(crate::fritz::normalize_ain_for_selection(&reading.ain))
         .or_default();
-    const SAMPLE_INTERVAL: Duration = Duration::from_secs(300);
+    let sample_interval = graph_sample_interval(window);
     if let Some((timestamp, power, temperature)) = samples.back_mut() {
-        if now.duration_since(*timestamp) < SAMPLE_INTERVAL {
+        if now.duration_since(*timestamp) < sample_interval {
             *power = reading.power_w;
             *temperature = reading.temperature_c;
         } else {
