@@ -173,6 +173,14 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Refresh · {}" => "Aktualisierung · {}",
         "Graph · {}" => "Diagramm · {}",
         "FORECAST UNAVAILABLE" => "VORHERSAGE NICHT VERFÜGBAR"
+        "GRAPH HISTORY" => "DIAGRAMMVERLAUF",
+        "AUTOMATIC REFRESH" => "AUTOMATISCHE AKTUALISIERUNG",
+        "Refresh" => "Aktualisieren",
+        "Graph" => "Diagramm",
+        "Upper limit" => "Oberer Grenzwert",
+        "Lower limit" => "Unterer Grenzwert",
+        "Weather refresh" => "Wetteraktualisierung",
+        "Refresh now" => "Jetzt aktualisieren",
         _ => key,
     }
 }
