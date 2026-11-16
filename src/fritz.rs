@@ -1596,9 +1596,9 @@ mod tests {
                 "internet-bandwidth",
                 "temperature"
             ]
-                .into_iter()
-                .map(str::to_string)
-                .collect::<Vec<_>>()
+            .into_iter()
+            .map(str::to_string)
+            .collect::<Vec<_>>()
         );
     }
 
