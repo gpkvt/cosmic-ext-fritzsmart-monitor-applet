@@ -473,17 +473,17 @@ fn build_weather_slideshow_frames(images: &[Vec<u8>]) -> Vec<Vec<u8>> {
     if decoded.len() < 2 {
         return decoded.first().map(|image| {
             let mut output = std::io::Cursor::new(Vec::new());
-            DynamicImage::ImageRgba8(image.clone()).write_to(&mut output, image::ImageFormat::Jpeg).ok();
+            DynamicImage::ImageRgb8(image.clone().into_rgb8()).write_to(&mut output, image::ImageFormat::Jpeg).ok();
             output.into_inner()
         }).into_iter().collect();
     }
     let mut frames = Vec::new();
     for index in 0..decoded.len() {
         let current = &decoded[index];
-        // Hold each photograph for two seconds at a 250 ms frame interval.
-        for _ in 0..8 {
+        // Hold each photograph for three seconds at a 250 ms frame interval.
+        for _ in 0..12 {
             let mut output = std::io::Cursor::new(Vec::new());
-            DynamicImage::ImageRgba8(current.clone()).write_to(&mut output, image::ImageFormat::Jpeg).ok();
+            DynamicImage::ImageRgb8(current.clone().into_rgb8()).write_to(&mut output, image::ImageFormat::Jpeg).ok();
             frames.push(output.into_inner());
         }
         let next = &decoded[(index + 1) % decoded.len()];
@@ -499,7 +499,7 @@ fn build_weather_slideshow_frames(images: &[Vec<u8>]) -> Vec<Vec<u8>> {
                 }));
             }
             let mut output = std::io::Cursor::new(Vec::new());
-            if DynamicImage::ImageRgba8(blended).write_to(&mut output, image::ImageFormat::Jpeg).is_ok() {
+            if DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(blended).to_rgb8()).write_to(&mut output, image::ImageFormat::Jpeg).is_ok() {
                 frames.push(output.into_inner());
             }
         }
