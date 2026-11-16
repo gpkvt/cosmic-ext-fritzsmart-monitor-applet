@@ -2182,7 +2182,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::title3("FRITZ!Box API endpoints"))
                     .push(widget::text::caption(
-                        "Configured URLs and the latest HTTP response for each API path. Session IDs and device identifiers are omitted.",
+                        "Configured URLs and the latest HTTP response for each API operation. Session IDs and device identifiers are omitted.",
                     ))
                     .push(widget::text::body(format!(
                         "FRITZ!Box · {}",
@@ -2193,34 +2193,47 @@ impl cosmic::Application for AppModel {
                         }
                     )))
                     .push(widget::text::caption(fritz_base_status))
-                    .push(widget::Row::new()
-                        .spacing(8)
-                        .push(widget::text::body("Session authentication").width(cosmic::iced::Length::Fill))
-                        .push(widget::text::caption(fritz_endpoint_status(
-                            "/login_sid.lua",
-                        ))))
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .push(
+                                widget::text::body("Session authentication")
+                                    .width(cosmic::iced::Length::Fill),
+                            )
+                            .push(widget::text::caption(fritz_endpoint_status("/login_sid.lua"))),
+                    )
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "/login_sid.lua".to_string()
                     } else {
                         format!("{fritz_base}/login_sid.lua")
                     }))
-                    .push(widget::Row::new()
-                        .spacing(8)
-                        .push(widget::text::body("Device list and meter readings").width(cosmic::iced::Length::Fill))
-                        .push(widget::text::caption(fritz_endpoint_status(
-                            "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
-                        ))))
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .push(
+                                widget::text::body("Device list and meter readings")
+                                    .width(cosmic::iced::Length::Fill),
+                            )
+                            .push(widget::text::caption(fritz_endpoint_status(
+                                "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
+                            ))),
+                    )
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos".to_string()
                     } else {
                         format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos")
                     }))
-                    .push(widget::Row::new()
-                        .spacing(8)
-                        .push(widget::text::body("Per-device switch state").width(cosmic::iced::Length::Fill))
-                        .push(widget::text::caption(fritz_endpoint_status(
-                            "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
-                        ))))
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .push(
+                                widget::text::body("Per-device switch state")
+                                    .width(cosmic::iced::Length::Fill),
+                            )
+                            .push(widget::text::caption(fritz_endpoint_status(
+                                "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
+                            ))),
+                    )
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>".to_string()
                     } else {
@@ -2234,9 +2247,7 @@ impl cosmic::Application for AppModel {
                             self.settings.ains.len()
                         }
                     )))
-                    .push(widget::text::caption(
-                        "Per-device switch state uses the same endpoint with switchcmd=getswitchstate and an AIN parameter.",
-                    ));
+                    ;
                 let request_countdown = if self.refresh_started_at.is_some() {
                     "Request in progress…".to_string()
                 } else {
