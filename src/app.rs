@@ -419,7 +419,13 @@ fn graph_visual(
     style: &str,
     unit: &str,
 ) -> cosmic::Element<'static, Message> {
-    graph_visual_with_dimensions(values, style, unit, 48.0, 56)
+    graph_visual_with_dimensions(
+        values,
+        style,
+        unit,
+        48.0,
+        cosmic::iced::Length::Fixed(56.0),
+    )
 }
 
 fn graph_visual_large(
@@ -428,7 +434,7 @@ fn graph_visual_large(
     unit: &str,
 ) -> cosmic::Element<'static, Message> {
     // The enlarged graph should use a genuinely large canvas, not just a slightly taller compact card.
-    graph_visual_with_dimensions(values, style, unit, 480.0, 480)
+    graph_visual_with_dimensions(values, style, unit, 480.0, cosmic::iced::Length::Fill)
 }
 
 fn graph_visual_with_dimensions(
@@ -436,7 +442,7 @@ fn graph_visual_with_dimensions(
     style: &str,
     unit: &str,
     graph_height: f64,
-    widget_height: u16,
+    widget_height: cosmic::iced::Length,
 ) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
     let current_value = values.last().copied().unwrap_or(0.0);
@@ -511,7 +517,7 @@ fn graph_visual_with_dimensions(
     .width(cosmic::iced::Length::Fill)
     .height(widget_height);
 
-    widget::Column::new()
+    let content = widget::Column::new()
         .spacing(8)
         .push(
             widget::Row::new()
@@ -521,8 +527,12 @@ fn graph_visual_with_dimensions(
                 .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
         )
         .push(graph)
-        .push(widget::text::caption(format!("CURRENT {current_value:.1} {unit}")))
-        .into()
+        .push(widget::text::caption(format!("CURRENT {current_value:.1} {unit}")));
+    if matches!(widget_height, cosmic::iced::Length::Fill) {
+        content.height(cosmic::iced::Length::Fill).into()
+    } else {
+        content.into()
+    }
 }
 
 fn interactive_graph(
@@ -1806,31 +1816,15 @@ impl cosmic::Application for AppModel {
         if self.graph_window == Some(id) {
             if let Some((title, values, unit)) = &self.expanded_graph {
                 let graph_page = widget::Column::new()
-                    .spacing(8)
-                    .padding(12)
+                    .spacing(4)
+                    .padding(8)
                     .width(cosmic::iced::Length::Fill)
+                    .height(cosmic::iced::Length::Fill)
                     .push(graph_visual_large(
                         values.iter().copied(),
                         &self.settings.graph_style,
                         unit,
                     ))
-                    .push(
-                        widget::Row::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::caption(format_graph_axis_start(
-                                self.settings.graph_timespan_minutes,
-                            )))
-                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(widget::text::caption(crate::i18n::tr(
-                                &self.settings.language,
-                                "Now",
-                            ))),
-                    )
-                    .push(widget::text::caption(format!(
-                        "{} samples · {}",
-                        values.len(),
-                        format_graph_timespan(self.settings.graph_timespan_minutes)
-                    )))
                     .push(
                         widget::Row::new()
                             .spacing(10)
