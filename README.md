@@ -267,8 +267,8 @@ The API key is stored in the owner-only configuration file.
 ## History and limitations
 
 - Configure graph history retention in Settings from 5 minutes up to 4 years.
-  The same retention window controls which samples are shown in graphs and
-  survives applet restarts.
+  The same retention window controls which samples are shown in graphs. Both
+  the saved samples and the selected retention period survive applet restarts.
 - Total-power and per-device readings are refreshed normally; history keeps
   the latest reading in an adaptive interval. Sampling automatically becomes
   less frequent for longer retention windows and is capped at about 50,000
