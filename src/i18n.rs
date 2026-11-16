@@ -95,7 +95,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "TEMPERATURE (°C)" => "TEMPERATUR (°C)",
         "Select one or more devices in Settings" => "Wählen Sie ein oder mehrere Geräte in den Einstellungen aus",
         "SETTINGS" => "EINSTELLUNGEN",
-        "QUICK SETTINGS" => "SCHNELLEINSTELLUNGEN"
+        "QUICK SETTINGS" => "SCHNELLEINSTELLUNGEN",
         "Solar power" => "Solarleistung",
         "Internet bandwidth" => "Internet-Bandbreite",
         "Temperature" => "Temperatur",
