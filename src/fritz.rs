@@ -73,8 +73,8 @@ pub struct FritzReading {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FritzInternetBandwidth {
-    pub download_bytes_per_second: u64,
-    pub upload_bytes_per_second: u64,
+    pub download_bits_per_second: u64,
+    pub upload_bits_per_second: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1032,8 +1032,8 @@ fn parse_internet_bandwidth(xml: &str) -> Option<FritzInternetBandwidth> {
             .ok()
     };
     Some(FritzInternetBandwidth {
-        download_bytes_per_second: read_rate("NewByteReceiveRate")?,
-        upload_bytes_per_second: read_rate("NewByteSendRate")?,
+        download_bits_per_second: read_rate("NewLayer1DownstreamMaxBitRate")?,
+        upload_bits_per_second: read_rate("NewLayer1UpstreamMaxBitRate")?,
     })
 }
 
@@ -1057,13 +1057,13 @@ async fn fetch_internet_bandwidth(
         r#"<?xml version="1.0" encoding="utf-8"?>
         <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
           s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-          <s:Body><u:GetAddonInfos xmlns:u="{SERVICE}"></u:GetAddonInfos></s:Body>
+          <s:Body><u:GetCommonLinkProperties xmlns:u="{SERVICE}"></u:GetCommonLinkProperties></s:Body>
         </s:Envelope>"#
     );
     let response = client
         .post(endpoint)
         .header(reqwest::header::CONTENT_TYPE, "text/xml; charset=\"utf-8\"")
-        .header("SOAPACTION", format!("\"{SERVICE}#GetAddonInfos\""))
+        .header("SOAPACTION", format!("\"{SERVICE}#GetCommonLinkProperties\""))
         .body(body)
         .send()
         .await
@@ -1183,23 +1183,24 @@ mod tests {
     }
 
     #[test]
-    fn parses_upnp_internet_bandwidth_rates_in_bytes_per_second() {
+    fn parses_tr064_maximum_wan_link_rates_in_bits_per_second() {
         let xml = r#"<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-          <s:Body><u:GetAddonInfosResponse>
-            <NewByteSendRate>125000</NewByteSendRate>
-            <NewByteReceiveRate>1250000</NewByteReceiveRate>
-          </u:GetAddonInfosResponse></s:Body>
+          <s:Body><u:GetCommonLinkPropertiesResponse>
+            <NewLayer1UpstreamMaxBitRate>50000000</NewLayer1UpstreamMaxBitRate>
+            <NewLayer1DownstreamMaxBitRate>1000000000</NewLayer1DownstreamMaxBitRate>
+            <NewPhysicalLinkStatus>Up</NewPhysicalLinkStatus>
+          </u:GetCommonLinkPropertiesResponse></s:Body>
         </s:Envelope>"#;
         assert_eq!(
             parse_internet_bandwidth(xml),
             Some(FritzInternetBandwidth {
-                download_bytes_per_second: 1_250_000,
-                upload_bytes_per_second: 125_000,
+                download_bits_per_second: 1_000_000_000,
+                upload_bits_per_second: 50_000_000,
             })
         );
         assert_eq!(parse_internet_bandwidth("<invalid"), None);
         assert_eq!(
-            parse_internet_bandwidth("<result><NewByteSendRate>bad</NewByteSendRate></result>"),
+            parse_internet_bandwidth("<result><NewLayer1UpstreamMaxBitRate>bad</NewLayer1UpstreamMaxBitRate></result>"),
             None
         );
     }
