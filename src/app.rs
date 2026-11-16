@@ -48,7 +48,7 @@ pub struct AppModel {
     weather_forecast_loading: bool,
     weather_forecast_expanded: bool,
     quick_options_expanded: bool,
-    collapsed_devices: HashSet<String>,
+    expanded_devices: HashSet<String>,
     quick_refresh_interval: u32,
     quick_graph_timespan: u16,
     next_weather_refresh_at: Option<Instant>,
@@ -2504,7 +2504,7 @@ impl cosmic::Application for AppModel {
                 }
                 for (index, reading) in self.readings.iter().enumerate() {
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                    let is_expanded = self.collapsed_devices.contains(&device_key);
+                    let is_expanded = self.expanded_devices.contains(&device_key);
                     let device_corner_radius = device_corner_radius(index, self.readings.len());
                     let device_history = self.device_history.get(&device_key);
                     let power_toggle: Option<cosmic::Element<'_, Message>> =
@@ -2521,7 +2521,23 @@ impl cosmic::Application for AppModel {
                                     .into()
                             }
                         });
-                    let device_heading = widget::button::custom(
+                    // Keep the disclosure trigger separate from the power switch:
+                    // interactive controls must not be nested inside another button.
+                    let heading_radius = [
+                        device_corner_radius.top_left,
+                        device_corner_radius.top_right,
+                        if is_expanded {
+                            0.0
+                        } else {
+                            device_corner_radius.bottom_right
+                        },
+                        if is_expanded {
+                            0.0
+                        } else {
+                            device_corner_radius.bottom_left
+                        },
+                    ];
+                    let device_heading_button = widget::button::custom(
                         widget::Row::new()
                             .spacing(12)
                             .align_y(cosmic::iced::Alignment::Center)
@@ -2555,12 +2571,11 @@ impl cosmic::Application for AppModel {
                                         )
                                     })),
                             )
-                            .push_maybe(power_toggle)
                             .push(
                                 widget::icon::from_name(if is_expanded {
-                                    "go-down-symbolic"
+                                    "go-up-symbolic"
                                 } else {
-                                    "go-next-symbolic"
+                                    "go-down-symbolic"
                                 })
                                 .size(16),
                             ),
@@ -2568,7 +2583,12 @@ impl cosmic::Application for AppModel {
                     .on_press(Message::ToggleDeviceDetails(reading.ain.clone()))
                     .width(cosmic::iced::Length::Fill)
                     .padding([8, 12])
-                    .class(cosmic::theme::Button::Standard);
+                    .class(cosmic::theme::Button::ListItem(heading_radius));
+                    let device_heading = widget::Row::new()
+                        .width(cosmic::iced::Length::Fill)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(device_heading_button)
+                        .push_maybe(power_toggle);
                     let metrics = widget::Row::new()
                         .spacing(8)
                         .width(cosmic::iced::Length::Fill)
@@ -2743,15 +2763,18 @@ impl cosmic::Application for AppModel {
                                     }),
                                 ),
                         );
-                    let mut card_column = widget::Column::new().spacing(0).push(device_heading);
+                    // Use COSMIC's list-column disclosure pattern so the
+                    // header, separator, and expanded content share native list spacing.
+                    let mut card_column = widget::list::list_column()
+                        .style(cosmic::theme::Container::Transparent)
+                        .list_item_padding([0, 0])
+                        .add(device_heading);
                     if is_expanded {
-                        card_column = card_column
-                            .push(widget::divider::horizontal::default())
-                            .push(
-                                widget::container(device_content)
-                                    .padding([12, 0])
-                                    .width(cosmic::iced::Length::Fill),
-                            );
+                        card_column = card_column.add(
+                            widget::container(device_content)
+                                .padding([12, 0])
+                                .width(cosmic::iced::Length::Fill),
+                        );
                     }
                     let device_card = widget::container(card_column)
                         .width(cosmic::iced::Length::Fill)
@@ -3353,8 +3376,8 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleDeviceDetails(ain) => {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
-                if !self.collapsed_devices.remove(&key) {
-                    self.collapsed_devices.insert(key);
+                if !self.expanded_devices.remove(&key) {
+                    self.expanded_devices.insert(key);
                 }
             }
             Message::ToggleQuickOptions => {
