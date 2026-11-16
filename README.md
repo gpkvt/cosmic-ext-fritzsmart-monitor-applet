@@ -136,12 +136,12 @@ cargo build --release
 Build all distributable Linux packages (Debian `.deb`, AppImage and Flatpak) with one command on an x86_64 Linux host. The script builds the optimized binary, prepares Flatpak's offline Cargo sources, installs the required Flatpak runtime/SDK, and writes packages plus `SHA256SUMS` to `dist/` by default:
 
 ```sh
-APP_VERSION=0.2.17 bash packaging/build-linux-packages.sh
+APP_VERSION=0.3.0 bash packaging/build-linux-packages.sh
 ```
 
 Override `OUTPUT_DIR` to choose another destination. Required tools include Cargo, curl, dpkg tooling, Flatpak/flatpak-builder, Git, Python 3 with venv support, and desktop-file-utils.
 
-Development builds display the numeric package version (for example, `0.2.3`);
+Development builds display the numeric package version (for example, `0.3.0`);
 release builds use the version supplied by the release tag.
 
 GitHub Actions runs formatting, tests, compilation, packaging and installation
@@ -264,7 +264,7 @@ The API key is stored in the owner-only configuration file.
 
 ## Releases and packages
 
-Push a version tag such as `v0.2.9` to build Linux x86_64 release packages and
+Push a version tag such as `v0.3.0` to build Linux x86_64 release packages and
 publish them on the GitHub Releases page.
 
 Each release includes SHA-256 checksums and the following artifacts:
