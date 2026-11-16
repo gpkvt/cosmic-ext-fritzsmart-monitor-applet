@@ -51,7 +51,7 @@ pub struct AppModel {
     expanded_devices: HashSet<String>,
     collapsed_menu_sections: HashSet<String>,
     quick_refresh_interval: u32,
-    quick_graph_timespan: u16,
+    quick_graph_timespan: u32,
     next_weather_refresh_at: Option<Instant>,
     pending_power_changes: HashSet<String>,
     pending_power_targets: HashMap<String, bool>,
@@ -80,7 +80,7 @@ pub enum Message {
     PanelRefreshButtonChanged(bool),
     PanelAverageTemperatureChanged(bool),
     PanelExcludeSolarTemperatureChanged(bool),
-    GraphTimespanChanged(u16),
+    GraphTimespanChanged(u32),
     GraphStyleChanged(String),
     RefreshIntervalChanged(u32),
     DiscoverDevices,
@@ -104,7 +104,7 @@ pub enum Message {
     MovePanelItem(&'static str, bool),
     QuickRefreshIntervalPreview(u32),
     CommitQuickRefreshInterval,
-    QuickGraphTimespanPreview(u16),
+    QuickGraphTimespanPreview(u32),
     CommitQuickGraphTimespan,
     WeatherEnabledChanged(bool),
     OpenWeatherMapApiKeyChanged(String),
@@ -229,10 +229,12 @@ fn device_background_color(base: cosmic::iced::Color, index: usize) -> cosmic::i
     )
 }
 
-fn format_graph_axis_start(minutes: u16) -> String {
-    let minutes = u32::from(minutes);
-    if minutes % 1440 == 0 {
-        format!("{}d ago", minutes / 1440)
+fn format_graph_axis_start(minutes: u32) -> String {
+    let days = minutes / 1440;
+    if days >= 365 && days % 365 == 0 {
+        format!("{}y ago", days / 365)
+    } else if days > 0 {
+        format!("{days}d ago")
     } else if minutes % 60 == 0 {
         format!("{}h ago", minutes / 60)
     } else if minutes > 60 {
@@ -242,12 +244,20 @@ fn format_graph_axis_start(minutes: u16) -> String {
     }
 }
 
-fn graph_history_window(minutes: u16) -> Duration {
-    Duration::from_secs(u64::from(minutes.clamp(5, 1440)) * 60)
+fn graph_history_window(minutes: u32) -> Duration {
+    Duration::from_secs(u64::from(minutes.clamp(5, 2_102_400)) * 60)
+}
+
+const MAX_HISTORY_SAMPLES: u64 = 50_000;
+const MIN_HISTORY_SAMPLE_INTERVAL: Duration = Duration::from_secs(60);
+
+fn graph_sample_interval(window: Duration) -> Duration {
+    let seconds = window.as_secs().div_ceil(MAX_HISTORY_SAMPLES);
+    Duration::from_secs(seconds.max(MIN_HISTORY_SAMPLE_INTERVAL.as_secs()))
 }
 
 fn max_history_samples(window: Duration) -> usize {
-    (window.as_secs() / 60) as usize + 1
+    (window.as_secs() / graph_sample_interval(window).as_secs()) as usize + 1
 }
 
 fn quick_slider_snap_position(position: f32) -> f32 {
@@ -302,10 +312,12 @@ fn format_countdown(seconds: u64) -> String {
     }
 }
 
-fn format_graph_timespan(minutes: u16) -> String {
-    let minutes = u32::from(minutes);
-    if minutes % 1440 == 0 {
-        let days = minutes / 1440;
+fn format_graph_timespan(minutes: u32) -> String {
+    let days = minutes / 1440;
+    if days >= 365 && days % 365 == 0 {
+        let years = days / 365;
+        format!("{years} {}", if years == 1 { "year" } else { "years" })
+    } else if days > 0 && minutes % 1440 == 0 {
         format!("{days} {}", if days == 1 { "day" } else { "days" })
     } else if minutes % 60 == 0 {
         let hours = minutes / 60;
@@ -323,7 +335,16 @@ fn record_power_sample(
     now: Instant,
     window: Duration,
 ) {
-    history.push_back((now, power_w));
+    let sample_interval = graph_sample_interval(window);
+    if let Some((timestamp, value)) = history.back_mut() {
+        if now.duration_since(*timestamp) < sample_interval {
+            *value = power_w;
+        } else {
+            history.push_back((now, power_w));
+        }
+    } else {
+        history.push_back((now, power_w));
+    }
     while history
         .front()
         .is_some_and(|(timestamp, _)| now.duration_since(*timestamp) > window)
@@ -521,7 +542,17 @@ fn record_device_sample(
     let samples = history
         .entry(crate::fritz::normalize_ain_for_selection(&reading.ain))
         .or_default();
-    samples.push_back((now, reading.power_w, reading.temperature_c));
+    let sample_interval = graph_sample_interval(window);
+    if let Some((timestamp, power, temperature)) = samples.back_mut() {
+        if now.duration_since(*timestamp) < sample_interval {
+            *power = reading.power_w;
+            *temperature = reading.temperature_c;
+        } else {
+            samples.push_back((now, reading.power_w, reading.temperature_c));
+        }
+    } else {
+        samples.push_back((now, reading.power_w, reading.temperature_c));
+    }
     while samples
         .front()
         .is_some_and(|(timestamp, _, _)| now.duration_since(*timestamp) > window)
@@ -1694,14 +1725,20 @@ impl cosmic::Application for AppModel {
                     )))
                     .push(
                         widget::slider(
-                            5.0..=1440.0,
-                            f32::from(self.settings.graph_timespan_minutes),
-                            |value| Message::GraphTimespanChanged(value.round() as u16),
+                            0.0..=4.0,
+                            quick_slider_position(
+                                self.settings.graph_timespan_minutes as f32,
+                                [5.0, 60.0, 1440.0, 43200.0, 2102400.0],
+                            ),
+                            |position| Message::GraphTimespanChanged(
+                                quick_slider_value(position, [5.0, 60.0, 1440.0, 43200.0, 2102400.0]).round() as u32
+                            ),
                         )
-                        .step(5.0),
+                        .step(0.01),
                     )
+                    .push(quick_slider_anchor_labels(["5m", "1h", "1d", "30d", "4y"]))
                     .push(widget::text::caption(
-                        "5 minutes to 24 hours; samples are collected once per refresh",
+                        "5 minutes to 4 years. Sampling adapts to retention, capped at about 50,000 samples per series.",
                     ))
                     .push(widget::divider::horizontal::default())
             }
@@ -2971,7 +3008,7 @@ impl cosmic::Application for AppModel {
             content = content.push(refresh_status);
             if self.quick_options_expanded {
                 const REFRESH_ANCHORS: [f32; 5] = [30.0, 300.0, 900.0, 1800.0, 3600.0];
-                const GRAPH_ANCHORS: [f32; 5] = [5.0, 60.0, 360.0, 720.0, 1440.0];
+                const GRAPH_ANCHORS: [f32; 5] = [5.0, 60.0, 1440.0, 43200.0, 2102400.0];
                 content = content
                     .push(widget::text::caption(format!(
                         "Refresh · {}",
@@ -3004,19 +3041,19 @@ impl cosmic::Application for AppModel {
                         widget::slider(
                             0.0..=4.0,
                             quick_slider_position(
-                                f32::from(self.quick_graph_timespan),
+                                self.quick_graph_timespan as f32,
                                 GRAPH_ANCHORS,
                             ),
                             |position| {
                                 Message::QuickGraphTimespanPreview(
-                                    quick_slider_value(position, GRAPH_ANCHORS).round() as u16,
+                                    quick_slider_value(position, GRAPH_ANCHORS).round() as u32,
                                 )
                             },
                         )
                         .step(0.01)
                         .on_release(Message::CommitQuickGraphTimespan),
                     )
-                    .push(quick_slider_anchor_labels(["5m", "1h", "6h", "12h", "24h"]));
+                    .push(quick_slider_anchor_labels(["5m", "1h", "1d", "30d", "4y"]));
             }
 
             if let Some(error) = &self.error {
@@ -3494,11 +3531,11 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::QuickGraphTimespanPreview(value) => {
-                self.quick_graph_timespan = value.clamp(5, 1440);
+                self.quick_graph_timespan = value.clamp(5, 2_102_400);
             }
             Message::CommitQuickGraphTimespan => {
                 if self.settings.graph_timespan_minutes != self.quick_graph_timespan {
-                    self.settings.graph_timespan_minutes = self.quick_graph_timespan.clamp(5, 1440);
+                    self.settings.graph_timespan_minutes = self.quick_graph_timespan.clamp(5, 2_102_400);
                     let now = Instant::now();
                     let window = graph_history_window(self.settings.graph_timespan_minutes);
                     self.history
@@ -3627,7 +3664,7 @@ impl cosmic::Application for AppModel {
                 self.persist_settings();
             }
             Message::GraphTimespanChanged(value) => {
-                self.settings.graph_timespan_minutes = value.clamp(5, 1440);
+                self.settings.graph_timespan_minutes = value.clamp(5, 2_102_400);
                 let now = Instant::now();
                 let window = graph_history_window(self.settings.graph_timespan_minutes);
                 self.history
@@ -3889,7 +3926,7 @@ mod history_tests {
     #[test]
     fn quick_setting_slider_maps_anchor_values_to_aligned_positions() {
         let refresh = [30.0, 300.0, 900.0, 1800.0, 3600.0];
-        let graph = [5.0, 60.0, 360.0, 720.0, 1440.0];
+        let graph = [5.0, 60.0, 1440.0, 43200.0, 2102400.0];
         for (position, value) in refresh.into_iter().enumerate() {
             assert!((quick_slider_position(value, refresh) - position as f32).abs() < 0.001);
             assert!((quick_slider_value(position as f32, refresh) - value).abs() < 0.001);
@@ -4134,7 +4171,7 @@ mod history_tests {
     }
 
     #[test]
-    fn device_history_keeps_only_recent_samples() {
+    fn device_history_keeps_recent_minute_samples() {
         let start = Instant::now();
         let mut history = HashMap::new();
         let reading = FritzReading {
@@ -4159,21 +4196,21 @@ mod history_tests {
     }
 
     #[test]
-    fn longer_graph_window_retains_more_minute_samples() {
+    fn longer_graph_window_retains_more_five_minute_samples() {
         let start = Instant::now();
         let mut history = VecDeque::new();
         let window = graph_history_window(60);
-        for minute in 0_u64..75 {
+        for sample in 0_u64..15 {
             record_power_sample(
                 &mut history,
-                minute as i64,
-                start + Duration::from_secs(minute * 60),
+                sample as i64,
+                start + Duration::from_secs(sample * 5 * 60),
                 window,
             );
         }
-        assert_eq!(history.len(), 61);
-        assert_eq!(history.front().unwrap().1, 14);
-        assert_eq!(history.back().unwrap().1, 74);
+        assert_eq!(history.len(), 13);
+        assert_eq!(history.front().unwrap().1, 2);
+        assert_eq!(history.back().unwrap().1, 14);
     }
 
     #[test]
@@ -4181,8 +4218,11 @@ mod history_tests {
         assert_eq!(graph_history_window(15), Duration::from_secs(900));
         assert_eq!(graph_history_window(60), Duration::from_secs(3600));
         assert_eq!(graph_history_window(0), Duration::from_secs(300));
-        assert_eq!(graph_history_window(2000), Duration::from_secs(86400));
+        assert_eq!(graph_history_window(2000), Duration::from_secs(120_000));
+        assert_eq!(graph_history_window(2_102_400), Duration::from_secs(126_144_000));
         assert_eq!(max_history_samples(graph_history_window(60)), 61);
+        assert_eq!(graph_sample_interval(graph_history_window(2_102_400)), Duration::from_secs(2523));
+        assert_eq!(max_history_samples(graph_history_window(2_102_400)), 49_998);
     }
 
     #[test]
@@ -4211,6 +4251,7 @@ mod history_tests {
         assert_eq!(format_graph_timespan(60), "1 hour");
         assert_eq!(format_graph_timespan(90), "1h 30m");
         assert_eq!(format_graph_timespan(1440), "1 day");
+        assert_eq!(format_graph_timespan(2_102_400), "4 years");
     }
 
     #[test]
@@ -4219,22 +4260,23 @@ mod history_tests {
         assert_eq!(format_graph_axis_start(60), "1h ago");
         assert_eq!(format_graph_axis_start(90), "1h 30m ago");
         assert_eq!(format_graph_axis_start(1440), "1d ago");
+        assert_eq!(format_graph_axis_start(2_102_400), "4y ago");
     }
 
     #[test]
-    fn history_keeps_only_the_last_fifteen_minutes_and_sixteen_samples() {
+    fn history_keeps_five_minute_samples_within_the_last_fifteen_minutes() {
         let start = Instant::now();
         let mut history = VecDeque::new();
-        for minute in 0_u64..18 {
+        for sample in 0_u64..18 {
             record_power_sample(
                 &mut history,
-                minute as i64,
-                start + Duration::from_secs(minute * 60),
+                sample as i64,
+                start + Duration::from_secs(sample * 5 * 60),
                 Duration::from_secs(15 * 60),
             );
         }
-        assert_eq!(history.len(), 16);
-        assert_eq!(history.front().unwrap().1, 2);
+        assert_eq!(history.len(), 4);
+        assert_eq!(history.front().unwrap().1, 14);
         assert_eq!(history.back().unwrap().1, 17);
     }
 
