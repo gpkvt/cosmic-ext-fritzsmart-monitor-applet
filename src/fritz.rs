@@ -371,15 +371,15 @@ impl FritzSettings {
             ca_cert_path: get("CA_CERT_PATH"),
             panel_text_size: parse_panel_text_size(&get("PANEL_TEXT_SIZE")),
             panel_item_spacing: parse_panel_item_spacing(&get("PANEL_ITEM_SPACING")),
-            panel_multiline: !values.contains_key("PANEL_MULTILINE") || get("PANEL_MULTILINE").eq_ignore_ascii_case("true"),
+            panel_multiline: !values.contains_key("PANEL_MULTILINE")
+                || get("PANEL_MULTILINE").eq_ignore_ascii_case("true"),
             panel_refresh_button: !values.contains_key("PANEL_REFRESH_BUTTON")
                 || get("PANEL_REFRESH_BUTTON").eq_ignore_ascii_case("true"),
             panel_average_temperature: get("PANEL_AVERAGE_TEMPERATURE")
                 .eq_ignore_ascii_case("true"),
             panel_exclude_solar_temperature: get("PANEL_EXCLUDE_SOLAR_TEMPERATURE")
                 .eq_ignore_ascii_case("true"),
-            panel_internet_bandwidth: get("PANEL_INTERNET_BANDWIDTH")
-                .eq_ignore_ascii_case("true"),
+            panel_internet_bandwidth: get("PANEL_INTERNET_BANDWIDTH").eq_ignore_ascii_case("true"),
             graph_timespan_minutes: parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")),
             graph_style: if get("GRAPH_STYLE") == "bar" {
                 "bar".into()
@@ -471,7 +471,11 @@ impl FritzSettings {
             self.ca_cert_path,
             self.panel_text_size.clamp(10, 24),
             self.panel_item_spacing.clamp(0, 16),
-            if self.panel_multiline { "true" } else { "false" },
+            if self.panel_multiline {
+                "true"
+            } else {
+                "false"
+            },
             if self.panel_refresh_button {
                 "true"
             } else {
@@ -655,10 +659,7 @@ fn is_complete_protocol_payload(bytes: &[u8]) -> bool {
     body == "0" || body == "1" || Document::parse(body).is_ok()
 }
 
-async fn read_xml_response(
-    response: reqwest::Response,
-    context: &str,
-) -> Result<String, String> {
+async fn read_xml_response(response: reqwest::Response, context: &str) -> Result<String, String> {
     read_xml_response_with_method(response, context, "GET").await
 }
 
@@ -1053,7 +1054,11 @@ fn parse_internet_bandwidth(xml: &str) -> Option<FritzInternetBandwidth> {
 
 fn wan_common_interface_url(base: &str) -> Option<reqwest::Url> {
     let mut url = reqwest::Url::parse(base).ok()?;
-    let port = if url.scheme() == "https" { 49_443 } else { 49_000 };
+    let port = if url.scheme() == "https" {
+        49_443
+    } else {
+        49_000
+    };
     url.set_port(Some(port)).ok()?;
     url.set_path("/igdupnp/control/WANCommonIFC1");
     url.set_query(None);
@@ -1061,10 +1066,7 @@ fn wan_common_interface_url(base: &str) -> Option<reqwest::Url> {
     Some(url)
 }
 
-async fn fetch_internet_bandwidth(
-    client: &Client,
-    base: &str,
-) -> Option<FritzInternetBandwidth> {
+async fn fetch_internet_bandwidth(client: &Client, base: &str) -> Option<FritzInternetBandwidth> {
     const SERVICE: &str = "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1";
     let endpoint = wan_common_interface_url(base)?;
     let body = format!(
@@ -1077,7 +1079,10 @@ async fn fetch_internet_bandwidth(
     let response = client
         .post(endpoint)
         .header(reqwest::header::CONTENT_TYPE, "text/xml; charset=\"utf-8\"")
-        .header("SOAPACTION", format!("\"{SERVICE}#GetCommonLinkProperties\""))
+        .header(
+            "SOAPACTION",
+            format!("\"{SERVICE}#GetCommonLinkProperties\""),
+        )
         .body(body)
         .send()
         .await
@@ -1186,11 +1191,15 @@ mod tests {
     #[test]
     fn wan_common_interface_url_uses_local_tr064_ports() {
         assert_eq!(
-            wan_common_interface_url("http://192.168.42.1").unwrap().as_str(),
+            wan_common_interface_url("http://192.168.42.1")
+                .unwrap()
+                .as_str(),
             "http://192.168.42.1:49000/igdupnp/control/WANCommonIFC1"
         );
         assert_eq!(
-            wan_common_interface_url("https://fritz.box").unwrap().as_str(),
+            wan_common_interface_url("https://fritz.box")
+                .unwrap()
+                .as_str(),
             "https://fritz.box:49443/igdupnp/control/WANCommonIFC1"
         );
     }
@@ -1213,7 +1222,9 @@ mod tests {
         );
         assert_eq!(parse_internet_bandwidth("<invalid"), None);
         assert_eq!(
-            parse_internet_bandwidth("<result><NewLayer1UpstreamMaxBitRate>bad</NewLayer1UpstreamMaxBitRate></result>"),
+            parse_internet_bandwidth(
+                "<result><NewLayer1UpstreamMaxBitRate>bad</NewLayer1UpstreamMaxBitRate></result>"
+            ),
             None
         );
     }
