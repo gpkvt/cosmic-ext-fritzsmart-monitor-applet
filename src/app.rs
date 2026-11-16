@@ -1944,12 +1944,12 @@ impl cosmic::Application for AppModel {
                             f32::from(self.settings.panel_text_size),
                             |value| Message::PanelTextSizeChanged(value.round() as u8),
                         )
-                        .step(1.0),
+                        .step(1.0_f32),
                     )
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Adjusts the power and temperature text in the panel")))
                     .push(widget::text::body(format!("{}: {} px", crate::i18n::tr(&self.settings.language, "Panel item spacing"), self.settings.panel_item_spacing)))
                     .push(widget::slider(0.0..=16.0, f32::from(self.settings.panel_item_spacing),
-                        |value| Message::PanelItemSpacingChanged(value.round() as u8)).step(1.0))
+                        |value| Message::PanelItemSpacingChanged(value.round() as u8)).step(1.0_f32))
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Controls the gap between panel items")))
                     .push(
                         widget::Row::new()
@@ -2094,7 +2094,7 @@ impl cosmic::Application for AppModel {
                             self.settings.refresh_interval_seconds as f32,
                             |value| Message::RefreshIntervalChanged(value.round() as u32),
                         )
-                        .step(30.0),
+                        .step(30.0_f32),
                     )
                     .push(widget::text::caption(crate::i18n::tr(
                         &self.settings.language,
@@ -2118,7 +2118,7 @@ impl cosmic::Application for AppModel {
                         .on_input(Message::WeatherLocationChanged))
                     .push(widget::text::caption(format!("{}: {} minutes", crate::i18n::tr(&self.settings.language, "Weather refresh"), self.settings.weather_refresh_interval_minutes)))
                     .push(widget::slider(5.0..=60.0, f32::from(self.settings.weather_refresh_interval_minutes),
-                        |value| Message::WeatherRefreshIntervalChanged(value.round() as u16)).step(5.0))
+                        |value| Message::WeatherRefreshIntervalChanged(value.round() as u16)).step(5.0_f32))
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.")))
                     .push(widget::divider::horizontal::default())
             }
@@ -2402,7 +2402,7 @@ impl cosmic::Application for AppModel {
                                             )
                                         }
                                     })
-                                    .step(1.0),
+                                    .step(1.0_f32),
                                 )
                                 .push(widget::text::caption(format!(
                                     "{}: {} °C",
@@ -2419,7 +2419,7 @@ impl cosmic::Application for AppModel {
                                             )
                                         }
                                     })
-                                    .step(1.0),
+                                    .step(1.0_f32),
                                 )
                                 .push(widget::text::caption(
                                     "Notify above the upper limit or below the lower limit",
