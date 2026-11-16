@@ -45,6 +45,7 @@ pub struct AppModel {
     next_refresh_at: Option<Instant>,
     refresh_started_at: Option<Instant>,
     weather: Option<WeatherData>,
+    weather_slideshow_index: usize,
     weather_forecast: Option<WeatherForecast>,
     weather_forecast_days: Option<u8>,
     weather_forecast_error: Option<String>,
@@ -103,6 +104,7 @@ pub enum Message {
     TemperatureAlertHighChanged(String, i16),
     TemperatureAlertLowChanged(String, i16),
     WeatherUpdated(Result<WeatherData, String>),
+    WeatherSlideshowTick,
     ToggleWeatherForecast,
     TestNotification,
     CopyDiagnosticUrl(String),
@@ -1418,6 +1420,17 @@ fn animation_ticks() -> impl futures::Stream<Item = Message> {
     clock_ticks(Duration::from_millis(16))
 }
 
+fn weather_slideshow_ticks() -> impl futures::Stream<Item = Message> {
+    cosmic::iced::stream::channel(2, |mut output: futures::channel::mpsc::Sender<Message>| async move {
+        let mut interval = tokio::time::interval(Duration::from_millis(250));
+        interval.tick().await;
+        loop {
+            interval.tick().await;
+            if output.send(Message::WeatherSlideshowTick).await.is_err() { break; }
+        }
+    })
+}
+
 impl cosmic::Application for AppModel {
     type Executor = cosmic::executor::Default;
     type Flags = ();
@@ -1507,7 +1520,11 @@ impl cosmic::Application for AppModel {
             Subscription::run(regular_clock_ticks)
         };
 
-        clock
+        if self.popup.is_some() && self.weather.as_ref().is_some_and(|weather| weather.slideshow_frames.len() > 1) {
+            Subscription::batch(vec![clock, weather_slideshow_ticks()])
+        } else {
+            clock
+        }
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
@@ -2686,7 +2703,7 @@ impl cosmic::Application for AppModel {
                         None,
                     )
                 } else if let Some(weather) = &self.weather {
-                    if weather.background_image.is_some() {
+                    if !weather.background_images.is_empty() {
                         (
                             crate::i18n::tr(&self.settings.language, "Image loaded"),
                             Some(true),
@@ -3188,7 +3205,7 @@ impl cosmic::Application for AppModel {
                     .push(weather_heading)
                     .push(weather_details);
                 let weather_card: cosmic::Element<'_, Message> =
-                    if let Some(image_bytes) = &weather.background_image {
+                    if let Some(image_bytes) = weather.slideshow_frames.get(self.weather_slideshow_index).or(weather.background_image.as_ref()) {
                         let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
                             image_bytes.clone(),
                         ))
@@ -4677,10 +4694,20 @@ impl cosmic::Application for AppModel {
                     self.persist_settings();
                 }
             }
+            Message::WeatherSlideshowTick => {
+                if self.popup.is_some() {
+                    if let Some(weather) = &self.weather {
+                        if !weather.slideshow_frames.is_empty() {
+                            self.weather_slideshow_index = (self.weather_slideshow_index + 1) % weather.slideshow_frames.len();
+                        }
+                    }
+                }
+            }
             Message::WeatherUpdated(result) => {
                 match result {
                     Ok(weather) => {
                         self.weather = Some(weather);
+                        self.weather_slideshow_index = 0;
                         self.weather_error = None;
                     }
                     Err(error) => {
