@@ -71,6 +71,7 @@ pub enum Message {
     PowerCommandFinished(String, bool, Result<(), String>),
     ToggleSettings,
     ToggleSettingsSection(&'static str),
+    LanguageChanged(String),
     BackToSettingsCategories,
     UrlChanged(String),
     UsernameChanged(String),
@@ -948,6 +949,7 @@ fn menu_element_label(id: &str) -> &'static str {
 
 fn settings_section_details(section: &'static str) -> (&'static str, &'static str) {
     match section {
+        "language" => ("Language", "Choose the interface language"),
         "panel" => ("Panel", "Appearance and live readings in the panel"),
         "graph" => (
             "Graph history",
@@ -972,6 +974,7 @@ fn settings_section_header<'a>(
     section: &'static str,
 ) -> cosmic::Element<'a, Message> {
     let (section_icon, description) = match section {
+        "language" => ("preferences-desktop-locale-symbolic", "Interface language"),
         "panel" => (
             "preferences-desktop-display-symbolic",
             "Panel appearance and readings",
@@ -1684,6 +1687,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::caption("GENERAL"));
                 for (title, section) in [
+                    ("Language", "language"),
                     ("Panel", "panel"),
                     ("Graph history", "graph"),
                     ("Automatic refresh", "refresh"),
@@ -1698,6 +1702,22 @@ impl cosmic::Application for AppModel {
                 }
             }
 
+            if self.active_settings_section == Some("language") {
+                content = content
+                    .push(widget::text::body("Interface language"))
+                    .push(widget::text::caption("System follows your desktop language. English and German are currently available."))
+                    .push(widget::Row::new().spacing(8)
+                        .push(widget::button::custom(widget::text::body("System default"))
+                            .on_press(Message::LanguageChanged("system".into()))
+                            .class(cosmic::theme::Button::Standard))
+                        .push(widget::button::custom(widget::text::body("English"))
+                            .on_press(Message::LanguageChanged("en".into()))
+                            .class(cosmic::theme::Button::Standard))
+                        .push(widget::button::custom(widget::text::body("Deutsch"))
+                            .on_press(Message::LanguageChanged("de".into()))
+                            .class(cosmic::theme::Button::Standard)))
+                    .push(widget::divider::horizontal::default());
+            }
             if self.active_settings_section == Some("panel") {
                 content = content
                     .push(widget::text::body(format!("Panel text size: {} pt", self.settings.panel_text_size)))
@@ -3848,6 +3868,14 @@ impl cosmic::Application for AppModel {
             Message::WeatherRefreshIntervalChanged(value) => {
                 self.settings.weather_refresh_interval_minutes = value.clamp(5, 60);
                 self.next_weather_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::LanguageChanged(language) => {
+                self.settings.language = match language.as_str() {
+                    "de" => "de".into(),
+                    "en" => "en".into(),
+                    _ => "system".into(),
+                };
                 self.persist_settings();
             }
             Message::ToggleSettings => {
