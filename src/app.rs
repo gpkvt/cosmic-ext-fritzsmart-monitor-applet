@@ -1199,11 +1199,6 @@ fn error_notice<'a>(title: &'static str, message: &'a str) -> cosmic::Element<'a
     )
     .width(cosmic::iced::Length::Fill)
     .padding(12)
-    .style(|_| cosmic::iced::widget::container::Style {
-        background: Some(cosmic::iced::Color::from_rgba(0.58, 0.08, 0.10, 0.96).into()),
-        text_color: Some(cosmic::iced::Color::WHITE),
-        ..Default::default()
-    })
     .into()
 }
 
@@ -2064,18 +2059,7 @@ impl cosmic::Application for AppModel {
                                     "Notify above the upper limit or below the lower limit",
                                 ));
                         }
-                        content = content.push(widget::container(device_row).padding(8).style(
-                            move |theme| {
-                                let cosmic = theme.cosmic();
-                                let base = cosmic::iced::Color::from(cosmic.background(false).base);
-                                cosmic::iced::widget::container::Style {
-                                    background: Some(
-                                        device_background_color(base, row_index).into(),
-                                    ),
-                                    ..Default::default()
-                                }
-                            },
-                        ));
+                        content = content.push(surface_card(device_row.into(), 8));
                     }
                 }
             }
@@ -2300,7 +2284,13 @@ impl cosmic::Application for AppModel {
                 .settings_saved_until
                 .is_some_and(|deadline| Instant::now() < deadline)
             {
-                content = content.push(widget::text::caption("✓ Saved"));
+                content = content.push(
+                    widget::Row::new()
+                        .spacing(6)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::icon::from_name("emblem-ok-symbolic").size(16))
+                        .push(widget::text::caption("Settings saved")),
+                );
             }
         } else {
             let mut weather_menu_card: Option<cosmic::Element<'_, Message>> = None;
