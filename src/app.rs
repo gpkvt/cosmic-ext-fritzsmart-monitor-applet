@@ -2073,7 +2073,7 @@ impl cosmic::Application for AppModel {
                                 quick_slider_value(position, [5.0, 60.0, 1440.0, 43200.0, 2102400.0]).round() as u32
                             ),
                         )
-                        .step(0.01),
+                        .step(0.01_f32),
                     )
                     .push(quick_slider_anchor_labels(["5m", "1h", "1d", "30d", "4y"]))
                     .push(widget::text::caption(
@@ -3825,7 +3825,7 @@ impl cosmic::Application for AppModel {
                                 )
                             },
                         )
-                        .step(0.01)
+                        .step(0.01_f32)
                         .on_release(Message::CommitQuickRefreshInterval),
                     )
                     .push(quick_slider_anchor_labels([
@@ -3846,7 +3846,7 @@ impl cosmic::Application for AppModel {
                                 )
                             },
                         )
-                        .step(0.01)
+                        .step(0.01_f32)
                         .on_release(Message::CommitQuickGraphTimespan),
                     )
                     .push(quick_slider_anchor_labels(["5m", "1h", "1d", "30d", "4y"]));
