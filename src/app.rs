@@ -3414,9 +3414,7 @@ impl cosmic::Application for AppModel {
                         samples
                             .retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
                     }
-                    if let Err(error) =
-                        crate::history::save(&self.history, &self.device_history)
-                    {
+                    if let Err(error) = crate::history::save(&self.history, &self.device_history) {
                         eprintln!("Could not persist graph history: {error}");
                     }
                     self.persist_settings();
@@ -3642,9 +3640,7 @@ impl cosmic::Application for AppModel {
                     rebuild_output_power_history(&self.device_history, &self.settings.input_ains)
                         .into_iter()
                         .collect();
-                if let Err(error) =
-                    crate::history::save(&self.history, &self.device_history)
-                {
+                if let Err(error) = crate::history::save(&self.history, &self.device_history) {
                     eprintln!("Could not persist graph history: {error}");
                 }
             }
