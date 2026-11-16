@@ -173,7 +173,7 @@ fn save_to_path(
     let temporary = parent.join(format!(
         ".history.{}.{}.tmp",
         std::process::id(),
-        now_epoch
+        format!("{}-{}", now_epoch, now.elapsed().as_nanos())
     ));
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
