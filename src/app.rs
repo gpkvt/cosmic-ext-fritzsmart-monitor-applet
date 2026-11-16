@@ -1736,7 +1736,7 @@ impl cosmic::Application for AppModel {
                     )
                     .push(quick_slider_anchor_labels(["5m", "1h", "1d", "30d", "4y"]))
                     .push(widget::text::caption(
-                        "5 minutes to 4 years. Sampling adapts to retention, capped at about 50,000 samples per series.",
+                        "5 minutes to 4 years. Saved samples and the selected retention period survive applet restarts. Sampling adapts to retention, capped at about 50,000 samples per series.",
                     ))
                     .push(widget::divider::horizontal::default())
             }
