@@ -1668,7 +1668,11 @@ impl cosmic::Application for AppModel {
         } else {
             widget::Row::new().push(button)
         };
-        widget::autosize::autosize(panel_controls, AUTOSIZE_MAIN_ID.clone()).into()
+        widget::autosize::autosize(
+            widget::container(panel_controls).padding([0, 6, 0, 0]),
+            AUTOSIZE_MAIN_ID.clone(),
+        )
+        .into()
     }
 
     fn view_window(&self, id: Id) -> Element<'_, Self::Message> {
