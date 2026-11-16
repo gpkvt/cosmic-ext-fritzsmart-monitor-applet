@@ -107,6 +107,7 @@ impl Default for TemperatureAlertThresholds {
 
 #[derive(Debug, Clone)]
 pub struct FritzSettings {
+    pub language: String,
     pub url: String,
     pub username: String,
     pub password: String,
@@ -139,6 +140,7 @@ pub struct FritzSettings {
 impl Default for FritzSettings {
     fn default() -> Self {
         Self {
+            language: "system".into(),
             url: String::new(),
             username: String::new(),
             password: String::new(),
@@ -349,6 +351,7 @@ impl FritzSettings {
         }
         let get = |key: &str| values.get(key).cloned().unwrap_or_default();
         let settings = Self {
+            language: match get("LANGUAGE").as_str() { "de" => "de".into(), "en" => "en".into(), _ => "system".into() },
             url: get("FRITZ_URL"),
             username: get("USERNAME"),
             password: get("PASSWORD"),
@@ -457,7 +460,8 @@ impl FritzSettings {
         let panel_order = parse_panel_order(&self.panel_order.join(",")).join(",");
         let device_order = parse_device_order(&self.device_order.join(",")).join(",");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\n",
+            match self.language.as_str() { "de" => "de", "en" => "en", _ => "system" },
             self.url,
             self.username,
             self.password,
