@@ -30,9 +30,9 @@ def render(source: Path, destination: Path, title: str) -> None:
 
     # README images are written relative to the repository root, while the
     # generated page is served from docs/.
-    body = re.sub(r'((?:src|href)=")docs/', r'\\1', body)
+    body = re.sub(r'((?:src|href)=")docs/', r'\1', body)
     body = re.sub(
-        r'((?:src|href)=")([^"#?]+)\\.md([?#][^"]*)?"',
+        r'((?:src|href)=")([^"#?]+)\.md([?#][^"]*)?"',
         lambda match: match.group(1) + match.group(2) + ".html" + (match.group(3) or "") + '"',
         body,
     )
