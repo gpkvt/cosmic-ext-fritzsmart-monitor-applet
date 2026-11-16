@@ -2834,7 +2834,7 @@ impl cosmic::Application for AppModel {
                         "weather"
                     } else if key.starts_with("2-") {
                         "devices"
-                    } else if key.starts_with("3-") || key.startsWith("4-") {
+                    } else if key.starts_with("3-") || key.starts_with("4-") {
                         "total-power"
                     } else {
                         "power-difference"
@@ -2850,7 +2850,7 @@ impl cosmic::Application for AppModel {
                     if index > 0 {
                         device_cards = device_cards.push(widget::divider::horizontal::default());
                     }
-                    if key.starts_with("2-") || key.startsWith("3-") || key.startsWith("4-") {
+                    if key.starts_with("2-") || key.starts_with("3-") || key.starts_with("4-") {
                         // Device and total-power rows already provide their own disclosure controls.
                         device_cards = device_cards.push(card);
                         continue;
@@ -2868,10 +2868,6 @@ impl cosmic::Application for AppModel {
                                 .map(|value| format!("{value} W")),
                             "weather" => self.weather.as_ref()
                                 .map(|weather| format!("{:.0}°", weather.temperature_c)),
-                            "total-power" => Some(format!(
-                                "{} W",
-                                output_power_w(&self.readings, &self.settings.input_ains)
-                            )),
                             "power-difference" => {
                                 let has_inputs = self.readings.iter().any(|reading| {
                                     self.settings.input_ains.contains(
