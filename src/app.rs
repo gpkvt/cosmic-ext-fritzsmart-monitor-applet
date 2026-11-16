@@ -1515,10 +1515,10 @@ impl cosmic::Application for AppModel {
                         )
                         .push(
                             widget::container(
-                                widget::text::body(value)
+                                widget::text::body(keep_value_unit_together(value))
                                     .size(f32::from(self.settings.panel_text_size)),
                             )
-                            .width(cosmic::iced::Length::Fixed(62.0))
+                            .width(cosmic::iced::Length::Fixed(76.0))
                             .align_x(cosmic::iced::alignment::Horizontal::Right),
                         )
                 };
