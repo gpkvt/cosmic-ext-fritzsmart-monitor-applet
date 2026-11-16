@@ -332,10 +332,12 @@ async fn fetch_commons_background(
             ("generator", "search"),
             ("gsrsearch", search),
             ("gsrnamespace", "6"),
-            ("gsrlimit", "1"),
+            // Search several files: the first result can be a video, SVG, or
+            // otherwise lack a usable thumbnail.
+            ("gsrlimit", "8"),
             ("prop", "imageinfo"),
             ("iiprop", "url|extmetadata"),
-            ("iiurlwidth", "1000"),
+            ("iiurlwidth", "1200"),
             ("format", "json"),
         ])
         .send()
@@ -343,50 +345,65 @@ async fn fetch_commons_background(
     let Ok(response) = response else {
         return (None, None);
     };
+    if !response.status().is_success() {
+        return (None, None);
+    }
     let response = response.json::<serde_json::Value>().await;
     let Ok(response) = response else {
         return (None, None);
     };
-    let Some(page) = response["query"]["pages"]
-        .as_object()
-        .and_then(|pages| pages.values().next())
-    else {
+    let Some(pages) = response["query"]["pages"].as_object() else {
         return (None, None);
     };
-    let info = &page["imageinfo"][0];
-    let Some(image_url) = info["thumburl"].as_str() else {
-        return (None, None);
-    };
-    let image_response = client.get(image_url).send().await;
-    let Ok(image_response) = image_response else {
-        return (None, None);
-    };
-    let image = image_response.bytes().await;
-    let Ok(image) = image else {
-        return (None, None);
-    };
-    // Blur the decorative photo before displaying it behind weather details,
-    // keeping the text legible without hiding the condition-matched image.
-    let image = blur_background_image(image.to_vec()).unwrap_or_else(|| image.to_vec());
-    let artist = info["extmetadata"]["Artist"]["value"]
-        .as_str()
-        .unwrap_or("Unknown author");
-    let license = info["extmetadata"]["LicenseShortName"]["value"]
-        .as_str()
-        .unwrap_or("See file page");
-    let title = page["title"]
-        .as_str()
-        .unwrap_or("Wikimedia Commons photograph");
-    let page_url = info["descriptionurl"]
-        .as_str()
-        .unwrap_or("https://commons.wikimedia.org/");
-    let attribution = CommonsAttribution {
-        title: title.to_string(),
-        artist: strip_html(artist),
-        license: license.to_string(),
-        page_url: commons_file_page_url(page_url),
-    };
-    (Some(image), Some(attribution))
+
+    // Do not let an unusable first search result hide valid photographs below it.
+    for page in pages.values() {
+        let info = &page["imageinfo"][0];
+        let image_url = info["thumburl"]
+            .as_str()
+            .or_else(|| info["url"].as_str());
+        let Some(image_url) = image_url else {
+            continue;
+        };
+        let image_response = client.get(image_url).send().await;
+        let Ok(image_response) = image_response else {
+            continue;
+        };
+        if !image_response.status().is_success() {
+            continue;
+        }
+        let image = image_response.bytes().await;
+        let Ok(image) = image else {
+            continue;
+        };
+        // Decode before accepting the result so a broken/non-image response
+        // cannot make the weather card fall back to a blank image surface.
+        let image = match blur_background_image(image.to_vec()) {
+            Some(image) => image,
+            None => continue,
+        };
+        let artist = info["extmetadata"]["Artist"]["value"]
+            .as_str()
+            .unwrap_or("Unknown author");
+        let license = info["extmetadata"]["LicenseShortName"]["value"]
+            .as_str()
+            .unwrap_or("See file page");
+        let title = page["title"]
+            .as_str()
+            .unwrap_or("Wikimedia Commons photograph");
+        let page_url = info["descriptionurl"]
+            .as_str()
+            .unwrap_or("https://commons.wikimedia.org/");
+        let attribution = CommonsAttribution {
+            title: title.to_string(),
+            artist: strip_html(artist),
+            license: license.to_string(),
+            page_url: commons_file_page_url(page_url),
+        };
+        return (Some(image), Some(attribution));
+    }
+
+    (None, None)
 }
 
 fn commons_file_page_url(value: &str) -> String {
