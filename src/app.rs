@@ -4064,11 +4064,16 @@ impl cosmic::Application for AppModel {
                     return destroy_popup(id);
                 }
             }
-            Message::EscapePressed(id) => {
-                if self.graph_window == Some(id) {
+            Message::EscapePressed(_id) => {
+                // Wayland popup events can be reported against the parent
+                // surface by some compositor/runtime combinations. Escape is
+                // an explicit dismissal shortcut, so do not require the event
+                // window ID to match the popup ID before closing the graph.
+                if self.expanded_graph.is_some() {
                     self.expanded_graph = None;
-                    self.graph_window = None;
-                    return destroy_popup(id);
+                    if let Some(id) = self.graph_window.take() {
+                        return destroy_popup(id);
+                    }
                 }
             }
             Message::Refresh => {
