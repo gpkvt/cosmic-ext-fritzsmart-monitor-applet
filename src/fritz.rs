@@ -306,7 +306,6 @@ fn parse_device_order(value: &str) -> Vec<String> {
         })
 }
 
-
 fn parse_settings_section(value: &str) -> String {
     match value.trim() {
         "language" | "panel" | "graph" | "refresh" | "weather" | "connection"
