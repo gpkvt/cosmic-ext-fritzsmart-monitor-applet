@@ -234,7 +234,7 @@ jobs:
           install -Dm0644 data/com.gpkvt.FritzPowerMonitor.svg "${dir}/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg"
           install -Dm0644 README.md "${dir}/README.md"
           install -Dm0644 LICENSE "${dir}/LICENSE"
-          tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+          tar -czf "dist/${name}.tar.gz" -C dist "${name}"
           sha256sum "dist/${name}.tar.gz" > "dist/${name}.tar.gz.sha256"
       - name: Upload packages for release job
         uses: actions/upload-artifact@v7
@@ -366,5 +366,5 @@ jobs:
           if [[ -n "$existing" ]]; then
             gh issue comment "$existing" --body "$body"
           else
-            gh issue create --title "$title" --body "$body" --label "automation"
+            gh issue create --title "$title" --body "$body"
           fi
