@@ -3081,16 +3081,21 @@ impl cosmic::Application for AppModel {
 
             content = content.push(
                 widget::Row::new()
-                    .spacing(8)
                     .width(cosmic::iced::Length::Fill)
                     .align_y(cosmic::iced::Alignment::Center)
-                    .push(widget::text::caption("QUICK SETTINGS"))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                    .push(icon_action_button(
-                        "⚙",
-                        "Quick settings",
-                        Message::ToggleQuickOptions,
-                    )),
+                    .push(
+                        widget::button::custom(
+                            widget::Row::new()
+                                .spacing(8)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::text::caption("QUICK SETTINGS"))
+                                .push(widget::text("⚙").size(20)),
+                        )
+                        .on_press(Message::ToggleQuickOptions)
+                        .padding([8, 12])
+                        .class(cosmic::theme::Button::Text),
+                    ),
             );
             if self.quick_options_expanded {
                 const REFRESH_ANCHORS: [f32; 5] = [30.0, 300.0, 900.0, 1800.0, 3600.0];
