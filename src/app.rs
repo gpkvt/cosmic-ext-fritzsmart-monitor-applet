@@ -1893,10 +1893,10 @@ impl cosmic::Application for AppModel {
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                         .push(widget::toggler(self.settings.weather_enabled).on_toggle(Message::WeatherEnabledChanged)))
                     .push(widget::text::body(crate::i18n::tr(&self.settings.language, "OpenWeatherMap API key")))
-                    .push(widget::secure_input("API key", &self.settings.openweathermap_api_key, None, true)
+                    .push(widget::secure_input(crate::i18n::tr(&self.settings.language, "API key"), &self.settings.openweathermap_api_key, None, true)
                         .on_input(Message::OpenWeatherMapApiKeyChanged))
                     .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Location (city or latitude,longitude)")))
-                    .push(widget::text_input("e.g. Amsterdam or 52.37,4.90", &self.settings.weather_location)
+                    .push(widget::text_input(crate::i18n::tr(&self.settings.language, "e.g. Amsterdam or 52.37,4.90"), &self.settings.weather_location)
                         .on_input(Message::WeatherLocationChanged))
                     .push(widget::text::caption(format!("Weather refresh: {} minutes", self.settings.weather_refresh_interval_minutes)))
                     .push(widget::slider(5.0..=60.0, f32::from(self.settings.weather_refresh_interval_minutes),
@@ -1909,17 +1909,17 @@ impl cosmic::Application for AppModel {
                 content = content
                     .push(widget::text::body(crate::i18n::tr(&self.settings.language, "FRITZ!Box URL")))
                     .push(
-                        widget::text_input("https://fritz.box", &self.settings.url)
+                        widget::text_input(crate::i18n::tr(&self.settings.language, "https://fritz.box"), &self.settings.url)
                             .on_input(Message::UrlChanged),
                     )
                     .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Username")))
                     .push(
-                        widget::text_input("Username", &self.settings.username)
+                        widget::text_input(crate::i18n::tr(&self.settings.language, "Username"), &self.settings.username)
                             .on_input(Message::UsernameChanged),
                     )
                     .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Password")))
                     .push(
-                        widget::secure_input("Password", &self.settings.password, None, true)
+                        widget::secure_input(crate::i18n::tr(&self.settings.language, "Password"), &self.settings.password, None, true)
                             .on_input(Message::PasswordChanged),
                     )
                     .push(widget::text::body(
