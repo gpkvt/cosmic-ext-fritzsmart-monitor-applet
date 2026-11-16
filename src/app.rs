@@ -54,6 +54,7 @@ pub struct AppModel {
     collapsed_menu_sections: HashSet<String>,
     quick_refresh_interval: u32,
     quick_graph_timespan: u32,
+    expanded_graph: Option<(String, Vec<f64>, String)>,
     next_weather_refresh_at: Option<Instant>,
     pending_power_changes: HashSet<String>,
     pending_power_targets: HashMap<String, bool>,
@@ -87,6 +88,8 @@ pub enum Message {
     PanelInternetBandwidthChanged(bool),
     GraphTimespanChanged(u32),
     GraphStyleChanged(String),
+    ShowGraph(String, Vec<f64>, String),
+    CloseGraph,
     RefreshIntervalChanged(u32),
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
@@ -397,11 +400,29 @@ fn graph_visual(
     style: &str,
     unit: &str,
 ) -> cosmic::Element<'static, Message> {
+    graph_visual_with_dimensions(values, style, unit, 48.0, 56)
+}
+
+fn graph_visual_large(
+    values: impl Iterator<Item = f64>,
+    style: &str,
+    unit: &str,
+) -> cosmic::Element<'static, Message> {
+    graph_visual_with_dimensions(values, style, unit, 180.0, 220)
+}
+
+fn graph_visual_with_dimensions(
+    values: impl Iterator<Item = f64>,
+    style: &str,
+    unit: &str,
+    graph_height: f64,
+    widget_height: u16,
+) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
     let current_value = values.last().copied().unwrap_or(0.0);
     const COUNT: usize = 24;
     const WIDTH: f64 = 120.0;
-    const HEIGHT: f64 = 48.0;
+    let height = graph_height;
     // Keep the graph slot identical in size before the first sample arrives.
     let values = if values.is_empty() { vec![0.0] } else { values };
     let minimum = values.iter().copied().reduce(f64::min).unwrap_or(0.0);
@@ -419,13 +440,13 @@ fn graph_visual(
             })
             .collect()
     };
-    let y = |v: f64| HEIGHT - 4.0 - ((v - minimum) / range) * (HEIGHT - 8.0);
+    let y = |v: f64| height - 4.0 - ((v - minimum) / range) * (height - 8.0);
     let drawing = if style == "bar" {
         let slot = WIDTH / COUNT as f64;
         samples.iter().enumerate().map(|(i,v)| {
             let top=y(*v);
             format!("<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"1\" fill=\"#8ab4f8\"/>",
-                i as f64*slot+1.0, top, slot-2.0, (HEIGHT-4.0-top).max(1.0))
+                i as f64*slot+1.0, top, slot-2.0, (height-4.0-top).max(1.0))
         }).collect::<String>()
     } else {
         let points = samples
@@ -443,14 +464,14 @@ fn graph_visual(
     const GRID_COLUMNS: usize = 6;
     let horizontal_grid = (1..GRID_ROWS)
         .map(|row| {
-            let y = row as f64 * HEIGHT / GRID_ROWS as f64;
+            let y = row as f64 * height / GRID_ROWS as f64;
             format!("M0 {y:.2}H{WIDTH}")
         })
         .collect::<Vec<_>>();
     let vertical_grid = (1..GRID_COLUMNS)
         .map(|column| {
             let x = column as f64 * WIDTH / GRID_COLUMNS as f64;
-            format!("M{x:.2} 0V{HEIGHT}")
+            format!("M{x:.2} 0V{height}")
         })
         .collect::<Vec<_>>();
     let grid = horizontal_grid
@@ -458,15 +479,15 @@ fn graph_visual(
         .chain(vertical_grid)
         .collect::<Vec<_>>()
         .join(" ");
-    let baseline = HEIGHT - 2.0;
+    let baseline = height - 2.0;
     let svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {HEIGHT}\" preserveAspectRatio=\"none\"><title>{current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.18\" stroke-width=\"0.6\"/><path d=\"M0 {baseline}H{WIDTH}\" stroke=\"#808080\" stroke-opacity=\"0.35\"/>{drawing}</svg>"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {height}\" preserveAspectRatio=\"none\"><title>{current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.18\" stroke-width=\"0.6\"/><path d=\"M0 {baseline}H{WIDTH}\" stroke=\"#808080\" stroke-opacity=\"0.35\"/>{drawing}</svg>"
     );
     let graph = widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
         svg.into_bytes(),
     ))
     .width(cosmic::iced::Length::Fill)
-    .height(56);
+    .height(widget_height);
 
     widget::Column::new()
         .spacing(2)
@@ -478,6 +499,25 @@ fn graph_visual(
                 .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
         )
         .push(graph)
+        .into()
+}
+
+fn interactive_graph(
+    title: &str,
+    values: impl Iterator<Item = f64>,
+    style: &str,
+    unit: &str,
+) -> cosmic::Element<'static, Message> {
+    let values: Vec<f64> = values.collect();
+    let graph = widget::Row::new()
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(graph_visual(values.iter().copied(), style, unit))
+        .push(widget::icon::from_name("zoom-in-symbolic").size(16));
+    widget::button::custom(graph)
+        .on_press(Message::ShowGraph(title.to_string(), values, unit.to_string()))
+        .padding(0)
+        .width(cosmic::iced::Length::Fill)
+        .class(cosmic::theme::Button::Text)
         .into()
 }
 
@@ -815,7 +855,8 @@ fn total_power_overview(
     let output_graph = widget::Column::new()
         .spacing(4)
         .push(widget::text::caption("TOTAL POWER OUTPUT (W)"))
-        .push(graph_visual(
+        .push(interactive_graph(
+            crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
             history.iter().map(|(_, value)| *value as f64),
             &settings.graph_style,
             "W",
@@ -870,7 +911,8 @@ fn total_power_overview(
         let input_graph = widget::Column::new()
             .spacing(4)
             .push(widget::text::caption("TOTAL POWER INPUT (W)"))
-            .push(graph_visual(
+            .push(interactive_graph(
+                crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
                 input_history.iter().map(|(_, value)| *value as f64),
                 &settings.graph_style,
                 "W",
@@ -1679,6 +1721,59 @@ impl cosmic::Application for AppModel {
             .spacing(10)
             .padding(12)
             .width(cosmic::iced::Length::Fill);
+
+        if let Some((title, values, unit)) = &self.expanded_graph {
+            let minimum = values.iter().copied().reduce(f64::min).unwrap_or_default();
+            let maximum = values.iter().copied().reduce(f64::max).unwrap_or_default();
+            let current = values.last().copied().unwrap_or_default();
+            let graph_page = widget::Column::new()
+                .spacing(14)
+                .padding(18)
+                .width(cosmic::iced::Length::Fill)
+                .push(
+                    widget::Row::new()
+                        .spacing(10)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(
+                            widget::button::custom(widget::icon::from_name("go-previous-symbolic").size(18))
+                                .on_press(Message::CloseGraph)
+                                .padding(8)
+                                .class(cosmic::theme::Button::Text),
+                        )
+                        .push(widget::text::title2(title.clone()).width(cosmic::iced::Length::Fill))
+                        .push(
+                            widget::button::custom(widget::icon::from_name("window-close-symbolic").size(18))
+                                .on_press(Message::CloseGraph)
+                                .padding(8)
+                                .class(cosmic::theme::Button::Text),
+                        ),
+                )
+                .push(widget::divider::horizontal::default())
+                .push(graph_visual_large(values.iter().copied(), &self.settings.graph_style, unit))
+                .push(
+                    widget::Row::new()
+                        .spacing(8)
+                        .push(widget::text::caption(format!("MIN {minimum:.1} {unit}")).width(cosmic::iced::Length::Fill))
+                        .push(widget::text::caption(format!("CURRENT {current:.1} {unit}")).width(cosmic::iced::Length::Fill))
+                        .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
+                )
+                .push(
+                    widget::Row::new()
+                        .width(cosmic::iced::Length::Fill)
+                        .push(widget::text::caption(format_graph_axis_start(self.settings.graph_timespan_minutes)))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Now"))),
+                )
+                .push(widget::text::caption(format!("{} samples · {}", values.len(), format_graph_timespan(self.settings.graph_timespan_minutes))));
+            return self.core.applet
+                .popup_container(
+                    widget::container(graph_page)
+                        .width(cosmic::iced::Length::Fixed(640.0))
+                        .height(cosmic::iced::Length::Fill),
+                )
+                .max_height(800.0)
+                .into();
+        }
 
         if self.settings_open {
             if let Some(section) = self.active_settings_section {
@@ -2820,7 +2915,8 @@ impl cosmic::Application for AppModel {
                         )
                         .push(widget::divider::horizontal::default())
                         .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "DOWNLOAD HISTORY")))
-                        .push(graph_visual(
+                        .push(interactive_graph(
+                            crate::i18n::tr(&self.settings.language, "DOWNLOAD HISTORY"),
                             self.bandwidth_history
                                 .iter()
                                 .map(|(_, download, _)| *download as f64 / 1_000_000.0),
@@ -2828,7 +2924,8 @@ impl cosmic::Application for AppModel {
                             "Mbps",
                         ))
                         .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "UPLOAD HISTORY")))
-                        .push(graph_visual(
+                        .push(interactive_graph(
+                            crate::i18n::tr(&self.settings.language, "UPLOAD HISTORY"),
                             self.bandwidth_history
                                 .iter()
                                 .map(|(_, _, upload)| *upload as f64 / 1_000_000.0),
@@ -2989,7 +3086,8 @@ impl cosmic::Application for AppModel {
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
                                                 .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "POWER (W)")))
-                                                .push(graph_visual(
+                                                .push(interactive_graph(
+                                                    &format!("{} · {}", reading.name, crate::i18n::tr(&self.settings.language, "POWER (W)")),
                                                     device_history.into_iter().flat_map(
                                                         |samples| {
                                                             samples
@@ -3063,7 +3161,8 @@ impl cosmic::Application for AppModel {
                                                 .spacing(4)
                                                 .width(cosmic::iced::Length::Fill)
                                                 .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "TEMPERATURE (°C)")))
-                                                .push(graph_visual(
+                                                .push(interactive_graph(
+                                                    &format!("{} · {}", reading.name, crate::i18n::tr(&self.settings.language, "TEMPERATURE (°C)")),
                                                     device_history.into_iter().flat_map(
                                                         |samples| {
                                                             samples.iter().map(
@@ -3476,6 +3575,12 @@ impl cosmic::Application for AppModel {
         match message {
             Message::TooltipSurfaceAction(action) => {
                 return Task::done(cosmic::Action::Surface(action));
+            }
+            Message::ShowGraph(title, values, unit) => {
+                self.expanded_graph = Some((title, values, unit));
+            }
+            Message::CloseGraph => {
+                self.expanded_graph = None;
             }
             Message::Refresh => {
                 // Ignore repeated clicks while a request is already running.
