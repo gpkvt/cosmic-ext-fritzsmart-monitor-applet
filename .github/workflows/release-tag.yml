@@ -170,6 +170,8 @@ jobs:
 
           tag="v${version}"
           release_commit="$(git rev-parse origin/main)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
             git fetch origin "refs/tags/$tag:refs/tags/$tag"
             existing_commit="$(git rev-list -n1 "$tag")"
