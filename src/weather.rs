@@ -291,7 +291,14 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
     let location_name = payload["name"].as_str().unwrap_or(location).to_string();
     // Select photos using both the observed condition and OpenWeatherMap's
     // local day/night indicator. Image failures remain non-fatal.
-    let (background_images, image_attribution) = fetch_commons_background(&client, icon_code).await;
+    let (mut background_images, image_attribution) = fetch_commons_background(&client, icon_code).await;
+    // At night, never substitute an unrelated image when Commons cannot
+    // provide a credible match. Use a locally generated star field instead.
+    if icon_code.ends_with('n') && background_images.is_empty() {
+        if let Some(stars) = generate_starry_night_background() {
+            background_images.push(stars);
+        }
+    }
     let background_image = background_images.first().cloned();
     // The applet builds its slideshow with the user's configured display duration.
     let slideshow_frames = Vec::new();
@@ -492,6 +499,56 @@ fn commons_file_page_url(value: &str) -> String {
     } else {
         "https://commons.wikimedia.org/".to_string()
     }
+}
+
+
+/// Creates a deterministic, locally generated starry-night backdrop. This is
+/// deliberately independent of network services and external image metadata.
+fn generate_starry_night_background() -> Option<Vec<u8>> {
+    let width = 1200u32;
+    let height = 520u32;
+    let mut image = image::RgbImage::from_fn(width, height, |_, y| {
+        let t = y as f32 / height as f32;
+        let blend = (t * 0.72).clamp(0.0, 1.0);
+        image::Rgb([
+            (8.0 + 8.0 * blend) as u8,
+            (13.0 + 10.0 * blend) as u8,
+            (34.0 + 18.0 * blend) as u8,
+        ])
+    });
+
+    // Fixed-seed generator keeps the fallback visually stable between refreshes.
+    let mut seed = 0x5eed_c0de_u32;
+    let mut random = || {
+        seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        seed
+    };
+    for _ in 0..230 {
+        let x = random() % width;
+        let y = random() % (height * 3 / 4);
+        let brightness = 150u8.saturating_add((random() % 106) as u8);
+        let radius = if brightness > 225 && random() % 5 == 0 { 2i32 } else { 1i32 };
+        for dy in -radius..=radius {
+            for dx in -radius..=radius {
+                if dx * dx + dy * dy > radius * radius { continue; }
+                let px = x as i32 + dx;
+                let py = y as i32 + dy;
+                if px >= 0 && py >= 0 && px < width as i32 && py < height as i32 {
+                    image.put_pixel(px as u32, py as u32, image::Rgb([
+                        brightness.saturating_sub(12),
+                        brightness.saturating_sub(5),
+                        brightness,
+                    ]));
+                }
+            }
+        }
+    }
+
+    let mut output = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgb8(image)
+        .write_to(&mut output, image::ImageFormat::Jpeg)
+        .ok()?;
+    Some(output.into_inner())
 }
 
 fn blur_background_image(bytes: Vec<u8>) -> Option<Vec<u8>> {
@@ -736,6 +793,13 @@ mod tests {
         for frame in frames {
             assert!(image::load_from_memory(&frame).is_ok());
         }
+    }
+
+    #[test]
+    fn generates_a_valid_starry_night_fallback() {
+        let bytes = generate_starry_night_background().expect("star field should render");
+        let decoded = image::load_from_memory(&bytes).expect("fallback must be a valid image");
+        assert_eq!((decoded.width(), decoded.height()), (1200, 520));
     }
 
     #[test]
