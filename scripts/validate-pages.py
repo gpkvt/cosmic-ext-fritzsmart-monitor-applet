@@ -70,7 +70,13 @@ for page in pages:
             fail("index.html: left-arrow keyboard navigation is missing")
         if not re.search(r"event\.key\s*===\s*['\"]ArrowRight['\"]", content):
             fail("index.html: right-arrow keyboard navigation is missing")
-        if not re.search(r"\.hero-gallery \.hero-shot\s*\{\s*display\s*:\s*none", content):
-            fail("index.html: hero preview must show only one screenshot")
+        hero_cards = content.count('<a class="hero-shot"')
+        if hero_cards != 8:
+            fail(f"index.html: expected eight screenshot cards, found {hero_cards}")
+        if '.hero-gallery .hero-shot{display:none}' in content:
+            fail("index.html: screenshot deck must not be hidden")
+        for feature in ("card-deal", "card-magic-reveal", "restoreMagicCard", "magic-card-open", "aria-pressed"):
+            if feature not in content:
+                fail(f"index.html: screenshot card interaction is missing {feature}")
 
 print(f"Validated {len(pages)} GitHub Pages HTML page(s) and all local references.")
