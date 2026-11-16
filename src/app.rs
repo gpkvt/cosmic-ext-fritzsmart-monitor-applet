@@ -1408,17 +1408,19 @@ impl cosmic::Application for AppModel {
             // Observe raw events: the normal keyboard subscription drops
             // events already captured by a popup widget or the compositor.
             // Keep the originating surface ID so Escape only closes this graph.
-            let escape = cosmic::iced::event::listen_raw(|event, _status, window| match event {
-                cosmic::iced::Event::Keyboard(
-                    cosmic::iced::keyboard::Event::KeyPressed {
-                        key: cosmic::iced::keyboard::Key::Named(
-                            cosmic::iced::keyboard::key::Named::Escape,
-                        ),
-                        ..
-                    },
-                ) => Some(Message::EscapePressed(window)),
-                _ => None,
-            });
+            let escape = cosmic::iced::event::listen_raw(
+                |event, _status, window| match event {
+                    cosmic::iced::Event::Keyboard(
+                        cosmic::iced::keyboard::Event::KeyPressed {
+                            key: cosmic::iced::keyboard::Key::Named(
+                                cosmic::iced::keyboard::key::Named::Escape,
+                            ),
+                            ..
+                        },
+                    ) => Some(Message::EscapePressed(window)),
+                    _ => None,
+                },
+            );
             Subscription::batch([clock, escape])
         } else {
             clock
