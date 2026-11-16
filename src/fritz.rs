@@ -1104,16 +1104,15 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     let base = settings.url.trim_end_matches('/');
     let devices_xml = fetch_device_list_xml(&client, base, &sid).await?;
     let mut result = parse_fetch_result_xml(&devices_xml, &selected_ains)?;
-    if settings.panel_internet_bandwidth {
-        // WAN statistics are optional: unsupported firmware or a disabled UPnP
-        // service must not interrupt Smart Home device monitoring.
-        result.internet_bandwidth = tokio::time::timeout(
-            Duration::from_secs(3),
-            fetch_internet_bandwidth(&client, base),
-        )
-        .await
-        .unwrap_or(None);
-    }
+    // Popup-menu bandwidth is independent of panel visibility. Always fetch
+    // the optional WAN statistics so the dedicated menu section remains live
+    // even when the panel bandwidth item is disabled.
+    result.internet_bandwidth = tokio::time::timeout(
+        Duration::from_secs(3),
+        fetch_internet_bandwidth(&client, base),
+    )
+    .await
+    .unwrap_or(None);
 
     // Query the dedicated switch-state endpoint: power-meter XML can lag behind
     // the actual actuator state on some FRITZ!Box devices.
