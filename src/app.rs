@@ -3192,8 +3192,9 @@ impl cosmic::Application for AppModel {
                         .content_fit(cosmic::iced::ContentFit::Cover);
                         let details = widget::container(weather_content)
                             .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(260.0))
                             .padding(10)
+                            .clip(true)
                             .style(|_| cosmic::iced::widget::container::Style {
                                 background: Some(
                                     cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.58).into(),
@@ -3205,11 +3206,15 @@ impl cosmic::Application for AppModel {
                         // one explicitly bounded, clipped weather surface. This
                         // prevents the image layer from painting into adjacent
                         // forecast or menu content when the popup is resized.
+                        let image_layer = widget::container(photo)
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .clip(true);
                         widget::container(
                             cosmic::iced::widget::Stack::new()
                                 .width(cosmic::iced::Length::Fill)
                                 .height(cosmic::iced::Length::Fixed(260.0))
-                                .push(photo)
+                                .push(image_layer)
                                 .push(details),
                         )
                         .width(cosmic::iced::Length::Fill)
