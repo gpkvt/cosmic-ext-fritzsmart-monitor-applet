@@ -184,13 +184,12 @@ fn parse_refresh_interval_seconds(value: &str) -> u32 {
     value.parse::<u32>().unwrap_or(60).clamp(30, 3600)
 }
 
-const MENU_ELEMENT_IDS: [&str; 6] = [
+const MENU_ELEMENT_IDS: [&str; 5] = [
     "summary",
     "weather",
     "devices",
     "total-power-output",
     "total-power-input",
-    "power-difference",
 ];
 
 fn default_menu_order() -> Vec<String> {
@@ -1636,8 +1635,7 @@ mod tests {
                 "weather",
                 "devices",
                 "total-power-output",
-                "total-power-input",
-                "power-difference"
+                "total-power-input"
             ]
             .into_iter()
             .map(str::to_string)
@@ -1654,8 +1652,7 @@ mod tests {
                 "summary",
                 "weather",
                 "total-power-output",
-                "total-power-input",
-                "power-difference"
+                "total-power-input"
             ]
             .into_iter()
             .map(str::to_string)
@@ -1670,7 +1667,6 @@ mod tests {
                 "total-power-input",
                 "summary",
                 "weather",
-                "power-difference",
             ]
             .into_iter()
             .map(str::to_string)
@@ -1684,7 +1680,6 @@ mod tests {
                 "total-power-output",
                 "weather",
                 "devices",
-                "power-difference",
             ]
             .into_iter()
             .map(str::to_string)

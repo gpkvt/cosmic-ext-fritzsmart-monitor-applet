@@ -485,21 +485,6 @@ fn rebuild_input_power_history(
     samples.into_iter().collect()
 }
 
-fn rebuild_power_difference_history(
-    output_history: &VecDeque<(Instant, i64)>,
-    input_history: &VecDeque<(Instant, i64)>,
-) -> VecDeque<(Instant, i64)> {
-    let input_by_time: HashMap<Instant, i64> = input_history.iter().copied().collect();
-    output_history
-        .iter()
-        .filter_map(|(timestamp, output)| {
-            input_by_time
-                .get(timestamp)
-                .map(|input| (*timestamp, output + input))
-        })
-        .collect()
-}
-
 fn rebuild_output_power_history(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     input_ains: &HashSet<String>,
@@ -768,7 +753,7 @@ fn total_power_section(
     collapsed: bool,
     content: cosmic::Element<'static, Message>,
 ) -> cosmic::Element<'static, Message> {
-    // Match the compact metric tiles used by Power difference, while keeping
+    // Match the compact metric tiles used by the power sections, while keeping
     // input and output independently collapsible.
     let mut heading = widget::Row::new()
         .spacing(6)
@@ -935,85 +920,6 @@ fn total_power_overview(
     Some(sections)
 }
 
-fn power_difference_overview(
-    readings: &[FritzReading],
-    settings: &FritzSettings,
-    history: &VecDeque<(Instant, i64)>,
-    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
-) -> Option<cosmic::Element<'static, Message>> {
-    let input_history = rebuild_input_power_history(device_history, &settings.input_ains);
-    let has_input_readings = readings.iter().any(|reading| {
-        settings
-            .input_ains
-            .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
-    });
-    if !has_input_readings {
-        return None;
-    }
-    let total_power = output_power_w(readings, &settings.input_ains);
-    let input_power = input_power_w(readings, &settings.input_ains);
-    // Input readings are signed negative values; adding them gives the net difference.
-    let difference = total_power + input_power;
-    let difference_history = rebuild_power_difference_history(history, &input_history);
-    let mut column = widget::Column::new()
-        .spacing(8)
-        .width(cosmic::iced::Length::Fill)
-        .push(metric_tile(
-            "POWER DIFFERENCE",
-            format!("{difference} W"),
-            if difference >= 0 {
-                "go-up-symbolic"
-            } else {
-                "go-down-symbolic"
-            },
-        ));
-    if let (Some(low), Some(high)) = (
-        difference_history.iter().map(|(_, value)| *value).min(),
-        difference_history.iter().map(|(_, value)| *value).max(),
-    ) {
-        column = column.push(
-            widget::Row::new()
-                .spacing(8)
-                .width(cosmic::iced::Length::Fill)
-                .push(
-                    widget::container(range_metric_tile(
-                        "LOW",
-                        format!("{low} W"),
-                        "go-down-symbolic",
-                    ))
-                    .width(cosmic::iced::Length::Fill),
-                )
-                .push(
-                    widget::container(range_metric_tile(
-                        "HIGH",
-                        format!("{high} W"),
-                        "go-up-symbolic",
-                    ))
-                    .width(cosmic::iced::Length::Fill),
-                ),
-        );
-    }
-    let graph = widget::Column::new()
-        .spacing(4)
-        .push(widget::text::caption("POWER DIFFERENCE (W)"))
-        .push(graph_visual(
-            difference_history.iter().map(|(_, value)| *value as f64),
-            &settings.graph_style,
-            "W",
-        ))
-        .push(
-            widget::Row::new()
-                .width(cosmic::iced::Length::Fill)
-                .push(widget::text::caption(format_graph_axis_start(
-                    settings.graph_timespan_minutes,
-                )))
-                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                .push(widget::text::caption("Now")),
-        );
-    column = column.push(graph_panel(graph.into()));
-    Some(surface_card(column.into(), 14))
-}
-
 fn panel_item_label(id: &str) -> &'static str {
     match id {
         "weather" => "Weather",
@@ -1037,7 +943,6 @@ fn menu_element_label(id: &str) -> &'static str {
         "devices" => "Devices",
         "total-power-output" => "Total power out",
         "total-power-input" => "Total power in",
-        "power-difference" => "Power difference",
         _ => "Unknown element",
     }
 }
@@ -1982,7 +1887,6 @@ impl cosmic::Application for AppModel {
                         "devices" => "devices",
                         "total-power-output" => "total-power-output",
                         "total-power-input" => "total-power-input",
-                        "power-difference" => "power-difference",
                         _ => continue,
                     };
                     let label = menu_element_label(id);
@@ -3087,14 +2991,6 @@ impl cosmic::Application for AppModel {
                 ) {
                     menu_cards.extend(power_sections);
                 }
-                if let Some(difference) = power_difference_overview(
-                    &self.readings,
-                    &self.settings,
-                    &self.history,
-                    &self.device_history,
-                ) {
-                    menu_cards.push(("5-power-difference".to_string(), difference));
-                }
                 // Sort popup sections by the user's saved order while preserving device order.
                 menu_cards.sort_by_key(|(key, _)| {
                     let element = if key == "0-summary" {
@@ -3108,7 +3004,7 @@ impl cosmic::Application for AppModel {
                     } else if key.starts_with("4-") {
                         "total-power-input"
                     } else {
-                        "power-difference"
+                        "devices"
                     };
                     self.settings
                         .menu_order
@@ -3134,7 +3030,6 @@ impl cosmic::Application for AppModel {
                     }
                     let section = match key.as_str() {
                         "0-summary" => ("summary", "CURRENT POWER"),
-                        "5-power-difference" => ("power-difference", "POWER DIFFERENCE"),
                         _ => continue,
                     };
                     let collapsed = self.collapsed_menu_sections.contains(section.0);
@@ -3146,23 +3041,6 @@ impl cosmic::Application for AppModel {
                                 .weather
                                 .as_ref()
                                 .map(|weather| format!("{:.0} °C", weather.temperature_c)),
-                            "power-difference" => {
-                                let has_inputs = self.readings.iter().any(|reading| {
-                                    self.settings.input_ains.contains(
-                                        &crate::fritz::normalize_ain_for_selection(&reading.ain),
-                                    )
-                                });
-                                has_inputs.then(|| {
-                                    format!(
-                                        "{} W",
-                                        output_power_w(&self.readings, &self.settings.input_ains)
-                                            + input_power_w(
-                                                &self.readings,
-                                                &self.settings.input_ains
-                                            )
-                                    )
-                                })
-                            }
                             _ => None,
                         }
                     } else {
@@ -4302,32 +4180,6 @@ mod history_tests {
         assert_eq!(average_temperature_c(&readings, false), Some(110.0 / 3.0));
         assert_eq!(average_temperature_c(&readings, true), Some(20.0));
         assert_eq!(average_temperature_c(&readings[1..], true), None);
-    }
-
-    #[test]
-    fn power_difference_history_combines_output_and_signed_input() {
-        let now = Instant::now();
-        let later = now + Duration::from_secs(60);
-        let output = VecDeque::from([(now, 900), (later, 1_000)]);
-        let input = VecDeque::from([(now, -250), (later, -300)]);
-
-        assert_eq!(
-            rebuild_power_difference_history(&output, &input),
-            VecDeque::from([(now, 650), (later, 700)]),
-        );
-    }
-
-    #[test]
-    fn power_difference_history_ignores_unmatched_samples() {
-        let now = Instant::now();
-        let later = now + Duration::from_secs(60);
-        let output = VecDeque::from([(now, 900), (later, 1_000)]);
-        let input = VecDeque::from([(later, -300)]);
-
-        assert_eq!(
-            rebuild_power_difference_history(&output, &input),
-            VecDeque::from([(later, 700)]),
-        );
     }
 
     #[test]
