@@ -96,7 +96,6 @@ pub enum Message {
     ToggleWeatherForecast,
     SelectWeatherForecast(u8),
     WeatherForecastUpdated(u8, Result<WeatherForecast, String>),
-    OpenCommonsPage(String),
     ToggleQuickOptions,
     ToggleDeviceDetails(String),
     ToggleMenuSection(String),
@@ -3430,11 +3429,6 @@ impl cosmic::Application for AppModel {
                     Err(error) => {
                         self.weather_forecast_error = Some(error);
                     }
-                }
-            }
-            Message::OpenCommonsPage(url) => {
-                if url.starts_with("https://commons.wikimedia.org/wiki/File:") {
-                    let _ = std::process::Command::new("xdg-open").arg(url).spawn();
                 }
             }
             Message::MoveMenuElement(element, move_up) => {
