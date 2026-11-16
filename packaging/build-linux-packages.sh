@@ -146,8 +146,24 @@ mkdir -p "$FLATPAK_SOURCE"
 )
 cp "$WORKSPACE/Cargo.toml" "$WORKSPACE/Cargo.lock" "$WORKSPACE/build.rs" "$FLATPAK_SOURCE/"
 cp -r "$WORKSPACE/src" "$WORKSPACE/data" "$FLATPAK_SOURCE/"
-test -s "$FLATPAK_SOURCE/cargo/config"
+# flatpak-cargo-generator stores cargo/config as an inline source in the
+# generated manifest; it is materialized by flatpak-builder, not in this
+# staging directory. Validate the generated source manifest here instead.
 test -s "$CARGO_SOURCES"
+python3 - "$CARGO_SOURCES" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+sources = json.loads(Path(sys.argv[1]).read_text())
+if not any(
+    source.get("type") == "inline"
+    and source.get("dest") == "cargo"
+    and source.get("dest-filename") == "config"
+    for source in sources
+):
+    raise SystemExit("Generated Flatpak Cargo sources do not include cargo/config")
+PY
 
 flatpak remote-add --user --if-not-exists flathub \
     https://dl.flathub.org/repo/flathub.flatpakrepo
