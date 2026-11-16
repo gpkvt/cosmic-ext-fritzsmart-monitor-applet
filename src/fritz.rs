@@ -35,7 +35,18 @@ fn record_http_response(url: &reqwest::Url, status: reqwest::StatusCode) {
                 .format("%Y-%m-%d %H:%M:%S%.3f")
                 .to_string(),
             method: "GET",
-            path: url.path().to_string(),
+            path: {
+                let mut path = url.path().to_string();
+                if let Some(command) = url
+                    .query_pairs()
+                    .find(|(key, _)| key == "switchcmd")
+                    .map(|(_, value)| value)
+                {
+                    path.push_str("?switchcmd=");
+                    path.push_str(&command);
+                }
+                path
+            },
             status: status.as_u16(),
             https: url.scheme() == "https",
         });
