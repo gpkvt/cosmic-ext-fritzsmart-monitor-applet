@@ -1396,15 +1396,14 @@ impl cosmic::Application for AppModel {
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>| {
             let mut item = widget::Row::new()
-                .spacing(4)
+                .spacing(0)
                 .align_y(cosmic::iced::Alignment::Center);
-            // Reserve the same 24px leading slot for every reading. Items
-            // without an icon (currently solar power) must not shift their
-            // value left or change the visual spacing between panel entries.
+            // Keep a consistent, compact 20px leading slot for every reading.
+            // Items without an icon must not shift their value left.
             let icon_slot = widget::container(icon.unwrap_or_else(|| widget::text("").into()))
-                .width(cosmic::iced::Length::Fixed(24.0))
+                .width(cosmic::iced::Length::Fixed(20.0))
                 .height(cosmic::iced::Length::Fixed(24.0))
-                .center_x(24)
+                .center_x(20)
                 .center_y(24);
             item = item.push(icon_slot);
             let value_slot = widget::container(value)
