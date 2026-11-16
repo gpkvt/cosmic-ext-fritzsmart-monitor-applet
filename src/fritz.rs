@@ -1244,6 +1244,29 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parses_persisted_collapsed_menu_sections_safely() {
+        assert_eq!(
+            parse_collapsed_menu_sections(
+                "weather,unknown,summary,weather,total-power-input"
+            ),
+            vec![
+                "weather".to_string(),
+                "summary".to_string(),
+                "total-power-input".to_string(),
+            ]
+        );
+        assert!(parse_collapsed_menu_sections("").is_empty());
+    }
+
+    #[test]
+    fn parses_persisted_expanded_devices_as_unique_normalized_ains() {
+        assert_eq!(
+            parse_expanded_devices(" 12:34 aa,1234AA,not-valid!, ,9876"),
+            vec!["1234AA".to_string(), "9876".to_string()]
+        );
+    }
+
+    #[test]
     fn wan_common_interface_url_uses_local_tr064_ports() {
         assert_eq!(
             wan_common_interface_url("http://192.168.42.1")
