@@ -30,6 +30,14 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: main
+      - name: Install Markdown renderer
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes python3-markdown
+      - name: Render Markdown documentation
+        run: python3 scripts/build-pages.py
+      - name: Validate generated Pages site
+        run: python3 scripts/validate-pages.py
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
       - name: Upload Pages artifact
