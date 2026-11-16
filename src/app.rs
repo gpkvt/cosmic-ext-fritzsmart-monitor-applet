@@ -2358,36 +2358,55 @@ impl cosmic::Application for AppModel {
                             })
                             .into()
                     };
-                let weather_heading = widget::button::custom(
-                    widget::Row::new()
-                        .spacing(8)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::icon::from_name(weather.icon_name()).size(20))
-                        .push(
-                            widget::Column::new()
-                                .spacing(1)
-                                .width(cosmic::iced::Length::Fill)
-                                .push(widget::text::title3("Weather"))
-                                .push(widget::text::caption(weather.location_name.clone())),
+                let weather_info_collapsed =
+                    self.collapsed_menu_sections.contains("weather-info");
+                let weather_heading = widget::Row::new()
+                    .spacing(8)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(
+                        widget::button::custom(
+                            widget::Row::new()
+                                .spacing(8)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::icon::from_name(weather.icon_name()).size(20))
+                                .push(
+                                    widget::Column::new()
+                                        .spacing(1)
+                                        .width(cosmic::iced::Length::Fill)
+                                        .push(widget::text::title3("Weather"))
+                                        .push(widget::text::caption(weather.location_name.clone())),
+                                )
+                                .push(widget::text::title2(format!(
+                                    "{:.0}°",
+                                    weather.temperature_c
+                                )))
+                                .push(widget::icon::from_name(if weather_info_collapsed {
+                                    "go-next-symbolic"
+                                } else {
+                                    "go-down-symbolic"
+                                }).size(16)),
                         )
-                        .push(widget::text::title2(format!(
-                            "{:.0}°",
-                            weather.temperature_c
-                        )))
-                        .push(
-                            widget::icon::from_name(if self.weather_forecast_expanded {
+                        .on_press(Message::ToggleMenuSection("weather-info".into()))
+                        .padding([4, 0])
+                        .width(cosmic::iced::Length::Fill)
+                        .class(cosmic::theme::Button::Text),
+                    )
+                    .push(
+                        widget::button::custom(widget::icon::from_name(
+                            if self.weather_forecast_expanded {
                                 "go-down-symbolic"
                             } else {
                                 "go-next-symbolic"
-                            })
-                            .size(16),
-                        ),
-                )
-                .on_press(Message::ToggleWeatherForecast)
-                .padding([4, 0])
-                .width(cosmic::iced::Length::Fill)
-                .class(cosmic::theme::Button::Text);
-                weather_section = weather_section.push(weather_heading).push(weather_card);
+                            }
+                        ).size(16))
+                        .on_press(Message::ToggleWeatherForecast)
+                        .padding(4)
+                        .class(cosmic::theme::Button::Text),
+                    );
+                weather_section = weather_section.push(weather_heading);
+                if !weather_info_collapsed {
+                    weather_section = weather_section.push(weather_card);
+                }
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
                     let forecast_range_selector = widget::Row::new()
