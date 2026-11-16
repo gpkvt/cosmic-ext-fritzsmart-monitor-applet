@@ -1406,12 +1406,17 @@ impl cosmic::Application for AppModel {
         if self.expanded_graph.is_some() {
             // Match the standard dialog interaction: Escape closes the
             // enlarged graph without requiring pointer interaction.
-            let escape = cosmic::iced::event::listen_with(|event, _status, _window| match event {
-                cosmic::iced::Event::Keyboard(cosmic::iced::keyboard::Event::KeyPressed {
-                    key:
-                        cosmic::iced::keyboard::Key::Named(cosmic::iced::keyboard::key::Named::Escape),
+            // Listen through iced's keyboard subscription so key presses
+            // from the focused popup surface are routed to the app as well.
+            // The generic event listener can miss Escape when the popup owns
+            // keyboard focus.
+            let escape = cosmic::iced::keyboard::listen().filter_map(|event| match event {
+                cosmic::iced::keyboard::Event::KeyPressed {
+                    key: cosmic::iced::keyboard::Key::Named(
+                        cosmic::iced::keyboard::key::Named::Escape,
+                    ),
                     ..
-                }) => Some(Message::CloseGraph),
+                } => Some(Message::CloseGraph),
                 _ => None,
             });
             Subscription::batch([clock, escape])
