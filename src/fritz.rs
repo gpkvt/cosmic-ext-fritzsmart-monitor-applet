@@ -240,8 +240,7 @@ const PANEL_ITEM_IDS: [&str; 6] = [
     "weather",
     "power-consumption",
     "solar-power",
-    "internet-download",
-    "internet-upload",
+    "internet-bandwidth",
     "temperature",
 ];
 
@@ -253,6 +252,10 @@ fn parse_panel_order(value: &str) -> Vec<String> {
     let mut order: Vec<String> = value
         .split(',')
         .map(str::trim)
+        .map(|id| match id {
+            "internet-download" | "internet-upload" => "internet-bandwidth",
+            other => other,
+        })
         .filter(|id| PANEL_ITEM_IDS.contains(id) && !id.is_empty())
         .map(str::to_string)
         .fold(Vec::new(), |mut order, id| {
@@ -261,14 +264,6 @@ fn parse_panel_order(value: &str) -> Vec<String> {
             }
             order
         });
-    for id in PANEL_ITEM_IDS {
-        if !order.iter().any(|existing| existing == id) {
-            order.push(id.to_string());
-        }
-    }
-    order
-}
-
 fn parse_device_order(value: &str) -> Vec<String> {
     value
         .split(',')
@@ -1580,8 +1575,7 @@ mod tests {
                 "weather",
                 "power-consumption",
                 "solar-power",
-                "internet-download",
-                "internet-upload",
+                "internet-bandwidth",
                 "temperature"
             ]
                 .into_iter()
@@ -1598,8 +1592,7 @@ mod tests {
                 "solar-power",
                 "power-consumption",
                 "weather",
-                "internet-download",
-                "internet-upload",
+                "internet-bandwidth",
                 "temperature"
             ]
                 .into_iter()
