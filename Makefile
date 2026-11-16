@@ -9,7 +9,7 @@ ICON_FILE := $(DATADIR)/icons/hicolor/scalable/apps/$(APP_ID).svg
 
 UPDATE ?= 1
 
-.PHONY: build update install uninstall
+.PHONY: build update install reload uninstall
 
 build:
 	cargo build --release
@@ -27,6 +27,15 @@ install:
 	install -D -m0644 "$(DESKTOP_FILE).tmp" "$(DESKTOP_FILE)"
 	rm -f "$(DESKTOP_FILE).tmp"
 	install -Dm0644 data/$(APP_ID).svg "$(ICON_FILE)"
+	$(MAKE) reload
+
+reload:
+	@if pgrep -x cosmic-panel >/dev/null; then \
+		echo "Restarting COSMIC panel to reload applets (panel configuration is preserved)..."; \
+		pkill -x cosmic-panel; \
+	else \
+		echo "COSMIC panel is not running; applet will load when the panel starts."; \
+	fi
 
 uninstall:
 	rm -f "$(BINDIR)/$(APP_NAME)" "$(DESKTOP_FILE)" "$(ICON_FILE)"

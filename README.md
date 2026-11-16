@@ -119,6 +119,17 @@ To use a different installation prefix:
 make install PREFIX=/opt/fritz-power-monitor
 ```
 
+Reload the installed applet without removing and re-adding it in COSMIC
+Settings with:
+
+```bash
+make reload
+```
+
+This restarts `cosmic-panel` so it launches the installed applet again. Your panel
+configuration and applet placement are preserved. The `make install` target also
+runs this reload automatically after installing the new build.
+
 Remove the user-local installation with:
 
 ```sh
