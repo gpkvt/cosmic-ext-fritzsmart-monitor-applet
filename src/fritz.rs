@@ -1427,7 +1427,8 @@ mod tests {
                 "summary",
                 "weather",
                 "devices",
-                "total-power",
+                "total-power-output",
+                "total-power-input",
                 "power-difference"
             ]
             .into_iter()
@@ -1444,7 +1445,8 @@ mod tests {
                 "devices",
                 "summary",
                 "weather",
-                "total-power",
+                "total-power-output",
+                "total-power-input",
                 "power-difference"
             ]
             .into_iter()
@@ -1452,5 +1454,33 @@ mod tests {
             .collect::<Vec<_>>()
         );
         assert_eq!(parse_menu_order(""), default_menu_order());
+        assert_eq!(
+            parse_menu_order("devices,total-power,summary"),
+            vec![
+                "devices",
+                "total-power-output",
+                "total-power-input",
+                "summary",
+                "weather",
+                "power-difference",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            parse_menu_order("total-power-input,summary,total-power-output"),
+            vec![
+                "total-power-input",
+                "summary",
+                "total-power-output",
+                "weather",
+                "devices",
+                "power-difference",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect::<Vec<_>>()
+        );
     }
 }
