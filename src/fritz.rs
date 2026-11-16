@@ -116,6 +116,7 @@ pub struct FritzSettings {
     pub ca_cert_path: String,
     pub panel_text_size: u8,
     pub panel_item_spacing: u8,
+    pub panel_multiline: bool,
     pub panel_refresh_button: bool,
     pub panel_average_temperature: bool,
     pub panel_exclude_solar_temperature: bool,
@@ -147,6 +148,7 @@ impl Default for FritzSettings {
             ca_cert_path: String::new(),
             panel_text_size: 14,
             panel_item_spacing: 3,
+            panel_multiline: true,
             panel_refresh_button: true,
             panel_average_temperature: false,
             panel_exclude_solar_temperature: false,
@@ -361,6 +363,7 @@ impl FritzSettings {
             ca_cert_path: get("CA_CERT_PATH"),
             panel_text_size: parse_panel_text_size(&get("PANEL_TEXT_SIZE")),
             panel_item_spacing: parse_panel_item_spacing(&get("PANEL_ITEM_SPACING")),
+            panel_multiline: !values.contains_key("PANEL_MULTILINE") || get("PANEL_MULTILINE").eq_ignore_ascii_case("true"),
             panel_refresh_button: !values.contains_key("PANEL_REFRESH_BUTTON")
                 || get("PANEL_REFRESH_BUTTON").eq_ignore_ascii_case("true"),
             panel_average_temperature: get("PANEL_AVERAGE_TEMPERATURE")
@@ -446,7 +449,7 @@ impl FritzSettings {
         let panel_order = parse_panel_order(&self.panel_order.join(",")).join(",");
         let device_order = parse_device_order(&self.device_order.join(",")).join(",");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\n",
             self.url,
             self.username,
             self.password,
@@ -460,6 +463,7 @@ impl FritzSettings {
             self.ca_cert_path,
             self.panel_text_size.clamp(10, 24),
             self.panel_item_spacing.clamp(0, 16),
+            if self.panel_multiline { "true" } else { "false" },
             if self.panel_refresh_button {
                 "true"
             } else {
