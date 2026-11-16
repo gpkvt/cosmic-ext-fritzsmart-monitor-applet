@@ -428,7 +428,7 @@ fn graph_visual_large(
     unit: &str,
 ) -> cosmic::Element<'static, Message> {
     // The enlarged graph should use a genuinely large canvas, not just a slightly taller compact card.
-    graph_visual_with_dimensions(values, style, unit, 400.0, 400)
+    graph_visual_with_dimensions(values, style, unit, 480.0, 480)
 }
 
 fn graph_visual_with_dimensions(
@@ -441,7 +441,9 @@ fn graph_visual_with_dimensions(
     let values: Vec<f64> = values.collect();
     let current_value = values.last().copied().unwrap_or(0.0);
     const COUNT: usize = 24;
-    const WIDTH: f64 = 120.0;
+    // Use a wide viewBox so the plot fills the expanded window instead of
+    // rendering as a narrow chart centered in the available space.
+    const WIDTH: f64 = 800.0;
     let height = graph_height;
     // Keep the graph slot identical in size before the first sample arrives.
     let values = if values.is_empty() { vec![0.0] } else { values };
