@@ -1204,10 +1204,7 @@ fn diagnostic_status_row(
                 .width(cosmic::iced::Length::Fixed(16.0))
                 .center_x(16),
         )
-        .push(
-            widget::text::body(label)
-                .width(cosmic::iced::Length::Fixed(LABEL_WIDTH)),
-        )
+        .push(widget::text::body(label).width(cosmic::iced::Length::Fixed(LABEL_WIDTH)))
         .push(
             widget::container(widget::text::caption(status.to_string()))
                 .width(cosmic::iced::Length::Fixed(STATUS_WIDTH))
@@ -2167,7 +2164,11 @@ impl cosmic::Application for AppModel {
                 content = content
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::title3("FRITZ!Box API"))
-                    .push(diagnostic_status_row("Connection", &fritz_base_status.0, fritz_base_status.1))
+                    .push(diagnostic_status_row(
+                        "Connection",
+                        &fritz_base_status.0,
+                        fritz_base_status.1,
+                    ))
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "Base URL not configured".to_string()
                     } else {
@@ -2176,7 +2177,11 @@ impl cosmic::Application for AppModel {
 
                 let auth = fritz_endpoint_status("/login_sid.lua");
                 content = content
-                    .push(diagnostic_status_row("Session authentication", &auth.0, auth.1))
+                    .push(diagnostic_status_row(
+                        "Session authentication",
+                        &auth.0,
+                        auth.1,
+                    ))
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "/login_sid.lua".to_string()
                     } else {
@@ -2220,21 +2225,27 @@ impl cosmic::Application for AppModel {
                         .map(|deadline| {
                             format!(
                                 "Next refresh in {}",
-                                format_countdown(deadline.saturating_duration_since(Instant::now()).as_secs())
+                                format_countdown(
+                                    deadline.saturating_duration_since(Instant::now()).as_secs()
+                                )
                             )
                         })
                         .unwrap_or_else(|| "Waiting for next refresh".to_string())
                 };
                 let refresh_indicator = if self.refresh_started_at.is_some() {
                     icon_action_button(
-                        self.refresh_started_at.map(refresh_spinner_frame)
+                        self.refresh_started_at
+                            .map(refresh_spinner_frame)
                             .unwrap_or_else(|| "◴".to_string()),
                         "Request in progress",
                         Message::Refresh,
                     )
-                } else if let Some(remaining) = self.next_refresh_at
+                } else if let Some(remaining) = self
+                    .next_refresh_at
                     .map(|deadline| deadline.saturating_duration_since(Instant::now()))
-                    .filter(|remaining| !remaining.is_zero() && *remaining < Duration::from_secs(10))
+                    .filter(|remaining| {
+                        !remaining.is_zero() && *remaining < Duration::from_secs(10)
+                    })
                 {
                     countdown_action_button(remaining.as_secs().saturating_add(1))
                 } else {
@@ -2244,7 +2255,10 @@ impl cosmic::Application for AppModel {
                     widget::Row::new()
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::caption(request_countdown).width(cosmic::iced::Length::Fill))
+                        .push(
+                            widget::text::caption(request_countdown)
+                                .width(cosmic::iced::Length::Fill),
+                        )
                         .push(refresh_indicator),
                 );
 
@@ -2260,7 +2274,8 @@ impl cosmic::Application for AppModel {
                         } else {
                             "CONNECTION FAILED"
                         };
-                        let message = status.split_once(':')
+                        let message = status
+                            .split_once(':')
                             .map(|(_, message)| message.trim())
                             .unwrap_or(status);
                         content = content.push(error_notice(title, message));
