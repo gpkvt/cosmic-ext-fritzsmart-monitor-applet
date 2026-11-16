@@ -2,7 +2,7 @@ use crate::fritz::{
     FritzDevice, FritzFetchResult, FritzInternetBandwidth, FritzReading, FritzSettings,
     TemperatureAlertThresholds, discover_devices, fetch_fritz_data,
 };
-use crate::weather::{WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather, fetch_weather_forecast};
+use crate::weather::{WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather, fetch_weather_forecast, starry_night_overlay};
 use cosmic::iced::{
     Limits, Subscription, futures,
     platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
@@ -3249,12 +3249,29 @@ impl cosmic::Application for AppModel {
                             .width(cosmic::iced::Length::Fill)
                             .height(cosmic::iced::Length::Fixed(260.0))
                             .clip(true);
-                        widget::container(
-                            cosmic::iced::widget::Stack::new()
+                        let mut weather_layers = cosmic::iced::widget::Stack::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .push(image_layer);
+                        // Add a subtle transparent star field to nighttime
+                        // weather scenes without replacing the condition-matched
+                        // photograph or obscuring its Commons attribution.
+                        if weather.icon_code.ends_with('n') {
+                            if let Some(stars) = starry_night_overlay() {
+                                let star_layer = widget::container(
+                                    widget::image::Image::new(widget::image::Handle::from_bytes(stars))
+                                        .width(cosmic::iced::Length::Fill)
+                                        .height(cosmic::iced::Length::Fixed(260.0))
+                                        .content_fit(cosmic::iced::ContentFit::Contain),
+                                )
                                 .width(cosmic::iced::Length::Fill)
                                 .height(cosmic::iced::Length::Fixed(260.0))
-                                .push(image_layer)
-                                .push(details),
+                                .clip(true);
+                                weather_layers = weather_layers.push(star_layer);
+                            }
+                        }
+                        widget::container(
+                            weather_layers.push(details),
                         )
                         .width(cosmic::iced::Length::Fill)
                         .height(cosmic::iced::Length::Fixed(260.0))
