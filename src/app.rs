@@ -801,6 +801,10 @@ fn displayed_power_w(readings: &[FritzReading], selected_ains: &[String]) -> Opt
 fn live_power_summary(
     power: String,
     temperature: Option<String>,
+    history: Vec<f64>,
+    graph_style: &str,
+    language: &str,
+    axis_start: String,
 ) -> cosmic::Element<'static, Message> {
     // The section already identifies these readings; avoid repeating a
     // separate "Current power" heading above the values.
@@ -826,9 +830,24 @@ fn live_power_summary(
         .push(values);
 
     let content = widget::Column::new()
-        .spacing(6)
+        .spacing(8)
         .width(cosmic::iced::Length::Fill)
-        .push(metrics);
+        .push(metrics)
+        .push(widget::text::caption(crate::i18n::tr(language, "CURRENT POWER HISTORY")))
+        .push(interactive_graph(
+            language,
+            crate::i18n::tr(language, "CURRENT POWER"),
+            history.into_iter(),
+            graph_style,
+            "W",
+        ))
+        .push(
+            widget::Row::new()
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::caption(axis_start))
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(widget::text::caption("Now")),
+        );
     surface_card(content.into(), 14)
 }
 
@@ -3223,7 +3242,14 @@ impl cosmic::Application for AppModel {
                 } else {
                     primary.map(|reading| format!("{:.1} °C", reading.temperature_c))
                 };
-                let summary_card = live_power_summary(summary_power, summary_temperature);
+                let summary_card = live_power_summary(
+                    summary_power,
+                    summary_temperature,
+                    self.history.iter().map(|(_, value)| *value as f64).collect(),
+                    &self.settings.graph_style,
+                    &self.settings.language,
+                    format_graph_axis_start(self.settings.graph_timespan_minutes),
+                );
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
                 menu_cards.push(("0-summary".to_string(), summary_card));
