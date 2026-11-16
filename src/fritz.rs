@@ -1176,7 +1176,7 @@ mod tests {
     #[test]
     fn response_read_error_includes_request_and_response_diagnostics() {
         let error = reqwest::Client::new()
-            .get("http://[::1")
+            .get("https://[::1")
             .build()
             .unwrap_err();
         let message = format_response_read_error(
