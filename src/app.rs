@@ -1389,22 +1389,26 @@ impl cosmic::Application for AppModel {
                 )
             });
 
-        // Keep each panel item content-sized: fixed-width value slots create
-        // large empty gaps between the icon and its reading on compact panels.
+        // Use a compact, consistent value column: this keeps stacked readings
+        // right-aligned without restoring the excessive 88px gap.
         let panel_item = |label: &'static str,
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>| {
             let mut item = widget::Row::new()
-                .spacing(2)
+                .spacing(5)
                 .align_y(cosmic::iced::Alignment::Center);
             if let Some(icon) = icon {
                 item = item.push(
                     widget::container(icon)
+                        .width(cosmic::iced::Length::Fixed(12.0))
                         .height(cosmic::iced::Length::Fixed(24.0))
                         .padding([0, 0, 0, 2])
                         .center_y(24),
                 );
             }
+            let value = widget::container(value)
+                .width(cosmic::iced::Length::Fixed(52.0))
+                .align_x(cosmic::iced::alignment::Horizontal::Right);
             self.core.applet.applet_tooltip(
                 item.push(value),
                 label,
@@ -1499,24 +1503,29 @@ impl cosmic::Application for AppModel {
                         format_bandwidth(bandwidth.upload_bits_per_second),
                     ))
                     .unwrap_or_else(|| ("-- Mbps".to_string(), "-- Mbps".to_string()));
-                // Keep both directional readings content-sized as well; a
-                // fixed 144px column needlessly separates the arrows and values.
+                // Keep the Mbps values right-aligned in a compact column,
+                // with a modest gap after each direction icon.
+                let bandwidth_row = |icon: &'static str, value: String| {
+                    widget::Row::new()
+                        .spacing(5)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(
+                            widget::container(widget::icon::from_name(icon).size(10))
+                                .width(cosmic::iced::Length::Fixed(12.0)),
+                        )
+                        .push(
+                            widget::container(
+                                widget::text::body(value)
+                                    .size(f32::from(self.settings.panel_text_size)),
+                            )
+                            .width(cosmic::iced::Length::Fixed(62.0))
+                            .align_x(cosmic::iced::alignment::Horizontal::Right),
+                        )
+                };
                 let bandwidth_rows = widget::Column::new()
                     .spacing(0)
-                    .push(
-                        widget::Row::new()
-                            .spacing(2)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::icon::from_name("go-down-symbolic").size(10))
-                            .push(widget::text::body(download).size(f32::from(self.settings.panel_text_size))),
-                    )
-                    .push(
-                        widget::Row::new()
-                            .spacing(2)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::icon::from_name("go-up-symbolic").size(10))
-                            .push(widget::text::body(upload).size(f32::from(self.settings.panel_text_size))),
-                    );
+                    .push(bandwidth_row("go-down-symbolic", download))
+                    .push(bandwidth_row("go-up-symbolic", upload));
                 let bandwidth_item = widget::container(bandwidth_rows)
                     .padding([0, 0, 0, 2]);
                 panel_items.push((
