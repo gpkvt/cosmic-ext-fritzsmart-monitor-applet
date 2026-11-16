@@ -3914,12 +3914,24 @@ impl cosmic::Application for AppModel {
         }
 
         content = content.push(
-            widget::container(widget::text::caption(format!(
-                "FRITZ!Power Monitor · v{}",
-                env!("APP_VERSION")
-            )))
-            .width(cosmic::iced::Length::Fill)
-            .center_x(cosmic::iced::Length::Fill),
+            widget::Row::new()
+                .width(cosmic::iced::Length::Fill)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(
+                    widget::text::caption(format!(
+                        "FRITZ!Power Monitor · v{}",
+                        env!("APP_VERSION")
+                    ))
+                    .width(cosmic::iced::Length::Fill),
+                )
+                .push(
+                    widget::button::custom(widget::text::caption("Source code ↗"))
+                        .on_press(Message::OpenCommonsPage(
+                            "https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet".into(),
+                        ))
+                        .padding([4, 8])
+                        .class(cosmic::theme::Button::Text),
+                ),
         );
         // Keep the popup content transparent so COSMIC can render its
         // compositor-backed frosted-glass surface behind the complete menu.
@@ -4353,7 +4365,9 @@ impl cosmic::Application for AppModel {
                 self.persist_layout_state();
             }
             Message::OpenCommonsPage(url) => {
-                if url.starts_with("https://commons.wikimedia.org/wiki/File:") {
+                if url.starts_with("https://commons.wikimedia.org/wiki/File:")
+                    || url == "https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet"
+                {
                     let _ = std::process::Command::new("xdg-open").arg(url).spawn();
                 }
             }
