@@ -1314,9 +1314,6 @@ impl cosmic::Application for AppModel {
             });
 
         let suggested = self.core.applet.suggested_size(true);
-        // Keep a comfortable pointer/touch target with a compact icon-to-value gap.
-        let vertical_padding = 0_u16;
-        let horizontal_padding = 0_u16;
 
         // Keep a compact icon-to-value gap inside each item. The configured row
         // spacing is the only gap between items, including when it is set to zero.
@@ -1482,13 +1479,13 @@ impl cosmic::Application for AppModel {
 
         // Keep the readings in their own popup button so the refresh action
         // can be shown or hidden independently in the applet's Panel settings.
-        let button = widget::button::custom(content)
-            .on_press(Message::TogglePopup)
-            .padding([vertical_padding, horizontal_padding])
-            .height(cosmic::iced::Length::Fixed(f32::from(
-                (suggested.1 + 2 * vertical_padding).max(40),
-            )))
-            .class(cosmic::theme::Button::AppletIcon);
+        // Use COSMIC's applet button helper: it applies the panel's
+        // configured applet dimensions and centers the content in that area.
+        let button = self
+            .core
+            .applet
+            .button_from_element(content, true)
+            .on_press(Message::TogglePopup);
 
         let refresh_button = widget::button::custom(
             widget::container(widget::icon::from_name("view-refresh-symbolic").size(16))
