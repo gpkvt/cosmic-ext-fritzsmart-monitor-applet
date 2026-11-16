@@ -1,0 +1,47 @@
+name: Publish GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gh-pages-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build, validate and publish site
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out merged commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Install Markdown renderer
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes python3-markdown
+
+      - name: Render Markdown documentation
+        run: python3 scripts/build-pages.py
+
+      - name: Validate generated site
+        run: python3 scripts/validate-pages.py
+
+      - name: Publish site to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./docs
+          force_orphan: true
+          enable_jekyll: false
+          commit_message: "docs: publish ${{ github.sha }}"
