@@ -92,7 +92,6 @@ pub enum Message {
     GraphStyleChanged(String),
     ShowGraph(String, Vec<f64>, String),
     CloseGraph,
-    EscapePressed(Id),
     RefreshIntervalChanged(u32),
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
@@ -1833,7 +1832,7 @@ impl cosmic::Application for AppModel {
                                         )
                                         .push(widget::text::caption(crate::i18n::tr(
                                             &self.settings.language,
-                                            "Close (Esc)",
+                                            "Close",
                                         ))),
                                 )
                                 .on_press(Message::CloseGraph)
