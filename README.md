@@ -41,6 +41,8 @@ directly and does **not** execute or depend on `fritz_solar.sh`.
 - Configure panel text size (10–24 pt).
 - Show live FRITZ!Box internet download and upload rates in Mbps, with separate
   down/up icons; enable this optional reading in Panel settings.
+- Optionally combine total power consumption and solar generation into one net
+  power value (consumption minus solar generation) in the panel.
 - Show the average temperature across selected devices, with an option to
   exclude devices whose names contain `solar`.
 - Reorder popup sections (summary, weather, devices and power overviews) in Settings; the chosen order is saved across restarts.
@@ -206,6 +208,10 @@ Devices, Menu order and Diagnostics.
    seconds).
 6. Enter the FRITZ!Box URL, username and password, then choose **Load devices**.
 7. Select the devices to monitor.
+8. In **Panel** settings, enable **Combine consumption and solar power** to
+   replace the separate panel readings with one net value. Solar generation is
+   subtracted from total consumption; positive values indicate net consumption
+   and negative values indicate net export.
 
 Use **Menu order** in Settings to arrange the live power summary, weather, device cards, Total power out, Total power in and Power difference independently. Device cards retain their relative order. Device settings list available devices in the order returned by the FRITZ!Box.
 Each selected device appears separately in the popup with its own readings and

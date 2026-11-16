@@ -86,6 +86,7 @@ pub enum Message {
     PanelAverageTemperatureChanged(bool),
     PanelExcludeSolarTemperatureChanged(bool),
     PanelInternetBandwidthChanged(bool),
+    PanelNetPowerChanged(bool),
     GraphTimespanChanged(u32),
     GraphStyleChanged(String),
     ShowGraph(String, Vec<f64>, String),
@@ -551,6 +552,10 @@ fn input_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64
         })
         .map(|reading| signed_device_power(reading.power_w, true))
         .sum()
+}
+
+fn net_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
+    output_power_w(readings, input_ains) + input_power_w(readings, input_ains)
 }
 
 fn average_temperature_c(readings: &[FritzReading], exclude_solar: bool) -> Option<f64> {
@@ -1397,9 +1402,13 @@ impl cosmic::Application for AppModel {
                 })
             })
             .or_else(|| self.readings.first());
-        let power = primary_reading
-            .map(|reading| format!("{} W", reading.power_w))
-            .unwrap_or_else(|| "-- W".to_string());
+        let power = if self.settings.panel_net_power {
+            format!("{} W", net_power_w(&self.readings, &self.settings.input_ains))
+        } else {
+            primary_reading
+                .map(|reading| format!("{} W", reading.power_w))
+                .unwrap_or_else(|| "-- W".to_string())
+        };
         let temperature = if self.settings.panel_average_temperature {
             Some(
                 average_temperature_c(
@@ -1487,7 +1496,11 @@ impl cosmic::Application for AppModel {
             panel_items.push((
                 "power-consumption",
                 panel_item(
-                    "Power consumption",
+                    if self.settings.panel_net_power {
+                        "Net power"
+                    } else {
+                        "Power consumption"
+                    },
                     Some(
                         widget::svg(widget::svg::Handle::from_memory(
                             br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5M16 3v5"/><path d="M6 8h12v3a6 6 0 0 1-6 6h0a6 6 0 0 1-6-6V8Z"/><path d="M12 17v2a3 3 0 0 0 3 3h1"/></svg>"#.to_vec(),
@@ -1507,30 +1520,34 @@ impl cosmic::Application for AppModel {
                 )
                 .into(),
             ));
-            if let Some(input_power) = input_power {
-                panel_items.push((
-                    "solar-power",
-                    panel_item(
-                        "Solar power",
-                        Some(
-                            widget::svg(widget::svg::Handle::from_memory(
-                                br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2-5h14l2 5H3Z"/><path d="M4 9h16l-2 11H6L4 9Z"/><path d="M8 9l1 11M16 9l-1 11M5 13h14M6 17h12"/><path d="M12 1v2M2 5l2 1M22 5l-2 1"/></svg>"#.to_vec(),
-                            ))
-                            .width(10)
-                            .height(10)
-                            .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
-                            color: Some(theme.cosmic().on_bg_color().into()),
-                        }))
-                            .into(),
-                        ),
-                        self.core
-                            .applet
-                            .text(input_power)
-                            .size(f32::from(self.settings.panel_text_size))
-                            .into(),
-                    )
-                    .into(),
-                ));
+            if !self.settings.panel_net_power {
+                if let Some(input_power) = input_power {
+                    panel_items.push((
+                        "solar-power",
+                        panel_item(
+                            "Solar power",
+                            Some(
+                                widget::svg(widget::svg::Handle::from_memory(
+                                    br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2-5h14l2 5H3Z"/><path d="M4 9h16l-2 11H6L4 9Z"/><path d="M8 9l1 11M16 9l-1 11M5 13h14M6 17h12"/><path d="M12 1v2M2 5l2 1M22 5l-2 1"/></svg>"#.to_vec(),
+                                ))
+                                .width(10)
+                                .height(10)
+                                .class(cosmic::theme::Svg::custom(|theme| {
+                                    cosmic::iced::widget::svg::Style {
+                                        color: Some(theme.cosmic().on_bg_color().into()),
+                                    }
+                                }))
+                                .into(),
+                            ),
+                            self.core
+                                .applet
+                                .text(input_power)
+                                .size(f32::from(self.settings.panel_text_size))
+                                .into(),
+                        )
+                        .into(),
+                    ));
+                }
             }
 
             if self.settings.panel_internet_bandwidth {
@@ -2006,6 +2023,27 @@ impl cosmic::Application for AppModel {
                                 widget::container(
                                     widget::toggler(self.settings.panel_internet_bandwidth)
                                         .on_toggle(Message::PanelInternetBandwidthChanged),
+                                )
+                                .padding([8, 10]),
+                            ),
+                    )
+                    .push(
+                        widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::Column::new()
+                                    .spacing(3)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Combine consumption and solar power")))
+                                    .push(widget::text::caption(crate::i18n::tr(
+                                        &self.settings.language,
+                                        "Show one net power value: total consumption minus solar generation.",
+                                    ))),
+                            )
+                            .push(
+                                widget::container(
+                                    widget::toggler(self.settings.panel_net_power)
+                                        .on_toggle(Message::PanelNetPowerChanged),
                                 )
                                 .padding([8, 10]),
                             ),
@@ -4492,6 +4530,10 @@ impl cosmic::Application for AppModel {
                 self.settings.panel_exclude_solar_temperature = value;
                 self.persist_settings();
             }
+            Message::PanelNetPowerChanged(value) => {
+                self.settings.panel_net_power = value;
+                self.persist_settings();
+            }
             Message::PanelInternetBandwidthChanged(value) => {
                 self.settings.panel_internet_bandwidth = value;
                 self.persist_settings();
@@ -4873,6 +4915,8 @@ mod history_tests {
         let inputs = HashSet::from(["222222".to_string(), "333333".to_string()]);
         assert_eq!(input_power_w(&readings, &inputs), -350);
         assert_eq!(input_power_w(&readings, &HashSet::new()), 0);
+        assert_eq!(net_power_w(&readings, &inputs), 50);
+        assert_eq!(net_power_w(&readings, &HashSet::new()), 750);
     }
 
     #[test]
