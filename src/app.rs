@@ -2107,7 +2107,10 @@ impl cosmic::Application for AppModel {
                 content = content.push(
                     widget::Row::new()
                         .spacing(8)
-                        .push(widget::text::body("OpenWeatherMap · current weather").width(cosmic::iced::Length::Fill))
+                        .push(
+                            widget::text::body("OpenWeatherMap · current weather")
+                                .width(cosmic::iced::Length::Fill),
+                        )
                         .push(widget::text::caption(weather_provider_status)),
                 );
                 let commons_status = if !self.settings.weather_enabled {
@@ -2126,7 +2129,10 @@ impl cosmic::Application for AppModel {
                 content = content.push(
                     widget::Row::new()
                         .spacing(8)
-                        .push(widget::text::body("Wikimedia Commons · weather image").width(cosmic::iced::Length::Fill))
+                        .push(
+                            widget::text::body("Wikimedia Commons · weather image")
+                                .width(cosmic::iced::Length::Fill),
+                        )
                         .push(widget::text::caption(commons_status)),
                 );
                 let forecast_status = if !self.settings.weather_enabled {
@@ -2141,7 +2147,10 @@ impl cosmic::Application for AppModel {
                 content = content.push(
                     widget::Row::new()
                         .spacing(8)
-                        .push(widget::text::body("Open-Meteo · forecast and geocoding").width(cosmic::iced::Length::Fill))
+                        .push(
+                            widget::text::body("Open-Meteo · forecast and geocoding")
+                                .width(cosmic::iced::Length::Fill),
+                        )
                         .push(widget::text::caption(forecast_status)),
                 );
                 let requests = crate::fritz::http_request_diagnostics();
