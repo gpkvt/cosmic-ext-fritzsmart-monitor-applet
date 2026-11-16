@@ -1724,7 +1724,7 @@ impl cosmic::Application for AppModel {
             }
             if self.active_settings_section == Some("panel") {
                 content = content
-                    .push(widget::text::body(format!("Panel text size: {} pt", self.settings.panel_text_size)))
+                    .push(widget::text::body(format!("{}: {} pt", crate::i18n::tr(&self.settings.language, "Panel text size"), self.settings.panel_text_size)))
                     .push(
                         widget::slider(
                             10.0..=24.0,
@@ -1734,7 +1734,7 @@ impl cosmic::Application for AppModel {
                         .step(1.0),
                     )
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Adjusts the power and temperature text in the panel")))
-                    .push(widget::text::body(format!("Panel item spacing: {} px", self.settings.panel_item_spacing)))
+                    .push(widget::text::body(format!("{}: {} px", crate::i18n::tr(&self.settings.language, "Panel item spacing"), self.settings.panel_item_spacing)))
                     .push(widget::slider(0.0..=16.0, f32::from(self.settings.panel_item_spacing),
                         |value| Message::PanelItemSpacingChanged(value.round() as u8)).step(1.0))
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Controls the gap between panel items")))
@@ -2689,8 +2689,9 @@ impl cosmic::Application for AppModel {
                                         .spacing(2)
                                         .align_x(cosmic::iced::Alignment::End)
                                         .push(widget::text::caption(format!(
-                                            "{}% rain",
-                                            day.precipitation_probability_percent
+                                            "{}% {}",
+                                            day.precipitation_probability_percent,
+                                            crate::i18n::tr(&self.settings.language, "rain")
                                         )))
                                         .push(widget::text::caption(format!(
                                             "{:.0} km/h",
