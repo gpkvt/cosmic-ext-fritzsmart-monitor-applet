@@ -3191,12 +3191,21 @@ impl cosmic::Application for AppModel {
                                 text_color: Some(cosmic::iced::Color::WHITE),
                                 ..Default::default()
                             });
-                        cosmic::iced::widget::Stack::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(260.0))
-                            .push(photo)
-                            .push(details)
-                            .into()
+                        // Keep the photograph and its readable details inside
+                        // one explicitly bounded, clipped weather surface. This
+                        // prevents the image layer from painting into adjacent
+                        // forecast or menu content when the popup is resized.
+                        widget::container(
+                            cosmic::iced::widget::Stack::new()
+                                .width(cosmic::iced::Length::Fill)
+                                .height(cosmic::iced::Length::Fixed(260.0))
+                                .push(photo)
+                                .push(details),
+                        )
+                        .width(cosmic::iced::Length::Fill)
+                        .height(cosmic::iced::Length::Fixed(260.0))
+                        .clip(true)
+                        .into()
                     } else {
                         widget::container(weather_content)
                             .padding(10)
