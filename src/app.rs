@@ -2892,7 +2892,7 @@ impl cosmic::Application for AppModel {
                         continue;
                     }
                     let section = match key.as_str() {
-                        "0-summary" => ("summary", "Current power"),
+                        "0-summary" => ("summary", "CURRENT POWER"),
                         "1-weather" => ("weather", "Weather"),
                         "5-power-difference" => ("power-difference", "POWER DIFFERENCE"),
                         _ => continue,
