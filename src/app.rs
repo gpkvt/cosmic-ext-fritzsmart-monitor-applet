@@ -731,35 +731,34 @@ fn total_power_section(
     collapsed: bool,
     content: cosmic::Element<'static, Message>,
 ) -> cosmic::Element<'static, Message> {
-    // Match the compact metric tiles used by the power sections, while keeping
-    // input and output independently collapsible.
+    // Use the established disclosure style from the other popup sections.
     let mut heading = widget::Row::new()
-        .spacing(6)
+        .spacing(8)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::text::caption(title))
+        .push(widget::text::body(title))
         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
     if collapsed {
         heading = heading.push(widget::text::title3(keep_value_unit_together(format!(
             "{value_w} W"
         ))));
     }
-    let heading = heading.push(
-        widget::icon::from_name(if collapsed {
-            "go-next-symbolic"
-        } else {
-            "go-down-symbolic"
-        })
-        .size(14),
-    );
-    let heading = widget::button::custom(heading)
-        .on_press(Message::ToggleMenuSection(section_id.into()))
-        .width(cosmic::iced::Length::Fill)
-        .padding(0)
-        .class(cosmic::theme::Button::Text);
-    let heading = surface_card(heading.into(), 10);
+    let heading = widget::button::custom(
+        heading.push(
+            widget::icon::from_name(if collapsed {
+                "go-next-symbolic"
+            } else {
+                "go-down-symbolic"
+            })
+            .size(16),
+        ),
+    )
+    .on_press(Message::ToggleMenuSection(section_id.into()))
+    .width(cosmic::iced::Length::Fill)
+    .padding([8, 12])
+    .class(cosmic::theme::Button::Text);
 
     let mut section = widget::Column::new()
-        .spacing(8)
+        .spacing(0)
         .width(cosmic::iced::Length::Fill)
         .push(heading);
     if !collapsed {
@@ -2427,7 +2426,7 @@ impl cosmic::Application for AppModel {
                             } else {
                                 "go-next-symbolic"
                             })
-                            .size(14),
+                            .size(16),
                         ),
                 )
                 .on_press(Message::ToggleWeatherForecast)
@@ -2737,11 +2736,11 @@ impl cosmic::Application for AppModel {
                             )
                             .push(
                                 widget::icon::from_name(if is_expanded {
-                                    "go-down-symbolic"
+                                    "go-up-symbolic"
                                 } else {
-                                    "go-next-symbolic"
+                                    "go-down-symbolic"
                                 })
-                                .size(14),
+                                .size(16),
                             ),
                     )
                     .on_press(Message::ToggleDeviceDetails(reading.ain.clone()))
@@ -3027,7 +3026,7 @@ impl cosmic::Application for AppModel {
                     let heading_row = widget::Row::new()
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::caption(section.1))
+                        .push(widget::text::body(section.1))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
                     let heading_row = if let Some(value) = collapsed_value {
                         heading_row.push(widget::text::title3(value))
@@ -3041,15 +3040,14 @@ impl cosmic::Application for AppModel {
                             } else {
                                 "go-down-symbolic"
                             })
-                            .size(14),
+                            .size(16),
                         ),
                     )
                     .on_press(Message::ToggleMenuSection(section.0.to_string()))
                     .width(cosmic::iced::Length::Fill)
-                    .padding(0)
+                    .padding([8, 12])
                     .class(cosmic::theme::Button::Text);
-                    let heading = surface_card(heading.into(), 10);
-                    let mut section_column = widget::Column::new().spacing(8).push(heading);
+                    let mut section_column = widget::Column::new().spacing(0).push(heading);
                     if !collapsed {
                         section_column = section_column.push(card);
                     }
@@ -3081,26 +3079,17 @@ impl cosmic::Application for AppModel {
                 content = content.push(weather_card);
             }
 
-            let quick_settings_heading = widget::button::custom(
+            content = content.push(
                 widget::Row::new()
-                    .spacing(6)
+                    .width(cosmic::iced::Length::Fill)
                     .align_y(cosmic::iced::Alignment::Center)
-                    .push(widget::text::caption("QUICK SETTINGS"))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                    .push(
-                        widget::icon::from_name(if self.quick_options_expanded {
-                            "go-down-symbolic"
-                        } else {
-                            "go-next-symbolic"
-                        })
-                        .size(14),
-                    ),
-            )
-            .on_press(Message::ToggleQuickOptions)
-            .width(cosmic::iced::Length::Fill)
-            .padding(0)
-            .class(cosmic::theme::Button::Text);
-            content = content.push(surface_card(quick_settings_heading.into(), 10));
+                    .push(icon_action_button(
+                        "⚙",
+                        "Quick settings",
+                        Message::ToggleQuickOptions,
+                    )),
+            );
             if self.quick_options_expanded {
                 const REFRESH_ANCHORS: [f32; 5] = [30.0, 300.0, 900.0, 1800.0, 3600.0];
                 const GRAPH_ANCHORS: [f32; 5] = [5.0, 60.0, 1440.0, 43200.0, 2102400.0];
