@@ -972,6 +972,7 @@ fn settings_section_details(section: &'static str) -> (&'static str, &'static st
 fn settings_section_header<'a>(
     title: &'a str,
     section: &'static str,
+    language: &str,
 ) -> cosmic::Element<'a, Message> {
     let (section_icon, description) = match section {
         "language" => ("preferences-desktop-locale-symbolic", "Interface language"),
@@ -995,6 +996,7 @@ fn settings_section_header<'a>(
         "diagnostics" => ("dialog-information-symbolic", "Connection and save status"),
         _ => ("preferences-system-symbolic", "Applet preferences"),
     };
+    let description = crate::i18n::tr(language, description);
     let section_row: cosmic::Element<'a, Message> = widget::button::custom(
         widget::Row::new()
             .spacing(12)
@@ -1700,7 +1702,7 @@ impl cosmic::Application for AppModel {
                     ("Panel order", "panel-order"),
                     ("Diagnostics", "diagnostics"),
                 ] {
-                    content = content.push(settings_section_header(title, section));
+                    content = content.push(settings_section_header(title, section, &self.settings.language));
                 }
             }
 
