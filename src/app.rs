@@ -2323,7 +2323,7 @@ impl cosmic::Application for AppModel {
                         format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>")
                     }))
                     .push(widget::text::caption(format!(
-                        "{}: {},
+                        "{}: {}",
                         crate::i18n::tr(&self.settings.language, "Configured devices"),
                         if self.settings.ains.is_empty() {
                             if self.settings.ain.trim().is_empty() { 0 } else { 1 }
