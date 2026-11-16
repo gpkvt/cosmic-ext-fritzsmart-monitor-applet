@@ -64,6 +64,7 @@ pub struct FritzReading {
     pub temperature_c: f64,
     pub power_state: Option<bool>,
     pub power_controllable: bool,
+    pub power_toggle_allowed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -849,7 +850,14 @@ fn parse_device_readings_xml(
             .unwrap_or("FRITZ!Box device")
             .trim()
             .to_string();
-        let power_controllable = device.children().any(|child| child.has_tag_name("switch"));
+        let switch_node = device.children().find(|child| child.has_tag_name("switch"));
+        let power_controllable = switch_node.is_some();
+        // AVM exposes the switch key lock as <switch><lock>0|1</lock>.
+        // Only explicitly unlocked devices may be controlled.
+        let power_toggle_allowed = switch_node
+            .and_then(|switch| switch.children().find(|child| child.has_tag_name("lock")))
+            .and_then(|lock| lock.text())
+            .is_some_and(|lock| lock.trim() == "0");
         let power_state =
             child_text(device, "switch", "state").and_then(|state| match state.trim() {
                 "1" => Some(true),
@@ -863,6 +871,7 @@ fn parse_device_readings_xml(
             temperature_c,
             power_state,
             power_controllable,
+            power_toggle_allowed,
         });
     }
     readings.sort_by_key(|reading| {
@@ -1370,6 +1379,23 @@ mod tests {
             let reading = parse_device_xml(&xml, "123456789012").unwrap();
             assert_eq!(reading.power_state, expected);
             assert!(reading.power_controllable);
+            assert!(!reading.power_toggle_allowed);
+        }
+    }
+
+    #[test]
+    fn detects_switch_lock_and_only_allows_explicitly_unlocked_devices() {
+        for (lock, expected) in [("0", true), ("1", false)] {
+            let xml = format!(
+                r#"<devicelist><device identifier="123456789012">
+                  <powermeter><power>123000</power></powermeter>
+                  <temperature><celsius>215</celsius></temperature>
+                  <switch><state>1</state><lock>{lock}</lock></switch>
+                </device></devicelist>"#
+            );
+            let reading = parse_device_xml(&xml, "123456789012").unwrap();
+            assert!(reading.power_controllable);
+            assert_eq!(reading.power_toggle_allowed, expected);
         }
     }
 
