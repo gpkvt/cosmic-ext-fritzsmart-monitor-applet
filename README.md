@@ -42,6 +42,9 @@ directly and does **not** execute or depend on `fritz_solar.sh`.
 - Show the average temperature across selected devices, with an option to
   exclude devices whose names contain `solar`.
 - Reorder popup sections (summary, weather, devices and power overviews) in Settings; the chosen order is saved across restarts.
+- Collapse top-level popup sections independently; collapsed headings retain
+  their primary live value. Collapsed device rows continue to show power and
+  temperature.
 - Use the popup's sticky title bar for Refresh and Settings. Its content scrolls
   independently when needed.
 - View a live refresh countdown and configure automatic refresh from
@@ -182,8 +185,6 @@ rather than generation.
 - Devices with `solar` in their name are automatically marked as inputs when
   first discovered. This default is applied only once; manual changes are
   preserved.
-
-The popup keeps its menu sections in a consistent order. Device selection and input configuration remain available in Settings.
 
 ### Temperature alerts
 
