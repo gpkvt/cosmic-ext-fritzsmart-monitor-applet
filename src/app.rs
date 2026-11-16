@@ -2476,22 +2476,7 @@ impl cosmic::Application for AppModel {
                 } else {
                     primary.map(|reading| format!("{:.1} °C", reading.temperature_c))
                 };
-                let summary_input = self
-                    .readings
-                    .iter()
-                    .any(|reading| {
-                        self.settings
-                            .input_ains
-                            .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
-                    })
-                    .then(|| {
-                        format!(
-                            "{} W",
-                            input_power_w(&self.readings, &self.settings.input_ains)
-                        )
-                    });
-                let summary_card =
-                    live_power_summary(summary_power, summary_input, summary_temperature);
+                let summary_card = live_power_summary(summary_power, summary_temperature);
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
                 menu_cards.push(("0-summary".to_string(), summary_card));
