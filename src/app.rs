@@ -79,6 +79,7 @@ pub enum Message {
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
     PanelItemSpacingChanged(u8),
+    PanelMultilineChanged(bool),
     PanelRefreshButtonChanged(bool),
     PanelAverageTemperatureChanged(bool),
     PanelExcludeSolarTemperatureChanged(bool),
@@ -1404,10 +1405,20 @@ impl cosmic::Application for AppModel {
                             .align_x(cosmic::iced::alignment::Horizontal::Right),
                         )
                 };
-                let bandwidth_rows = widget::Column::new()
-                    .spacing(0)
-                    .push(bandwidth_row("go-down-symbolic", download))
-                    .push(bandwidth_row("go-up-symbolic", upload));
+                let bandwidth_rows: cosmic::Element<'static, Message> = if self.settings.panel_multiline {
+                    widget::Column::new()
+                        .spacing(0)
+                        .push(bandwidth_row("go-down-symbolic", download))
+                        .push(bandwidth_row("go-up-symbolic", upload))
+                        .into()
+                } else {
+                    widget::Row::new()
+                        .spacing(4)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(bandwidth_row("go-down-symbolic", download))
+                        .push(bandwidth_row("go-up-symbolic", upload))
+                        .into()
+                };
                 let bandwidth_item = widget::container(bandwidth_rows)
                     .padding([0, 0, 0, 2]);
                 panel_items.push((
@@ -1463,24 +1474,32 @@ impl cosmic::Application for AppModel {
 
         let mut panel_groups: Vec<(Vec<&str>, cosmic::Element<'static, Message>)> = Vec::new();
         if weather_item.is_some() || temperature_item.is_some() {
-            let mut rows = widget::Column::new().spacing(0);
-            if let Some(item) = weather_item {
-                rows = rows.push(item);
-            }
-            if let Some(item) = temperature_item {
-                rows = rows.push(item);
-            }
-            panel_groups.push((vec!["weather", "temperature"], rows.into()));
+            let rows: cosmic::Element<'static, Message> = if self.settings.panel_multiline {
+                let mut rows = widget::Column::new().spacing(0);
+                if let Some(item) = weather_item { rows = rows.push(item); }
+                if let Some(item) = temperature_item { rows = rows.push(item); }
+                rows.into()
+            } else {
+                let mut rows = widget::Row::new().spacing(4).align_y(cosmic::iced::Alignment::Center);
+                if let Some(item) = weather_item { rows = rows.push(item); }
+                if let Some(item) = temperature_item { rows = rows.push(item); }
+                rows.into()
+            };
+            panel_groups.push((vec!["weather", "temperature"], rows));
         }
         if power_item.is_some() || solar_item.is_some() {
-            let mut rows = widget::Column::new().spacing(0);
-            if let Some(item) = power_item {
-                rows = rows.push(item);
-            }
-            if let Some(item) = solar_item {
-                rows = rows.push(item);
-            }
-            panel_groups.push((vec!["power-consumption", "solar-power"], rows.into()));
+            let rows: cosmic::Element<'static, Message> = if self.settings.panel_multiline {
+                let mut rows = widget::Column::new().spacing(0);
+                if let Some(item) = power_item { rows = rows.push(item); }
+                if let Some(item) = solar_item { rows = rows.push(item); }
+                rows.into()
+            } else {
+                let mut rows = widget::Row::new().spacing(4).align_y(cosmic::iced::Alignment::Center);
+                if let Some(item) = power_item { rows = rows.push(item); }
+                if let Some(item) = solar_item { rows = rows.push(item); }
+                rows.into()
+            };
+            panel_groups.push((vec!["power-consumption", "solar-power"], rows));
         }
         for (id, item) in panel_items.drain(..) {
             panel_groups.push((vec![id], item));
@@ -1651,6 +1670,19 @@ impl cosmic::Application for AppModel {
                     .push(widget::slider(0.0..=16.0, f32::from(self.settings.panel_item_spacing),
                         |value| Message::PanelItemSpacingChanged(value.round() as u8)).step(1.0))
                     .push(widget::text::caption("Controls the gap between panel items"))
+                    .push(
+                        widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::Column::new()
+                                .spacing(3)
+                                .width(cosmic::iced::Length::Fill)
+                                .push(widget::text::body("Multiline panel values"))
+                                .push(widget::text::caption("Stack related readings vertically instead of placing them on one line.")))
+                            .push(widget::container(
+                                widget::toggler(self.settings.panel_multiline)
+                                    .on_toggle(Message::PanelMultilineChanged)
+                            ).padding([8, 10]))
+                    )
                     .push(widget::Row::new()
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::Column::new()
@@ -3724,6 +3756,10 @@ impl cosmic::Application for AppModel {
             }
             Message::PanelItemSpacingChanged(value) => {
                 self.settings.panel_item_spacing = value.clamp(0, 16);
+                self.persist_settings();
+            }
+            Message::PanelMultilineChanged(value) => {
+                self.settings.panel_multiline = value;
                 self.persist_settings();
             }
             Message::PanelRefreshButtonChanged(value) => {
