@@ -1990,15 +1990,11 @@ impl cosmic::Application for AppModel {
             .width(cosmic::iced::Length::Fill);
 
         if self.settings_open {
-            if let Some(section) = self.active_settings_section {
-                let (title, description) = settings_section_details(section);
-                let title = crate::i18n::tr(&self.settings.language, title);
-                let description = crate::i18n::tr(&self.settings.language, description);
-
+            if self.active_settings_section.is_some() {
+                // The section title and back button are rendered in the sticky
+                // header below; keep only the selected section's controls here.
             } else {
-
                 content = content
-                    .push(settings_heading)
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::caption(crate::i18n::tr(
                         &self.settings.language,
