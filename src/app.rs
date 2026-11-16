@@ -2377,15 +2377,51 @@ impl cosmic::Application for AppModel {
                             .push(widget::text::body(format!("Sunrise  {sunrise}"))),
                     )
                     .push(widget::text::body(format!("Sunset  {sunset}")));
+                let weather_heading = widget::button::custom(
+                    widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::icon::from_name(weather.icon_name()).size(20))
+                        .push(
+                            widget::Column::new()
+                                .spacing(1)
+                                .width(cosmic::iced::Length::Fill)
+                                .push(widget::text::title3("Weather"))
+                                .push(widget::text::caption(weather.location_name.clone())),
+                        )
+                        .push(widget::text::title2(format!(
+                            "{:.0}°",
+                            weather.temperature_c
+                        )))
+                        .push(
+                            widget::icon::from_name(if self.weather_forecast_expanded {
+                                "go-down-symbolic"
+                            } else {
+                                "go-next-symbolic"
+                            })
+                            .size(16),
+                        ),
+                )
+                .on_press(Message::ToggleWeatherForecast)
+                .padding([4, 0])
+                .width(cosmic::iced::Length::Fill)
+                .class(cosmic::theme::Button::Text);
+                // Keep the city/temperature header inside the same full-width
+                // surface as the weather content so the photo starts directly
+                // behind it, with identical left and right alignment.
+                let weather_content = widget::Column::new()
+                    .spacing(8)
+                    .push(weather_heading)
+                    .push(weather_details);
                 let weather_card: cosmic::Element<'_, Message> =
                     if let Some(image_bytes) = &weather.background_image {
                         let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
                             image_bytes.clone(),
                         ))
                         .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fixed(210.0))
+                        .height(cosmic::iced::Length::Fixed(260.0))
                         .content_fit(cosmic::iced::ContentFit::Cover);
-                        let details = widget::container(weather_details)
+                        let details = widget::container(weather_content)
                             .width(cosmic::iced::Length::Fill)
                             .height(cosmic::iced::Length::Fill)
                             .padding(10)
@@ -2423,13 +2459,13 @@ impl cosmic::Application for AppModel {
                             .padding(8);
                         cosmic::iced::widget::Stack::new()
                             .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(210.0))
+                            .height(cosmic::iced::Length::Fixed(260.0))
                             .push(photo)
                             .push(details)
                             .push(image_credit_button)
                             .into()
                     } else {
-                        widget::container(weather_details)
+                        widget::container(weather_content)
                             .padding(10)
                             .style(|theme| {
                                 let cosmic = theme.cosmic();
@@ -2445,36 +2481,7 @@ impl cosmic::Application for AppModel {
                             })
                             .into()
                     };
-                let weather_heading = widget::button::custom(
-                    widget::Row::new()
-                        .spacing(8)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::icon::from_name(weather.icon_name()).size(20))
-                        .push(
-                            widget::Column::new()
-                                .spacing(1)
-                                .width(cosmic::iced::Length::Fill)
-                                .push(widget::text::title3("Weather"))
-                                .push(widget::text::caption(weather.location_name.clone())),
-                        )
-                        .push(widget::text::title2(format!(
-                            "{:.0}°",
-                            weather.temperature_c
-                        )))
-                        .push(
-                            widget::icon::from_name(if self.weather_forecast_expanded {
-                                "go-down-symbolic"
-                            } else {
-                                "go-next-symbolic"
-                            })
-                            .size(16),
-                        ),
-                )
-                .on_press(Message::ToggleWeatherForecast)
-                .padding([4, 0])
-                .width(cosmic::iced::Length::Fill)
-                .class(cosmic::theme::Button::Text);
-                weather_section = weather_section.push(weather_heading).push(weather_card);
+                weather_section = weather_section.push(weather_card);
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
                     let forecast_range_selector = widget::Row::new()
