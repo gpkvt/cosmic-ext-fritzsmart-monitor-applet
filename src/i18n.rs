@@ -216,6 +216,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "maximum" => "Maximum",
         "minimum" => "Minimum",
         "Close (Esc)" => "Schließen (Esc)",
+        "Open graph" => "Diagramm öffnen",
         _ => key,
     }
 }
