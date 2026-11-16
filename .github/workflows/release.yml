@@ -1,14 +1,6 @@
 name: Release Linux packages
 
 on:
-  push:
-    branches:
-      - main
-    # The version job commits only these files. Ignore that commit so it
-    # cannot start a second release run if a repository token is configured.
-    paths-ignore:
-      - Cargo.toml
-      - Cargo.lock
   workflow_dispatch:
     inputs:
       bump_type:
