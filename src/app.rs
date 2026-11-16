@@ -111,6 +111,7 @@ pub enum Message {
     ToggleDeviceDetails(String),
     ToggleMenuSection(String),
     MoveMenuElement(&'static str, bool),
+    ToggleMenuElementVisibility(&'static str, bool),
     MovePanelItem(&'static str, bool),
     QuickRefreshIntervalPreview(u32),
     CommitQuickRefreshInterval,
@@ -2327,10 +2328,12 @@ impl cosmic::Application for AppModel {
                         _ => continue,
                     };
                     let label = crate::i18n::tr(&self.settings.language, menu_element_label(id));
+                    let visible = !self.settings.hidden_menu_elements.iter().any(|hidden| hidden == id);
                     let mut row = widget::Row::new()
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::body(label).width(cosmic::iced::Length::Fill));
+                        .push(widget::text::body(label).width(cosmic::iced::Length::Fill))
+                        .push(widget::toggler(visible).on_toggle(move |value| Message::ToggleMenuElementVisibility(id, value)));
                     row = row.push(icon_action_button(
                         "+",
                         crate::i18n::tr(&self.settings.language, "Move up"),
@@ -3754,6 +3757,16 @@ impl cosmic::Application for AppModel {
                 ) {
                     menu_cards.extend(power_sections);
                 }
+                menu_cards.retain(|(key, _)| {
+                    let element = if key == "0-summary" { "summary" }
+                    else if key == "1-weather" { "weather" }
+                    else if key == "bandwidth" { "internet-bandwidth" }
+                    else if key.starts_with("2-") { "devices" }
+                    else if key.starts_with("3-") { "total-power-output" }
+                    else if key.starts_with("4-") { "total-power-input" }
+                    else { "devices" };
+                    !self.settings.hidden_menu_elements.iter().any(|hidden| hidden == element)
+                });
                 // Sort popup sections by the user's saved order while preserving device order.
                 menu_cards.sort_by_key(|(key, _)| {
                     let element = if key == "0-summary" {
@@ -4404,6 +4417,11 @@ impl cosmic::Application for AppModel {
                     self.settings.menu_order.swap(index, target);
                     self.persist_settings();
                 }
+            }
+            Message::ToggleMenuElementVisibility(element, visible) => {
+                self.settings.hidden_menu_elements.retain(|hidden| hidden != element);
+                if !visible { self.settings.hidden_menu_elements.push(element.to_string()); }
+                self.persist_settings();
             }
             Message::MovePanelItem(item, move_up) => {
                 let Some(index) = self
