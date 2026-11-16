@@ -820,7 +820,6 @@ fn total_power_overview(
     readings: &[FritzReading],
     settings: &FritzSettings,
     history: &VecDeque<(Instant, i64)>,
-    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     collapsed_sections: &HashSet<String>,
 ) -> Option<Vec<(String, cosmic::Element<'static, Message>)>> {
     let output_low = history.iter().map(|(_, value)| *value).min()?;
@@ -846,45 +845,6 @@ fn total_power_overview(
                 .push(widget::text::caption("Now")),
         )
         .into();
-
-    let mut input_graphs = widget::Column::new().spacing(8);
-    let mut has_input_graph = false;
-    for reading in readings.iter().filter(|reading| {
-        settings
-            .input_ains
-            .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
-    }) {
-        has_input_graph = true;
-        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-        input_graphs = input_graphs.push(
-            widget::Column::new()
-                .spacing(4)
-                .push(widget::text::caption(format!(
-                    "{} · {} W",
-                    reading.name,
-                    signed_device_power(reading.power_w, true),
-                )))
-                .push(graph_visual(
-                    device_history.get(&key).into_iter().flat_map(|samples| {
-                        samples
-                            .iter()
-                            .map(|(_, power, _)| signed_device_power(*power, true) as f64)
-                    }),
-                    &settings.graph_style,
-                    "W",
-                ))
-                .push(
-                    widget::Row::new()
-                        .width(cosmic::iced::Length::Fill)
-                        .push(widget::text::caption(axis_start.clone()))
-                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                        .push(widget::text::caption("Now")),
-                ),
-        );
-    }
-    if !has_input_graph {
-        input_graphs = input_graphs.push(widget::text::caption("No input devices"));
-    }
 
     let has_input_readings = readings.iter().any(|reading| {
         settings
@@ -929,19 +889,47 @@ fn total_power_overview(
         output_section,
     )];
     if has_input_readings {
-        let mut input_column = widget::Column::new()
+        let input_graph = widget::Column::new()
+            .spacing(4)
+            .push(widget::text::caption("TOTAL POWER INPUT (W)"))
+            .push(graph_visual(
+                input_history.iter().map(|(_, value)| *value as f64),
+                &settings.graph_style,
+                "W",
+            ))
+            .push(
+                widget::Row::new()
+                    .width(cosmic::iced::Length::Fill)
+                    .push(widget::text::caption(axis_start.clone()))
+                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                    .push(widget::text::caption("Now")),
+            )
+            .into();
+        let input_column = widget::Column::new()
             .spacing(8)
-            .width(cosmic::iced::Length::Fill);
-        if let (Some(low), Some(high)) = (input_low, input_high) {
-            input_column = input_column.push(
+            .width(cosmic::iced::Length::Fill)
+            .push(
                 widget::Row::new()
                     .spacing(8)
                     .width(cosmic::iced::Length::Fill)
-                    .push(widget::container(range_metric_tile("LOW", format!("{low} W"), "go-down-symbolic")).width(cosmic::iced::Length::Fill))
-                    .push(widget::container(range_metric_tile("HIGH", format!("{high} W"), "go-up-symbolic")).width(cosmic::iced::Length::Fill)),
-            );
-        }
-        input_column = input_column.push(graph_panel(input_graphs.into()));
+                    .push(
+                        widget::container(range_metric_tile(
+                            "LOW",
+                            format!("{} W", input_low.unwrap_or_default()),
+                            "go-down-symbolic",
+                        ))
+                        .width(cosmic::iced::Length::Fill),
+                    )
+                    .push(
+                        widget::container(range_metric_tile(
+                            "HIGH",
+                            format!("{} W", input_high.unwrap_or_default()),
+                            "go-up-symbolic",
+                        ))
+                        .width(cosmic::iced::Length::Fill),
+                    ),
+            )
+            .push(graph_panel(input_graph));
         let input_collapsed = collapsed_sections.contains("total-power-input");
         let input_section = total_power_section(
             "Total power in",
@@ -2863,7 +2851,6 @@ impl cosmic::Application for AppModel {
                     &self.readings,
                     &self.settings,
                     &self.history,
-                    &self.device_history,
                     &self.collapsed_menu_sections,
                 ) {
                     menu_cards.extend(power_sections);
