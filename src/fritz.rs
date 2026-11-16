@@ -186,9 +186,10 @@ fn parse_refresh_interval_seconds(value: &str) -> u32 {
     value.parse::<u32>().unwrap_or(60).clamp(30, 3600)
 }
 
-const MENU_ELEMENT_IDS: [&str; 5] = [
+const MENU_ELEMENT_IDS: [&str; 6] = [
     "summary",
     "weather",
+    "internet-bandwidth",
     "devices",
     "total-power-output",
     "total-power-input",
@@ -220,6 +221,13 @@ fn parse_menu_order(value: &str) -> Vec<String> {
             }
             order
         });
+    if !order.iter().any(|id| id == "internet-bandwidth") {
+        let insert_at = order
+            .iter()
+            .position(|id| id == "devices")
+            .unwrap_or(order.len());
+        order.insert(insert_at, "internet-bandwidth".to_string());
+    }
     if order.iter().any(|id| id == "total-power-output")
         && !order.iter().any(|id| id == "total-power-input")
     {
