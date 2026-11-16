@@ -464,7 +464,7 @@ fn blur_background_image(bytes: Vec<u8>) -> Option<Vec<u8>> {
 }
 
 fn build_weather_slideshow_frames(images: &[Vec<u8>]) -> Vec<Vec<u8>> {
-    use image::{DynamicImage, ImageBuffer, Rgba};
+    use image::{DynamicImage, GenericImageView, ImageBuffer, Rgba};
     if images.is_empty() { return Vec::new(); }
     let decoded: Vec<_> = images.iter()
         .filter_map(|bytes| image::load_from_memory(bytes).ok())
@@ -631,6 +631,26 @@ mod tests {
         }
         assert_eq!(commons_search_term("01n", 1), "clear night sky over city skyline");
         assert_eq!(commons_search_term("01n", 2), "moon stars night mountain landscape");
+    }
+
+    #[test]
+    fn weather_slideshow_contains_hold_and_crossfade_frames() {
+        let first = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
+            8, 8, image::Rgb([0, 0, 0]),
+        ));
+        let second = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
+            8, 8, image::Rgb([255, 255, 255]),
+        ));
+        let encode = |image: image::DynamicImage| {
+            let mut output = std::io::Cursor::new(Vec::new());
+            image.write_to(&mut output, image::ImageFormat::Jpeg).unwrap();
+            output.into_inner()
+        };
+        let frames = build_weather_slideshow_frames(&[encode(first), encode(second)]);
+        assert_eq!(frames.len(), 30);
+        for frame in frames {
+            assert!(image::load_from_memory(&frame).is_ok());
+        }
     }
 
     #[test]
