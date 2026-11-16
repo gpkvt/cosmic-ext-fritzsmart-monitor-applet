@@ -47,6 +47,8 @@ jobs:
             dpkg-dev \
             patchelf \
             file
+      - name: Validate GitHub Pages documentation
+        run: python3 scripts/validate-pages.py
       - name: Validate desktop entry and AppStream metadata
         run: |
           desktop-file-validate data/com.gpkvt.FritzPowerMonitor.desktop
