@@ -510,7 +510,7 @@ fn graph_visual_with_dimensions(
     .height(widget_height);
 
     widget::Column::new()
-        .spacing(2)
+        .spacing(8)
         .push(
             widget::Row::new()
                 .width(cosmic::iced::Length::Fill)
@@ -519,6 +519,13 @@ fn graph_visual_with_dimensions(
                 .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
         )
         .push(graph)
+        .push(
+            widget::Row::new()
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::caption(format!("CURRENT {current_value:.1} {unit}")))
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(widget::text::caption(crate::i18n::tr("en", "Latest sample"))),
+        )
         .into()
 }
 
@@ -530,14 +537,19 @@ fn interactive_graph(
     unit: &str,
 ) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
-    let graph = widget::Row::new()
-        .align_y(cosmic::iced::Alignment::Center)
+    let graph = widget::Column::new()
+        .spacing(6)
         .push(graph_visual(values.iter().copied(), style, unit))
-        .push(widget::icon::from_name("zoom-in-symbolic").size(16))
-        .push(widget::text::caption(crate::i18n::tr(
-            language,
-            "Open graph",
-        )));
+        .push(
+            widget::Row::new()
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(widget::text::body(title.to_string()).width(cosmic::iced::Length::Fill))
+                .push(widget::icon::from_name("zoom-in-symbolic").size(16))
+                .push(widget::text::caption(crate::i18n::tr(
+                    language,
+                    "Open graph",
+                ))),
+        );
     widget::button::custom(graph)
         .on_press(Message::ShowGraph(
             title.to_string(),
@@ -1797,25 +1809,36 @@ impl cosmic::Application for AppModel {
         // The expanded graph is a regular, independently managed desktop window.
         if self.graph_window == Some(id) {
             if let Some((title, values, unit)) = &self.expanded_graph {
-                let minimum = values.iter().copied().reduce(f64::min).unwrap_or_default();
-                let maximum = values.iter().copied().reduce(f64::max).unwrap_or_default();
-                let current = values.last().copied().unwrap_or_default();
                 let graph_page = widget::Column::new()
                     .spacing(8)
                     .padding(12)
                     .width(cosmic::iced::Length::Fill)
+                    .push(graph_visual_large(
+                        values.iter().copied(),
+                        &self.settings.graph_style,
+                        unit,
+                    ))
+                    .push(
+                        widget::Row::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::caption(format_graph_axis_start(
+                                self.settings.graph_timespan_minutes,
+                            )))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(widget::text::caption(crate::i18n::tr(
+                                &self.settings.language,
+                                "Now",
+                            ))),
+                    )
+                    .push(widget::text::caption(format!(
+                        "{} samples · {}",
+                        values.len(),
+                        format_graph_timespan(self.settings.graph_timespan_minutes)
+                    )))
                     .push(
                         widget::Row::new()
                             .spacing(10)
                             .align_y(cosmic::iced::Alignment::Center)
-                            .push(
-                                widget::button::custom(
-                                    widget::icon::from_name("go-previous-symbolic").size(18),
-                                )
-                                .on_press(Message::CloseGraph)
-                                .padding(8)
-                                .class(cosmic::theme::Button::Text),
-                            )
                             .push(
                                 widget::text::title2(title.clone())
                                     .width(cosmic::iced::Length::Fill),
@@ -1838,43 +1861,7 @@ impl cosmic::Application for AppModel {
                                 .padding(8)
                                 .class(cosmic::theme::Button::Text),
                             ),
-                    )
-                    .push(widget::divider::horizontal::default())
-                    .push(graph_visual_large(
-                        values.iter().copied(),
-                        &self.settings.graph_style,
-                        unit,
-                    ))
-                    .push(
-                        widget::Row::new()
-                            .spacing(8)
-                            .push(
-                                widget::text::caption(format!("MIN {minimum:.1} {unit}"))
-                                    .width(cosmic::iced::Length::Fill),
-                            )
-                            .push(
-                                widget::text::caption(format!("CURRENT {current:.1} {unit}"))
-                                    .width(cosmic::iced::Length::Fill),
-                            )
-                            .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
-                    )
-                    .push(
-                        widget::Row::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::caption(format_graph_axis_start(
-                                self.settings.graph_timespan_minutes,
-                            )))
-                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(widget::text::caption(crate::i18n::tr(
-                                &self.settings.language,
-                                "Now",
-                            ))),
-                    )
-                    .push(widget::text::caption(format!(
-                        "{} samples · {}",
-                        values.len(),
-                        format_graph_timespan(self.settings.graph_timespan_minutes)
-                    )));
+                    );
                 // Applet popup surfaces do not receive the normal desktop
                 // window background automatically. Apply COSMIC's window
                 // background style to the entire graph surface so it has a
