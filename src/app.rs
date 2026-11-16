@@ -4063,7 +4063,7 @@ impl cosmic::Application for AppModel {
                 self.expanded_graph = None;
                 if let Some(id) = self.graph_window.take() {
                     return cosmic::iced::window::close(id)
-                        .map(move |_| cosmic::Action::App(Message::PopupClosed(id)));
+                        .map(move |_: ()| cosmic::Action::App(Message::PopupClosed(id)));
                 }
             }
             Message::Refresh => {
