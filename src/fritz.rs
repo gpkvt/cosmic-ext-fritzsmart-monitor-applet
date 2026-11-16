@@ -1610,7 +1610,10 @@ mod tests {
         assert_eq!(parse_panel_order(""), default_panel_order());
         let migrated = parse_panel_order("internet-download,internet-upload");
         assert_eq!(
-            migrated.iter().filter(|id| id.as_str() == "internet-bandwidth").count(),
+            migrated
+                .iter()
+                .filter(|id| id.as_str() == "internet-bandwidth")
+                .count(),
             1
         );
     }
