@@ -1735,28 +1735,46 @@ impl cosmic::Application for AppModel {
                             widget::toggler(self.settings.panel_refresh_button)
                                 .on_toggle(Message::PanelRefreshButtonChanged)
                         ).padding([8, 10])))
-                    .push(widget::Row::new()
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::Column::new()
-                            .spacing(3)
-                            .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::body("Show internet bandwidth"))
-                            .push(widget::text::caption("Display current FRITZ!Box internet download and upload rates in Mbps in the panel.")))
-                        .push(widget::container(
-                            widget::toggler(self.settings.panel_internet_bandwidth)
-                                .on_toggle(Message::PanelInternetBandwidthChanged)
-                        ).padding([8, 10])))
-                    .push(widget::Row::new()
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::Column::new()
-                            .spacing(3)
-                            .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::body("Average temperature"))
-                            .push(widget::text::caption("When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.")))
-                        .push(widget::container(
-                            widget::toggler(self.settings.panel_average_temperature)
-                                .on_toggle(Message::PanelAverageTemperatureChanged)
-                        )                        .padding([8, 10])) );
+                    .push(
+                        widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::Column::new()
+                                    .spacing(3)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::body("Show internet bandwidth"))
+                                    .push(widget::text::caption(
+                                        "Display current FRITZ!Box internet download and upload rates in Mbps in the panel.",
+                                    )),
+                            )
+                            .push(
+                                widget::container(
+                                    widget::toggler(self.settings.panel_internet_bandwidth)
+                                        .on_toggle(Message::PanelInternetBandwidthChanged),
+                                )
+                                .padding([8, 10]),
+                            ),
+                    )
+                    .push(
+                        widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::Column::new()
+                                    .spacing(3)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::body("Average temperature"))
+                                    .push(widget::text::caption(
+                                        "When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.",
+                                    )),
+                            )
+                            .push(
+                                widget::container(
+                                    widget::toggler(self.settings.panel_average_temperature)
+                                        .on_toggle(Message::PanelAverageTemperatureChanged),
+                                )
+                                .padding([8, 10]),
+                            ),
+                    );
                 if self.settings.panel_average_temperature {
                     content = content.push(
                         widget::Row::new()
