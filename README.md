@@ -270,8 +270,9 @@ The API key is stored in the owner-only configuration file.
   The same retention window controls which samples are shown in graphs and
   survives applet restarts.
 - Total-power and per-device readings are refreshed normally; history keeps
-  the latest reading in each 5-minute interval to bound storage for long
-  retention periods.
+  the latest reading in an adaptive interval. Sampling automatically becomes
+  less frequent for longer retention windows and is capped at about 50,000
+  samples per history series.
 - The popup shows net-power low/high values, per-device power and temperature
   sparklines, and a separate signed power graph for each input device.
 - Sparklines are evenly downsampled to 12 columns to fit their cards.
