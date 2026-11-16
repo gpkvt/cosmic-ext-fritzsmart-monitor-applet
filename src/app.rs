@@ -4052,7 +4052,7 @@ impl cosmic::Application for AppModel {
                     };
                     let (id, task) = cosmic::iced::window::open(settings);
                     self.graph_window = Some(id);
-                    return task.map(|_: ()| cosmic::Action::App(Message::GraphWindowOpened));
+                    return task.map(|_: cosmic::iced::window::Id| cosmic::Action::App(Message::GraphWindowOpened));
                 } else if let Some(id) = self.graph_window {
                     return cosmic::iced::window::gain_focus(id)
                         .map(|_: ()| cosmic::Action::App(Message::GraphWindowOpened));
