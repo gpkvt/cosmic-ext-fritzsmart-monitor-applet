@@ -25,6 +25,7 @@ pub struct WeatherData {
     pub sunset_unix: i64,
     pub location_name: String,
     pub background_image: Option<Vec<u8>>,
+    pub background_images: Vec<Vec<u8>>,
     pub image_attribution: Option<CommonsAttribution>,
 }
 
@@ -288,7 +289,8 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
     let location_name = payload["name"].as_str().unwrap_or(location).to_string();
     // Select photos using both the observed condition and OpenWeatherMap's
     // local day/night indicator. Image failures remain non-fatal.
-    let (background_image, image_attribution) = fetch_commons_background(&client, icon_code).await;
+    let (background_images, image_attribution) = fetch_commons_background(&client, icon_code).await;
+    let background_image = background_images.first().cloned();
     Ok(WeatherData {
         icon_code: icon_code.to_string(),
         description,
@@ -304,6 +306,7 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
         sunset_unix,
         location_name,
         background_image,
+        background_images,
         image_attribution,
     })
 }
@@ -393,87 +396,48 @@ fn commons_search_offset() -> u64 {
 async fn fetch_commons_background(
     client: &Client,
     icon_code: &str,
-) -> (Option<Vec<u8>>, Option<CommonsAttribution>) {
+) -> (Vec<Vec<u8>>, Option<CommonsAttribution>) {
     let search_offset = commons_search_offset();
-    let search = commons_search_term(icon_code, search_offset as usize);
-    let response = client
-        .get("https://commons.wikimedia.org/w/api.php")
-        .query(&[
-            ("action", "query"),
-            ("generator", "search"),
-            ("gsrsearch", search),
-            ("gsrnamespace", "6"),
-            // Search several files: the first result can be a video, SVG, or
-            // otherwise lack a usable thumbnail.
-            ("gsrlimit", "20"),
-            ("gsroffset", &search_offset.to_string()),
-            ("prop", "imageinfo"),
-            ("iiprop", "url|extmetadata"),
-            ("iiurlwidth", "1200"),
-            ("format", "json"),
-        ])
-        .send()
-        .await;
-    let Ok(response) = response else {
-        return (None, None);
-    };
-    if !response.status().is_success() {
-        return (None, None);
-    }
-    let response = response.json::<serde_json::Value>().await;
-    let Ok(response) = response else {
-        return (None, None);
-    };
-    let Some(pages) = response["query"]["pages"].as_object() else {
-        return (None, None);
-    };
-
-    // Do not let an unusable first search result hide valid photographs below it.
-    for page in pages.values() {
-        let info = &page["imageinfo"][0];
-        let image_url = info["thumburl"].as_str().or_else(|| info["url"].as_str());
-        let Some(image_url) = image_url else {
-            continue;
-        };
-        let image_response = client.get(image_url).send().await;
-        let Ok(image_response) = image_response else {
-            continue;
-        };
-        if !image_response.status().is_success() {
-            continue;
+    let mut images = Vec::new();
+    let mut attribution = None;
+    for variant in 0..3 {
+        let search = commons_search_term(icon_code, search_offset as usize + variant);
+        let offset = (search_offset + variant as u64 * 7).to_string();
+        let response = client.get("https://commons.wikimedia.org/w/api.php")
+            .query(&[
+                ("action", "query"), ("generator", "search"),
+                ("gsrsearch", search), ("gsrnamespace", "6"),
+                ("gsrlimit", "12"), ("gsroffset", offset.as_str()),
+                ("prop", "imageinfo"), ("iiprop", "url|extmetadata"),
+                ("iiurlwidth", "1200"), ("format", "json"),
+            ]).send().await;
+        let Ok(response) = response else { continue };
+        if !response.status().is_success() { continue; }
+        let Ok(response) = response.json::<serde_json::Value>().await else { continue };
+        let Some(pages) = response["query"]["pages"].as_object() else { continue };
+        for page in pages.values() {
+            if images.len() >= 5 { break; }
+            let info = &page["imageinfo"][0];
+            let Some(image_url) = info["thumburl"].as_str().or_else(|| info["url"].as_str()) else { continue };
+            let Ok(response) = client.get(image_url).send().await else { continue };
+            if !response.status().is_success() { continue; }
+            let Ok(bytes) = response.bytes().await else { continue };
+            let Some(image) = blur_background_image(bytes.to_vec()) else { continue };
+            if attribution.is_none() {
+                let artist = info["extmetadata"]["Artist"]["value"].as_str().unwrap_or("Unknown author");
+                let license = info["extmetadata"]["LicenseShortName"]["value"].as_str().unwrap_or("See file page");
+                let title = page["title"].as_str().unwrap_or("Wikimedia Commons photograph");
+                let page_url = info["descriptionurl"].as_str().unwrap_or("https://commons.wikimedia.org/");
+                attribution = Some(CommonsAttribution {
+                    title: title.to_string(), artist: strip_html(artist), license: license.to_string(),
+                    page_url: commons_file_page_url(page_url),
+                });
+            }
+            images.push(image);
         }
-        let image = image_response.bytes().await;
-        let Ok(image) = image else {
-            continue;
-        };
-        // Decode before accepting the result so a broken/non-image response
-        // cannot make the weather card fall back to a blank image surface.
-        let image = match blur_background_image(image.to_vec()) {
-            Some(image) => image,
-            None => continue,
-        };
-        let artist = info["extmetadata"]["Artist"]["value"]
-            .as_str()
-            .unwrap_or("Unknown author");
-        let license = info["extmetadata"]["LicenseShortName"]["value"]
-            .as_str()
-            .unwrap_or("See file page");
-        let title = page["title"]
-            .as_str()
-            .unwrap_or("Wikimedia Commons photograph");
-        let page_url = info["descriptionurl"]
-            .as_str()
-            .unwrap_or("https://commons.wikimedia.org/");
-        let attribution = CommonsAttribution {
-            title: title.to_string(),
-            artist: strip_html(artist),
-            license: license.to_string(),
-            page_url: commons_file_page_url(page_url),
-        };
-        return (Some(image), Some(attribution));
+        if images.len() >= 5 { break; }
     }
-
-    (None, None)
+    (images, attribution)
 }
 
 fn commons_file_page_url(value: &str) -> String {
@@ -596,6 +560,7 @@ mod tests {
                 sunset_unix: 0,
                 location_name: String::new(),
                 background_image: None,
+                background_images: Vec::new(),
                 image_attribution: None,
             };
             assert_eq!(weather.icon_name(), expected);
