@@ -237,6 +237,7 @@
       heroCards.forEach(card=>{
         card.classList.remove('is-revealed');
         card.setAttribute('aria-pressed','false');
+        card.style.animation='none';
       });
       document.body.classList.remove('magic-card-open');
     };
@@ -252,6 +253,7 @@
           return;
         }
         restoreMagicCard();
+        card.style.animation='';
         card.classList.add('is-revealed');
         card.setAttribute('aria-pressed','true');
         document.body.classList.add('magic-card-open');
