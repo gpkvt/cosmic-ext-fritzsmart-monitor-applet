@@ -1398,12 +1398,12 @@ impl cosmic::Application for AppModel {
             let mut item = widget::Row::new()
                 .spacing(0)
                 .align_y(cosmic::iced::Alignment::Center);
-            // Keep the icon close to its value while preserving a consistent
-            // 16px leading slot, including for readings without an icon.
+            // Add a small left inset to panel icons without increasing the
+            // gap between each icon and its value. Keep empty slots aligned.
             let icon_slot = widget::container(icon.unwrap_or_else(|| widget::text("").into()))
-                .width(cosmic::iced::Length::Fixed(16.0))
+                .width(cosmic::iced::Length::Fixed(20.0))
                 .height(cosmic::iced::Length::Fixed(24.0))
-                .center_x(16)
+                .padding([0, 0, 0, 4])
                 .center_y(24);
             item = item.push(icon_slot);
             let value_slot = widget::container(value)
