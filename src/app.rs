@@ -2663,6 +2663,7 @@ impl cosmic::Application for AppModel {
                         let ain = reading.ain.clone();
                         let key = crate::fritz::normalize_ain_for_selection(&ain);
                         let can_toggle = reading.power_controllable
+                            && reading.power_toggle_allowed
                             && reading.power_state.is_some()
                             && !self.pending_power_changes.contains(&key);
                         let toggle = widget::toggler(is_on);
