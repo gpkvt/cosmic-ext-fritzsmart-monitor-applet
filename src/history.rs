@@ -31,7 +31,12 @@ fn epoch_now() -> Result<i64, String> {
         .map_err(|error| error.to_string())
 }
 
-fn instant_from_epoch(timestamp: i64, now_epoch: i64, now: Instant, window: Duration) -> Option<Instant> {
+fn instant_from_epoch(
+    timestamp: i64,
+    now_epoch: i64,
+    now: Instant,
+    window: Duration,
+) -> Option<Instant> {
     let age = now_epoch.checked_sub(timestamp)?;
     if age < 0 {
         return None;
@@ -43,7 +48,12 @@ fn instant_from_epoch(timestamp: i64, now_epoch: i64, now: Instant, window: Dura
     now.checked_sub(age)
 }
 
-fn parse_power_history(value: Option<&Value>, now_epoch: i64, now: Instant, window: Duration) -> PowerHistory {
+fn parse_power_history(
+    value: Option<&Value>,
+    now_epoch: i64,
+    now: Instant,
+    window: Duration,
+) -> PowerHistory {
     let mut history = VecDeque::new();
     if let Some(samples) = value.and_then(Value::as_array) {
         for sample in samples {
@@ -61,7 +71,12 @@ fn parse_power_history(value: Option<&Value>, now_epoch: i64, now: Instant, wind
     history
 }
 
-fn parse_device_history(value: Option<&Value>, now_epoch: i64, now: Instant, window: Duration) -> DeviceHistory {
+fn parse_device_history(
+    value: Option<&Value>,
+    now_epoch: i64,
+    now: Instant,
+    window: Duration,
+) -> DeviceHistory {
     let mut histories = HashMap::new();
     let Some(devices) = value.and_then(Value::as_object) else {
         return histories;
