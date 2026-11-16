@@ -23,6 +23,7 @@ pub struct AppModel {
     popup: Option<Id>,
     readings: Vec<FritzReading>,
     internet_bandwidth: Option<FritzInternetBandwidth>,
+    bandwidth_history: VecDeque<(Instant, u64, u64)>,
     error: Option<String>,
     weather_error: Option<String>,
     updated: Option<String>,
@@ -330,6 +331,35 @@ fn record_power_sample(
     while history
         .front()
         .is_some_and(|(timestamp, _)| now.duration_since(*timestamp) > window)
+    {
+        history.pop_front();
+    }
+    while history.len() > max_history_samples(window) {
+        history.pop_front();
+    }
+}
+
+fn record_bandwidth_sample(
+    history: &mut VecDeque<(Instant, u64, u64)>,
+    download: u64,
+    upload: u64,
+    now: Instant,
+    window: Duration,
+) {
+    let sample_interval = graph_sample_interval(window);
+    if let Some((timestamp, previous_download, previous_upload)) = history.back_mut() {
+        if now.duration_since(*timestamp) < sample_interval {
+            *previous_download = download;
+            *previous_upload = upload;
+        } else {
+            history.push_back((now, download, upload));
+        }
+    } else {
+        history.push_back((now, download, upload));
+    }
+    while history
+        .front()
+        .is_some_and(|(timestamp, _, _)| now.duration_since(*timestamp) > window)
     {
         history.pop_front();
     }
@@ -2731,6 +2761,23 @@ impl cosmic::Application for AppModel {
                                     bandwidth.upload_bits_per_second,
                                 ))),
                         )
+                        .push(widget::divider::horizontal::default())
+                        .push(widget::text::caption("DOWNLOAD HISTORY"))
+                        .push(graph_visual(
+                            self.bandwidth_history
+                                .iter()
+                                .map(|(_, download, _)| *download as f64 / 1_000_000.0),
+                            &self.settings.graph_style,
+                            "Mbps",
+                        ))
+                        .push(widget::text::caption("UPLOAD HISTORY"))
+                        .push(graph_visual(
+                            self.bandwidth_history
+                                .iter()
+                                .map(|(_, _, upload)| *upload as f64 / 1_000_000.0),
+                            &self.settings.graph_style,
+                            "Mbps",
+                        ))
                 } else {
                     widget::Column::new()
                         .padding([8, 12])
@@ -3481,6 +3528,17 @@ impl cosmic::Application for AppModel {
                             &self.pending_power_changes,
                         );
                         notify_missing_devices(&newly_missing);
+                        let history_window =
+                            graph_history_window(self.settings.graph_timespan_minutes);
+                        if let Some(bandwidth) = result.internet_bandwidth.as_ref() {
+                            record_bandwidth_sample(
+                                &mut self.bandwidth_history,
+                                bandwidth.download_bits_per_second,
+                                bandwidth.upload_bits_per_second,
+                                Instant::now(),
+                                history_window,
+                            );
+                        }
                         self.internet_bandwidth = result.internet_bandwidth;
                         let readings = result.readings;
                         clear_confirmed_power_changes(
