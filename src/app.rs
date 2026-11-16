@@ -2208,12 +2208,23 @@ impl cosmic::Application for AppModel {
                         .spacing(8)
                         .push(widget::text::body("Device list and meter readings").width(cosmic::iced::Length::Fill))
                         .push(widget::text::caption(fritz_endpoint_status(
-                            "/webservices/homeautoswitch.lua",
+                            "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
                         ))))
                     .push(widget::text::caption(if endpoint.is_empty() {
                         "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos".to_string()
                     } else {
                         format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos")
+                    }))
+                    .push(widget::Row::new()
+                        .spacing(8)
+                        .push(widget::text::body("Per-device switch state").width(cosmic::iced::Length::Fill))
+                        .push(widget::text::caption(fritz_endpoint_status(
+                            "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
+                        ))))
+                    .push(widget::text::caption(if endpoint.is_empty() {
+                        "/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>".to_string()
+                    } else {
+                        format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>")
                     }))
                     .push(widget::text::caption(format!(
                         "Configured devices: {}",
@@ -2272,7 +2283,7 @@ impl cosmic::Application for AppModel {
                             .push(refresh_indicator),
                     )
                     .push(widget::text::caption(
-                        "Most recent responses · query parameters and session IDs are omitted",
+                        "Most recent responses · session IDs and device identifiers are omitted",
                     ));
                 if requests.is_empty() {
                     content = content.push(widget::text::caption("No HTTP responses recorded yet"));
