@@ -52,6 +52,7 @@ pub struct AppModel {
     weather_forecast_error: Option<String>,
     weather_forecast_loading: bool,
     weather_forecast_expanded: bool,
+    weather_attribution_expanded: bool,
     quick_options_expanded: bool,
     expanded_devices: HashSet<String>,
     collapsed_menu_sections: HashSet<String>,
@@ -107,6 +108,7 @@ pub enum Message {
     WeatherUpdated(Result<WeatherData, String>),
     WeatherSlideshowTick,
     ToggleWeatherForecast,
+    ToggleWeatherAttribution,
     TestNotification,
     CopyDiagnosticUrl(String),
     FetchForecastFromDiagnostics,
@@ -3036,17 +3038,38 @@ impl cosmic::Application for AppModel {
                     })
                     .unwrap_or_else(|| "—".into());
                 let current_date = chrono::Local::now().format("%A, %d %B %Y").to_string();
+                let mut date_row = widget::Row::new()
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::text::caption(current_date))
+                    .push(widget::Space::new().width(cosmic::iced::Length::Fill));
+                if weather.image_attribution.is_some() {
+                    date_row = date_row.push(
+                        widget::button::custom(
+                            widget::icon::from_name(if self.weather_attribution_expanded {
+                                "go-up-symbolic"
+                            } else {
+                                "image-x-generic-symbolic"
+                            })
+                            .size(16),
+                        )
+                        .on_press(Message::ToggleWeatherAttribution)
+                        .padding(5)
+                        .class(cosmic::theme::Button::Standard),
+                    );
+                }
                 let mut weather_details = widget::Column::new()
                     .spacing(6)
-                    .push(widget::text::caption(current_date));
-                if let Some(credit) = &weather.image_attribution {
-                    weather_details = weather_details.push(widget::text::caption(format!(
-                        "{} {} · {} · {}",
-                        crate::i18n::tr(&self.settings.language, "Photo"),
-                        credit.title,
-                        credit.artist,
-                        credit.license
-                    )));
+                    .push(date_row);
+                if self.weather_attribution_expanded {
+                    if let Some(credit) = &weather.image_attribution {
+                        weather_details = weather_details.push(widget::text::caption(format!(
+                            "{} {} · {} · {}",
+                            crate::i18n::tr(&self.settings.language, "Photo"),
+                            credit.title,
+                            credit.artist,
+                            credit.license
+                        )));
+                    }
                 }
                 weather_details = weather_details
                     .push(
@@ -4543,6 +4566,9 @@ impl cosmic::Application for AppModel {
                 return Task::perform(fetch_weather_forecast(location, days), move |result| {
                     cosmic::Action::App(Message::WeatherForecastUpdated(days, result))
                 });
+            }
+            Message::ToggleWeatherAttribution => {
+                self.weather_attribution_expanded = !self.weather_attribution_expanded;
             }
             Message::ToggleWeatherForecast => {
                 self.weather_forecast_expanded = !self.weather_forecast_expanded;
