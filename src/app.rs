@@ -855,7 +855,10 @@ fn live_power_summary(
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
         .push(metrics)
-        .push(widget::text::caption(crate::i18n::tr(language, "CURRENT POWER HISTORY")))
+        .push(widget::text::caption(crate::i18n::tr(
+            language,
+            "CURRENT POWER HISTORY",
+        )))
         .push(interactive_graph(
             language,
             crate::i18n::tr(language, "CURRENT POWER"),
@@ -3295,7 +3298,10 @@ impl cosmic::Application for AppModel {
                 let summary_card = live_power_summary(
                     summary_power,
                     summary_temperature,
-                    self.history.iter().map(|(_, value)| *value as f64).collect(),
+                    self.history
+                        .iter()
+                        .map(|(_, value)| *value as f64)
+                        .collect(),
                     rebuild_temperature_history(&self.device_history, &self.settings.input_ains, false)
                         .iter()
                         .map(|(_, value)| *value)
