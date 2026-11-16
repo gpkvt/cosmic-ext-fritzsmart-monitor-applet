@@ -3647,6 +3647,11 @@ impl cosmic::Application for AppModel {
                     rebuild_output_power_history(&self.device_history, &self.settings.input_ains)
                         .into_iter()
                         .collect();
+                if let Err(error) =
+                    crate::history::save(&self.history, &self.device_history)
+                {
+                    eprintln!("Could not persist graph history: {error}");
+                }
             }
             Message::ToggleTemperatureAlert(ain, enabled) => {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
