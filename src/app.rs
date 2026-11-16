@@ -1434,7 +1434,10 @@ impl cosmic::Application for AppModel {
             }
         }
         for item_id in &self.settings.panel_order {
-            if let Some(index) = panel_items.iter().position(|(id, _)| *id == item_id.as_str()) {
+            if let Some(index) = panel_items
+                .iter()
+                .position(|(id, _)| *id == item_id.as_str())
+            {
                 let (_, item) = panel_items.remove(index);
                 content = content.push(item);
             }
@@ -1801,11 +1804,11 @@ impl cosmic::Application for AppModel {
             }
 
             if self.active_settings_section == Some("panel-order") {
-                content = content
-                    .push(widget::text::body("Panel item order"))
-                    .push(widget::text::caption(
+                content = content.push(widget::text::body("Panel item order")).push(
+                    widget::text::caption(
                         "Move each reading independently. Changes are saved automatically.",
-                    ));
+                    ),
+                );
                 for (index, item) in self.settings.panel_order.iter().enumerate() {
                     let id = match item.as_str() {
                         "weather" => "weather",
@@ -1817,9 +1820,20 @@ impl cosmic::Application for AppModel {
                     let mut row = widget::Row::new()
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::body(panel_item_label(id)).width(cosmic::iced::Length::Fill));
-                    row = row.push(icon_action_button("+", "Move up", Message::MovePanelItem(id, true)));
-                    row = row.push(icon_action_button("−", "Move down", Message::MovePanelItem(id, false)));
+                        .push(
+                            widget::text::body(panel_item_label(id))
+                                .width(cosmic::iced::Length::Fill),
+                        );
+                    row = row.push(icon_action_button(
+                        "+",
+                        "Move up",
+                        Message::MovePanelItem(id, true),
+                    ));
+                    row = row.push(icon_action_button(
+                        "−",
+                        "Move down",
+                        Message::MovePanelItem(id, false),
+                    ));
                     content = content.push(row);
                     if index + 1 < self.settings.panel_order.len() {
                         content = content.push(widget::divider::horizontal::default());
