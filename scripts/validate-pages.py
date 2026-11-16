@@ -78,8 +78,8 @@ for page in pages:
         for feature in ("card-deal", "openGallery(index)", "gallery-enter", "gallery-image-enter", ".hero-shot:hover", "border-color:#8be0c4aa"):
             if feature not in content:
                 fail(f"index.html: screenshot gallery interaction or styling is missing {feature}")
-        hover_rule = re.search(r"\\.hero-shot:hover[^\\{]*\\{([^}]*)\\}", content)
-        if not hover_rule or re.search(r"\\b(?:transform|z-index)\\s*:", hover_rule.group(1)):
+        hover_rule = re.search(r"\.hero-shot:hover[^\{]*\{([^}]*)\}", content)
+        if not hover_rule or re.search(r"\b(?:transform|z-index)\s*:", hover_rule.group(1)):
             fail("index.html: screenshot hover must highlight without moving cards or changing their stacking order")
 
 print(f"Validated {len(pages)} GitHub Pages HTML page(s) and all local references.")
