@@ -2658,20 +2658,24 @@ impl cosmic::Application for AppModel {
                     let is_expanded = self.expanded_devices.contains(&device_key);
                     let device_corner_radius = device_corner_radius(index, self.readings.len());
                     let device_history = self.device_history.get(&device_key);
-                    let power_toggle: Option<cosmic::Element<'_, Message>> =
-                        reading.power_state.map(|is_on| {
-                            let ain = reading.ain.clone();
-                            let key = crate::fritz::normalize_ain_for_selection(&ain);
-                            if self.pending_power_changes.contains(&key) {
-                                widget::toggler(is_on).into()
-                            } else {
-                                widget::toggler(is_on)
-                                    .on_toggle(move |requested| {
-                                        Message::SetDevicePower(ain.clone(), requested)
-                                    })
-                                    .into()
-                            }
-                        });
+                    let power_toggle: cosmic::Element<'_, Message> = {
+                        let is_on = reading.power_state.unwrap_or(false);
+                        let ain = reading.ain.clone();
+                        let key = crate::fritz::normalize_ain_for_selection(&ain);
+                        let can_toggle = reading.power_controllable
+                            && reading.power_state.is_some()
+                            && !self.pending_power_changes.contains(&key);
+                        let toggle = widget::toggler(is_on).disabled(!can_toggle);
+                        if can_toggle {
+                            toggle
+                                .on_toggle(move |requested| {
+                                    Message::SetDevicePower(ain.clone(), requested)
+                                })
+                                .into()
+                        } else {
+                            toggle.into()
+                        }
+                    };
                     // Keep the disclosure trigger separate from the power switch:
                     // interactive controls must not be nested inside another button.
                     let heading_radius = [
@@ -2739,7 +2743,7 @@ impl cosmic::Application for AppModel {
                         .width(cosmic::iced::Length::Fill)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(device_heading_button)
-                        .push_maybe(power_toggle);
+                        .push(power_toggle);
                     let metrics = widget::Row::new()
                         .spacing(8)
                         .width(cosmic::iced::Length::Fill)
