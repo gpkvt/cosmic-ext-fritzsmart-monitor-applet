@@ -104,6 +104,7 @@ pub enum Message {
     TemperatureAlertLowChanged(String, i16),
     WeatherUpdated(Result<WeatherData, String>),
     ToggleWeatherForecast,
+    TestNotification,
     FetchForecastFromDiagnostics,
     SelectWeatherForecast(u8),
     WeatherForecastUpdated(u8, Result<WeatherForecast, String>),
@@ -2611,6 +2612,20 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::title3(crate::i18n::tr(&self.settings.language, "External resources")))
                     .push(widget::text::caption(
                         "Status from the latest real request. Opening Diagnostics does not trigger network requests.",
+                    ))
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3(crate::i18n::tr(
+                        &self.settings.language,
+                        "System notifications",
+                    )))
+                    .push(widget::text::caption(crate::i18n::tr(
+                        &self.settings.language,
+                        "Send a test notification to verify desktop notification delivery.",
+                    )))
+                    .push(action_button(
+                        "preferences-system-notifications-symbolic",
+                        crate::i18n::tr(&self.settings.language, "Send test notification"),
+                        Message::TestNotification,
                     ));
 
                 let weather_provider_status = if !self.settings.weather_enabled {
@@ -4408,6 +4423,12 @@ impl cosmic::Application for AppModel {
                             self.settings.refresh_interval_seconds.clamp(30, 3600),
                         )),
                 );
+            }
+            Message::TestNotification => {
+                let _ = notify_rust::Notification::new()
+                    .summary(&crate::i18n::tr(&self.settings.language, "Fritz Power Monitor notification test"))
+                    .body(&crate::i18n::tr(&self.settings.language, "Notifications are working correctly."))
+                    .show();
             }
             Message::FetchForecastFromDiagnostics => {
                 let days = 7;
