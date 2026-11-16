@@ -60,6 +60,7 @@ pub struct AppModel {
 pub enum Message {
     TogglePopup,
     PopupClosed(Id),
+    TooltipSurfaceAction(cosmic::surface::Action<Message>),
     Refresh,
     ClockTick,
     Updated(Result<FritzFetchResult, String>),
@@ -1320,10 +1321,12 @@ impl cosmic::Application for AppModel {
                     .center_y(24);
                 item = item.push(icon_slot);
             }
-            widget::tooltip(
+            self.core.applet.applet_tooltip(
                 item.push(value),
-                widget::text::caption(label),
-                cosmic::widget::tooltip::Position::Top,
+                label,
+                false,
+                Message::TooltipSurfaceAction,
+                self.core.main_window_id(),
             )
         };
 
@@ -2970,6 +2973,9 @@ impl cosmic::Application for AppModel {
 
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
+            Message::TooltipSurfaceAction(action) => {
+                return Task::done(cosmic::Action::Surface(action));
+            }
             Message::Refresh => {
                 // Ignore repeated clicks while a request is already running.
                 if self.refresh_started_at.is_some() {
