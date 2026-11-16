@@ -2089,7 +2089,70 @@ impl cosmic::Application for AppModel {
                         } else {
                             endpoint
                         }
-                    )));
+                    )))
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3("External resources"))
+                    .push(widget::text::caption(
+                        "Status reflects the latest real request; resources are not contacted just for opening Diagnostics.",
+                    ));
+                let weather_provider_status = if !self.settings.weather_enabled {
+                    "Not configured"
+                } else if self.weather.is_some() {
+                    "Available · latest request succeeded"
+                } else if self.weather_error.is_some() {
+                    "Unavailable · latest request failed"
+                } else {
+                    "Not checked yet"
+                };
+                content = content.push(
+                    widget::Row::new()
+                        .spacing(8)
+                        .push(
+                            widget::text::body("OpenWeatherMap · current weather")
+                                .width(cosmic::iced::Length::Fill),
+                        )
+                        .push(widget::text::caption(weather_provider_status)),
+                );
+                let commons_status = if !self.settings.weather_enabled {
+                    "Not configured"
+                } else if let Some(weather) = &self.weather {
+                    if weather.background_image.is_some() {
+                        "Available · image loaded"
+                    } else {
+                        "Unavailable · no usable image loaded"
+                    }
+                } else if self.weather_error.is_some() {
+                    "Not checked · weather request failed"
+                } else {
+                    "Not checked yet"
+                };
+                content = content.push(
+                    widget::Row::new()
+                        .spacing(8)
+                        .push(
+                            widget::text::body("Wikimedia Commons · weather image")
+                                .width(cosmic::iced::Length::Fill),
+                        )
+                        .push(widget::text::caption(commons_status)),
+                );
+                let forecast_status = if !self.settings.weather_enabled {
+                    "Not configured"
+                } else if self.weather_forecast.is_some() {
+                    "Available · forecast loaded"
+                } else if self.weather_forecast_error.is_some() {
+                    "Unavailable · latest request failed"
+                } else {
+                    "Not checked · request a forecast to test"
+                };
+                content = content.push(
+                    widget::Row::new()
+                        .spacing(8)
+                        .push(
+                            widget::text::body("Open-Meteo · forecast and geocoding")
+                                .width(cosmic::iced::Length::Fill),
+                        )
+                        .push(widget::text::caption(forecast_status)),
+                );
                 let requests = crate::fritz::http_request_diagnostics();
                 let request_countdown = if self.refresh_started_at.is_some() {
                     "Request in progress…".to_string()
