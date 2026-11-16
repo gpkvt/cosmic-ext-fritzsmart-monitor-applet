@@ -2264,10 +2264,10 @@ impl cosmic::Application for AppModel {
                                 (format!("{} {} · {}", crate::i18n::tr(&self.settings.language, "HTTP"), request.status, crate::i18n::tr(&self.settings.language, "HTTP failed")), Some(false))
                             }
                         })
-                        .unwrap_or_else(|| ("Not checked yet".to_string(), None))
+                        .unwrap_or_else(|| (crate::i18n::tr(&self.settings.language, "Not checked yet").to_string(), None))
                 };
                 let fritz_base_status = if endpoint.is_empty() {
-                    ("Base URL not configured".to_string(), None)
+                    (crate::i18n::tr(&self.settings.language, "Base URL not configured").to_string(), None)
                 } else if self.error.is_none() && !self.readings.is_empty() {
                     (crate::i18n::tr(&self.settings.language, "Connected · device data loaded").to_string(), Some(true))
                 } else if let Some(error) = &self.error {
@@ -2284,7 +2284,7 @@ impl cosmic::Application for AppModel {
                         fritz_base_status.1,
                     ))
                     .push(widget::text::caption(if endpoint.is_empty() {
-                        "Base URL not configured".to_string()
+                        crate::i18n::tr(&self.settings.language, "Base URL not configured").to_string()
                     } else {
                         endpoint.to_string()
                     }));
@@ -2323,7 +2323,8 @@ impl cosmic::Application for AppModel {
                         format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>")
                     }))
                     .push(widget::text::caption(format!(
-                        "Configured devices: {}",
+                        "{}: {},
+                        crate::i18n::tr(&self.settings.language, "Configured devices"),
                         if self.settings.ains.is_empty() {
                             if self.settings.ain.trim().is_empty() { 0 } else { 1 }
                         } else {
@@ -2336,7 +2337,7 @@ impl cosmic::Application for AppModel {
                         self.refresh_started_at
                             .map(refresh_spinner_frame)
                             .unwrap_or_else(|| "◴".to_string()),
-                        "Request in progress",
+                        crate::i18n::tr(&self.settings.language, "Request in progress"),
                         Message::Refresh,
                     )
                 } else if let Some(remaining) = self
@@ -2348,7 +2349,7 @@ impl cosmic::Application for AppModel {
                 {
                     countdown_action_button(remaining.as_secs().saturating_add(1))
                 } else {
-                    icon_action_button("view-refresh-symbolic", "Reload now", Message::Refresh)
+                    icon_action_button("view-refresh-symbolic", crate::i18n::tr(&self.settings.language, "Reload now"), Message::Refresh)
                 };
                 content = content.push(
                     widget::Row::new()
