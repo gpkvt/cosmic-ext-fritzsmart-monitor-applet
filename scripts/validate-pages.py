@@ -34,7 +34,7 @@ def fail(message):
     raise SystemExit(1)
 
 
-pages = sorted(ROOT.glob("*.html"))
+pages = sorted(ROOT.rglob("*.html"))
 if not pages:
     fail("no HTML pages found")
 
