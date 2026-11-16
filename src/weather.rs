@@ -485,7 +485,7 @@ pub fn build_weather_slideshow_frames(
             .write_to(&mut output, image::ImageFormat::Jpeg).is_ok()
         {
             frames.push(output.into_inner());
-            sequence.extend(std::iter::repeat_n(frames.len() - 1, hold_ticks));
+            sequence.extend(std::iter::repeat(frames.len() - 1).take(hold_ticks));
         }
         if decoded.len() < 2 { continue; }
         let next = &decoded[(index + 1) % decoded.len()];
