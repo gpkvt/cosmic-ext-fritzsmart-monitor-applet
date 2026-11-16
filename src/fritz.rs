@@ -393,7 +393,11 @@ impl FritzSettings {
         }
         let get = |key: &str| values.get(key).cloned().unwrap_or_default();
         let settings = Self {
-            language: match get("LANGUAGE").as_str() { "de" => "de".into(), "en" => "en".into(), _ => "system".into() },
+            language: match get("LANGUAGE").as_str() {
+                "de" => "de".into(),
+                "en" => "en".into(),
+                _ => "system".into(),
+            },
             url: get("FRITZ_URL"),
             username: get("USERNAME"),
             password: get("PASSWORD"),
@@ -451,7 +455,8 @@ impl FritzSettings {
             collapsed_menu_sections: parse_collapsed_menu_sections(&get("COLLAPSED_MENU_SECTIONS")),
             expanded_devices: parse_expanded_devices(&get("EXPANDED_DEVICES")),
             quick_options_expanded: get("QUICK_OPTIONS_EXPANDED").eq_ignore_ascii_case("true"),
-            weather_forecast_expanded: get("WEATHER_FORECAST_EXPANDED").eq_ignore_ascii_case("true"),
+            weather_forecast_expanded: get("WEATHER_FORECAST_EXPANDED")
+                .eq_ignore_ascii_case("true"),
         };
         Ok(settings)
     }
@@ -505,11 +510,16 @@ impl FritzSettings {
         let menu_order = parse_menu_order(&self.menu_order.join(",")).join(",");
         let panel_order = parse_panel_order(&self.panel_order.join(",")).join(",");
         let device_order = parse_device_order(&self.device_order.join(",")).join(",");
-        let collapsed_menu_sections = parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
+        let collapsed_menu_sections =
+            parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
         let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
             "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\n",
-            match self.language.as_str() { "de" => "de", "en" => "en", _ => "system" },
+            match self.language.as_str() {
+                "de" => "de",
+                "en" => "en",
+                _ => "system",
+            },
             self.url,
             self.username,
             self.password,
@@ -575,8 +585,16 @@ impl FritzSettings {
             device_order,
             collapsed_menu_sections,
             expanded_devices,
-            if self.quick_options_expanded { "true" } else { "false" },
-            if self.weather_forecast_expanded { "true" } else { "false" },
+            if self.quick_options_expanded {
+                "true"
+            } else {
+                "false"
+            },
+            if self.weather_forecast_expanded {
+                "true"
+            } else {
+                "false"
+            },
         );
         #[cfg(unix)]
         let mut file = {
@@ -1246,9 +1264,7 @@ mod tests {
     #[test]
     fn parses_persisted_collapsed_menu_sections_safely() {
         assert_eq!(
-            parse_collapsed_menu_sections(
-                "weather,unknown,summary,weather,total-power-input"
-            ),
+            parse_collapsed_menu_sections("weather,unknown,summary,weather,total-power-input"),
             vec![
                 "weather".to_string(),
                 "summary".to_string(),
