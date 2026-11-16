@@ -207,6 +207,8 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Panel text size" => "Panel-Schriftgröße",
         "Panel item spacing" => "Abstand der Panel-Elemente",
         "rain" => "Regen",
+        "Move device up" => "Gerät nach oben verschieben",
+        "Move device down" => "Gerät nach unten verschieben",
         _ => key,
     }
 }
