@@ -60,7 +60,7 @@ jobs:
           from pathlib import Path
           path = Path("Cargo.toml")
           text = path.read_text()
-          pattern = r'(?ms)(^\\[package\\]\\s+.*?^version\\s*=\\s*")([0-9]+)\\.([0-9]+)\\.([0-9]+)(")'
+          pattern = r'(?ms)(^\[package\]\s+.*?^version\s*=\s*")([0-9]+)\.([0-9]+)\.([0-9]+)(")'
           match = re.search(pattern, text)
           if not match:
               raise SystemExit("Could not parse stable [package].version")
@@ -94,7 +94,7 @@ jobs:
           from pathlib import Path
           path = Path("Cargo.lock")
           text = path.read_text()
-          pattern = r'(?ms)(\\[\\[package\\]\\]\\nname = "fritz-power-monitor"\\nversion = ")[^"]+(")'
+          pattern = r'(?ms)(\[\[package\]\]\nname = "fritz-power-monitor"\nversion = ")[^"]+(")'
           updated, count = re.subn(pattern, lambda m: m.group(1) + os.environ["NEW_VERSION"] + m.group(2), text, count=1)
           if count != 1:
               raise SystemExit("Could not update root package version in Cargo.lock")
