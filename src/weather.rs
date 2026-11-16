@@ -400,17 +400,16 @@ fn commons_search_term(icon_code: &str, variant: usize) -> &'static str {
 
 fn commons_title_matches_condition(icon_code: &str, title: &str) -> bool {
     let normalized = title.to_ascii_lowercase();
-    let words: Vec<String> = normalized
+    let words: Vec<&str> = normalized
         .split(|character: char| !character.is_ascii_alphanumeric())
         .filter(|word| !word.is_empty())
-        .map(str::to_string)
         .collect();
-    let has = |terms: &[&str]| words.iter().any(|word| terms.iter().any(|term| word == term || word.starts_with(term)));
+    // Exact tokens only: prefixes and generic landscape/night words are not
+    // evidence that a file actually depicts the requested weather.
+    let has = |terms: &[&str]| words.iter().any(|word| terms.contains(word));
 
-    // Commons search also returns books, films, posters and illustrations
-    // whose titles merely mention weather (for example, "Cloudy with a
-    // Chance of Meatballs"). Never let broad category metadata make these
-    // editorial assets look like weather photographs.
+    // Commons search can return editorial assets whose titles only mention
+    // weather. Reject these before considering condition keywords.
     let non_photo_terms = [
         "book", "novel", "film", "movie", "cover", "poster", "illustration",
         "drawing", "painting", "cartoon", "comic", "manga", "album", "song",
@@ -422,14 +421,28 @@ fn commons_title_matches_condition(icon_code: &str, title: &str) -> bool {
         return false;
     }
 
+    let rain = ["rain", "rains", "raining", "rainy", "shower", "showers", "drizzle", "drizzling", "precipitation"];
+    let storm = ["storm", "storms", "stormy", "thunder", "thunderstorm", "lightning"];
+    let snow = ["snow", "snowfall", "snowy", "blizzard"];
+    let fog = ["fog", "foggy", "mist", "misty", "haze", "hazy"];
+    let clouds = ["cloud", "clouds", "cloudy", "overcast", "cumulus", "stratus"];
+
     match icon_code.get(..2).unwrap_or("") {
-        "01" => has(&["sun", "sunny", "sunshine", "sunlight", "cloudless", "clear"])
-            || normalized.contains("blue sky"),
-        "02" | "03" | "04" => has(&["cloud", "cloudy", "overcast", "cumulus", "stratus"]),
-        "09" | "10" => has(&["rain", "raining", "rainy", "shower", "drizzle", "precipitation"]),
-        "11" => has(&["storm", "stormy", "thunder", "lightning"]),
-        "13" => has(&["snow", "snowfall", "snowy", "blizzard", "winter"]),
-        "50" => has(&["fog", "foggy", "mist", "misty", "haze", "hazy"]),
+        "01" if icon_code.ends_with('n') => {
+            has(&["clear", "star", "stars", "starry", "moon", "moonlight"])
+                && !has(&rain) && !has(&storm) && !has(&snow) && !has(&fog)
+        }
+        "01" => {
+            (has(&["sun", "sunny", "sunshine", "sunlight", "cloudless"]) || has(&["blue", "sky"]) && normalized.contains("blue sky") || has(&["clear"]) && normalized.contains("clear sky"))
+                && !has(&rain) && !has(&storm) && !has(&snow) && !has(&fog)
+        }
+        "02" | "03" | "04" => {
+            has(&clouds) && !has(&rain) && !has(&storm) && !has(&snow) && !has(&fog)
+        }
+        "09" | "10" => has(&rain) && !has(&storm) && !has(&snow),
+        "11" => has(&storm),
+        "13" => has(&snow),
+        "50" => has(&fog),
         _ => false,
     }
 }
@@ -743,7 +756,12 @@ mod tests {
             ("01d", "Rain clouds over city", false),
             ("02d", "Cumulus clouds", true),
             ("04d", "Overcast sky", true),
+            ("04d", "Beautiful landscape at night", false),
+            ("04d", "Rain clouds over the city", false),
+            ("02d", "Cloudy with a chance of meatballs", false),
             ("10d", "Heavy rain over a field", true),
+            ("10d", "Cloudy sky over the coast", false),
+            ("10d", "Thunderstorm with heavy rain", false),
             ("10n", "Rainbow over the city", false),
             ("11d", "Lightning during a thunderstorm", true),
             ("11n", "Snowy mountain at night", false),
