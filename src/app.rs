@@ -2961,10 +2961,24 @@ impl cosmic::Application for AppModel {
                         );
                     }
                 } else {
-                    content = content.push(widget::text::caption(crate::i18n::tr(
-                        &self.settings.language,
-                        "No status messages yet",
-                    )));
+                    content = content.push(surface_card(
+                        widget::Column::new()
+                            .spacing(6)
+                            .push(widget::text::body(crate::i18n::tr(
+                                &self.settings.language,
+                                "No additional status messages",
+                            )))
+                            .push(widget::text::caption(crate::i18n::tr(
+                                &self.settings.language,
+                                "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.",
+                            )))
+                            .push(widget::text::caption(crate::i18n::tr(
+                                &self.settings.language,
+                                "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.",
+                            )))
+                            .into(),
+                        10,
+                    ));
                 }
                 content = content.push(widget::divider::horizontal::default());
             }
