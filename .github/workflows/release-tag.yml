@@ -116,19 +116,6 @@ jobs:
           path.write_text(updated)
           PY
             echo "Bumping package version to ${new_version} (attempt ${attempt}/5)"
-            NEW_VERSION="$new_version" python3 - <<'PY'
-          import os
-          import re
-          from pathlib import Path
-
-          path = Path("Cargo.lock")
-          text = path.read_text()
-          pattern = r'(?ms)(\[\[package\]\]\nname = "fritz-power-monitor"\nversion = ")[^"]+(")'
-          updated, count = re.subn(pattern, rf'\\g<1>{os.environ["NEW_VERSION"]}\\g<2>', text, count=1)
-          if count != 1:
-              raise SystemExit("Could not update the root package version in Cargo.lock")
-          path.write_text(updated)
-          PY
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add Cargo.toml Cargo.lock
