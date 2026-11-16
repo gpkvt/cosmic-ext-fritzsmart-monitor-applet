@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       bump_type:
-        description: Semantic version increment (release only)
+        description: Semantic version increment (pushes use patch by default)
         type: choice
         required: true
         default: patch
@@ -111,7 +111,7 @@ jobs:
       - name: Bump version and create immutable tag
         id: version
         env:
-          BUMP_TYPE: ${{ inputs.bump_type }}
+          BUMP_TYPE: ${{ inputs.bump_type || 'patch' }}
           EVENT_NAME: ${{ github.event_name }}
         shell: bash
         run: |
@@ -119,12 +119,12 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
-              echo "Run release dispatches from main only." >&2
-              exit 1
-            fi
-            new_version="$(python3 - <<'PY'
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Releases must run from main only." >&2
+            exit 1
+          fi
+
+          new_version="$(python3 - <<'PY'
           import os, re
           from pathlib import Path
           path = Path("Cargo.toml")
@@ -144,14 +144,14 @@ jobs:
           else:
               raise SystemExit(f"Unsupported bump type: {bump}")
           version = f"{major}.{minor}.{patch}"
-          updated, count = re.subn(pattern, rf"\g<1>{version}\g<5>", text, count=1)
+          updated, count = re.subn(pattern, lambda m: m.group(1) + version + m.group(5), text, count=1)
           if count != 1:
               raise SystemExit("Failed to update Cargo.toml")
           path.write_text(updated)
           print(version)
           PY
           )"
-            NEW_VERSION="$new_version" python3 - <<'PY'
+          NEW_VERSION="$new_version" python3 - <<'PY'
           import os, re
           from pathlib import Path
           path = Path("Cargo.lock")
@@ -162,24 +162,19 @@ jobs:
               raise SystemExit("Could not update root package version in Cargo.lock")
           path.write_text(updated)
           PY
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add Cargo.toml Cargo.lock
-            git commit -m "chore(release): bump version to $new_version"
-            git push origin HEAD:main
-          else
-            new_version="$(sed -n '/^\[package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n1)"
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml Cargo.lock
+          git commit -m "chore(release): bump version to $new_version"
+          git push origin HEAD:main
 
           tag="v$new_version"
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-              echo "Release tag $tag already exists; refusing to move it." >&2
-              exit 1
-            fi
-            git tag --annotate "$tag" HEAD --message "Release $tag"
-            git push origin "refs/tags/$tag"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "Release tag $tag already exists; refusing to move it." >&2
+            exit 1
           fi
+          git tag --annotate "$tag" HEAD --message "Release $tag"
+          git push origin "refs/tags/$tag"
           echo "version=$new_version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -249,7 +244,7 @@ jobs:
   release:
     name: Publish GitHub release
     needs: [version, packages]
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
