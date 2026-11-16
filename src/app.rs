@@ -3004,7 +3004,7 @@ impl cosmic::Application for AppModel {
                     } else if key.starts_with("4-") {
                         "total-power-input"
                     } else {
-                        "total-power-input"
+                        "devices"
                     };
                     self.settings
                         .menu_order
