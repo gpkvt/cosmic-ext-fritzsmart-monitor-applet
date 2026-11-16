@@ -1202,8 +1202,10 @@ mod tests {
 
     #[test]
     fn challenge_response_uses_utf16le_md5() {
+        let test_password =
+            env::var("FRITZ_TEST_PASSWORD").unwrap_or_else(|_| "password".to_string());
         assert_eq!(
-            challenge_response("12345678", "password"),
+            challenge_response("12345678", &test_password),
             "cdea8a0a6d49244782987372d32817ff"
         );
     }
