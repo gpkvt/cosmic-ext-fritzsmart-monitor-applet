@@ -1520,7 +1520,7 @@ impl cosmic::Application for AppModel {
                     )
                     .push(
                         widget::Row::new()
-                            .width(cosmic::iced::Length::Fixed(64.0))
+                            .width(cosmic::iced::Length::Fixed(88.0))
                             .spacing(3)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::icon::from_name("go-up-symbolic").size(10))
