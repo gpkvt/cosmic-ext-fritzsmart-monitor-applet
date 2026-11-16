@@ -820,6 +820,7 @@ fn total_power_overview(
     readings: &[FritzReading],
     settings: &FritzSettings,
     history: &VecDeque<(Instant, i64)>,
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     collapsed_sections: &HashSet<String>,
 ) -> Option<Vec<(String, cosmic::Element<'static, Message>)>> {
     let output_low = history.iter().map(|(_, value)| *value).min()?;
@@ -2851,6 +2852,7 @@ impl cosmic::Application for AppModel {
                     &self.readings,
                     &self.settings,
                     &self.history,
+                    &self.device_history,
                     &self.collapsed_menu_sections,
                 ) {
                     menu_cards.extend(power_sections);
