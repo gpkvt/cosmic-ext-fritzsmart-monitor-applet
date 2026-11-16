@@ -1401,9 +1401,9 @@ impl cosmic::Application for AppModel {
             // Add a small left inset to panel icons without increasing the
             // gap between each icon and its value. Keep empty slots aligned.
             let icon_slot = widget::container(icon.unwrap_or_else(|| widget::text("").into()))
-                .width(cosmic::iced::Length::Fixed(20.0))
+                .width(cosmic::iced::Length::Fixed(12.0))
                 .height(cosmic::iced::Length::Fixed(24.0))
-                .padding([0, 0, 0, 4])
+                .padding([0, 0, 0, 2])
                 .center_y(24);
             item = item.push(icon_slot);
             let value_slot = widget::container(value)
@@ -1431,7 +1431,7 @@ impl cosmic::Application for AppModel {
                         "Weather",
                         Some(
                             widget::icon::from_name(weather.icon_name())
-                                .size(self.settings.panel_text_size.into())
+                                .size(10)
                                 .into(),
                         ),
                         self.core
@@ -1453,8 +1453,8 @@ impl cosmic::Application for AppModel {
                         widget::svg(widget::svg::Handle::from_memory(
                             br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5M16 3v5"/><path d="M6 8h12v3a6 6 0 0 1-6 6h0a6 6 0 0 1-6-6V8Z"/><path d="M12 17v2a3 3 0 0 0 3 3h1"/></svg>"#.to_vec(),
                         ))
-                        .width(16)
-                        .height(16)
+                        .width(10)
+                        .height(10)
                         .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
                             color: Some(theme.cosmic().on_bg_color().into()),
                         }))
@@ -1477,8 +1477,8 @@ impl cosmic::Application for AppModel {
                             widget::svg(widget::svg::Handle::from_memory(
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2-5h14l2 5H3Z"/><path d="M4 9h16l-2 11H6L4 9Z"/><path d="M8 9l1 11M16 9l-1 11M5 13h14M6 17h12"/><path d="M12 1v2M2 5l2 1M22 5l-2 1"/></svg>"#.to_vec(),
                             ))
-                            .width(16)
-                            .height(16)
+                            .width(10)
+                            .height(10)
                             .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
                             color: Some(theme.cosmic().on_bg_color().into()),
                         }))
@@ -1536,7 +1536,7 @@ impl cosmic::Application for AppModel {
                     .align_y(cosmic::iced::Alignment::Center)
                     .push(
                         widget::container(widget::text(""))
-                            .width(cosmic::iced::Length::Fixed(20.0))
+                            .width(cosmic::iced::Length::Fixed(12.0))
                             .height(cosmic::iced::Length::Fixed(24.0)),
                     )
                     .push(
