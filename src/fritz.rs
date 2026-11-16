@@ -1033,11 +1033,22 @@ fn parse_internet_bandwidth(xml: &str) -> Option<FritzInternetBandwidth> {
     })
 }
 
+fn wan_common_interface_url(base: &str) -> Option<reqwest::Url> {
+    let mut url = reqwest::Url::parse(base).ok()?;
+    let port = if url.scheme() == "https" { 49_443 } else { 49_000 };
+    url.set_port(Some(port)).ok()?;
+    url.set_path("/igdupnp/control/WANCommonIFC1");
+    url.set_query(None);
+    url.set_fragment(None);
+    Some(url)
+}
+
 async fn fetch_internet_bandwidth(
     client: &Client,
     base: &str,
 ) -> Option<FritzInternetBandwidth> {
     const SERVICE: &str = "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1";
+    let endpoint = wan_common_interface_url(base)?;
     let body = format!(
         r#"<?xml version="1.0" encoding="utf-8"?>
         <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
@@ -1046,7 +1057,7 @@ async fn fetch_internet_bandwidth(
         </s:Envelope>"#
     );
     let response = client
-        .post(format!("{base}/upnp/control/wancommonifconfig1"))
+        .post(endpoint)
         .header(reqwest::header::CONTENT_TYPE, "text/xml; charset=\"utf-8\"")
         .header("SOAPACTION", format!("\"{SERVICE}#GetAddonInfos\""))
         .body(body)
@@ -1148,6 +1159,18 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn wan_common_interface_url_uses_local_tr064_ports() {
+        assert_eq!(
+            wan_common_interface_url("http://192.168.42.1").unwrap().as_str(),
+            "http://192.168.42.1:49000/igdupnp/control/WANCommonIFC1"
+        );
+        assert_eq!(
+            wan_common_interface_url("https://fritz.box").unwrap().as_str(),
+            "https://fritz.box:49443/igdupnp/control/WANCommonIFC1"
+        );
+    }
 
     #[test]
     fn parses_upnp_internet_bandwidth_rates_in_bytes_per_second() {
