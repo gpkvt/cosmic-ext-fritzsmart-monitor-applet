@@ -2400,15 +2400,6 @@ impl cosmic::Application for AppModel {
                 weather_section = weather_section
                     .push(widget::divider::horizontal::default())
                     .push(forecast_toggle);
-                if self.weather_forecast_expanded { "go-down-symbolic" } else { "go-next-symbolic" }
-                        ).size(16)),
-                )
-                .on_press(Message::ToggleWeatherForecast)
-                .padding([4, 0])
-                .class(cosmic::theme::Button::Text);
-                weather_section = weather_section
-                    .push(weather_card)
-                    .push(forecast_toggle);
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
                     let forecast_range_selector = widget::Row::new()
