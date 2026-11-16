@@ -2289,13 +2289,21 @@ impl cosmic::Application for AppModel {
                             .push(widget::text::body(format!("Sunrise  {sunrise}"))),
                     )
                     .push(widget::text::body(format!("Sunset  {sunset}")));
+                // Keep the original Weather menu entry as a static heading.
+                // The forecast has its own independent disclosure control below.
                 let weather_header_row: cosmic::Element<'_, Message> = widget::Row::new()
                     .width(cosmic::iced::Length::Fill)
-                    .align_y(cosmic::iced::Alignment::Start)
+                    .align_y(cosmic::iced::Alignment::Center)
                     .spacing(8)
-                    .push(widget::text::title3(weather.location_name.clone()))
-                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                    .push(widget::text::title2(format!("{:.0}°C", weather.temperature_c)))
+                    .push(widget::icon::from_name(weather.icon_name()).size(20))
+                    .push(
+                        widget::Column::new()
+                            .spacing(1)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::title3("Weather"))
+                            .push(widget::text::caption(weather.location_name.clone())),
+                    )
+                    .push(widget::text::title2(format!("{:.0}°", weather.temperature_c)))
                     .into();
                 let weather_details_panel: cosmic::Element<'_, Message> =
                     widget::container(weather_details)
