@@ -301,9 +301,7 @@ fn quick_slider_anchor_labels(labels: [&'static str; 5]) -> cosmic::Element<'sta
 }
 
 fn format_panel_temperature(temperature_c: f64) -> String {
-    let value = format!("{temperature_c:.1}");
-    let value = value.strip_suffix(".0").unwrap_or(&value);
-    format!("{value} °C")
+    format!("{} °C", format_compact_decimal(temperature_c))
 }
 
 fn format_countdown(seconds: u64) -> String {
@@ -1007,9 +1005,14 @@ fn panel_item_label(id: &str) -> &'static str {
     }
 }
 
+fn format_compact_decimal(value: f64) -> String {
+    let formatted = format!("{value:.1}");
+    formatted.strip_suffix(".0").unwrap_or(&formatted).to_string()
+}
+
 fn format_bandwidth(bits_per_second: u64) -> String {
     let megabits_per_second = bits_per_second as f64 / 1_000_000.0;
-    format!("{megabits_per_second:.1} Mbps")
+    format!("{} Mbps", format_compact_decimal(megabits_per_second))
 }
 
 fn menu_element_label(id: &str) -> &'static str {
@@ -4937,6 +4940,13 @@ mod history_tests {
         assert_eq!(input_power_w(&readings, &HashSet::new()), 0);
         assert_eq!(net_power_w(&readings, &inputs), 50);
         assert_eq!(net_power_w(&readings, &HashSet::new()), 750);
+    }
+
+    #[test]
+    fn panel_bandwidth_omits_trailing_decimal_zero() {
+        assert_eq!(format_bandwidth(1_000_000), "1 Mbps");
+        assert_eq!(format_bandwidth(1_500_000), "1.5 Mbps");
+        assert_eq!(format_bandwidth(0), "0 Mbps");
     }
 
     #[test]
