@@ -159,13 +159,13 @@
     </div></section>
 
     <section id="downloads"><div class="wrap">
-      <div class="section-head reveal"><div class="eyebrow">Ready to install</div><h2>Choose your Linux package.</h2><p>The latest stable FRITZ!Power Monitor release for Linux x86_64 is checked automatically. Download links are shown only after they have been verified against that release: <a id="package-release-link" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/latest" style="color:var(--mint);text-decoration:underline;text-underline-offset:3px">latest stable release</a>.</p></div>
+      <div class="section-head reveal"><div class="eyebrow">Ready to install</div><h2>Choose your Linux package.</h2><p>The latest stable FRITZ!Power Monitor release for Linux x86_64 is checked automatically. Current version: <strong id="package-version">loading…</strong>. Every available install package is listed below, with verified links from that release: <a id="package-release-link" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/latest" style="color:var(--mint);text-decoration:underline;text-underline-offset:3px">latest stable release</a>.</p></div>
       <p id="package-status" class="muted" role="status" aria-live="polite" style="margin-bottom:20px" hidden></p>
       <div class="details-grid" id="package-grid" hidden>
         <article class="detail reveal" hidden><h3>Debian / Ubuntu</h3><p>Install the native Debian package with its declared runtime dependencies.</p><p style="margin-top:18px"><a class="btn" id="package-deb-link" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/download/v0.6.1/fritz-power-monitor_0.6.1_amd64.deb">Download .deb ↗</a></p><p style="margin-top:12px"><code id="package-deb-command">sudo apt install ./fritz-power-monitor_0.6.1_amd64.deb</code></p></article>
         <article class="detail reveal" hidden><h3>AppImage</h3><p>Portable application image with bundled shared-library dependencies. Make it executable, then run it.</p><p style="margin-top:18px"><a class="btn" id="package-appimage-link" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/download/v0.6.1/fritz-power-monitor-0.6.1-x86_64.AppImage">Download AppImage ↗</a></p><p style="margin-top:12px"><code id="package-appimage-command">chmod +x fritz-power-monitor-0.6.1-x86_64.AppImage</code></p></article>
         <article class="detail reveal" hidden><h3>Flatpak bundle</h3><p>Install the standalone Flatpak bundle. This is separate from publication in the official COSMIC Store.</p><p style="margin-top:18px"><a class="btn" id="package-flatpak-link" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/download/v0.6.1/fritz-power-monitor-0.6.1.flatpak">Download Flatpak ↗</a></p><p style="margin-top:12px"><code id="package-flatpak-command">flatpak install --user ./fritz-power-monitor-0.6.1.flatpak</code></p></article>
-        <article class="detail reveal" hidden><h3>Portable archive</h3><p>Binary, desktop entry, application icon, README and license in a compressed archive.</p><p style="margin-top:18px"><a class="btn secondary" id="package-archive-link" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/download/v0.6.1/fritz-power-monitor-v0.6.1-x86_64-unknown-linux-gnu.tar.gz">Download .tar.gz ↗</a></p><p style="margin-top:12px"><code id="package-archive-command">tar -xzf fritz-power-monitor-v0.6.1-x86_64-unknown-linux-gnu.tar.gz</code></p></article>
+        <article class="detail reveal" hidden><h3>Portable archive</h3><p>Binary, desktop entry, application icon, README and license in a compressed archive.</p><p style="margin-top:18px"><a class="btn secondary" id="package-archive-link" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/download/v0.6.1/fritz-power-monitor-v0.6.1-x86_64-unknown-linux-gnu.tar.gz">Download .tar.gz ↗</a></p><p style="margin-top:12px"><code id="package-archive-command">tar -xzf fritz-power-monitor-v0.6.1-x86_64-unknown-linux-gnu.tar.gz</code></p><p style="margin-top:12px"><a id="package-archive-checksum-link" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/download/v0.6.1/fritz-power-monitor-v0.6.1-x86_64-unknown-linux-gnu.tar.gz.sha256" style="color:var(--mint);text-decoration:underline;text-underline-offset:3px">Download archive SHA-256 ↗</a></p></article>
       </div>
       <div class="actions" id="package-checksums-actions" style="margin-top:28px" hidden><a class="btn secondary" id="package-checksums-link" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/download/v0.6.1/SHA256SUMS">SHA-256 checksums ↗</a><a class="btn secondary" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases">All releases ↗</a></div>
       <p class="muted" style="margin-top:18px;font-size:13px">Packages are built for x86_64 Linux. Check the release notes and verify downloaded files against SHA256SUMS before installing. Only assets attached to the latest stable release are displayed; older package links are never carried forward.</p>
@@ -310,6 +310,14 @@
           card.hidden=false;
           visiblePackages++;
         }
+        const archiveChecksum=release.assets.find(asset=>/^fritz-power-monitor-v.*-x86_64-unknown-linux-gnu\.tar\.gz\.sha256$/.test(asset.name));
+        const archiveChecksumLink=document.getElementById('package-archive-checksum-link');
+        if(archiveChecksum&&archiveChecksumLink){
+          archiveChecksumLink.href=archiveChecksum.browser_download_url;
+          archiveChecksumLink.hidden=false;
+        }else if(archiveChecksumLink){
+          archiveChecksumLink.hidden=true;
+        }
         const checksums=release.assets.find(asset=>asset.name==='SHA256SUMS');
         if(checksums){
           document.getElementById('package-checksums-link').href=checksums.browser_download_url;
@@ -328,8 +336,8 @@
       }catch(error){
         grid.hidden=true;
         checksumActions.hidden=true;
-        status.hidden=true;
-        status.textContent='';
+        status.hidden=false;
+        status.textContent='Package downloads could not be loaded from GitHub. Open the latest release to download files directly.';
         console.warn('Could not verify latest package links.',error);
       }
     };
