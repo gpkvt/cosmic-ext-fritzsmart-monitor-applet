@@ -186,9 +186,10 @@ fn parse_refresh_interval_seconds(value: &str) -> u32 {
     value.parse::<u32>().unwrap_or(60).clamp(30, 3600)
 }
 
-const MENU_ELEMENT_IDS: [&str; 5] = [
+const MENU_ELEMENT_IDS: [&str; 6] = [
     "summary",
     "weather",
+    "internet-bandwidth",
     "devices",
     "total-power-output",
     "total-power-input",
