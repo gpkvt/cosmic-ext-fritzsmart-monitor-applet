@@ -2964,9 +2964,14 @@ impl cosmic::Application for AppModel {
                         device_cards = device_cards.push(card);
                         continue;
                     }
+                    // Weather content stays visible; only its forecast has a separate
+                    // disclosure control inside the weather card.
+                    if key == "1-weather" {
+                        device_cards = device_cards.push(card);
+                        continue;
+                    }
                     let section = match key.as_str() {
                         "0-summary" => ("summary", "CURRENT POWER"),
-                        "1-weather" => ("weather", "Weather"),
                         "5-power-difference" => ("power-difference", "POWER DIFFERENCE"),
                         _ => continue,
                     };
