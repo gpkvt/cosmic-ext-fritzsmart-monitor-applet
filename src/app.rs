@@ -1487,19 +1487,15 @@ impl cosmic::Application for AppModel {
             .button_from_element(content, true)
             .on_press(Message::TogglePopup);
 
-        let refresh_button = widget::button::custom(
-            widget::container(widget::icon::from_name("view-refresh-symbolic").size(16))
-                .center_x(32)
-                .center_y(f32::from((suggested.1 + 2 * vertical_padding).max(40))),
-        )
-        .on_press(Message::Refresh)
-        .padding(0)
-        .width(cosmic::iced::Length::Fixed(32.0))
-        .height(cosmic::iced::Length::Fixed(f32::from(
-            (suggested.1 + 2 * vertical_padding).max(40),
-        )))
-        .class(cosmic::theme::Button::AppletIcon)
-        .name("Refresh now");
+        let refresh_button = self
+            .core
+            .applet
+            .button_from_element(
+                widget::icon::from_name("view-refresh-symbolic").size(16),
+                true,
+            )
+            .on_press(Message::Refresh)
+            .name("Refresh now");
 
         let panel_controls = if self.settings.panel_refresh_button {
             widget::Row::new()
