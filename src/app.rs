@@ -1,5 +1,6 @@
 use crate::fritz::{
-    FritzDevice, FritzFetchResult, FritzReading, FritzSettings, TemperatureAlertThresholds,
+    FritzDevice, FritzFetchResult, FritzInternetBandwidth, FritzReading, FritzSettings,
+    TemperatureAlertThresholds,
     discover_devices, fetch_fritz_data,
 };
 use crate::weather::{WeatherData, WeatherForecast, fetch_weather, fetch_weather_forecast};
@@ -22,6 +23,7 @@ pub struct AppModel {
     core: cosmic::Core,
     popup: Option<Id>,
     readings: Vec<FritzReading>,
+    internet_bandwidth: Option<FritzInternetBandwidth>,
     error: Option<String>,
     weather_error: Option<String>,
     updated: Option<String>,
@@ -80,6 +82,7 @@ pub enum Message {
     PanelRefreshButtonChanged(bool),
     PanelAverageTemperatureChanged(bool),
     PanelExcludeSolarTemperatureChanged(bool),
+    PanelInternetBandwidthChanged(bool),
     GraphTimespanChanged(u32),
     GraphStyleChanged(String),
     RefreshIntervalChanged(u32),
@@ -1017,9 +1020,16 @@ fn panel_item_label(id: &str) -> &'static str {
         "weather" => "Weather",
         "power-consumption" => "Power consumption",
         "solar-power" => "Solar power",
+        "internet-download" => "Internet download",
+        "internet-upload" => "Internet upload",
         "temperature" => "Temperature",
         _ => "Unknown item",
     }
+}
+
+fn format_bandwidth(bytes_per_second: u64) -> String {
+    let megabits_per_second = bytes_per_second as f64 * 8.0 / 1_000_000.0;
+    format!("{megabits_per_second:.1} Mbps")
 }
 
 fn menu_element_label(id: &str) -> &'static str {
@@ -1482,6 +1492,51 @@ impl cosmic::Application for AppModel {
                     .into(),
                 ));
             }
+
+            if self.settings.panel_internet_bandwidth {
+                let (download, upload) = self
+                    .internet_bandwidth
+                    .as_ref()
+                    .map(|bandwidth| (
+                        format_bandwidth(bandwidth.download_bytes_per_second),
+                        format_bandwidth(bandwidth.upload_bytes_per_second),
+                    ))
+                    .unwrap_or_else(|| ("-- Mbps".to_string(), "-- Mbps".to_string()));
+                panel_items.push((
+                    "internet-download",
+                    panel_item(
+                        "Internet download",
+                        Some(
+                            widget::icon::from_name("go-down-symbolic")
+                                .size(self.settings.panel_text_size.into())
+                                .into(),
+                        ),
+                        self.core
+                            .applet
+                            .text(download)
+                            .size(f32::from(self.settings.panel_text_size))
+                            .into(),
+                    )
+                    .into(),
+                ));
+                panel_items.push((
+                    "internet-upload",
+                    panel_item(
+                        "Internet upload",
+                        Some(
+                            widget::icon::from_name("go-up-symbolic")
+                                .size(self.settings.panel_text_size.into())
+                                .into(),
+                        ),
+                        self.core
+                            .applet
+                            .text(upload)
+                            .size(f32::from(self.settings.panel_text_size))
+                            .into(),
+                    )
+                    .into(),
+                ));
+            }
             if let Some(temperature) = temperature {
                 panel_items.push((
                     "temperature",
@@ -1680,17 +1735,46 @@ impl cosmic::Application for AppModel {
                             widget::toggler(self.settings.panel_refresh_button)
                                 .on_toggle(Message::PanelRefreshButtonChanged)
                         ).padding([8, 10])))
-                    .push(widget::Row::new()
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::Column::new()
-                            .spacing(3)
-                            .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::body("Average temperature"))
-                            .push(widget::text::caption("When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.")))
-                        .push(widget::container(
-                            widget::toggler(self.settings.panel_average_temperature)
-                                .on_toggle(Message::PanelAverageTemperatureChanged)
-                        )                        .padding([8, 10])) );
+                    .push(
+                        widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::Column::new()
+                                    .spacing(3)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::body("Show internet bandwidth"))
+                                    .push(widget::text::caption(
+                                        "Display current FRITZ!Box internet download and upload rates in Mbps in the panel.",
+                                    )),
+                            )
+                            .push(
+                                widget::container(
+                                    widget::toggler(self.settings.panel_internet_bandwidth)
+                                        .on_toggle(Message::PanelInternetBandwidthChanged),
+                                )
+                                .padding([8, 10]),
+                            ),
+                    )
+                    .push(
+                        widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::Column::new()
+                                    .spacing(3)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::body("Average temperature"))
+                                    .push(widget::text::caption(
+                                        "When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.",
+                                    )),
+                            )
+                            .push(
+                                widget::container(
+                                    widget::toggler(self.settings.panel_average_temperature)
+                                        .on_toggle(Message::PanelAverageTemperatureChanged),
+                                )
+                                .padding([8, 10]),
+                            ),
+                    );
                 if self.settings.panel_average_temperature {
                     content = content.push(
                         widget::Row::new()
@@ -1890,6 +1974,8 @@ impl cosmic::Application for AppModel {
                         "weather" => "weather",
                         "power-consumption" => "power-consumption",
                         "solar-power" => "solar-power",
+                        "internet-download" => "internet-download",
+                        "internet-upload" => "internet-upload",
                         "temperature" => "temperature",
                         _ => continue,
                     };
@@ -3385,6 +3471,7 @@ impl cosmic::Application for AppModel {
                             &self.pending_power_changes,
                         );
                         notify_missing_devices(&newly_missing);
+                        self.internet_bandwidth = result.internet_bandwidth;
                         let readings = result.readings;
                         clear_confirmed_power_changes(
                             &mut self.pending_power_targets,
@@ -3449,6 +3536,7 @@ impl cosmic::Application for AppModel {
                         }
                     }
                     Err(error) => {
+                        self.internet_bandwidth = None;
                         // Do not continue presenting the last known switch state as live.
                         for reading in &mut self.readings {
                             reading.power_state = None;
@@ -3760,6 +3848,18 @@ impl cosmic::Application for AppModel {
             Message::PanelExcludeSolarTemperatureChanged(value) => {
                 self.settings.panel_exclude_solar_temperature = value;
                 self.persist_settings();
+            }
+            Message::PanelInternetBandwidthChanged(value) => {
+                self.settings.panel_internet_bandwidth = value;
+                self.persist_settings();
+                if value {
+                    self.refresh_started_at = Some(Instant::now());
+                    self.next_refresh_at = None;
+                    return Task::perform(fetch_fritz_data(), |result| {
+                        cosmic::Action::App(Message::Updated(result))
+                    });
+                }
+                self.internet_bandwidth = None;
             }
             Message::GraphTimespanChanged(value) => {
                 self.settings.graph_timespan_minutes = value.clamp(5, 2_102_400);

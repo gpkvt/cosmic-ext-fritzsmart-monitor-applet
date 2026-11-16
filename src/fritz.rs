@@ -28,13 +28,17 @@ pub fn http_request_diagnostics() -> Vec<HttpRequestDiagnostic> {
         .unwrap_or_default()
 }
 
-fn record_http_response(url: &reqwest::Url, status: reqwest::StatusCode) {
+fn record_http_response_with_method(
+    url: &reqwest::Url,
+    status: reqwest::StatusCode,
+    method: &'static str,
+) {
     if let Ok(mut log) = HTTP_REQUEST_LOG.lock() {
         log.push_back(HttpRequestDiagnostic {
             timestamp: chrono::Local::now()
                 .format("%Y-%m-%d %H:%M:%S%.3f")
                 .to_string(),
-            method: "GET",
+            method,
             path: {
                 let mut path = url.path().to_string();
                 if let Some(command) = url
@@ -68,9 +72,16 @@ pub struct FritzReading {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct FritzInternetBandwidth {
+    pub download_bytes_per_second: u64,
+    pub upload_bytes_per_second: u64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct FritzFetchResult {
     pub readings: Vec<FritzReading>,
     pub missing_devices: Vec<(String, String)>,
+    pub internet_bandwidth: Option<FritzInternetBandwidth>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -108,6 +119,7 @@ pub struct FritzSettings {
     pub panel_refresh_button: bool,
     pub panel_average_temperature: bool,
     pub panel_exclude_solar_temperature: bool,
+    pub panel_internet_bandwidth: bool,
     pub graph_timespan_minutes: u32,
     pub graph_style: String,
     pub refresh_interval_seconds: u32,
@@ -138,6 +150,7 @@ impl Default for FritzSettings {
             panel_refresh_button: true,
             panel_average_temperature: false,
             panel_exclude_solar_temperature: false,
+            panel_internet_bandwidth: false,
             graph_timespan_minutes: 15,
             graph_style: "line".into(),
             refresh_interval_seconds: 60,
@@ -223,7 +236,14 @@ fn parse_menu_order(value: &str) -> Vec<String> {
     order
 }
 
-const PANEL_ITEM_IDS: [&str; 4] = ["weather", "power-consumption", "solar-power", "temperature"];
+const PANEL_ITEM_IDS: [&str; 6] = [
+    "weather",
+    "power-consumption",
+    "solar-power",
+    "internet-download",
+    "internet-upload",
+    "temperature",
+];
 
 fn default_panel_order() -> Vec<String> {
     PANEL_ITEM_IDS.iter().map(|id| (*id).to_string()).collect()
@@ -345,6 +365,8 @@ impl FritzSettings {
                 .eq_ignore_ascii_case("true"),
             panel_exclude_solar_temperature: get("PANEL_EXCLUDE_SOLAR_TEMPERATURE")
                 .eq_ignore_ascii_case("true"),
+            panel_internet_bandwidth: get("PANEL_INTERNET_BANDWIDTH")
+                .eq_ignore_ascii_case("true"),
             graph_timespan_minutes: parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")),
             graph_style: if get("GRAPH_STYLE") == "bar" {
                 "bar".into()
@@ -422,7 +444,7 @@ impl FritzSettings {
         let panel_order = parse_panel_order(&self.panel_order.join(",")).join(",");
         let device_order = parse_device_order(&self.device_order.join(",")).join(",");
         let contents = format!(
-            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\n",
+            "FRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\n",
             self.url,
             self.username,
             self.password,
@@ -447,6 +469,11 @@ impl FritzSettings {
                 "false"
             },
             if self.panel_exclude_solar_temperature {
+                "true"
+            } else {
+                "false"
+            },
+            if self.panel_internet_bandwidth {
                 "true"
             } else {
                 "false"
@@ -615,11 +642,19 @@ fn is_complete_protocol_payload(bytes: &[u8]) -> bool {
 }
 
 async fn read_xml_response(
-    mut response: reqwest::Response,
+    response: reqwest::Response,
     context: &str,
 ) -> Result<String, String> {
+    read_xml_response_with_method(response, context, "GET").await
+}
+
+async fn read_xml_response_with_method(
+    mut response: reqwest::Response,
+    context: &str,
+    method: &'static str,
+) -> Result<String, String> {
     let status = response.status();
-    record_http_response(response.url(), status);
+    record_http_response_with_method(response.url(), status, method);
     if !status.is_success() {
         return Err(format!("{context}: HTTP {status}"));
     }
@@ -980,7 +1015,67 @@ fn parse_fetch_result_xml(xml: &str, selected_ains: &[String]) -> Result<FritzFe
     Ok(FritzFetchResult {
         readings,
         missing_devices,
+        internet_bandwidth: None,
     })
+}
+
+
+fn parse_internet_bandwidth(xml: &str) -> Option<FritzInternetBandwidth> {
+    let document = Document::parse(xml).ok()?;
+    let read_rate = |name: &str| {
+        document
+            .descendants()
+            .find(|node| node.has_tag_name(name))?
+            .text()?
+            .trim()
+            .parse::<u64>()
+            .ok()
+    };
+    Some(FritzInternetBandwidth {
+        download_bytes_per_second: read_rate("NewByteReceiveRate")?,
+        upload_bytes_per_second: read_rate("NewByteSendRate")?,
+    })
+}
+
+fn wan_common_interface_url(base: &str) -> Option<reqwest::Url> {
+    let mut url = reqwest::Url::parse(base).ok()?;
+    let port = if url.scheme() == "https" { 49_443 } else { 49_000 };
+    url.set_port(Some(port)).ok()?;
+    url.set_path("/igdupnp/control/WANCommonIFC1");
+    url.set_query(None);
+    url.set_fragment(None);
+    Some(url)
+}
+
+async fn fetch_internet_bandwidth(
+    client: &Client,
+    base: &str,
+) -> Option<FritzInternetBandwidth> {
+    const SERVICE: &str = "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1";
+    let endpoint = wan_common_interface_url(base)?;
+    let body = format!(
+        r#"<?xml version="1.0" encoding="utf-8"?>
+        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+          s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+          <s:Body><u:GetAddonInfos xmlns:u="{SERVICE}"></u:GetAddonInfos></s:Body>
+        </s:Envelope>"#
+    );
+    let response = client
+        .post(endpoint)
+        .header(reqwest::header::CONTENT_TYPE, "text/xml; charset=\"utf-8\"")
+        .header("SOAPACTION", format!("\"{SERVICE}#GetAddonInfos\""))
+        .body(body)
+        .send()
+        .await
+        .ok()?;
+    let xml = read_xml_response_with_method(
+        response,
+        "FRITZ!Box internet bandwidth request failed",
+        "POST",
+    )
+    .await
+    .ok()?;
+    parse_internet_bandwidth(&xml)
 }
 
 pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
@@ -995,6 +1090,16 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     let base = settings.url.trim_end_matches('/');
     let devices_xml = fetch_device_list_xml(&client, base, &sid).await?;
     let mut result = parse_fetch_result_xml(&devices_xml, &selected_ains)?;
+    if settings.panel_internet_bandwidth {
+        // WAN statistics are optional: unsupported firmware or a disabled UPnP
+        // service must not interrupt Smart Home device monitoring.
+        result.internet_bandwidth = tokio::time::timeout(
+            Duration::from_secs(3),
+            fetch_internet_bandwidth(&client, base),
+        )
+        .await
+        .unwrap_or(None);
+    }
 
     // Query the dedicated switch-state endpoint: power-meter XML can lag behind
     // the actual actuator state on some FRITZ!Box devices.
@@ -1064,6 +1169,40 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn wan_common_interface_url_uses_local_tr064_ports() {
+        assert_eq!(
+            wan_common_interface_url("http://192.168.42.1").unwrap().as_str(),
+            "http://192.168.42.1:49000/igdupnp/control/WANCommonIFC1"
+        );
+        assert_eq!(
+            wan_common_interface_url("https://fritz.box").unwrap().as_str(),
+            "https://fritz.box:49443/igdupnp/control/WANCommonIFC1"
+        );
+    }
+
+    #[test]
+    fn parses_upnp_internet_bandwidth_rates_in_bytes_per_second() {
+        let xml = r#"<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+          <s:Body><u:GetAddonInfosResponse>
+            <NewByteSendRate>125000</NewByteSendRate>
+            <NewByteReceiveRate>1250000</NewByteReceiveRate>
+          </u:GetAddonInfosResponse></s:Body>
+        </s:Envelope>"#;
+        assert_eq!(
+            parse_internet_bandwidth(xml),
+            Some(FritzInternetBandwidth {
+                download_bytes_per_second: 1_250_000,
+                upload_bytes_per_second: 125_000,
+            })
+        );
+        assert_eq!(parse_internet_bandwidth("<invalid"), None);
+        assert_eq!(
+            parse_internet_bandwidth("<result><NewByteSendRate>bad</NewByteSendRate></result>"),
+            None
+        );
+    }
 
     #[test]
     fn panel_text_size_defaults_and_is_clamped() {
@@ -1426,6 +1565,7 @@ mod tests {
         let settings = FritzSettings::default();
         assert!(!settings.weather_enabled);
         assert!(!settings.panel_exclude_solar_temperature);
+        assert!(!settings.panel_internet_bandwidth);
         assert!(settings.openweathermap_api_key.is_empty());
         assert!(settings.weather_location.is_empty());
         assert_eq!(settings.weather_refresh_interval_minutes, 10);
@@ -1435,7 +1575,14 @@ mod tests {
     fn panel_order_defaults_to_all_individual_panel_items() {
         assert_eq!(
             FritzSettings::default().panel_order,
-            vec!["weather", "power-consumption", "solar-power", "temperature"]
+            vec![
+                "weather",
+                "power-consumption",
+                "solar-power",
+                "internet-download",
+                "internet-upload",
+                "temperature"
+            ]
                 .into_iter()
                 .map(str::to_string)
                 .collect::<Vec<_>>()
@@ -1446,7 +1593,14 @@ mod tests {
     fn panel_order_parser_preserves_custom_order_and_repairs_invalid_entries() {
         assert_eq!(
             parse_panel_order("solar-power,power-consumption,solar-power,unknown"),
-            vec!["solar-power", "power-consumption", "weather", "temperature"]
+            vec![
+                "solar-power",
+                "power-consumption",
+                "weather",
+                "internet-download",
+                "internet-upload",
+                "temperature"
+            ]
                 .into_iter()
                 .map(str::to_string)
                 .collect::<Vec<_>>()
