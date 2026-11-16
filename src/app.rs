@@ -99,6 +99,7 @@ pub enum Message {
     ToggleQuickOptions,
     ToggleDeviceDetails(String),
     MoveMenuElement(&'static str, bool),
+    MovePanelItem(&'static str, bool),
     QuickRefreshIntervalPreview(u32),
     CommitQuickRefreshInterval,
     QuickGraphTimespanPreview(u16),
@@ -975,6 +976,16 @@ fn power_difference_overview(
     Some(surface_card(column.into(), 14))
 }
 
+fn panel_item_label(id: &str) -> &'static str {
+    match id {
+        "weather" => "Weather",
+        "power-consumption" => "Power consumption",
+        "solar-power" => "Solar power",
+        "temperature" => "Temperature",
+        _ => "Unknown item",
+    }
+}
+
 fn menu_element_label(id: &str) -> &'static str {
     match id {
         "summary" => "Live power summary",
@@ -1001,6 +1012,7 @@ fn settings_section_details(section: &'static str) -> (&'static str, &'static st
         "connection" => ("Connection", "FRITZ!Box address and security settings"),
         "device" => ("Devices", "Select and configure monitored devices"),
         "menu-order" => ("Menu order", "Choose the order of popup elements"),
+        "panel-order" => ("Panel order", "Arrange individual panel readings"),
         "diagnostics" => ("Diagnostics", "Connection and settings status"),
         _ => ("Settings", "Configure your power monitor"),
     }
@@ -1027,6 +1039,7 @@ fn settings_section_header<'a>(
         "connection" => ("network-server-symbolic", "FRITZ!Box access and security"),
         "device" => ("computer-symbolic", "Choose and configure devices"),
         "menu-order" => ("view-list-symbolic", "Arrange popup sections"),
+        "panel-order" => ("view-sort-ascending-symbolic", "Arrange panel readings"),
         "diagnostics" => ("dialog-information-symbolic", "Connection and save status"),
         _ => ("preferences-system-symbolic", "Applet preferences"),
     };
@@ -1330,88 +1343,94 @@ impl cosmic::Application for AppModel {
             )
         };
 
-        let content = widget::Row::new()
+        let mut content = widget::Row::new()
             .spacing(f32::from(self.settings.panel_item_spacing))
             .align_y(cosmic::iced::Alignment::Center);
-        let content = if self.settings.weather_enabled {
+        let mut panel_items: Vec<(&str, cosmic::Element<'static, Message>)> = Vec::new();
+
+        if self.settings.weather_enabled {
             if let Some(weather) = &self.weather {
-                content.push(panel_item(
-                    "Weather",
-                    Some(
-                        widget::icon::from_name(weather.icon_name())
-                            .size(self.settings.panel_text_size.into())
+                panel_items.push((
+                    "weather",
+                    panel_item(
+                        "Weather",
+                        Some(
+                            widget::icon::from_name(weather.icon_name())
+                                .size(self.settings.panel_text_size.into())
+                                .into(),
+                        ),
+                        self.core
+                            .applet
+                            .text(format!("{:.0}°", weather.temperature_c))
+                            .size(f32::from(self.settings.panel_text_size))
                             .into(),
-                    ),
-                    self.core
-                        .applet
-                        .text(format!("{:.0}°", weather.temperature_c))
-                        .size(f32::from(self.settings.panel_text_size))
-                        .into(),
-                ))
-            } else {
-                content
-            }
-        } else {
-            content
-        };
-        let content = if self.error.is_none() {
-            content.push(panel_item(
-                "Power consumption",
-                Some(
-                    widget::icon::from_name("electricity-symbolic")
-                        .size(self.settings.panel_text_size.into())
-                        .into(),
-                ),
-                self.core
-                    .applet
-                    .text(power)
-                    .size(f32::from(self.settings.panel_text_size))
+                    )
                     .into(),
-            ))
-        } else {
-            content
-        };
-        let content = if self.error.is_none() {
-            if let Some(input_power) = input_power {
-                content.push(panel_item(
-                    "Solar power",
-                    None,
-                    self.core
-                        .applet
-                        .text(input_power)
-                        .size(f32::from(self.settings.panel_text_size))
-                        .into(),
-                ))
-            } else {
-                content
+                ));
             }
-        } else {
-            content
-        };
-        let content = if self.error.is_none() {
-            if let Some(temperature) = temperature {
-                content.push(panel_item(
-                    "Temperature",
+        }
+        if self.error.is_none() {
+            panel_items.push((
+                "power-consumption",
+                panel_item(
+                    "Power consumption",
                     Some(
-                        widget::icon::from_name("thermometer-symbolic")
+                        widget::icon::from_name("electricity-symbolic")
                             .size(self.settings.panel_text_size.into())
                             .into(),
                     ),
                     self.core
                         .applet
-                        .text(temperature)
+                        .text(power)
                         .size(f32::from(self.settings.panel_text_size))
                         .into(),
-                ))
-            } else {
-                content
+                )
+                .into(),
+            ));
+            if let Some(input_power) = input_power {
+                panel_items.push((
+                    "solar-power",
+                    panel_item(
+                        "Solar power",
+                        None,
+                        self.core
+                            .applet
+                            .text(input_power)
+                            .size(f32::from(self.settings.panel_text_size))
+                            .into(),
+                    )
+                    .into(),
+                ));
             }
-        } else {
-            content
-        };
+            if let Some(temperature) = temperature {
+                panel_items.push((
+                    "temperature",
+                    panel_item(
+                        "Temperature",
+                        Some(
+                            widget::icon::from_name("thermometer-symbolic")
+                                .size(self.settings.panel_text_size.into())
+                                .into(),
+                        ),
+                        self.core
+                            .applet
+                            .text(temperature)
+                            .size(f32::from(self.settings.panel_text_size))
+                            .into(),
+                    )
+                    .into(),
+                ));
+            }
+        }
+        for item_id in &self.settings.panel_order {
+            if let Some(index) = panel_items.iter().position(|(id, _)| id == item_id) {
+                let (_, item) = panel_items.remove(index);
+                content = content.push(item);
+            }
+        }
         // Keep connection health visible even when the popup is closed.
-        let content = if self.error.is_some() {
-            content.push(panel_item(
+        if self.error.is_some() {
+            content = content.push(panel_item(
                 "Connection error",
                 Some(
                     widget::icon::from_name("dialog-warning-symbolic")
@@ -1423,12 +1442,10 @@ impl cosmic::Application for AppModel {
                     .text("Connection error")
                     .size(f32::from(self.settings.panel_text_size))
                     .into(),
-            ))
-        } else {
-            content
-        };
-        let content = if self.weather_error.is_some() {
-            content.push(panel_item(
+            ));
+        }
+        if self.weather_error.is_some() {
+            content = content.push(panel_item(
                 "Weather unavailable",
                 Some(
                     widget::icon::from_name("weather-severe-alert-symbolic")
@@ -1440,10 +1457,8 @@ impl cosmic::Application for AppModel {
                     .text("Weather unavailable")
                     .size(f32::from(self.settings.panel_text_size))
                     .into(),
-            ))
-        } else {
-            content
-        };
+            ));
+        }
 
         // Keep the readings in their own popup button so the refresh action
         // can be shown or hidden independently in the applet's Panel settings.
@@ -1548,6 +1563,7 @@ impl cosmic::Application for AppModel {
                     ("Connection", "connection"),
                     ("Devices", "device"),
                     ("Menu order", "menu-order"),
+                    ("Panel order", "panel-order"),
                     ("Diagnostics", "diagnostics"),
                 ] {
                     content = content.push(settings_section_header(title, section));
@@ -1768,6 +1784,33 @@ impl cosmic::Application for AppModel {
                     ));
                     content = content.push(row);
                     if index + 1 < self.settings.menu_order.len() {
+                        content = content.push(widget::divider::horizontal::default());
+                    }
+                }
+            }
+
+            if self.active_settings_section == Some("panel-order") {
+                content = content
+                    .push(widget::text::body("Panel item order"))
+                    .push(widget::text::caption(
+                        "Move each reading independently. Changes are saved automatically.",
+                    ));
+                for (index, item) in self.settings.panel_order.iter().enumerate() {
+                    let id = match item.as_str() {
+                        "weather" => "weather",
+                        "power-consumption" => "power-consumption",
+                        "solar-power" => "solar-power",
+                        "temperature" => "temperature",
+                        _ => continue,
+                    };
+                    let mut row = widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::body(panel_item_label(id)).width(cosmic::iced::Length::Fill));
+                    row = row.push(icon_action_button("+", "Move up", Message::MovePanelItem(id, true)));
+                    row = row.push(icon_action_button("−", "Move down", Message::MovePanelItem(id, false)));
+                    content = content.push(row);
+                    if index + 1 < self.settings.panel_order.len() {
                         content = content.push(widget::divider::horizontal::default());
                     }
                 }
@@ -3228,6 +3271,27 @@ impl cosmic::Application for AppModel {
                 };
                 if let Some(target) = target {
                     self.settings.menu_order.swap(index, target);
+                    self.persist_settings();
+                }
+            }
+            Message::MovePanelItem(item, move_up) => {
+                let Some(index) = self
+                    .settings
+                    .panel_order
+                    .iter()
+                    .position(|existing| existing == item)
+                else {
+                    return Task::none();
+                };
+                let target = if move_up {
+                    index.checked_sub(1)
+                } else if index + 1 < self.settings.panel_order.len() {
+                    Some(index + 1)
+                } else {
+                    None
+                };
+                if let Some(target) = target {
+                    self.settings.panel_order.swap(index, target);
                     self.persist_settings();
                 }
             }
