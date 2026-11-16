@@ -420,13 +420,7 @@ fn graph_visual(
     style: &str,
     unit: &str,
 ) -> cosmic::Element<'static, Message> {
-    graph_visual_with_dimensions(
-        values,
-        style,
-        unit,
-        48.0,
-        cosmic::iced::Length::Fixed(56.0),
-    )
+    graph_visual_with_dimensions(values, style, unit, 48.0, cosmic::iced::Length::Fixed(56.0))
 }
 
 fn graph_visual_large(
@@ -528,7 +522,9 @@ fn graph_visual_with_dimensions(
                 .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
         )
         .push(graph)
-        .push(widget::text::caption(format!("CURRENT {current_value:.1} {unit}")));
+        .push(widget::text::caption(format!(
+            "CURRENT {current_value:.1} {unit}"
+        )));
     if matches!(widget_height, cosmic::iced::Length::Fill) {
         content.height(cosmic::iced::Length::Fill).into()
     } else {
@@ -1028,7 +1024,10 @@ fn panel_item_label(id: &str) -> &'static str {
 
 fn format_compact_decimal(value: f64) -> String {
     let formatted = format!("{value:.1}");
-    formatted.strip_suffix(".0").unwrap_or(&formatted).to_string()
+    formatted
+        .strip_suffix(".0")
+        .unwrap_or(&formatted)
+        .to_string()
 }
 
 fn format_bandwidth(bits_per_second: u64) -> String {
@@ -1408,19 +1407,14 @@ impl cosmic::Application for AppModel {
             // Observe raw events: the normal keyboard subscription drops
             // events already captured by a popup widget or the compositor.
             // Keep the originating surface ID so Escape only closes this graph.
-            let escape = cosmic::iced::event::listen_raw(
-                |event, _status, window| match event {
-                    cosmic::iced::Event::Keyboard(
-                        cosmic::iced::keyboard::Event::KeyPressed {
-                            key: cosmic::iced::keyboard::Key::Named(
-                                cosmic::iced::keyboard::key::Named::Escape,
-                            ),
-                            ..
-                        },
-                    ) => Some(Message::EscapePressed(window)),
-                    _ => None,
-                },
-            );
+            let escape = cosmic::iced::event::listen_raw(|event, _status, window| match event {
+                cosmic::iced::Event::Keyboard(cosmic::iced::keyboard::Event::KeyPressed {
+                    key:
+                        cosmic::iced::keyboard::Key::Named(cosmic::iced::keyboard::key::Named::Escape),
+                    ..
+                }) => Some(Message::EscapePressed(window)),
+                _ => None,
+            });
             Subscription::batch([clock, escape])
         } else {
             clock
