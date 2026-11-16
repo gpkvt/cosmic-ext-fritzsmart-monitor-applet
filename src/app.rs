@@ -3081,9 +3081,17 @@ impl cosmic::Application for AppModel {
 
             content = content.push(
                 widget::Row::new()
+                    .spacing(8)
                     .width(cosmic::iced::Length::Fill)
                     .align_y(cosmic::iced::Alignment::Center)
-                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                    .push(
+                        action_button(
+                            "preferences-system-symbolic",
+                            "Settings",
+                            Message::ToggleSettings,
+                        )
+                        .width(cosmic::iced::Length::Fill),
+                    )
                     .push(
                         widget::button::custom(
                             widget::Row::new()
@@ -3094,6 +3102,7 @@ impl cosmic::Application for AppModel {
                         )
                         .on_press(Message::ToggleQuickOptions)
                         .padding([8, 12])
+                        .width(cosmic::iced::Length::Fill)
                         .class(cosmic::theme::Button::Text),
                     ),
             );
@@ -3148,14 +3157,6 @@ impl cosmic::Application for AppModel {
                 content = content.push(error_notice("CONNECTION ERROR", error));
             }
 
-            content = content.push(widget::divider::horizontal::default()).push(
-                action_button(
-                    "preferences-system-symbolic",
-                    "Settings",
-                    Message::ToggleSettings,
-                )
-                .width(cosmic::iced::Length::Fill),
-            );
         }
 
         content = content.push(
