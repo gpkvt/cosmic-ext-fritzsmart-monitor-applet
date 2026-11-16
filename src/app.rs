@@ -21,6 +21,7 @@ static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
 pub struct AppModel {
     core: cosmic::Core,
     popup: Option<Id>,
+    graph_window: Option<Id>,
     readings: Vec<FritzReading>,
     internet_bandwidth: Option<FritzInternetBandwidth>,
     bandwidth_history: VecDeque<(Instant, u64, u64)>,
@@ -90,6 +91,7 @@ pub enum Message {
     GraphTimespanChanged(u32),
     GraphStyleChanged(String),
     ShowGraph(String, Vec<f64>, String),
+    GraphWindowOpened(Id),
     CloseGraph,
     RefreshIntervalChanged(u32),
     DiscoverDevices,
@@ -427,7 +429,7 @@ fn graph_visual_large(
     unit: &str,
 ) -> cosmic::Element<'static, Message> {
     // The enlarged graph should use a genuinely large canvas, not just a slightly taller compact card.
-    graph_visual_with_dimensions(values, style, unit, 560.0, 560)
+    graph_visual_with_dimensions(values, style, unit, 420.0, 420)
 }
 
 fn graph_visual_with_dimensions(
@@ -1793,102 +1795,94 @@ impl cosmic::Application for AppModel {
         // Only render applet content for the popup we created. Other
         // secondary surfaces (including native text context menus) must not
         // accidentally receive the applet's interactive view.
+        // The expanded graph is a regular, independently managed desktop window.
+        if self.graph_window == Some(id) {
+            if let Some((title, values, unit)) = &self.expanded_graph {
+                let minimum = values.iter().copied().reduce(f64::min).unwrap_or_default();
+                let maximum = values.iter().copied().reduce(f64::max).unwrap_or_default();
+                let current = values.last().copied().unwrap_or_default();
+                let graph_page = widget::Column::new()
+                    .spacing(14)
+                    .padding(18)
+                    .width(cosmic::iced::Length::Fill)
+                    .push(
+                        widget::Row::new()
+                            .spacing(10)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::button::custom(
+                                    widget::icon::from_name("go-previous-symbolic").size(18),
+                                )
+                                .on_press(Message::CloseGraph)
+                                .padding(8)
+                                .class(cosmic::theme::Button::Text),
+                            )
+                            .push(widget::text::title2(title.clone()).width(cosmic::iced::Length::Fill))
+                            .push(
+                                widget::button::custom(
+                                    widget::Row::new()
+                                        .spacing(6)
+                                        .align_y(cosmic::iced::Alignment::Center)
+                                        .push(widget::icon::from_name("window-close-symbolic").size(18))
+                                        .push(widget::text::caption(crate::i18n::tr(
+                                            &self.settings.language,
+                                            "Close (Esc)",
+                                        ))),
+                                )
+                                .on_press(Message::CloseGraph)
+                                .padding(8)
+                                .class(cosmic::theme::Button::Text),
+                            ),
+                    )
+                    .push(widget::divider::horizontal::default())
+                    .push(graph_visual_large(
+                        values.iter().copied(),
+                        &self.settings.graph_style,
+                        unit,
+                    ))
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .push(
+                                widget::text::caption(format!("MIN {minimum:.1} {unit}"))
+                                    .width(cosmic::iced::Length::Fill),
+                            )
+                            .push(
+                                widget::text::caption(format!("CURRENT {current:.1} {unit}"))
+                                    .width(cosmic::iced::Length::Fill),
+                            )
+                            .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
+                    )
+                    .push(
+                        widget::Row::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::caption(format_graph_axis_start(
+                                self.settings.graph_timespan_minutes,
+                            )))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(widget::text::caption(crate::i18n::tr(
+                                &self.settings.language,
+                                "Now",
+                            ))),
+                    )
+                    .push(widget::text::caption(format!(
+                        "{} samples · {}",
+                        values.len(),
+                        format_graph_timespan(self.settings.graph_timespan_minutes)
+                    )));
+                return widget::container(graph_page)
+                    .width(cosmic::iced::Length::Fill)
+                    .height(cosmic::iced::Length::Fill)
+                    .into();
+            }
+
+        }
+        // Only render applet content for the popup we created. Other
+        // secondary surfaces (including native text context menus) must not
+        // accidentally receive the applet's interactive view.
         if self.popup != Some(id) {
             return widget::text("").into();
         }
-
-        // Give the graph cards enough horizontal room to use the available space.
-        // Keep this width explicit because the applet popup otherwise stays narrow.
-        let mut content = widget::Column::new()
-            .spacing(10)
-            .padding(12)
-            .width(cosmic::iced::Length::Fill);
-
-        if let Some((title, values, unit)) = &self.expanded_graph {
-            let minimum = values.iter().copied().reduce(f64::min).unwrap_or_default();
-            let maximum = values.iter().copied().reduce(f64::max).unwrap_or_default();
-            let current = values.last().copied().unwrap_or_default();
-            let graph_page = widget::Column::new()
-                .spacing(14)
-                .padding(18)
-                .width(cosmic::iced::Length::Fill)
-                .push(
-                    widget::Row::new()
-                        .spacing(10)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(
-                            widget::button::custom(
-                                widget::icon::from_name("go-previous-symbolic").size(18),
-                            )
-                            .on_press(Message::CloseGraph)
-                            .padding(8)
-                            .class(cosmic::theme::Button::Text),
-                        )
-                        .push(widget::text::title2(title.clone()).width(cosmic::iced::Length::Fill))
-                        .push(
-                            widget::button::custom(
-                                widget::Row::new()
-                                    .spacing(6)
-                                    .align_y(cosmic::iced::Alignment::Center)
-                                    .push(widget::icon::from_name("window-close-symbolic").size(18))
-                                    .push(widget::text::caption(crate::i18n::tr(
-                                        &self.settings.language,
-                                        "Close (Esc)",
-                                    ))),
-                            )
-                            .on_press(Message::CloseGraph)
-                            .padding(8)
-                            .class(cosmic::theme::Button::Text),
-                        ),
-                )
-                .push(widget::divider::horizontal::default())
-                .push(graph_visual_large(
-                    values.iter().copied(),
-                    &self.settings.graph_style,
-                    unit,
-                ))
-                .push(
-                    widget::Row::new()
-                        .spacing(8)
-                        .push(
-                            widget::text::caption(format!("MIN {minimum:.1} {unit}"))
-                                .width(cosmic::iced::Length::Fill),
-                        )
-                        .push(
-                            widget::text::caption(format!("CURRENT {current:.1} {unit}"))
-                                .width(cosmic::iced::Length::Fill),
-                        )
-                        .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
-                )
-                .push(
-                    widget::Row::new()
-                        .width(cosmic::iced::Length::Fill)
-                        .push(widget::text::caption(format_graph_axis_start(
-                            self.settings.graph_timespan_minutes,
-                        )))
-                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                        .push(widget::text::caption(crate::i18n::tr(
-                            &self.settings.language,
-                            "Now",
-                        ))),
-                )
-                .push(widget::text::caption(format!(
-                    "{} samples · {}",
-                    values.len(),
-                    format_graph_timespan(self.settings.graph_timespan_minutes)
-                )));
-            return self
-                .core
-                .applet
-                .popup_container(
-                    widget::container(graph_page)
-                        .width(cosmic::iced::Length::Fixed(840.0))
-                        .height(cosmic::iced::Length::Fill),
-                )
-                .max_height(800.0)
-                .into();
-        }
-
         if self.settings_open {
             if let Some(section) = self.active_settings_section {
                 let (title, description) = settings_section_details(section);
@@ -4035,9 +4029,27 @@ impl cosmic::Application for AppModel {
             }
             Message::ShowGraph(title, values, unit) => {
                 self.expanded_graph = Some((title, values, unit));
+                if self.graph_window.is_none() {
+                    let settings = cosmic::iced::window::Settings {
+                        size: cosmic::iced::Size::new(800.0, 600.0),
+                        min_size: Some(cosmic::iced::Size::new(640.0, 480.0)),
+                        resizable: true,
+                        ..Default::default()
+                    };
+                    let (id, task) = cosmic::iced::window::open(settings);
+                    self.graph_window = Some(id);
+                    return task.map(move |_| {
+                        cosmic::Action::App(Message::GraphWindowOpened(id))
+                    });
+                }
             }
+            Message::GraphWindowOpened(_) => {}
             Message::CloseGraph => {
                 self.expanded_graph = None;
+                if let Some(id) = self.graph_window.take() {
+                    return cosmic::iced::window::close(id)
+                        .map(move |_| cosmic::Action::App(Message::PopupClosed(id)));
+                }
             }
             Message::Refresh => {
                 // Ignore repeated clicks while a request is already running.
@@ -4736,6 +4748,10 @@ impl cosmic::Application for AppModel {
             Message::PopupClosed(id) => {
                 if self.popup == Some(id) {
                     self.popup = None;
+                }
+                if self.graph_window == Some(id) {
+                    self.graph_window = None;
+                    self.expanded_graph = None;
                 }
             }
         }
