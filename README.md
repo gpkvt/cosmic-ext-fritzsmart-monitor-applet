@@ -4,7 +4,7 @@ A native COSMIC panel applet for monitoring live power and temperature readings
 from compatible FRITZ!Box Smart Home devices. It communicates with the FRITZ!Box
 directly and does **not** execute or depend on `fritz_solar.sh`.
 
-![COSMIC FRITZ!Power Monitor applet](docs/fritz-power-monitor-overview.png)
+![COSMIC FRITZ!Power Monitor applet](docs/Screenshot_2026-11-16_18-17-17.png)
 
 ## Contents
 
