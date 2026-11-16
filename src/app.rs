@@ -1907,7 +1907,7 @@ impl cosmic::Application for AppModel {
             if self.active_settings_section == Some("refresh") {
                 content = content
                     .push(widget::text::caption(format!(
-                        "{}: {},
+                        "{}: {}",
                         format_countdown(u64::from(self.settings.refresh_interval_seconds))
                     )))
                     .push(
@@ -3366,7 +3366,7 @@ impl cosmic::Application for AppModel {
                         "30s", "5m", "15m", "30m", "60m",
                     ]))
                     .push(widget::text::caption(format!(
-                        "{} · {},
+                        "{} · {}",
                         format_graph_timespan(self.quick_graph_timespan)
                     )))
                     .push(
