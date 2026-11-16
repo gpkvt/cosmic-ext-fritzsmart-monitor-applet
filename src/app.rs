@@ -794,7 +794,9 @@ fn total_power_section(
         .push(widget::text::caption(title))
         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
     if collapsed {
-        heading = heading.push(widget::text::title3(keep_value_unit_together(format!("{value_w} W"))));
+        heading = heading.push(widget::text::title3(keep_value_unit_together(format!(
+            "{value_w} W"
+        ))));
     }
     let heading = heading.push(
         widget::icon::from_name(if collapsed {
@@ -831,8 +833,16 @@ fn total_power_overview(
     let output_low = history.iter().map(|(_, value)| *value).min()?;
     let output_high = history.iter().map(|(_, value)| *value).max()?;
     let input_history = rebuild_input_power_history(device_history, &settings.input_ains);
-    let input_low = input_history.iter().map(|(_, value)| *value).min().unwrap_or_default();
-    let input_high = input_history.iter().map(|(_, value)| *value).max().unwrap_or_default();
+    let input_low = input_history
+        .iter()
+        .map(|(_, value)| *value)
+        .min()
+        .unwrap_or_default();
+    let input_high = input_history
+        .iter()
+        .map(|(_, value)| *value)
+        .max()
+        .unwrap_or_default();
     let total_power = output_power_w(readings, &settings.input_ains);
     let input_power = input_power_w(readings, &settings.input_ains);
     let axis_start = format_graph_axis_start(settings.graph_timespan_minutes);
@@ -2904,19 +2914,24 @@ impl cosmic::Application for AppModel {
                         match section.0 {
                             "summary" => displayed_power_w(&self.readings, &self.selected_ains)
                                 .map(|value| format!("{value} W")),
-                            "weather" => self.weather.as_ref()
+                            "weather" => self
+                                .weather
+                                .as_ref()
                                 .map(|weather| format!("{:.0}°", weather.temperature_c)),
                             "power-difference" => {
                                 let has_inputs = self.readings.iter().any(|reading| {
                                     self.settings.input_ains.contains(
-                                        &crate::fritz::normalize_ain_for_selection(&reading.ain)
+                                        &crate::fritz::normalize_ain_for_selection(&reading.ain),
                                     )
                                 });
                                 has_inputs.then(|| {
                                     format!(
                                         "{} W",
                                         output_power_w(&self.readings, &self.settings.input_ains)
-                                            + input_power_w(&self.readings, &self.settings.input_ains)
+                                            + input_power_w(
+                                                &self.readings,
+                                                &self.settings.input_ains
+                                            )
                                     )
                                 })
                             }
@@ -2936,19 +2951,20 @@ impl cosmic::Application for AppModel {
                         heading_row
                     };
                     let heading = widget::button::custom(
-                        heading_row.push(widget::icon::from_name(if collapsed {
-                            "go-next-symbolic"
-                        } else {
-                            "go-down-symbolic"
-                        }).size(16)),
+                        heading_row.push(
+                            widget::icon::from_name(if collapsed {
+                                "go-next-symbolic"
+                            } else {
+                                "go-down-symbolic"
+                            })
+                            .size(16),
+                        ),
                     )
                     .on_press(Message::ToggleMenuSection(section.0.to_string()))
                     .width(cosmic::iced::Length::Fill)
                     .padding([8, 12])
                     .class(cosmic::theme::Button::Text);
-                    let mut section_column = widget::Column::new()
-                        .spacing(0)
-                        .push(heading);
+                    let mut section_column = widget::Column::new().spacing(0).push(heading);
                     if !collapsed {
                         section_column = section_column.push(card);
                     }
@@ -3041,10 +3057,7 @@ impl cosmic::Application for AppModel {
                     .push(
                         widget::slider(
                             0.0..=4.0,
-                            quick_slider_position(
-                                self.quick_graph_timespan as f32,
-                                GRAPH_ANCHORS,
-                            ),
+                            quick_slider_position(self.quick_graph_timespan as f32, GRAPH_ANCHORS),
                             |position| {
                                 Message::QuickGraphTimespanPreview(
                                     quick_slider_value(position, GRAPH_ANCHORS).round() as u32,
@@ -3536,7 +3549,8 @@ impl cosmic::Application for AppModel {
             }
             Message::CommitQuickGraphTimespan => {
                 if self.settings.graph_timespan_minutes != self.quick_graph_timespan {
-                    self.settings.graph_timespan_minutes = self.quick_graph_timespan.clamp(5, 2_102_400);
+                    self.settings.graph_timespan_minutes =
+                        self.quick_graph_timespan.clamp(5, 2_102_400);
                     let now = Instant::now();
                     let window = graph_history_window(self.settings.graph_timespan_minutes);
                     self.history
@@ -4220,9 +4234,15 @@ mod history_tests {
         assert_eq!(graph_history_window(60), Duration::from_secs(3600));
         assert_eq!(graph_history_window(0), Duration::from_secs(300));
         assert_eq!(graph_history_window(2000), Duration::from_secs(120_000));
-        assert_eq!(graph_history_window(2_102_400), Duration::from_secs(126_144_000));
+        assert_eq!(
+            graph_history_window(2_102_400),
+            Duration::from_secs(126_144_000)
+        );
         assert_eq!(max_history_samples(graph_history_window(60)), 61);
-        assert_eq!(graph_sample_interval(graph_history_window(2_102_400)), Duration::from_secs(2523));
+        assert_eq!(
+            graph_sample_interval(graph_history_window(2_102_400)),
+            Duration::from_secs(2523)
+        );
         assert_eq!(max_history_samples(graph_history_window(2_102_400)), 49_998);
     }
 
