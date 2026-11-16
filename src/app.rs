@@ -704,7 +704,6 @@ fn displayed_power_w(readings: &[FritzReading], selected_ains: &[String]) -> Opt
 
 fn live_power_summary(
     power: String,
-    input_power: Option<String>,
     temperature: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     let title = "CURRENT POWER";
@@ -740,13 +739,10 @@ fn live_power_summary(
         .push(heading)
         .push(values);
 
-    let mut content = widget::Column::new()
+    let content = widget::Column::new()
         .spacing(6)
         .width(cosmic::iced::Length::Fill)
         .push(metrics);
-    if let Some(input) = input_power {
-        content = content.push(metric_tile("TOTAL POWER INPUT", input, "go-down-symbolic"));
-    }
     surface_card(content.into(), 14)
 }
 
@@ -2480,22 +2476,7 @@ impl cosmic::Application for AppModel {
                 } else {
                     primary.map(|reading| format!("{:.1} °C", reading.temperature_c))
                 };
-                let summary_input = self
-                    .readings
-                    .iter()
-                    .any(|reading| {
-                        self.settings
-                            .input_ains
-                            .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
-                    })
-                    .then(|| {
-                        format!(
-                            "{} W",
-                            input_power_w(&self.readings, &self.settings.input_ains)
-                        )
-                    });
-                let summary_card =
-                    live_power_summary(summary_power, summary_input, summary_temperature);
+                let summary_card = live_power_summary(summary_power, summary_temperature);
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
                 menu_cards.push(("0-summary".to_string(), summary_card));
