@@ -1802,8 +1802,8 @@ impl cosmic::Application for AppModel {
                 let maximum = values.iter().copied().reduce(f64::max).unwrap_or_default();
                 let current = values.last().copied().unwrap_or_default();
                 let graph_page = widget::Column::new()
-                    .spacing(14)
-                    .padding(18)
+                    .spacing(8)
+                    .padding(12)
                     .width(cosmic::iced::Length::Fill)
                     .push(
                         widget::Row::new()
@@ -1817,13 +1817,19 @@ impl cosmic::Application for AppModel {
                                 .padding(8)
                                 .class(cosmic::theme::Button::Text),
                             )
-                            .push(widget::text::title2(title.clone()).width(cosmic::iced::Length::Fill))
+                            .push(
+                                widget::text::title2(title.clone())
+                                    .width(cosmic::iced::Length::Fill),
+                            )
                             .push(
                                 widget::button::custom(
                                     widget::Row::new()
                                         .spacing(6)
                                         .align_y(cosmic::iced::Alignment::Center)
-                                        .push(widget::icon::from_name("window-close-symbolic").size(18))
+                                        .push(
+                                            widget::icon::from_name("window-close-symbolic")
+                                                .size(18),
+                                        )
                                         .push(widget::text::caption(crate::i18n::tr(
                                             &self.settings.language,
                                             "Close (Esc)",
