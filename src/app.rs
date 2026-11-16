@@ -1181,11 +1181,11 @@ fn error_notice<'a>(title: &'static str, message: &'a str) -> cosmic::Element<'a
     .into()
 }
 
-fn diagnostic_status_row<'a>(
-    label: &'a str,
-    status: &'a str,
+fn diagnostic_status_row(
+    label: &'static str,
+    status: impl ToString,
     success: Option<bool>,
-) -> cosmic::Element<'a, Message> {
+) -> cosmic::Element<'static, Message> {
     let icon = match success {
         Some(true) => "emblem-ok-symbolic",
         Some(false) => "dialog-error-symbolic",
@@ -1196,7 +1196,7 @@ fn diagnostic_status_row<'a>(
         .align_y(cosmic::iced::Alignment::Center)
         .push(widget::icon::from_name(icon).size(16))
         .push(widget::text::body(label).width(cosmic::iced::Length::Fill))
-        .push(widget::text::caption(status))
+        .push(widget::text::caption(status.to_string()))
         .into()
 }
 
