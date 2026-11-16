@@ -3093,20 +3093,8 @@ impl cosmic::Application for AppModel {
             .center_x(cosmic::iced::Length::Fill),
         );
 
-        // Give the popup content an opaque base so it remains readable even
-        // when the panel theme uses a translucent applet background.
-        let content = widget::container(content)
-            .width(cosmic::iced::Length::Fill)
-            .style(|theme| {
-                let cosmic = theme.cosmic();
-                cosmic::iced::widget::container::Style {
-                    background: Some(
-                        cosmic::iced::Color::from(cosmic.background(false).base).into(),
-                    ),
-                    ..Default::default()
-                }
-            });
-
+        // Keep the popup content transparent so COSMIC can render its
+        // compositor-backed frosted-glass surface behind the complete menu.
         // Only the main-menu title bar stays outside the scrollable area.
         // This keeps the applet name and both actions visible while the device
         // cards and graphs scroll independently beneath it.
@@ -3172,16 +3160,7 @@ impl cosmic::Application for AppModel {
             .popup_container(
                 widget::container(popup_content)
                     .width(cosmic::iced::Length::Fixed(440.0))
-                    .height(cosmic::iced::Length::Fill)
-                    .style(|theme| {
-                        let cosmic = theme.cosmic();
-                        cosmic::iced::widget::container::Style {
-                            background: Some(
-                                cosmic::iced::Color::from(cosmic.background(false).base).into(),
-                            ),
-                            ..Default::default()
-                        }
-                    }),
+                    .height(cosmic::iced::Length::Fill),
             )
             .max_height(800.0)
             .into()
