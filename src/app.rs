@@ -2223,171 +2223,158 @@ impl cosmic::Application for AppModel {
                     })
                     .unwrap_or_else(|| "—".into());
                 let current_date = chrono::Local::now().format("%A, %d %B %Y").to_string();
-                let weather_details = widget::Column::new()
-                    .spacing(6)
-                    .push(widget::text::caption(current_date))
+
+                // Keep the date and current conditions visible. The image and
+                // detailed readings live in a separate disclosure, collapsed by default.
+                let weather_summary = widget::Row::new()
+                    .spacing(10)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::icon::from_name(weather.icon_name()).size(36))
+                    .push(
+                        widget::Column::new()
+                            .spacing(2)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::caption(current_date))
+                            .push(widget::text::title3(weather.location_name.clone()))
+                            .push(widget::text::body(weather.description.clone())),
+                    )
+                    .push(widget::text::title2(format!("{:.0}°", weather.temperature_c)));
+
+                let weather_metrics = widget::Column::new()
+                    .spacing(8)
                     .push(
                         widget::Row::new()
-                            .spacing(10)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::icon::from_name(weather.icon_name()).size(36))
-                            .push(
-                                widget::Column::new()
-                                    .spacing(2)
-                                    .push(widget::text::body(weather.description.clone()))
-                                    .push(widget::text::caption(format!(
-                                        "Feels like {:.1} °C",
-                                        weather.feels_like_c
-                                    ))),
-                            ),
+                            .spacing(8)
+                            .push(widget::text::body(format!("Humidity  {}%", weather.humidity_percent)))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(widget::text::body(format!("Clouds  {}%", weather.cloudiness_percent))),
                     )
                     .push(
                         widget::Row::new()
                             .spacing(8)
-                            .push(widget::text::body(format!(
-                                "Humidity  {}%",
-                                weather.humidity_percent
-                            )))
+                            .push(widget::text::body(format!("Wind speed  {:.1} m/s", weather.wind_speed_mps)))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(widget::text::body(format!("Direction  {wind_direction}"))),
+                    )
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .push(widget::text::body(format!("Pressure  {} hPa", weather.pressure_hpa)))
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                             .push(widget::text::body(format!(
-                                "Clouds  {}%",
-                                weather.cloudiness_percent
+                                "Visibility  {:.1} km",
+                                f64::from(weather.visibility_m) / 1000.0
                             ))),
                     )
                     .push(
                         widget::Row::new()
                             .spacing(8)
-                            .push(
-                                widget::Column::new()
-                                    .spacing(8)
-                                    .push(widget::text::body("Wind speed"))
-                                    .push(widget::text::body(format!(
-                                        "{:.1} m/s",
-                                        weather.wind_speed_mps
-                                    )))
-                                    .push(widget::text::body("Direction"))
-                                    .push(widget::text::body(wind_direction)),
-                            )
+                            .push(widget::text::body(format!("Sunrise  {sunrise}")))
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(
-                                widget::Column::new()
-                                    .spacing(8)
-                                    .push(widget::text::body("Pressure"))
-                                    .push(widget::text::body(format!(
-                                        "{} hPa",
-                                        weather.pressure_hpa
-                                    ))),
-                            ),
-                    )
-                    .push(
+                            .push(widget::text::body(format!("Sunset  {sunset}"))),
+                    );
+
+                let mut weather_details_content = widget::Column::new()
+                    .spacing(8)
+                    .width(cosmic::iced::Length::Fill)
+                    .push(weather_metrics);
+                if let Some(credit) = &weather.image_attribution {
+                    weather_details_content = weather_details_content.push(
                         widget::Row::new()
-                            .spacing(8)
-                            .push(widget::text::body(format!(
-                                "Visibility  {:.1} km",
-                                f64::from(weather.visibility_m) / 1000.0
-                            )))
-                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(widget::text::body(format!("Sunrise  {sunrise}"))),
-                    )
-                    .push(widget::text::body(format!("Sunset  {sunset}")));
-                let weather_card: cosmic::Element<'_, Message> =
-                    if let Some(image_bytes) = &weather.background_image {
+                            .spacing(6)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::icon::from_name("image-x-generic-symbolic").size(14))
+                            .push(
+                                widget::Column::new()
+                                    .spacing(1)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::caption(format!(
+                                        "{} · {}",
+                                        credit.artist, credit.license
+                                    )))
+                                    .push(widget::text::caption(credit.title.clone())),
+                            )
+                            .push(
+                                widget::button::text("Open image source")
+                                    .on_press(Message::OpenCommonsPage(credit.page_url.clone()))
+                                    .class(cosmic::theme::Button::Text),
+                            ),
+                    );
+                }
+
+                let weather_details_collapsed =
+                    self.collapsed_menu_sections.contains("weather-details");
+                let weather_details_toggle = widget::button::custom(
+                    widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::body("Weather details"))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(widget::icon::from_name(if weather_details_collapsed {
+                            "go-next-symbolic"
+                        } else {
+                            "go-down-symbolic"
+                        }).size(16)),
+                )
+                .on_press(Message::ToggleMenuSection("weather-details".into()))
+                .padding([6, 0])
+                .width(cosmic::iced::Length::Fill)
+                .class(cosmic::theme::Button::Text);
+
+                weather_section = weather_section
+                    .push(weather_summary)
+                    .push(weather_details_toggle);
+                if !weather_details_collapsed {
+                    let details_panel = if let Some(image_bytes) = &weather.background_image {
                         let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
                             image_bytes.clone(),
                         ))
                         .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fixed(210.0))
+                        .height(cosmic::iced::Length::Fixed(300.0))
                         .content_fit(cosmic::iced::ContentFit::Cover);
-                        let details = widget::container(weather_details)
-                            .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fill)
-                            .padding(10)
-                            .style(|_| cosmic::iced::widget::container::Style {
-                                background: Some(
-                                    cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.58).into(),
+                        let overlay = widget::container(
+                            widget::Column::new()
+                                .width(cosmic::iced::Length::Fill)
+                                .height(cosmic::iced::Length::Fill)
+                                .push(widget::Space::new().height(cosmic::iced::Length::Fill))
+                                .push(
+                                    widget::container(weather_details_content)
+                                        .width(cosmic::iced::Length::Fill)
+                                        .padding(10)
+                                        .style(|_| cosmic::iced::widget::container::Style {
+                                            background: Some(
+                                                cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.82).into(),
+                                            ),
+                                            text_color: Some(cosmic::iced::Color::WHITE),
+                                            ..Default::default()
+                                        }),
                                 ),
-                                text_color: Some(cosmic::iced::Color::WHITE),
-                                ..Default::default()
-                            });
-                        let image_credit_button = widget::Column::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fill)
-                            .push(widget::Space::new().height(cosmic::iced::Length::Fill))
-                            .push(
-                                widget::Row::new()
-                                    .width(cosmic::iced::Length::Fill)
-                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                    .push(
-                                        widget::button::custom(
-                                            widget::icon::from_name("image-x-generic-symbolic")
-                                                .size(16),
-                                        )
-                                        .on_press(Message::OpenCommonsPage(
-                                            weather
-                                                .image_attribution
-                                                .as_ref()
-                                                .map(|credit| credit.page_url.clone())
-                                                .unwrap_or_default(),
-                                        ))
-                                        .padding(7)
-                                        .class(cosmic::theme::Button::Standard),
-                                    ),
-                            )
-                            .padding(8);
+                        )
+                        .width(cosmic::iced::Length::Fill)
+                        .height(cosmic::iced::Length::Fixed(300.0));
                         cosmic::iced::widget::Stack::new()
                             .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(210.0))
+                            .height(cosmic::iced::Length::Fixed(300.0))
                             .push(photo)
-                            .push(details)
-                            .push(image_credit_button)
+                            .push(overlay)
                             .into()
                     } else {
-                        widget::container(weather_details)
+                        widget::container(weather_details_content)
+                            .width(cosmic::iced::Length::Fill)
                             .padding(10)
                             .style(|theme| {
                                 let cosmic = theme.cosmic();
                                 cosmic::iced::widget::container::Style {
                                     background: Some(
-                                        cosmic::iced::Color::from(
-                                            cosmic.background(false).small_widget,
-                                        )
-                                        .into(),
+                                        cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
                                     ),
                                     ..Default::default()
                                 }
                             })
                             .into()
                     };
-                let weather_heading = widget::button::custom(
-                    widget::Row::new()
-                        .spacing(8)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::icon::from_name(weather.icon_name()).size(20))
-                        .push(
-                            widget::Column::new()
-                                .spacing(1)
-                                .width(cosmic::iced::Length::Fill)
-                                .push(widget::text::title3("Weather"))
-                                .push(widget::text::caption(weather.location_name.clone())),
-                        )
-                        .push(widget::text::title2(format!(
-                            "{:.0}°",
-                            weather.temperature_c
-                        )))
-                        .push(
-                            widget::icon::from_name(if self.weather_forecast_expanded {
-                                "go-down-symbolic"
-                            } else {
-                                "go-next-symbolic"
-                            })
-                            .size(16),
-                        ),
-                )
-                .on_press(Message::ToggleWeatherForecast)
-                .padding([4, 0])
-                .width(cosmic::iced::Length::Fill)
-                .class(cosmic::theme::Button::Text);
-                weather_section = weather_section.push(weather_heading).push(weather_card);
+                    weather_section = weather_section.push(details_panel);
+                }
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
                     let forecast_range_selector = widget::Row::new()
