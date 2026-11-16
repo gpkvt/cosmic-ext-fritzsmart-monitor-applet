@@ -92,7 +92,6 @@ pub enum Message {
     GraphStyleChanged(String),
     ShowGraph(String, Vec<f64>, String),
     CloseGraph,
-    EscapePressed(Id),
     RefreshIntervalChanged(u32),
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
@@ -802,6 +801,10 @@ fn displayed_power_w(readings: &[FritzReading], selected_ains: &[String]) -> Opt
 fn live_power_summary(
     power: String,
     temperature: Option<String>,
+    history: Vec<f64>,
+    graph_style: &str,
+    language: &str,
+    axis_start: String,
 ) -> cosmic::Element<'static, Message> {
     // The section already identifies these readings; avoid repeating a
     // separate "Current power" heading above the values.
@@ -827,9 +830,24 @@ fn live_power_summary(
         .push(values);
 
     let content = widget::Column::new()
-        .spacing(6)
+        .spacing(8)
         .width(cosmic::iced::Length::Fill)
-        .push(metrics);
+        .push(metrics)
+        .push(widget::text::caption(crate::i18n::tr(language, "CURRENT POWER HISTORY")))
+        .push(interactive_graph(
+            language,
+            crate::i18n::tr(language, "CURRENT POWER"),
+            history.into_iter(),
+            graph_style,
+            "W",
+        ))
+        .push(
+            widget::Row::new()
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::caption(axis_start))
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(widget::text::caption("Now")),
+        );
     surface_card(content.into(), 14)
 }
 
@@ -1403,22 +1421,7 @@ impl cosmic::Application for AppModel {
             Subscription::run(regular_clock_ticks)
         };
 
-        if self.expanded_graph.is_some() {
-            // Observe raw events: the normal keyboard subscription drops
-            // events already captured by a popup widget or the compositor.
-            // Keep the originating surface ID so Escape only closes this graph.
-            let escape = cosmic::iced::event::listen_raw(|event, _status, window| match event {
-                cosmic::iced::Event::Keyboard(cosmic::iced::keyboard::Event::KeyPressed {
-                    key:
-                        cosmic::iced::keyboard::Key::Named(cosmic::iced::keyboard::key::Named::Escape),
-                    ..
-                }) => Some(Message::EscapePressed(window)),
-                _ => None,
-            });
-            Subscription::batch([clock, escape])
-        } else {
-            clock
-        }
+        clock
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
@@ -1848,7 +1851,7 @@ impl cosmic::Application for AppModel {
                                         )
                                         .push(widget::text::caption(crate::i18n::tr(
                                             &self.settings.language,
-                                            "Close (Esc)",
+                                            "Close",
                                         ))),
                                 )
                                 .on_press(Message::CloseGraph)
@@ -3239,7 +3242,14 @@ impl cosmic::Application for AppModel {
                 } else {
                     primary.map(|reading| format!("{:.1} °C", reading.temperature_c))
                 };
-                let summary_card = live_power_summary(summary_power, summary_temperature);
+                let summary_card = live_power_summary(
+                    summary_power,
+                    summary_temperature,
+                    self.history.iter().map(|(_, value)| *value as f64).collect(),
+                    &self.settings.graph_style,
+                    &self.settings.language,
+                    format_graph_axis_start(self.settings.graph_timespan_minutes),
+                );
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
                 menu_cards.push(("0-summary".to_string(), summary_card));
@@ -4060,18 +4070,6 @@ impl cosmic::Application for AppModel {
                 self.expanded_graph = None;
                 if let Some(id) = self.graph_window.take() {
                     return destroy_popup(id);
-                }
-            }
-            Message::EscapePressed(_id) => {
-                // Wayland popup events can be reported against the parent
-                // surface by some compositor/runtime combinations. Escape is
-                // an explicit dismissal shortcut, so do not require the event
-                // window ID to match the popup ID before closing the graph.
-                if self.expanded_graph.is_some() {
-                    self.expanded_graph = None;
-                    if let Some(id) = self.graph_window.take() {
-                        return destroy_popup(id);
-                    }
                 }
             }
             Message::Refresh => {

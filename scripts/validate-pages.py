@@ -75,8 +75,8 @@ for page in pages:
         if not re.search(r"event\.key\s*===\s*['\"]ArrowRight['\"]", content):
             fail("index.html: right-arrow keyboard navigation is missing")
         hero_cards = content.count('<a class="hero-shot"')
-        if hero_cards != 8:
-            fail(f"index.html: expected eight screenshot cards, found {hero_cards}")
+        if hero_cards != 10:
+            fail(f"index.html: expected ten screenshot cards, found {hero_cards}")
         if '.hero-gallery .hero-shot{display:none}' in content:
             fail("index.html: screenshot deck must not be hidden")
         for feature in ("card-deal", "openGallery(index)", "gallery-enter", "gallery-image-enter", ".hero-shot:hover", "border-color:#8be0c4aa"):
