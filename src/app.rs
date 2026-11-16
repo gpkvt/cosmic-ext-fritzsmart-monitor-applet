@@ -4316,9 +4316,25 @@ impl cosmic::Application for AppModel {
                 }
                 self.refresh_started_at = Some(Instant::now());
                 self.next_refresh_at = None;
-                return Task::perform(fetch_fritz_data(), |result| {
+
+                // A manual reload refreshes the weather photo/slideshow as well
+                // as the FRITZ!Box readings. Keep the weather request independent
+                // so a weather-provider failure cannot block the main refresh.
+                let mut tasks = vec![Task::perform(fetch_fritz_data(), |result| {
                     cosmic::Action::App(Message::Updated(result))
-                });
+                })];
+                if self.settings.weather_enabled
+                    && !self.settings.openweathermap_api_key.trim().is_empty()
+                    && !self.settings.weather_location.trim().is_empty()
+                {
+                    self.next_weather_refresh_at = None;
+                    let api_key = self.settings.openweathermap_api_key.clone();
+                    let location = self.settings.weather_location.clone();
+                    tasks.push(Task::perform(fetch_weather(api_key, location), |result| {
+                        cosmic::Action::App(Message::WeatherUpdated(result))
+                    }));
+                }
+                return Task::batch(tasks);
             }
             Message::ClockTick => {
                 if self
