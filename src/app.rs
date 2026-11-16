@@ -1191,12 +1191,28 @@ fn diagnostic_status_row(
         Some(false) => "dialog-error-symbolic",
         None => "dialog-question-symbolic",
     };
+    // Keep diagnostics in a predictable three-column layout. Fixed label
+    // and value widths prevent rows from shifting as status text changes.
+    const LABEL_WIDTH: f32 = 132.0;
+    const STATUS_WIDTH: f32 = 140.0;
     widget::Row::new()
         .spacing(8)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::icon::from_name(icon).size(16))
-        .push(widget::text::body(label).width(cosmic::iced::Length::Fill))
-        .push(widget::text::caption(status.to_string()))
+        .width(cosmic::iced::Length::Fill)
+        .push(
+            widget::container(widget::icon::from_name(icon).size(16))
+                .width(cosmic::iced::Length::Fixed(16.0))
+                .center_x(16),
+        )
+        .push(
+            widget::text::body(label)
+                .width(cosmic::iced::Length::Fixed(LABEL_WIDTH)),
+        )
+        .push(
+            widget::container(widget::text::caption(status.to_string()))
+                .width(cosmic::iced::Length::Fixed(STATUS_WIDTH))
+                .align_x(cosmic::iced::alignment::Horizontal::Right),
+        )
         .into()
 }
 
