@@ -7,6 +7,8 @@ on:
     paths-ignore:
       - Cargo.toml
       - Cargo.lock
+  schedule:
+    - cron: "23 6 * * 1"
   workflow_dispatch:
     inputs:
       bump_type:
@@ -91,7 +93,7 @@ jobs:
   version:
     name: Resolve version and create release tag
     needs: checks
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -185,7 +187,7 @@ jobs:
   packages:
     name: Build Linux packages
     needs: [checks, version]
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -296,7 +298,7 @@ jobs:
     name: Build and publish GitHub Pages
     needs: [version, packages, release]
     if: >-
-      github.event_name != 'pull_request' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       needs.version.result == 'success' &&
       needs.packages.result == 'success' &&
       (needs.release.result == 'success' || needs.release.result == 'skipped')
@@ -327,9 +329,36 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
 
+  dependency-review:
+    name: Review dependency changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: always
+
+  security-audit:
+    name: Audit Rust dependencies
+    if: github.event_name == 'schedule' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Check dependency advisories
+        run: cargo audit --deny warnings
+
   report-failure:
     name: Track pipeline failures in GitHub Issues
-    needs: [checks, version, packages, release, publish-pages]
+    needs: [checks, dependency-review, security-audit, version, packages, release, publish-pages]
     if: >-
       always() &&
       contains(needs.*.result, 'failure')
