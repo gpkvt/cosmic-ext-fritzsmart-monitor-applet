@@ -126,6 +126,21 @@ make uninstall
 After installation, reopen COSMIC Settings and add **FRITZ!Power Monitor**
 from the panel applet list. If it does not appear, log out and back in.
 
+### COSMIC Store (Flatpak)
+
+The Flatpak is being prepared for the official COSMIC Flatpak repository, which
+is the distribution channel for COSMIC panel applets. Once the submission is
+accepted and published, install it from the COSMIC Store or use:
+
+```sh
+flatpak remote-add --if-not-exists --user cosmic https://apt.pop-os.org/cosmic/cosmic.flatpakrepo
+flatpak install --user cosmic com.gpkvt.FritzPowerMonitor
+```
+
+The submission manifest and its offline Cargo dependency sources are maintained
+in `packaging/cosmic-flatpak/`. The standalone `.flatpak` bundle attached to
+GitHub releases remains available independently of the COSMIC Store.
+
 ## Build from source
 
 Run formatting, tests and an optimized build independently:
