@@ -1,4 +1,5 @@
 use reqwest::Client;
+use std::sync::LazyLock;
 use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -533,6 +534,52 @@ fn commons_file_page_url(value: &str) -> String {
 
 /// Creates a deterministic, locally generated starry-night backdrop. This is
 /// deliberately independent of network services and external image metadata.
+/// Transparent star layer composited over every nighttime weather image.
+/// The fixed seed keeps stars stable while the weather card redraws.
+pub fn starry_night_overlay() -> Option<Vec<u8>> {
+    static OVERLAY: LazyLock<Option<Vec<u8>>> = LazyLock::new(|| {
+        let width = 1200u32;
+        let height = 520u32;
+        let mut image = image::RgbaImage::from_pixel(width, height, image::Rgba([0, 0, 0, 0]));
+        let mut seed = 0x51a7_2026_u32;
+        let mut random = || {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            seed
+        };
+
+        for _ in 0..190 {
+            let x = random() % width;
+            let y = random() % (height * 3 / 4);
+            let brightness = 175u8.saturating_add((random() % 81) as u8);
+            let alpha = 105u8.saturating_add((random() % 125) as u8);
+            let radius = if brightness > 230 && random() % 7 == 0 { 1i32 } else { 0i32 };
+            for dy in -radius..=radius {
+                for dx in -radius..=radius {
+                    if dx * dx + dy * dy > radius * radius {
+                        continue;
+                    }
+                    let px = x as i32 + dx;
+                    let py = y as i32 + dy;
+                    if px >= 0 && py >= 0 && px < width as i32 && py < height as i32 {
+                        image.put_pixel(
+                            px as u32,
+                            py as u32,
+                            image::Rgba([brightness.saturating_sub(8), brightness, 255, alpha]),
+                        );
+                    }
+                }
+            }
+        }
+
+        let mut output = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(image)
+            .write_to(&mut output, image::ImageFormat::Png)
+            .ok()?;
+        Some(output.into_inner())
+    });
+    OVERLAY.clone()
+}
+
 fn generate_starry_night_background() -> Option<Vec<u8>> {
     let width = 1200u32;
     let height = 520u32;
