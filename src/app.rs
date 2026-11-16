@@ -1883,6 +1883,14 @@ impl cosmic::Application for AppModel {
         if self.popup != Some(id) {
             return widget::text("").into();
         }
+
+        // The applet popup keeps its compact layout; expanded graphs use the
+        // dedicated native window above.
+        let mut content = widget::Column::new()
+            .spacing(10)
+            .padding(12)
+            .width(cosmic::iced::Length::Fill);
+
         if self.settings_open {
             if let Some(section) = self.active_settings_section {
                 let (title, description) = settings_section_details(section);
