@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout latest site source
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: main
       - name: Configure GitHub Pages
