@@ -2427,7 +2427,7 @@ impl cosmic::Application for AppModel {
                             } else {
                                 "go-next-symbolic"
                             })
-                            .size(16),
+                            .size(14),
                         ),
                 )
                 .on_press(Message::ToggleWeatherForecast)
@@ -2737,11 +2737,11 @@ impl cosmic::Application for AppModel {
                             )
                             .push(
                                 widget::icon::from_name(if is_expanded {
-                                    "go-up-symbolic"
-                                } else {
                                     "go-down-symbolic"
+                                } else {
+                                    "go-next-symbolic"
                                 })
-                                .size(16),
+                                .size(14),
                             ),
                     )
                     .on_press(Message::ToggleDeviceDetails(reading.ain.clone()))
@@ -3027,7 +3027,7 @@ impl cosmic::Application for AppModel {
                     let heading_row = widget::Row::new()
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::body(section.1))
+                        .push(widget::text::caption(section.1))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
                     let heading_row = if let Some(value) = collapsed_value {
                         heading_row.push(widget::text::title3(value))
@@ -3041,14 +3041,15 @@ impl cosmic::Application for AppModel {
                             } else {
                                 "go-down-symbolic"
                             })
-                            .size(16),
+                            .size(14),
                         ),
                     )
                     .on_press(Message::ToggleMenuSection(section.0.to_string()))
                     .width(cosmic::iced::Length::Fill)
-                    .padding([8, 12])
+                    .padding(0)
                     .class(cosmic::theme::Button::Text);
-                    let mut section_column = widget::Column::new().spacing(0).push(heading);
+                    let heading = surface_card(heading.into(), 10);
+                    let mut section_column = widget::Column::new().spacing(8).push(heading);
                     if !collapsed {
                         section_column = section_column.push(card);
                     }
@@ -3080,17 +3081,26 @@ impl cosmic::Application for AppModel {
                 content = content.push(weather_card);
             }
 
-            content = content.push(
+            let quick_settings_heading = widget::button::custom(
                 widget::Row::new()
-                    .width(cosmic::iced::Length::Fill)
+                    .spacing(6)
                     .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::text::caption("QUICK SETTINGS"))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                    .push(icon_action_button(
-                        "⚙",
-                        "Quick settings",
-                        Message::ToggleQuickOptions,
-                    )),
-            );
+                    .push(
+                        widget::icon::from_name(if self.quick_options_expanded {
+                            "go-down-symbolic"
+                        } else {
+                            "go-next-symbolic"
+                        })
+                        .size(14),
+                    ),
+            )
+            .on_press(Message::ToggleQuickOptions)
+            .width(cosmic::iced::Length::Fill)
+            .padding(0)
+            .class(cosmic::theme::Button::Text);
+            content = content.push(surface_card(quick_settings_heading.into(), 10));
             if self.quick_options_expanded {
                 const REFRESH_ANCHORS: [f32; 5] = [30.0, 300.0, 900.0, 1800.0, 3600.0];
                 const GRAPH_ANCHORS: [f32; 5] = [5.0, 60.0, 1440.0, 43200.0, 2102400.0];
