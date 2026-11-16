@@ -92,7 +92,6 @@ pub enum Message {
     GraphStyleChanged(String),
     ShowGraph(String, Vec<f64>, String),
     CloseGraph,
-    EscapePressed(Id),
     RefreshIntervalChanged(u32),
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
@@ -1403,22 +1402,7 @@ impl cosmic::Application for AppModel {
             Subscription::run(regular_clock_ticks)
         };
 
-        if self.expanded_graph.is_some() {
-            // Observe raw events: the normal keyboard subscription drops
-            // events already captured by a popup widget or the compositor.
-            // Keep the originating surface ID so Escape only closes this graph.
-            let escape = cosmic::iced::event::listen_raw(|event, _status, window| match event {
-                cosmic::iced::Event::Keyboard(cosmic::iced::keyboard::Event::KeyPressed {
-                    key:
-                        cosmic::iced::keyboard::Key::Named(cosmic::iced::keyboard::key::Named::Escape),
-                    ..
-                }) => Some(Message::EscapePressed(window)),
-                _ => None,
-            });
-            Subscription::batch([clock, escape])
-        } else {
-            clock
-        }
+        clock
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
@@ -1848,7 +1832,7 @@ impl cosmic::Application for AppModel {
                                         )
                                         .push(widget::text::caption(crate::i18n::tr(
                                             &self.settings.language,
-                                            "Close (Esc)",
+                                            "Close",
                                         ))),
                                 )
                                 .on_press(Message::CloseGraph)
@@ -4060,18 +4044,6 @@ impl cosmic::Application for AppModel {
                 self.expanded_graph = None;
                 if let Some(id) = self.graph_window.take() {
                     return destroy_popup(id);
-                }
-            }
-            Message::EscapePressed(_id) => {
-                // Wayland popup events can be reported against the parent
-                // surface by some compositor/runtime combinations. Escape is
-                // an explicit dismissal shortcut, so do not require the event
-                // window ID to match the popup ID before closing the graph.
-                if self.expanded_graph.is_some() {
-                    self.expanded_graph = None;
-                    if let Some(id) = self.graph_window.take() {
-                        return destroy_popup(id);
-                    }
                 }
             }
             Message::Refresh => {
