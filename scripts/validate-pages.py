@@ -34,9 +34,13 @@ def fail(message):
     raise SystemExit(1)
 
 
-pages = sorted(ROOT.glob("*.html"))
+pages = sorted(ROOT.rglob("*.html"))
 if not pages:
     fail("no HTML pages found")
+
+for generated in ("readme.html", "security.html"):
+    if not (ROOT / generated).is_file():
+        fail(f"missing generated Markdown page: {generated}")
 
 for page in pages:
     parser = PageParser()
