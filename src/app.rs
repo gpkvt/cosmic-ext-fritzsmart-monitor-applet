@@ -2292,17 +2292,89 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::body(format!("Sunset  {sunset}")));
                 let weather_card: cosmic::Element<'_, Message> =
                     if let Some(image_bytes) = &weather.background_image {
+                        let weather_info_collapsed =
+                            self.collapsed_menu_sections.contains("weather-info");
                         let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
                             image_bytes.clone(),
                         ))
                         .width(cosmic::iced::Length::Fill)
                         .height(cosmic::iced::Length::Fixed(210.0))
                         .content_fit(cosmic::iced::ContentFit::Cover);
-                        let weather_info_collapsed =
-                            self.collapsed_menu_sections.contains("weather-info");
-                        let details = if weather_info_collapsed {
-                            None
-                        } else {
+                        let image_controls = widget::Column::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fill)
+                            .push(
+                                widget::Row::new()
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::title3(weather.location_name.clone()))
+                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                    .push(widget::text::title2(format!("{:.0}°", weather.temperature_c)))
+                                    .push(
+                                        widget::button::custom(widget::icon::from_name(
+                                            if weather_info_collapsed {
+                                                "go-next-symbolic"
+                                            } else {
+                                                "go-down-symbolic"
+                                            },
+                                        ).size(16))
+                                        .on_press(Message::ToggleMenuSection("weather-info".into()))
+                                        .padding(7)
+                                        .class(cosmic::theme::Button::Standard),
+                                    )
+                                    .spacing(8)
+                                    .align_y(cosmic::iced::Alignment::Center),
+                            )
+                            .push(widget::Space::new().height(cosmic::iced::Length::Fill))
+                            .push(
+                                widget::Row::new()
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                    .push(
+                                        widget::button::custom(
+                                            widget::icon::from_name("image-x-generic-symbolic").size(16),
+                                        )
+                                        .on_press(Message::OpenCommonsPage(
+                                            weather.image_attribution.as_ref()
+                                                .map(|credit| credit.page_url.clone())
+                                                .unwrap_or_default(),
+                                        ))
+                                        .padding(7)
+                                        .class(cosmic::theme::Button::Standard),
+                                    ),
+                            )
+                            .padding(8);
+                        let image_header = cosmic::iced::widget::Stack::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(210.0))
+                            .push(photo)
+                            .push(
+                                widget::container(image_controls)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .height(cosmic::iced::Length::Fill)
+                                    .style(|_| cosmic::iced::widget::container::Style {
+                                        text_color: Some(cosmic::iced::Color::WHITE),
+                                        ..Default::default()
+                                    }),
+                            );
+                        let mut card = widget::Column::new()
+                            .spacing(0)
+                            .push(image_header);
+                        if !weather_info_collapsed {
+                            card = card.push(
+                                widget::container(weather_details)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .padding(10)
+                                    .style(|_| cosmic::iced::widget::container::Style {
+                                        background: Some(
+                                            cosmic::iced::Color::from_rgba(0.04, 0.05, 0.07, 0.88).into(),
+                                        ),
+                                        text_color: Some(cosmic::iced::Color::WHITE),
+                                        ..Default::default()
+                                    }),
+                            );
+                        }
+                        card.into()
+                    } else {
                             Some(
                                 widget::container(weather_details)
                                     .width(cosmic::iced::Length::Fill)
