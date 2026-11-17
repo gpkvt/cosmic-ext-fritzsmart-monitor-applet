@@ -3,6 +3,7 @@
 ## [17.11.2026]
 
 ### Fixed
+- Make the weather image refresh indicator a minimal 1 px countdown line that recedes as refresh approaches.
 - Remove the gap between the weather background image and its refresh progress indicator while preserving spacing around the weather section.
 
 - Use libcosmic's `progress_bar::linear::Linear` widget API for the 2 px weather refresh indicator.
