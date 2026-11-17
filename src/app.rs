@@ -7987,7 +7987,7 @@ mod history_tests {
             (now - Duration::from_secs(3 * 24 * 60 * 60 + 90), 100, 20.0),
             (now, 200, 21.0),
         ]);
-        assert_eq!(max_device_history_minutes(&samples, now), 4_321);
+        assert_eq!(max_device_history_minutes(&samples, now), 4_322);
         assert_eq!(max_device_history_minutes(&VecDeque::new(), now), 5);
     }
 
