@@ -1817,6 +1817,10 @@ fn is_newer_version(candidate: &str, current: &str) -> bool {
         .is_some_and(|(candidate, current)| candidate > current)
 }
 
+fn is_current_or_newer_version(current: &str, latest: &str) -> bool {
+    !is_newer_version(latest, current)
+}
+
 fn regular_clock_ticks() -> impl futures::Stream<Item = Message> {
     clock_ticks(Duration::from_secs(1))
 }
@@ -3030,7 +3034,7 @@ impl cosmic::Application for AppModel {
                             crate::i18n::tr(&self.settings.language, "Not checked yet").to_string()
                         },
                         self.latest_version.as_ref().map(|result| match result {
-                            Ok(version) => !is_newer_version(version, env!("APP_VERSION")),
+                            Ok(version) => is_current_or_newer_version(env!("APP_VERSION"), version),
                             Err(_) => false,
                         }),
                     ))
@@ -6362,6 +6366,14 @@ mod history_tests {
         assert!(!is_newer_version("v0.8.67", "0.8.67"));
         assert!(!is_newer_version("v0.8.6", "0.8.67"));
         assert!(!is_newer_version("v1.0", "1.0.0"));
+    }
+
+    #[test]
+    fn version_status_is_green_when_installed_version_equals_or_exceeds_latest() {
+        assert!(is_current_or_newer_version("1.0.0", "1.0.0"));
+        assert!(is_current_or_newer_version("1.1.0", "1.0.0"));
+        assert!(is_current_or_newer_version("1.0.1", "1.0.0"));
+        assert!(!is_current_or_newer_version("0.9.9", "1.0.0"));
     }
 
     #[test]
