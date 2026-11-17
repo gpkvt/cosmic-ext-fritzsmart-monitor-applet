@@ -142,7 +142,7 @@ pub enum Message {
     CopyDiagnosticUrl(String),
     ClearDiagnosticEvents,
     WriteDebugFile,
-    DebugDumpGenerated(Result<String, String>),
+    DebugDumpGenerated(String),
     FetchForecastFromDiagnostics,
     CheckLatestVersion,
     LatestVersionChecked(Result<String, String>),
