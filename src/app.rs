@@ -4274,24 +4274,20 @@ impl cosmic::Application for AppModel {
                                         "{}  {}%",
                                         crate::i18n::tr(&self.settings.language, "Clouds"),
                                         weather.cloudiness_percent
-                                    )))
-                                    .push(widget::text::body(format!(
-                                        "{}  {} hPa",
-                                        crate::i18n::tr(&self.settings.language, "Pressure"),
-                                        weather.pressure_hpa
                                     ))),
                             )
                             .push(
                                 widget::Row::new()
                                     .spacing(12)
                                     .push(widget::text::body(format!(
-                                        "{}  {:.1} m/s",
-                                        crate::i18n::tr(&self.settings.language, "Wind speed"),
-                                        weather.wind_speed_mps
+                                        "{}  {} hPa",
+                                        crate::i18n::tr(&self.settings.language, "Pressure"),
+                                        weather.pressure_hpa
                                     )))
                                     .push(widget::text::body(format!(
-                                        "{}  {}",
-                                        crate::i18n::tr(&self.settings.language, "Direction"),
+                                        "{}  {:.1} m/s · {}",
+                                        crate::i18n::tr(&self.settings.language, "Wind"),
+                                        weather.wind_speed_mps,
                                         wind_direction
                                     ))),
                             ),
