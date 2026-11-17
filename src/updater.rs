@@ -39,7 +39,9 @@ fn normalize_release_version(tag: &str) -> Result<&str, String> {
     if components.len() != 3
         || components
             .iter()
-            .any(|part| part.is_empty() || !part.chars().all(|character| character.is_ascii_digit()))
+            .any(|part| {
+            part.is_empty() || !part.chars().all(|character| character.is_ascii_digit())
+        })
     {
         return Err("The release tag has an unexpected format".into());
     }
@@ -50,7 +52,7 @@ fn checksum_for_asset<'a>(checksums: &'a str, name: &str) -> Option<&'a str> {
     checksums.lines().find_map(|line| {
         let mut fields = line.split_whitespace();
         let checksum = fields.next()?;
-        let filename = fields.next()?.trim_start_matches('*');
+        let filename = fields.next()?.trim_start_matches('*').trim_start_matches("./");
         (filename == name).then_some(checksum)
     })
 }
@@ -175,7 +177,8 @@ async fn install_debian_update(
         .status()
         .await;
     let _ = fs::remove_file(&package).await;
-    let status = result.map_err(|error| format!("Could not start the privileged package installer: {error}"))?;
+    let status = result
+        .map_err(|error| format!("Could not start the privileged package installer: {error}"))?;
     if !status.success() {
         return Err(format!("The package installer exited with status {status}"));
     }
@@ -200,7 +203,9 @@ async fn install_source_update(source: &Path) -> Result<String, String> {
     if !status.success() {
         return Err(format!("The source installer exited with status {status}"));
     }
-    Ok("The latest source version was built and installed. The COSMIC panel is reloading.".into())
+    Ok(
+        "The latest source version was built and installed. The COSMIC panel is reloading.".into(),
+    )
 }
 
 async fn install_flatpak_update() -> Result<String, String> {
@@ -239,7 +244,10 @@ async fn install_flatpak_update() -> Result<String, String> {
         .call::<_, _, ()>("Update", &("", options))
         .await
         .map_err(|error| format!("Flatpak could not install this update: {error}"))?;
-    Ok("The COSMIC Flatpak updater accepted the request. The update is managed by the system.".into())
+    Ok(
+        "The COSMIC Flatpak updater accepted the request. The update is managed by the system."
+            .into(),
+    )
 }
 
 #[cfg(test)]
@@ -256,7 +264,7 @@ mod tests {
 
     #[test]
     fn checksum_lookup_matches_the_exact_asset_name() {
-        let sums = "0123456789abcdef  app.deb\nabcdef0123456789 *app.AppImage\n";
+        let sums = "0123456789abcdef  ./app.deb\nabcdef0123456789 *./app.AppImage\n";
         assert_eq!(checksum_for_asset(sums, "app.deb"), Some("0123456789abcdef"));
         assert_eq!(checksum_for_asset(sums, "app.AppImage"), Some("abcdef0123456789"));
         assert_eq!(checksum_for_asset(sums, "other.deb"), None);
