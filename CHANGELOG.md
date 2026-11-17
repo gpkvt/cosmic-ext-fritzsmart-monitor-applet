@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Flattened multiline panel items into one horizontal sequence of icon/value pairs; icons align left and values align right independently.
+
 - Left-aligned icon columns in paired panel readings and stacked download/upload rows while retaining right-aligned values.
 
 - Unified single-line and multiline panel value rendering with the same fixed-width, right-aligned text slot; multiline slots use their longest line to calculate width.
