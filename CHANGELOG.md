@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- Indented the second line of two-line panel values by two non-breaking spaces for the requested stepped layout.
+
+## [17.11.2026]
+
+### Fixed
+
 - Right-aligned single-line panel values using the same fixed-width value container as two-line values.
 
 ## [17.11.2026]

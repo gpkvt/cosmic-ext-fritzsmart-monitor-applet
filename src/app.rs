@@ -2213,31 +2213,23 @@ impl cosmic::Application for AppModel {
             };
             if let Some((upper, lower)) = value.split_once('\n') {
                 let line_height = (panel_text_size * 0.85).max(1.0);
-                let width = text_width(upper).max(text_width(lower));
+                // In two-line mode, keep the first line at the value column
+                // edge and visibly indent the second line. Non-breaking
+                // spaces preserve the intentional leading whitespace.
+                let lower = format!("\u{00a0}\u{00a0}{lower}");
+                let width = text_width(upper).max(text_width(&lower));
                 widget::Column::new()
                     .spacing(0)
                     .width(cosmic::iced::Length::Fixed(width))
                     .push(
-                        widget::container(
-                            panel_text(upper.to_string())
-                                .width(cosmic::iced::Length::Fill)
-                                .align_x(cosmic::iced::Alignment::End),
-                        )
-                        .width(cosmic::iced::Length::Fixed(width))
-                        .height(cosmic::iced::Length::Fixed(line_height))
-                        .align_x(cosmic::iced::Alignment::End)
-                        .align_y(cosmic::iced::Alignment::End),
+                        widget::container(panel_text(upper.to_string()))
+                            .height(cosmic::iced::Length::Fixed(line_height))
+                            .align_y(cosmic::iced::Alignment::End),
                     )
                     .push(
-                        widget::container(
-                            panel_text(lower.to_string())
-                                .width(cosmic::iced::Length::Fill)
-                                .align_x(cosmic::iced::Alignment::End),
-                        )
-                        .width(cosmic::iced::Length::Fixed(width))
-                        .height(cosmic::iced::Length::Fixed(line_height))
-                        .align_x(cosmic::iced::Alignment::End)
-                        .align_y(cosmic::iced::Alignment::Start),
+                        widget::container(panel_text(lower))
+                            .height(cosmic::iced::Length::Fixed(line_height))
+                            .align_y(cosmic::iced::Alignment::Start),
                     )
                     .into()
             } else {
