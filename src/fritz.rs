@@ -78,10 +78,30 @@ pub struct FritzInternetBandwidth {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct FritzWanLinkInfo {
+    pub access_type: Option<String>,
+    pub physical_link_status: Option<String>,
+    pub download_bits_per_second: Option<u64>,
+    pub upload_bits_per_second: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FritzBoxSystemInfo {
+    pub manufacturer: Option<String>,
+    pub model: Option<String>,
+    pub product_class: Option<String>,
+    pub hardware_version: Option<String>,
+    pub software_version: Option<String>,
+    pub uptime_seconds: Option<u64>,
+    pub wan: Option<FritzWanLinkInfo>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct FritzFetchResult {
     pub readings: Vec<FritzReading>,
     pub missing_devices: Vec<(String, String)>,
     pub internet_bandwidth: Option<FritzInternetBandwidth>,
+    pub system_info: Option<FritzBoxSystemInfo>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1012,6 +1032,61 @@ async fn authenticated_client(settings: &FritzSettings) -> Result<(Client, Strin
 pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<FritzDevice>, String> {
     let (client, sid) = authenticated_client(&settings).await?;
     let base = settings.url.trim_end_matches('/');
+    // DeviceInfo exposes the router identity, installed FRITZ!OS release,
+    // hardware revision and uptime. Never export the serial number or device log.
+    if let Some(endpoint) = device_info_url(base) {
+        const SERVICE: &str = "urn:dslforum-org:service:DeviceInfo:1";
+        let body = format!(
+            r#"<?xml version="1.0" encoding="utf-8"?>
+            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+              s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+              <s:Body><u:GetInfo xmlns:u="{SERVICE}"></u:GetInfo></s:Body>
+            </s:Envelope>"#
+        );
+        let endpoint_path = endpoint.path().to_string();
+        match client
+            .post(endpoint)
+            .header(reqwest::header::CONTENT_TYPE, "text/xml; charset=\"utf-8\"")
+            .header("SOAPACTION", format!("\"{SERVICE}#GetInfo\""))
+            .body(body)
+            .send()
+            .await
+        {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                match read_xml_response_with_method(
+                    response,
+                    "FRITZ!Box debug device information request failed",
+                    "POST",
+                )
+                .await
+                {
+                    Ok(response_body) => endpoints.push(json!({
+                        "name": "device_information",
+                        "method": "POST",
+                        "endpoint": endpoint_path,
+                        "soap_action": format!("{SERVICE}#GetInfo"),
+                        "status": status,
+                        "body_json": redact_device_info_json(xml_response_as_json(&response_body)),
+                    })),
+                    Err(error) => endpoints.push(json!({
+                        "name": "device_information",
+                        "method": "POST",
+                        "endpoint": endpoint_path,
+                        "status": status,
+                        "error": error,
+                    })),
+                }
+            }
+            Err(error) => endpoints.push(json!({
+                "name": "device_information",
+                "method": "POST",
+                "endpoint": endpoint_path,
+                "error": error.without_url().to_string(),
+            })),
+        }
+    }
+
     let device_response = client
         .get(format!("{base}/webservices/homeautoswitch.lua"))
         .query(&[("sid", sid.as_str()), ("switchcmd", "getdevicelistinfos")])
@@ -1226,10 +1301,58 @@ fn parse_fetch_result_xml(xml: &str, selected_ains: &[String]) -> Result<FritzFe
         readings,
         missing_devices,
         internet_bandwidth: None,
+        system_info: None,
     })
 }
 
-fn parse_internet_bandwidth(xml: &str) -> Option<FritzInternetBandwidth> {
+fn upnp_control_url(base: &str, path: &str) -> Option<reqwest::Url> {
+    let mut url = reqwest::Url::parse(base).ok()?;
+    let port = if url.scheme() == "https" {
+        49_443
+    } else {
+        49_000
+    };
+    url.set_port(Some(port)).ok()?;
+    url.set_path(path);
+    url.set_query(None);
+    url.set_fragment(None);
+    Some(url)
+}
+
+fn wan_common_interface_url(base: &str) -> Option<reqwest::Url> {
+    upnp_control_url(base, "/igdupnp/control/WANCommonIFC1")
+}
+
+fn device_info_url(base: &str) -> Option<reqwest::Url> {
+    upnp_control_url(base, "/upnp/control/deviceinfo")
+}
+
+fn parse_optional_text(document: &Document<'_>, name: &str) -> Option<String> {
+    document
+        .descendants()
+        .find(|node| node.has_tag_name(name))?
+        .text()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn parse_device_info(xml: &str) -> Option<FritzBoxSystemInfo> {
+    let document = Document::parse(xml).ok()?;
+    let uptime_seconds = parse_optional_text(&document, "NewUpTime")
+        .and_then(|value| value.parse::<u64>().ok());
+    Some(FritzBoxSystemInfo {
+        manufacturer: parse_optional_text(&document, "NewManufacturerName"),
+        model: parse_optional_text(&document, "NewModelName"),
+        product_class: parse_optional_text(&document, "NewProductClass"),
+        hardware_version: parse_optional_text(&document, "NewHardwareVersion"),
+        software_version: parse_optional_text(&document, "NewSoftwareVersion"),
+        uptime_seconds,
+        wan: None,
+    })
+}
+
+fn parse_wan_link_info(xml: &str) -> Option<FritzWanLinkInfo> {
     let document = Document::parse(xml).ok()?;
     let read_rate = |name: &str| {
         document
@@ -1240,27 +1363,43 @@ fn parse_internet_bandwidth(xml: &str) -> Option<FritzInternetBandwidth> {
             .parse::<u64>()
             .ok()
     };
-    Some(FritzInternetBandwidth {
-        download_bits_per_second: read_rate("NewLayer1DownstreamMaxBitRate")?,
-        upload_bits_per_second: read_rate("NewLayer1UpstreamMaxBitRate")?,
+    Some(FritzWanLinkInfo {
+        access_type: parse_optional_text(&document, "NewWANAccessType"),
+        physical_link_status: parse_optional_text(&document, "NewPhysicalLinkStatus"),
+        download_bits_per_second: read_rate("NewLayer1DownstreamMaxBitRate"),
+        upload_bits_per_second: read_rate("NewLayer1UpstreamMaxBitRate"),
     })
 }
 
-fn wan_common_interface_url(base: &str) -> Option<reqwest::Url> {
-    let mut url = reqwest::Url::parse(base).ok()?;
-    let port = if url.scheme() == "https" {
-        49_443
-    } else {
-        49_000
-    };
-    url.set_port(Some(port)).ok()?;
-    url.set_path("/igdupnp/control/WANCommonIFC1");
-    url.set_query(None);
-    url.set_fragment(None);
-    Some(url)
+async fn fetch_device_info(client: &Client, base: &str) -> Option<FritzBoxSystemInfo> {
+    const SERVICE: &str = "urn:dslforum-org:service:DeviceInfo:1";
+    let endpoint = device_info_url(base)?;
+    let body = format!(
+        r#"<?xml version="1.0" encoding="utf-8"?>
+        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+          s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+          <s:Body><u:GetInfo xmlns:u="{SERVICE}"></u:GetInfo></s:Body>
+        </s:Envelope>"#
+    );
+    let response = client
+        .post(endpoint)
+        .header(reqwest::header::CONTENT_TYPE, "text/xml; charset=\"utf-8\"")
+        .header("SOAPACTION", format!("\"{SERVICE}#GetInfo\""))
+        .body(body)
+        .send()
+        .await
+        .ok()?;
+    let xml = read_xml_response_with_method(
+        response,
+        "FRITZ!Box device information request failed",
+        "POST",
+    )
+    .await
+    .ok()?;
+    parse_device_info(&xml)
 }
 
-async fn fetch_internet_bandwidth(client: &Client, base: &str) -> Option<FritzInternetBandwidth> {
+async fn fetch_wan_link_info(client: &Client, base: &str) -> Option<FritzWanLinkInfo> {
     const SERVICE: &str = "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1";
     let endpoint = wan_common_interface_url(base)?;
     let body = format!(
@@ -1288,7 +1427,29 @@ async fn fetch_internet_bandwidth(client: &Client, base: &str) -> Option<FritzIn
     )
     .await
     .ok()?;
-    parse_internet_bandwidth(&xml)
+    parse_wan_link_info(&xml)
+}
+
+fn redact_device_info_json(value: serde_json::Value) -> serde_json::Value {
+    use serde_json::Value;
+
+    match value {
+        Value::Object(mut object) => {
+            for key in ["NewSerialNumber", "NewProvisioningCode", "NewDeviceLog"] {
+                if object.contains_key(key) {
+                    object.insert(key.to_string(), Value::String("<redacted>".into()));
+                }
+            }
+            for child in object.values_mut() {
+                *child = redact_device_info_json(std::mem::take(child));
+            }
+            Value::Object(object)
+        }
+        Value::Array(values) => Value::Array(
+            values.into_iter().map(redact_device_info_json).collect(),
+        ),
+        other => other,
+    }
 }
 
 fn xml_response_as_json(xml: &str) -> serde_json::Value {
@@ -1552,12 +1713,35 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     // Popup-menu bandwidth is independent of panel visibility. Always fetch
     // the optional WAN statistics so the dedicated menu section remains live
     // even when the panel bandwidth item is disabled.
-    result.internet_bandwidth = tokio::time::timeout(
-        Duration::from_secs(3),
-        fetch_internet_bandwidth(&client, base),
-    )
-    .await
-    .unwrap_or(None);
+    // DeviceInfo and WAN link statistics are optional TR-064 services. Query
+    // them independently so unsupported firmware does not break device readings.
+    let (device_info, wan_info) = tokio::join!(
+        tokio::time::timeout(Duration::from_secs(3), fetch_device_info(&client, base)),
+        tokio::time::timeout(Duration::from_secs(3), fetch_wan_link_info(&client, base)),
+    );
+    let wan_info = wan_info.ok().flatten();
+    result.internet_bandwidth = wan_info.as_ref().and_then(|wan| {
+        Some(FritzInternetBandwidth {
+            download_bits_per_second: wan.download_bits_per_second?,
+            upload_bits_per_second: wan.upload_bits_per_second?,
+        })
+    });
+    result.system_info = match (device_info.ok().flatten(), wan_info) {
+        (Some(mut info), wan) => {
+            info.wan = wan;
+            Some(info)
+        }
+        (None, Some(wan)) => Some(FritzBoxSystemInfo {
+            manufacturer: None,
+            model: None,
+            product_class: None,
+            hardware_version: None,
+            software_version: None,
+            uptime_seconds: None,
+            wan: Some(wan),
+        }),
+        (None, None) => None,
+    };
 
     // Query the dedicated switch-state endpoint: power-meter XML can lag behind
     // the actual actuator state on some FRITZ!Box devices.
@@ -1712,6 +1896,41 @@ mod tests {
                 .as_str(),
             "https://fritz.box:49443/igdupnp/control/WANCommonIFC1"
         );
+        assert_eq!(
+            device_info_url("http://192.168.42.1").unwrap().as_str(),
+            "http://192.168.42.1:49000/upnp/control/deviceinfo"
+        );
+        assert_eq!(
+            device_info_url("https://fritz.box").unwrap().as_str(),
+            "https://fritz.box:49443/upnp/control/deviceinfo"
+        );
+    }
+
+    #[test]
+    fn parses_tr064_device_information_including_fritz_os_and_uptime() {
+        let xml = r#"<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+          <s:Body><u:GetInfoResponse xmlns:u="urn:dslforum-org:service:DeviceInfo:1">
+            <NewManufacturerName>AVM</NewManufacturerName>
+            <NewModelName>FRITZ!Box 6690 Cable</NewModelName>
+            <NewProductClass>FRITZ!Box</NewProductClass>
+            <NewHardwareVersion>2</NewHardwareVersion>
+            <NewSoftwareVersion>8.51</NewSoftwareVersion>
+            <NewUpTime>86461</NewUpTime>
+          </u:GetInfoResponse></s:Body>
+        </s:Envelope>"#;
+        assert_eq!(
+            parse_device_info(xml),
+            Some(FritzBoxSystemInfo {
+                manufacturer: Some("AVM".into()),
+                model: Some("FRITZ!Box 6690 Cable".into()),
+                product_class: Some("FRITZ!Box".into()),
+                hardware_version: Some("2".into()),
+                software_version: Some("8.51".into()),
+                uptime_seconds: Some(86461),
+                wan: None,
+            })
+        );
+        assert_eq!(parse_device_info("<invalid"), None);
     }
 
     #[test]
@@ -1724,18 +1943,25 @@ mod tests {
           </u:GetCommonLinkPropertiesResponse></s:Body>
         </s:Envelope>"#;
         assert_eq!(
-            parse_internet_bandwidth(xml),
-            Some(FritzInternetBandwidth {
-                download_bits_per_second: 1_000_000_000,
-                upload_bits_per_second: 50_000_000,
+            parse_wan_link_info(xml),
+            Some(FritzWanLinkInfo {
+                access_type: None,
+                physical_link_status: Some("Up".into()),
+                download_bits_per_second: Some(1_000_000_000),
+                upload_bits_per_second: Some(50_000_000),
             })
         );
-        assert_eq!(parse_internet_bandwidth("<invalid"), None);
+        assert_eq!(parse_wan_link_info("<invalid"), None);
         assert_eq!(
-            parse_internet_bandwidth(
+            parse_wan_link_info(
                 "<result><NewLayer1UpstreamMaxBitRate>bad</NewLayer1UpstreamMaxBitRate></result>"
             ),
-            None
+            Some(FritzWanLinkInfo {
+                access_type: None,
+                physical_link_status: None,
+                download_bits_per_second: None,
+                upload_bits_per_second: None,
+            })
         );
     }
 

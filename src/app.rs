@@ -1,5 +1,6 @@
 use crate::fritz::{
-    FritzDevice, FritzFetchResult, FritzInternetBandwidth, FritzReading, FritzSettings,
+    FritzBoxSystemInfo, FritzDevice, FritzFetchResult, FritzInternetBandwidth, FritzReading,
+    FritzSettings,
     TemperatureAlertThresholds, collect_fritzbox_debug_dump, discover_devices, fetch_fritz_data,
 };
 use crate::weather::{
@@ -27,6 +28,7 @@ pub struct AppModel {
     graph_window: Option<Id>,
     readings: Vec<FritzReading>,
     internet_bandwidth: Option<FritzInternetBandwidth>,
+    fritzbox_system_info: Option<FritzBoxSystemInfo>,
     bandwidth_history: VecDeque<(Instant, u64, u64)>,
     error: Option<String>,
     weather_error: Option<String>,
@@ -289,6 +291,28 @@ fn build_debug_report(app: &AppModel, fritzbox_dump: &str) -> String {
         activity,
         history_diagnostics
     )
+}
+
+fn format_uptime(seconds: u64) -> String {
+    let days = seconds / 86_400;
+    let hours = (seconds % 86_400) / 3_600;
+    let minutes = (seconds % 3_600) / 60;
+    if days > 0 {
+        format!("{days}d {hours}h {minutes}m")
+    } else if hours > 0 {
+        format!("{hours}h {minutes}m")
+    } else {
+        format!("{minutes}m")
+    }
+}
+
+fn format_link_rate(bits_per_second: u64) -> String {
+    let megabits = (bits_per_second as f64 / 1_000_000.0 * 10.0).round() / 10.0;
+    if megabits.fract().abs() < f64::EPSILON {
+        format!("{megabits:.0} Mb/s")
+    } else {
+        format!("{megabits:.1} Mb/s")
+    }
 }
 
 fn cpu_temperature_c() -> Option<f64> {
@@ -4324,6 +4348,105 @@ impl cosmic::Application for AppModel {
                         cpu_temperature
                             .map(|temperature| Some(temperature < 90.0))
                             .unwrap_or(None),
+                    ));
+                let router_info = self.fritzbox_system_info.as_ref();
+                let not_available = crate::i18n::tr(&self.settings.language, "Not available");
+                let router_model = router_info
+                    .and_then(|info| {
+                        match (info.manufacturer.as_deref(), info.model.as_deref()) {
+                            (Some(manufacturer), Some(model)) => Some(format!("{manufacturer} {model}")),
+                            (Some(manufacturer), None) => Some(manufacturer.to_string()),
+                            (None, Some(model)) => Some(model.to_string()),
+                            (None, None) => info.product_class.clone(),
+                        }
+                    })
+                    .unwrap_or_else(|| not_available.to_string());
+                let fritz_os_version = router_info
+                    .and_then(|info| info.software_version.as_deref())
+                    .unwrap_or(not_available);
+                let hardware_version = router_info
+                    .and_then(|info| info.hardware_version.as_deref())
+                    .unwrap_or(not_available);
+                let router_uptime = router_info
+                    .and_then(|info| info.uptime_seconds)
+                    .map(format_uptime)
+                    .unwrap_or_else(|| not_available.to_string());
+                let wan = router_info.and_then(|info| info.wan.as_ref());
+                let wan_access_type = wan
+                    .and_then(|info| info.access_type.as_deref())
+                    .unwrap_or(not_available);
+                let wan_link_status = wan
+                    .and_then(|info| info.physical_link_status.as_deref())
+                    .unwrap_or(not_available);
+                let wan_link_ok = wan
+                    .and_then(|info| info.physical_link_status.as_deref())
+                    .map(|status| status.eq_ignore_ascii_case("up"));
+                let max_download = wan
+                    .and_then(|info| info.download_bits_per_second)
+                    .map(format_link_rate)
+                    .unwrap_or_else(|| not_available.to_string());
+                let max_upload = wan
+                    .and_then(|info| info.upload_bits_per_second)
+                    .map(format_link_rate)
+                    .unwrap_or_else(|| not_available.to_string());
+                content = content
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "FRITZ!Box model"),
+                        &router_model,
+                        router_info
+                            .and_then(|info| info.model.as_ref().or(info.product_class.as_ref()))
+                            .map(|_| Some(true))
+                            .unwrap_or(None),
+                    ))
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "FRITZ!OS version"),
+                        fritz_os_version,
+                        router_info
+                            .and_then(|info| info.software_version.as_ref())
+                            .map(|_| Some(true))
+                            .unwrap_or(None),
+                    ))
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "Hardware version"),
+                        hardware_version,
+                        router_info
+                            .and_then(|info| info.hardware_version.as_ref())
+                            .map(|_| Some(true))
+                            .unwrap_or(None),
+                    ))
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "Router uptime"),
+                        &router_uptime,
+                        router_info
+                            .and_then(|info| info.uptime_seconds)
+                            .map(|_| Some(true))
+                            .unwrap_or(None),
+                    ))
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "WAN access type"),
+                        wan_access_type,
+                        wan.and_then(|info| info.access_type.as_ref())
+                            .map(|_| Some(true))
+                            .unwrap_or(None),
+                    ))
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "WAN link status"),
+                        wan_link_status,
+                        wan_link_ok,
+                    ))
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "Maximum download rate"),
+                        &max_download,
+                        wan.and_then(|info| info.download_bits_per_second)
+                            .map(|_| Some(true))
+                            .unwrap_or(None),
+                    ))
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "Maximum upload rate"),
+                        &max_upload,
+                        wan.and_then(|info| info.upload_bits_per_second)
+                            .map(|_| Some(true))
+                            .unwrap_or(None),
                     ))
                     .push(widget::divider::horizontal::default());
                 content = content
@@ -6546,6 +6669,7 @@ impl cosmic::Application for AppModel {
                             );
                         }
                         self.internet_bandwidth = result.internet_bandwidth;
+                        self.fritzbox_system_info = result.system_info;
                         let readings = result.readings;
                         clear_confirmed_power_changes(
                             &mut self.pending_power_targets,
@@ -7697,6 +7821,19 @@ impl cosmic::Application for AppModel {
 #[cfg(test)]
 mod history_tests {
     use super::*;
+
+    #[test]
+    fn router_uptime_is_formatted_without_losing_days() {
+        assert_eq!(format_uptime(59), "0m");
+        assert_eq!(format_uptime(3_661), "1h 1m");
+        assert_eq!(format_uptime(90_061), "1d 1h 1m");
+    }
+
+    #[test]
+    fn wan_link_rates_are_shown_in_megabits_per_second() {
+        assert_eq!(format_link_rate(531_968_000), "532 Mb/s");
+        assert_eq!(format_link_rate(55_000_000), "55 Mb/s");
+    }
 
     #[test]
     fn energy_flow_animation_moves_in_one_direction_without_bouncing() {
