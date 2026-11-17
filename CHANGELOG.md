@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- Add a per-device external-temperature source. The first device with “solar” in its name is selected by default; selecting a source automatically includes it in monitored readings, and only one device can be active.
+
 ### Fixed
 
 - Reduce weather slideshow CPU and memory use by downscaling source photos to the weather-card display limit and applying photo opacity during frame encoding, avoiding a second full decode/encode pass for every frame.
