@@ -4256,47 +4256,7 @@ impl cosmic::Application for AppModel {
                         "view-refresh-symbolic",
                         crate::i18n::tr(&self.settings.language, "Get 7-day forecast"),
                         Message::FetchForecastFromDiagnostics,
-                    ))
-                    .push(if let Some(error) = &self.weather_forecast_error {
-                        error_notice(
-                            crate::i18n::tr(&self.settings.language, "Forecast unavailable"),
-                            error,
-                        )
-                    } else if let Some(forecast) = &self.weather_forecast {
-                        let mut forecast_summary = widget::Column::new().spacing(6);
-                        for day in &forecast.days {
-                            forecast_summary = forecast_summary.push(
-                                widget::Row::new()
-                                    .spacing(8)
-                                    .align_y(cosmic::iced::Alignment::Center)
-                                    .push(widget::icon::from_name(day.icon_name()).size(18))
-                                    .push(
-                                        widget::text::body(format!(
-                                            "{} · {}",
-                                            day.date, day.description
-                                        ))
-                                        .width(cosmic::iced::Length::Fill),
-                                    )
-                                    .push(widget::text::body(format!(
-                                        "{:.0}° / {:.0}°",
-                                        day.max_temperature_c, day.min_temperature_c
-                                    ))),
-                            );
-                        }
-                        surface_card(forecast_summary.into(), 10)
-                    } else if self.weather_forecast_loading {
-                        widget::text::caption(crate::i18n::tr(
-                            &self.settings.language,
-                            "Loading forecast…",
-                        ))
-                        .into()
-                    } else {
-                        widget::text::caption(crate::i18n::tr(
-                            &self.settings.language,
-                            "Request a forecast to verify the Open-Meteo endpoints.",
-                        ))
-                        .into()
-                    });
+                    ));
 
                 let requests = crate::fritz::http_request_diagnostics();
                 let fritz_base = endpoint.trim_end_matches('/');
