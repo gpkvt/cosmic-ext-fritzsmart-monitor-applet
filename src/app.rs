@@ -2287,8 +2287,7 @@ impl cosmic::Application for AppModel {
             // Keep the value shrink-wrapped so it cannot consume the space
             // needed by subsequent readings. Multiline values start at the
             // same top edge as their icon; single-line values are centered.
-            let mut value = widget::container(value)
-                .width(cosmic::iced::Length::Shrink);
+            let mut value = widget::container(value).width(cosmic::iced::Length::Shrink);
             if !icon_at_top {
                 value = value.center_y(item_height as u16);
             }
