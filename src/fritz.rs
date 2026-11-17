@@ -1032,61 +1032,6 @@ async fn authenticated_client(settings: &FritzSettings) -> Result<(Client, Strin
 pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<FritzDevice>, String> {
     let (client, sid) = authenticated_client(&settings).await?;
     let base = settings.url.trim_end_matches('/');
-    // DeviceInfo exposes the router identity, installed FRITZ!OS release,
-    // hardware revision and uptime. Never export the serial number or device log.
-    if let Some(endpoint) = device_info_url(base) {
-        const SERVICE: &str = "urn:dslforum-org:service:DeviceInfo:1";
-        let body = format!(
-            r#"<?xml version="1.0" encoding="utf-8"?>
-            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
-              s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-              <s:Body><u:GetInfo xmlns:u="{SERVICE}"></u:GetInfo></s:Body>
-            </s:Envelope>"#
-        );
-        let endpoint_path = endpoint.path().to_string();
-        match client
-            .post(endpoint)
-            .header(reqwest::header::CONTENT_TYPE, "text/xml; charset=\"utf-8\"")
-            .header("SOAPACTION", format!("\"{SERVICE}#GetInfo\""))
-            .body(body)
-            .send()
-            .await
-        {
-            Ok(response) => {
-                let status = response.status().as_u16();
-                match read_xml_response_with_method(
-                    response,
-                    "FRITZ!Box debug device information request failed",
-                    "POST",
-                )
-                .await
-                {
-                    Ok(response_body) => endpoints.push(json!({
-                        "name": "device_information",
-                        "method": "POST",
-                        "endpoint": endpoint_path,
-                        "soap_action": format!("{SERVICE}#GetInfo"),
-                        "status": status,
-                        "body_json": redact_device_info_json(xml_response_as_json(&response_body)),
-                    })),
-                    Err(error) => endpoints.push(json!({
-                        "name": "device_information",
-                        "method": "POST",
-                        "endpoint": endpoint_path,
-                        "status": status,
-                        "error": error,
-                    })),
-                }
-            }
-            Err(error) => endpoints.push(json!({
-                "name": "device_information",
-                "method": "POST",
-                "endpoint": endpoint_path,
-                "error": error.without_url().to_string(),
-            })),
-        }
-    }
-
     let device_response = client
         .get(format!("{base}/webservices/homeautoswitch.lua"))
         .query(&[("sid", sid.as_str()), ("switchcmd", "getdevicelistinfos")])
@@ -1625,6 +1570,61 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                     "error": error.without_url().to_string(),
                 })),
             }
+        }
+    }
+
+    // DeviceInfo exposes the router identity, installed FRITZ!OS release,
+    // hardware revision and uptime. Never export the serial number or device log.
+    if let Some(endpoint) = device_info_url(base) {
+        const SERVICE: &str = "urn:dslforum-org:service:DeviceInfo:1";
+        let body = format!(
+            r#"<?xml version="1.0" encoding="utf-8"?>
+            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+              s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+              <s:Body><u:GetInfo xmlns:u="{SERVICE}"></u:GetInfo></s:Body>
+            </s:Envelope>"#
+        );
+        let endpoint_path = endpoint.path().to_string();
+        match client
+            .post(endpoint)
+            .header(reqwest::header::CONTENT_TYPE, "text/xml; charset=\"utf-8\"")
+            .header("SOAPACTION", format!("\"{SERVICE}#GetInfo\""))
+            .body(body)
+            .send()
+            .await
+        {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                match read_xml_response_with_method(
+                    response,
+                    "FRITZ!Box debug device information request failed",
+                    "POST",
+                )
+                .await
+                {
+                    Ok(response_body) => endpoints.push(json!({
+                        "name": "device_information",
+                        "method": "POST",
+                        "endpoint": endpoint_path,
+                        "soap_action": format!("{SERVICE}#GetInfo"),
+                        "status": status,
+                        "body_json": redact_device_info_json(xml_response_as_json(&response_body)),
+                    })),
+                    Err(error) => endpoints.push(json!({
+                        "name": "device_information",
+                        "method": "POST",
+                        "endpoint": endpoint_path,
+                        "status": status,
+                        "error": error,
+                    })),
+                }
+            }
+            Err(error) => endpoints.push(json!({
+                "name": "device_information",
+                "method": "POST",
+                "endpoint": endpoint_path,
+                "error": error.without_url().to_string(),
+            })),
         }
     }
 
