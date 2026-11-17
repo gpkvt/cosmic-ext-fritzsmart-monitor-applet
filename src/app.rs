@@ -4468,9 +4468,11 @@ impl cosmic::Application for AppModel {
                                             "{}  {:.1} m/s{}",
                                             crate::i18n::tr(&self.settings.language, "Wind"),
                                             weather.wind_speed_mps,
-                                            crate::weather::wind_direction_compass(weather.wind_direction_degrees)
-                                                .map(|direction| format!(" · {direction}"))
-                                                .unwrap_or_default()
+                                            crate::weather::wind_direction_compass(
+                                                weather.wind_direction_degrees
+                                            )
+                                            .map(|direction| format!(" · {direction}"))
+                                            .unwrap_or_default()
                                         ))
                                         .width(cosmic::iced::Length::Fill),
                                     ),
@@ -5089,7 +5091,7 @@ impl cosmic::Application for AppModel {
                                     "History",
                                 ))),
                         )
-.on_press(Message::ShowDeviceHistoryGraph(reading.ain.clone()))
+                        .on_press(Message::ShowDeviceHistoryGraph(reading.ain.clone()))
                         .padding([8, 8])
                         .class(cosmic::theme::Button::Text)
                         .into()
@@ -5922,7 +5924,8 @@ impl cosmic::Application for AppModel {
                         self.history_graph_index = Some(next);
                         let (key, name) = self.history_graph_devices[next].clone();
                         if let Some(samples) = self.device_history.get(&key) {
-                            let values = samples.iter().map(|(_, power, _)| *power as f64).collect();
+                            let values =
+                                samples.iter().map(|(_, power, _)| *power as f64).collect();
                             let axis_start = format_graph_axis_start(
                                 self.settings.graph_timespan_minutes,
                                 samples.front().map(|(timestamp, _, _)| {
