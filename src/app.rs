@@ -1211,26 +1211,26 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
     }
     content = content
         .push(widget::text::caption(crate::i18n::tr(
-            language,
+            &language,
             "CURRENT POWER HISTORY",
         )))
         .push(interactive_graph_with_axis(
-            language,
+            &language,
             crate::i18n::tr(language, "CURRENT POWER"),
             history.into_iter(),
-            graph_style,
+            &graph_style,
             "W",
             axis_start.clone(),
         ))
         .push(widget::text::caption(crate::i18n::tr(
-            language,
+            &language,
             "AVERAGE TEMPERATURE HISTORY (°C)",
         )))
         .push(interactive_graph_with_axis(
             language,
             crate::i18n::tr(language, "AVERAGE TEMPERATURE"),
             temperature_history.into_iter(),
-            graph_style,
+            &graph_style,
             "°C",
             axis_start,
         ));
