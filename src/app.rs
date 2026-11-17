@@ -1708,33 +1708,33 @@ impl cosmic::Application for AppModel {
                 .any(|hidden| hidden == "power-consumption")
             {
                 panel_items.push((
-                "power-consumption",
-                panel_item(
-                    if self.settings.panel_net_power {
-                        "Net power"
-                    } else {
-                        "Power consumption"
-                    },
-                    Some(
-                        widget::svg(widget::svg::Handle::from_memory(
-                            br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5M16 3v5"/><path d="M6 8h12v3a6 6 0 0 1-6 6h0a6 6 0 0 1-6-6V8Z"/><path d="M12 17v2a3 3 0 0 0 3 3h1"/></svg>"#.to_vec(),
-                        ))
-                        .width(10)
-                        .height(10)
-                        .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
-                            color: Some(theme.cosmic().on_bg_color().into()),
-                        }))
-                        .into(),
-                    ),
-                    self.core
-                        .applet
-                        .text(power)
-                        .size(f32::from(self.settings.panel_text_size))
-                        .into(),
-                )
-                .into(),
-                ));
-            }
+                    "power-consumption",
+                    panel_item(
+                        if self.settings.panel_net_power {
+                            "Net power"
+                        } else {
+                            "Power consumption"
+                        },
+                        Some(
+                            widget::svg(widget::svg::Handle::from_memory(
+                                br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5M16 3v5"/><path d="M6 8h12v3a6 6 0 0 1-6 6h0a6 6 0 0 1-6-6V8Z"/><path d="M12 17v2a3 3 0 0 0 3 3h1"/></svg>"#.to_vec(),
+                            ))
+                            .width(10)
+                            .height(10)
+                            .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
+                                color: Some(theme.cosmic().on_bg_color().into()),
+                            }))
+                            .into(),
+                        ),
+                        self.core
+                            .applet
+                            .text(power)
+                            .size(f32::from(self.settings.panel_text_size))
+                            .into(),
+                    )
+                    .into(),
+                    ));
+                }
             if !self.settings.panel_net_power
                 && !self
                     .settings
