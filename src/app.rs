@@ -4279,10 +4279,6 @@ impl cosmic::Application for AppModel {
             let mut weather_menu_card: Option<cosmic::Element<'_, Message>> = None;
             if let Some(weather) = &self.weather {
                 let mut weather_section = widget::Column::new().spacing(8);
-                let wind_direction = weather
-                    .wind_direction_degrees
-                    .map(|degrees| format!("{degrees}°"))
-                    .unwrap_or_else(|| "—".into());
                 let sunrise = chrono::DateTime::from_timestamp(weather.sunrise_unix, 0)
                     .map(|time| {
                         time.with_timezone(&chrono::Local)
@@ -4407,10 +4403,9 @@ impl cosmic::Application for AppModel {
                                         weather.pressure_hpa
                                     )).width(cosmic::iced::Length::Fill))
                                     .push(widget::text::body(format!(
-                                        "{}  {:.1} m/s · {}",
+                                        "{}  {:.1} m/s",
                                         crate::i18n::tr(&self.settings.language, "Wind"),
-                                        weather.wind_speed_mps,
-                                        wind_direction
+                                        weather.wind_speed_mps
                                     )).width(cosmic::iced::Length::Fill)),
                             )
                             .push(
