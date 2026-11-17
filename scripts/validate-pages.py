@@ -17,17 +17,35 @@ class PageParser(HTMLParser):
         self.ids = set()
         self.references = []
         self.gallery_images = 0
+        self.text_parts = []
+        self.suppressed = []
+        self.duplicate_ids = set()
 
     def handle_starttag(self, tag, attrs):
         values = dict(attrs)
         if "id" in values:
+            if values["id"] in self.ids:
+                self.duplicate_ids.add(values["id"])
             self.ids.add(values["id"])
+        if tag in {"pre", "code", "script", "style"}:
+            self.suppressed.append(tag)
         for attribute in ("href", "src"):
             value = values.get(attribute)
             if value:
                 self.references.append((attribute, value))
         if tag == "img" and values.get("id") == "gallery-image":
             self.gallery_images += 1
+
+    def handle_endtag(self, tag):
+        if tag in self.suppressed:
+            for index in range(len(self.suppressed) - 1, -1, -1):
+                if self.suppressed[index] == tag:
+                    del self.suppressed[index]
+                    break
+
+    def handle_data(self, data):
+        if not self.suppressed:
+            self.text_parts.append(data)
 
 
 def fail(message):
@@ -48,6 +66,23 @@ for page in pages:
     content = page.read_text(encoding="utf-8")
     parser.feed(content)
     parser.close()
+
+    if parser.duplicate_ids:
+        fail(f"{page.name}: duplicate HTML id(s): {', '.join(sorted(parser.duplicate_ids))}")
+
+    # Markdown belongs in source .md files, not rendered Pages HTML.
+    # Ignore code samples, scripts and styles, where Markdown punctuation is valid.
+    visible_text = "\\n".join(parser.text_parts)
+    markdown_residue = (
+        (r"\\*\\*[^*\\n]+\\*\\*", "Markdown bold markers"),
+        (r"(?<!\\x60)\\x60[^\\x60\\n]+\\x60(?!\\x60)", "Markdown inline-code markers"),
+        (r"!\\[[^]]*\\]\\([^)]+\\)", "Markdown image syntax"),
+        (r"(?<!!)\\[[^]]+\\]\\([^)]+\\)", "Markdown link syntax"),
+        (r"(?m)^\\s{0,3}#{1,6}\\s+\\S", "Markdown heading syntax"),
+    )
+    for pattern, description in markdown_residue:
+        if re.search(pattern, visible_text):
+            fail(f"{page.name}: unrendered {description} found in visible page text")
 
     for attribute, reference in parser.references:
         parsed = urlsplit(reference)
