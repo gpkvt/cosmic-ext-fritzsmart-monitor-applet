@@ -353,6 +353,30 @@ fn format_graph_timespan(minutes: u32) -> String {
     }
 }
 
+fn input_energy_and_timespan(history: &VecDeque<(Instant, i64)>) -> Option<(f64, Duration)> {
+    let (first_timestamp, _) = history.front()?;
+    let (last_timestamp, _) = history.back()?;
+    let timespan = last_timestamp.saturating_duration_since(*first_timestamp);
+    let energy_wh = history
+        .iter()
+        .zip(history.iter().skip(1))
+        .map(|((start, start_power), (end, end_power))| {
+            let elapsed_hours = end.saturating_duration_since(*start).as_secs_f64() / 3600.0;
+            (start_power.abs() as f64 + end_power.abs() as f64) / 2.0 * elapsed_hours
+        })
+        .sum();
+    Some((energy_wh, timespan))
+}
+
+fn format_elapsed_timespan(timespan: Duration) -> String {
+    let total_minutes = timespan.as_secs() / 60;
+    if total_minutes == 0 {
+        format!("{} seconds", timespan.as_secs())
+    } else {
+        format_graph_timespan(total_minutes.min(u64::from(u32::MAX)) as u32)
+    }
+}
+
 fn record_power_sample(
     history: &mut VecDeque<(Instant, i64)>,
     power_w: i64,
@@ -1084,7 +1108,14 @@ fn total_power_overview(
             .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
     });
     if has_input_readings {
-        let input_graph = widget::Column::new()
+        let input_energy_summary = input_energy_and_timespan(&input_history)
+            .map(|(energy_wh, timespan)| {
+                widget::text::caption(format!(
+                    "TOTAL ENERGY: {energy_wh:.1} Wh · {}",
+                    format_elapsed_timespan(timespan)
+                ))
+            });
+        let mut input_graph = widget::Column::new()
             .spacing(4)
             .push(widget::text::caption("TOTAL POWER INPUT (W)"))
             .push(interactive_graph_with_axis(
@@ -1094,8 +1125,11 @@ fn total_power_overview(
                 &settings.graph_style,
                 "W",
                 axis_start.clone(),
-            ))
-            .push(widget::text::caption("AVERAGE TEMPERATURE (°C)"))
+            ));
+        if let Some(summary) = input_energy_summary {
+            input_graph = input_graph.push(summary);
+        }
+        input_graph = input_graph.push(widget::text::caption("AVERAGE TEMPERATURE (°C)"))
             .push(interactive_graph_with_axis(
                 &settings.language,
                 crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
@@ -5774,6 +5808,29 @@ mod history_tests {
         assert_eq!(format_countdown(60), "1m 00s");
         assert_eq!(format_countdown(3599), "59m 59s");
         assert_eq!(format_countdown(3600), "1h 00m 00s");
+    }
+
+    #[test]
+    fn input_energy_uses_trapezoidal_power_integration_and_actual_timespan() {
+        let start = Instant::now();
+        let history = VecDeque::from([
+            (start, -1000),
+            (start + Duration::from_secs(1800), -2000),
+            (start + Duration::from_secs(3600), -1000),
+        ]);
+
+        let (energy_wh, timespan) = input_energy_and_timespan(&history).unwrap();
+        assert!((energy_wh - 1500.0).abs() < f64::EPSILON);
+        assert_eq!(timespan, Duration::from_secs(3600));
+        assert_eq!(format_elapsed_timespan(timespan), "1 hour");
+    }
+
+    #[test]
+    fn input_energy_handles_a_single_sample_without_inventing_energy() {
+        let history = VecDeque::from([(Instant::now(), -500)]);
+        let (energy_wh, timespan) = input_energy_and_timespan(&history).unwrap();
+        assert_eq!(energy_wh, 0.0);
+        assert_eq!(timespan, Duration::ZERO);
     }
 
     #[test]
