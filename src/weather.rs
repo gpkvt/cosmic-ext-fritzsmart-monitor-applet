@@ -571,8 +571,7 @@ async fn fetch_commons_background(
             let Ok(bytes) = response.bytes().await else {
                 continue;
             };
-            // Keep the original photograph intact. The weather card adds a
-            // transparent black chessboard overlay at display time.
+            // Keep the original photograph intact for display in the weather card.
             let image = bytes.to_vec();
             let metadata = &info["extmetadata"];
             let artist = metadata["Artist"]["value"]
@@ -730,29 +729,6 @@ fn generate_starry_night_background() -> Option<Vec<u8>> {
         .write_to(&mut output, image::ImageFormat::Jpeg)
         .ok()?;
     Some(output.into_inner())
-}
-
-/// A black chessboard texture for photo-backed weather cards. Every other
-/// square is black at 50% opacity; the alternating squares are fully transparent.
-pub fn chessboard_background_overlay() -> Option<Vec<u8>> {
-    static OVERLAY: LazyLock<Option<Vec<u8>>> = LazyLock::new(|| {
-        let width = 1200u32;
-        let height = 520u32;
-        let square_size = 8u32;
-        let image = image::RgbaImage::from_fn(width, height, |x, y| {
-            if ((x / square_size) + (y / square_size)) % 2 == 0 {
-                image::Rgba([0, 0, 0, 224])
-            } else {
-                image::Rgba([0, 0, 0, 0])
-            }
-        });
-        let mut output = std::io::Cursor::new(Vec::new());
-        image::DynamicImage::ImageRgba8(image)
-            .write_to(&mut output, image::ImageFormat::Png)
-            .ok()?;
-        Some(output.into_inner())
-    });
-    OVERLAY.clone()
 }
 
 pub fn build_weather_slideshow_frames(
@@ -1066,17 +1042,6 @@ mod tests {
         let bytes = generate_starry_night_background().expect("star field should render");
         let decoded = image::load_from_memory(&bytes).expect("fallback must be a valid image");
         assert_eq!((decoded.width(), decoded.height()), (1200, 520));
-    }
-
-    #[test]
-    fn chessboard_overlay_alternates_dark_pixels_and_transparency() {
-        let bytes = chessboard_background_overlay().expect("overlay should render");
-        let decoded = image::load_from_memory(&bytes).unwrap().to_rgba8();
-        assert_eq!(decoded.dimensions(), (1200, 520));
-        assert_eq!(decoded.get_pixel(0, 0).0, [0, 0, 0, 224]);
-        assert_eq!(decoded.get_pixel(8, 0).0, [0, 0, 0, 224]);
-        assert_eq!(decoded.get_pixel(0, 8).0, [0, 0, 0, 224]);
-        assert_eq!(decoded.get_pixel(8, 8).0, [0, 0, 0, 224]);
     }
 
     #[test]
