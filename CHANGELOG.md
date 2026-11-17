@@ -6,6 +6,10 @@ Changes are tracked in date-based entries. See the [GitHub Releases](https://git
 
 ## [17.11.2026]
 
+### Changed
+
+- Unified all panel text rendering through one shared renderer so temperature, power, bandwidth and status values use identical typography, alignment and line spacing.
+
 ### Added
 
 - Added an optional outdoor-temperature source that uses a selected FRITZ!Box device sensor instead of OpenWeatherMap's reported temperature.
