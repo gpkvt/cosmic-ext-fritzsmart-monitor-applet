@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Construct the weather refresh indicator using libcosmic's `progress_bar::ProgressBar` widget type, avoiding a call to the module as though it were a function.
+
 - Replaced a full-vector `extend(drain(..))` with `append` in panel-item ordering to satisfy Clippy's `extend_with_drain` lint.
 
 ### Added
