@@ -4481,7 +4481,7 @@ impl cosmic::Application for AppModel {
                             "first_sample_age_seconds": samples.front().map(|(timestamp, _, _)| now.saturating_duration_since(*timestamp).as_secs()),
                             "last_sample_age_seconds": samples.back().map(|(timestamp, _, _)| now.saturating_duration_since(*timestamp).as_secs()),
                             "graph_power_values_retrievable": !samples.is_empty(),
-                            "graph_power_values_count": samples.iter().map(|(_, power, _)| *power as f64).count(),
+                            "graph_power_values_count": samples.len(),
                             "power_min_w": samples.iter().map(|(_, power, _)| *power).min(),
                             "power_max_w": samples.iter().map(|(_, power, _)| *power).max()
                         })

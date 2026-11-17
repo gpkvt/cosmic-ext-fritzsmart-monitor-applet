@@ -1402,70 +1402,70 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
 
     // Query switch state individually for every switch-capable device present
     // in the full inventory response, not just devices selected for the panel.
-    if let Some(xml) = device_xml.as_deref() {
-        if let Ok(document) = Document::parse(xml) {
-            for device in document
-                .descendants()
-                .filter(|node| node.has_tag_name("device"))
-            {
-                let Some(ain) = device.attribute("identifier") else {
-                    continue;
-                };
-                if !device.descendants().any(|node| node.has_tag_name("switch")) {
-                    continue;
-                }
-                let response = client
-                    .get(format!("{base}/webservices/homeautoswitch.lua"))
-                    .query(&[
-                        ("sid", sid.as_str()),
-                        ("switchcmd", "getswitchstate"),
-                        ("ain", ain),
-                    ])
-                    .send()
-                    .await;
-                match response {
-                    Ok(response) => {
-                        let status = response.status().as_u16();
-                        let device_name = device
-                            .children()
-                            .find(|node| node.has_tag_name("name"))
-                            .and_then(|node| node.text())
-                            .unwrap_or("Unnamed device");
-                        match read_xml_response(
-                            response,
-                            "FRITZ!Box debug switch-state request failed",
-                        )
-                        .await
-                        {
-                            Ok(body) => endpoints.push(json!({
-                                "name": "device_switch_state",
-                                "method": "GET",
-                                "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
-                                "device_name": device_name,
-                                "device_ain": ain,
-                                "status": status,
-                                "body_json": xml_response_as_json(&body),
-                                "body_raw": body,
-                            })),
-                            Err(error) => endpoints.push(json!({
-                                "name": "device_switch_state",
-                                "method": "GET",
-                                "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
-                                "device_name": device_name,
-                                "device_ain": ain,
-                                "status": status,
-                                "error": error,
-                            })),
-                        }
+    if let Some(xml) = device_xml.as_deref()
+        && let Ok(document) = Document::parse(xml)
+    {
+        for device in document
+            .descendants()
+            .filter(|node| node.has_tag_name("device"))
+        {
+            let Some(ain) = device.attribute("identifier") else {
+                continue;
+            };
+            if !device.descendants().any(|node| node.has_tag_name("switch")) {
+                continue;
+            }
+            let response = client
+                .get(format!("{base}/webservices/homeautoswitch.lua"))
+                .query(&[
+                    ("sid", sid.as_str()),
+                    ("switchcmd", "getswitchstate"),
+                    ("ain", ain),
+                ])
+                .send()
+                .await;
+            match response {
+                Ok(response) => {
+                    let status = response.status().as_u16();
+                    let device_name = device
+                        .children()
+                        .find(|node| node.has_tag_name("name"))
+                        .and_then(|node| node.text())
+                        .unwrap_or("Unnamed device");
+                    match read_xml_response(
+                        response,
+                        "FRITZ!Box debug switch-state request failed",
+                    )
+                    .await
+                    {
+                        Ok(body) => endpoints.push(json!({
+                            "name": "device_switch_state",
+                            "method": "GET",
+                            "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
+                            "device_name": device_name,
+                            "device_ain": ain,
+                            "status": status,
+                            "body_json": xml_response_as_json(&body),
+                            "body_raw": body,
+                        })),
+                        Err(error) => endpoints.push(json!({
+                            "name": "device_switch_state",
+                            "method": "GET",
+                            "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
+                            "device_name": device_name,
+                            "device_ain": ain,
+                            "status": status,
+                            "error": error,
+                        })),
                     }
-                    Err(error) => endpoints.push(json!({
-                        "name": "device_switch_state",
-                        "method": "GET",
-                        "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
-                        "device_ain": ain,
-                        "error": error.without_url().to_string(),
-                    })),
                 }
+                Err(error) => endpoints.push(json!({
+                    "name": "device_switch_state",
+                    "method": "GET",
+                    "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
+                    "device_ain": ain,
+                    "error": error.without_url().to_string(),
+                })),
             }
         }
     }
