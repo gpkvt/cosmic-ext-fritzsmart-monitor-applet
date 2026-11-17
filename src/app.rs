@@ -1,7 +1,7 @@
 use crate::fritz::{
     FritzBoxSystemInfo, FritzDevice, FritzFetchResult, FritzInternetBandwidth, FritzReading,
-    FritzSettings,
-    TemperatureAlertThresholds, collect_fritzbox_debug_dump, discover_devices, fetch_fritz_data,
+    FritzSettings, TemperatureAlertThresholds, collect_fritzbox_debug_dump, discover_devices,
+    fetch_fritz_data,
 };
 use crate::weather::{
     WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather,
@@ -4352,14 +4352,16 @@ impl cosmic::Application for AppModel {
                 let router_info = self.fritzbox_system_info.as_ref();
                 let not_available = crate::i18n::tr(&self.settings.language, "Not available");
                 let router_model = router_info
-                    .and_then(|info| {
-                        match (info.manufacturer.as_deref(), info.model.as_deref()) {
-                            (Some(manufacturer), Some(model)) => Some(format!("{manufacturer} {model}")),
+                    .and_then(
+                        |info| match (info.manufacturer.as_deref(), info.model.as_deref()) {
+                            (Some(manufacturer), Some(model)) => {
+                                Some(format!("{manufacturer} {model}"))
+                            }
                             (Some(manufacturer), None) => Some(manufacturer.to_string()),
                             (None, Some(model)) => Some(model.to_string()),
                             (None, None) => info.product_class.clone(),
-                        }
-                    })
+                        },
+                    )
                     .unwrap_or_else(|| not_available.to_string());
                 let fritz_os_version = router_info
                     .and_then(|info| info.software_version.as_deref())

@@ -1339,8 +1339,8 @@ fn parse_optional_text(document: &Document<'_>, name: &str) -> Option<String> {
 
 fn parse_device_info(xml: &str) -> Option<FritzBoxSystemInfo> {
     let document = Document::parse(xml).ok()?;
-    let uptime_seconds = parse_optional_text(&document, "NewUpTime")
-        .and_then(|value| value.parse::<u64>().ok());
+    let uptime_seconds =
+        parse_optional_text(&document, "NewUpTime").and_then(|value| value.parse::<u64>().ok());
     Some(FritzBoxSystemInfo {
         manufacturer: parse_optional_text(&document, "NewManufacturerName"),
         model: parse_optional_text(&document, "NewModelName"),
@@ -1445,9 +1445,9 @@ fn redact_device_info_json(value: serde_json::Value) -> serde_json::Value {
             }
             Value::Object(object)
         }
-        Value::Array(values) => Value::Array(
-            values.into_iter().map(redact_device_info_json).collect(),
-        ),
+        Value::Array(values) => {
+            Value::Array(values.into_iter().map(redact_device_info_json).collect())
+        }
         other => other,
     }
 }
