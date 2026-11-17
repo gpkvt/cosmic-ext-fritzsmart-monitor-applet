@@ -2216,11 +2216,13 @@ impl cosmic::Application for AppModel {
                 // This keeps split-unit values (including unpaired items) in
                 // the same compact layout without multiline text measurement
                 // shifting the lower line outside the value column.
-                let lower = format!("\u{00a0}\u{00a0}{lower}");
+                // The icon already occupies the leading slot beside the
+                // first line. Start the unit directly below the number;
+                // adding whitespace here double-counts that icon offset.
                 widget::Column::new()
                     .spacing(0)
                     .push(panel_text(upper.to_string()))
-                    .push(panel_text(lower))
+                    .push(panel_text(lower.to_string()))
                     .into()
             } else {
                 let width = text_width(&value);
