@@ -2188,8 +2188,8 @@ impl cosmic::Application for AppModel {
                 )
             });
 
-        // Use a compact, consistent value column: this keeps stacked readings
-        // right-aligned without restoring the excessive 88px gap.
+        // Keep every reading at its intrinsic width. Expanding each child to
+        // Fill inside the horizontal panel row pushes later readings off-screen.
         let panel_item = |label: &'static str,
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>,
@@ -2197,11 +2197,14 @@ impl cosmic::Application for AppModel {
             // A split number/unit value needs two text lines. The previous
             // fixed 24px item height clipped those lines in multiline mode.
             let item_height = if icon_at_top { 40.0 } else { 24.0 };
-            let mut item = widget::Row::new().spacing(5).align_y(if icon_at_top {
-                cosmic::iced::Alignment::Start
-            } else {
-                cosmic::iced::Alignment::Center
-            });
+            let mut item = widget::Row::new()
+                .width(cosmic::iced::Length::Shrink)
+                .spacing(5)
+                .align_y(if icon_at_top {
+                    cosmic::iced::Alignment::Start
+                } else {
+                    cosmic::iced::Alignment::Center
+                });
             if let Some(icon) = icon {
                 // Keep the icon beside the first line when a value wraps.
                 let icon_column = widget::container(icon)
@@ -2218,14 +2221,12 @@ impl cosmic::Application for AppModel {
                     icon_column.center_y(item_height as u16)
                 });
             }
-            // Give the value a real, expanding layout area so right/bottom
-            // alignment works for both one-line and two-line readings.
+            // Keep the value shrink-wrapped so it cannot consume the space
+            // needed by subsequent readings.
             let value = widget::container(value)
-                .align_right(cosmic::iced::Length::Fill)
+                .width(cosmic::iced::Length::Shrink)
                 .align_bottom(item_height as u16);
-            item = item
-                .width(cosmic::iced::Length::Fill)
-                .height(cosmic::iced::Length::Fixed(item_height));
+            item = item.height(cosmic::iced::Length::Fixed(item_height));
             self.core.applet.applet_tooltip(
                 item.push(value),
                 label,
@@ -2391,7 +2392,7 @@ impl cosmic::Application for AppModel {
                 // with a modest gap after each direction icon.
                 let bandwidth_row = |icon: &'static str, value: String| {
                     widget::Row::new()
-                        .width(cosmic::iced::Length::Fill)
+                        .width(cosmic::iced::Length::Shrink)
                         .height(cosmic::iced::Length::Fixed(24.0))
                         .spacing(5)
                         .align_y(cosmic::iced::Alignment::End)
@@ -2410,7 +2411,7 @@ impl cosmic::Application for AppModel {
                                 widget::text::body(keep_value_unit_together(value))
                                     .size(f32::from(self.settings.panel_text_size)),
                             )
-                            .align_right(cosmic::iced::Length::Fill)
+                            .width(cosmic::iced::Length::Shrink)
                             .align_bottom(24),
                         )
                 };

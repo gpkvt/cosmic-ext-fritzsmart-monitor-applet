@@ -30,6 +30,7 @@ Changes are tracked in date-based entries. See the [GitHub Releases](https://git
 
 ### Fixed
 
+- Fixed panel readings disappearing beyond the right edge by allowing each item and value to use its natural width instead of expanding to the full panel width.
 - Fixed repository selection in the workflow CLI and release lockfile resolution; corrected the AppImage updater's asynchronous permission update ([#466](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/466), [#471](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/471), [#476](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/476)).
 - Fixed TLS diagnostics severity when certificate validation is explicitly disabled, and clarified installed/latest version status indicators ([#472](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/472), [#475](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/475)).
 - Fixed broken README and security-policy links on the website and user guide ([#474](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/474)).
