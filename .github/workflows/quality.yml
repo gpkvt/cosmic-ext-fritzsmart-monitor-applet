@@ -81,7 +81,12 @@ jobs:
           else
             changed_files="$(git diff --name-only "$BASE_SHA" "$GITHUB_SHA")"
           fi
-          if grep -Eq '(^|/)(src/.*\\.rs|build\\.rs)
+          if [[ "$changed_files" == *".rs"* || "$changed_files" == *"build.rs"* ]]; then
+            cargo fmt --all -- --check
+          else
+            echo "No Rust sources changed; formatting check not required."
+          fi
+
       - name: Check all targets compile
         run: cargo check --locked --all-targets
 
