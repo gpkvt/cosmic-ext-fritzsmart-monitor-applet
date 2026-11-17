@@ -32,6 +32,8 @@ pub struct AppModel {
     weather_error: Option<String>,
     updated: Option<String>,
     settings_open: bool,
+    setup_assistant: bool,
+    setup_step: u8,
     active_settings_section: Option<&'static str>,
     settings: FritzSettings,
     devices: Vec<FritzDevice>,
@@ -88,6 +90,9 @@ pub enum Message {
     SetDevicePower(String, bool),
     PowerCommandFinished(String, bool, Result<(), String>),
     ToggleSettings,
+    SetupNext,
+    SetupBack,
+    SetupFinish,
     ToggleSettingsSection(&'static str),
     LanguageChanged(String),
     BackToSettingsCategories,
@@ -2008,6 +2013,7 @@ impl cosmic::Application for AppModel {
         _flags: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
         let settings = FritzSettings::load().unwrap_or_default();
+        let setup_assistant = !settings.setup_completed;
         let (history, device_history) =
             crate::history::load(graph_history_window(settings.graph_timespan_minutes));
         let collapsed_menu_sections = settings.collapsed_menu_sections.iter().cloned().collect();
@@ -2047,7 +2053,10 @@ impl cosmic::Application for AppModel {
             Self {
                 core,
                 settings,
-                active_settings_section,
+                settings_open: setup_assistant,
+                setup_assistant,
+                setup_step: 0,
+                active_settings_section: if setup_assistant { None } else { active_settings_section },
                 history,
                 device_history,
                 collapsed_menu_sections,
@@ -2523,7 +2532,85 @@ impl cosmic::Application for AppModel {
             .width(cosmic::iced::Length::Fill);
 
         if self.settings_open {
-            if self.active_settings_section.is_some() {
+            if self.setup_assistant {
+                let step_title = match self.setup_step {
+                    0 => "Welcome",
+                    1 => "Connect your FRITZ!Box",
+                    2 => "Choose your devices",
+                    3 => "Optional weather",
+                    _ => "You're ready to go",
+                };
+                content = content
+                    .push(widget::text::title2(crate::i18n::tr(&self.settings.language, step_title)))
+                    .push(widget::text::caption(format!("{} / 4", self.setup_step.min(3) + 1)))
+                    .push(widget::divider::horizontal::default());
+                match self.setup_step {
+                    0 => {
+                        content = content
+                            .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Let's get your power monitor connected.")))
+                            .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "This short setup will connect to your FRITZ!Box, discover compatible smart-home devices and optionally configure local weather. You can change everything later in Settings.")));
+                    }
+                    1 => {
+                        content = content
+                            .push(widget::text::body("FRITZ!Box address"))
+                            .push(widget::text_input("http://fritz.box or https://fritz.box", &self.settings.url).on_input(Message::UrlChanged))
+                            .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Username")))
+                            .push(widget::text_input("Username", &self.settings.username).on_input(Message::UsernameChanged))
+                            .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Password")))
+                            .push(widget::secure_input("Password", &self.settings.password, None, true).on_input(Message::PasswordChanged))
+                            .push(widget::text::caption("Use the FRITZ!Box user credentials that have permission to access smart-home devices."));
+                    }
+                    2 => {
+                        content = content
+                            .push(widget::text::caption("Discover compatible FRITZ! smart-home devices, then select the devices to monitor."))
+                            .push(action_button("view-refresh-symbolic", "Discover devices", Message::DiscoverDevices));
+                        if self.devices_loading {
+                            content = content.push(widget::text::caption("Searching your FRITZ!Box…"));
+                        } else if let Some(error) = &self.error {
+                            content = content.push(error_notice("FRITZ!Box connection", error));
+                        }
+                        for device in &self.devices {
+                            let selected = self.selected_ains.iter().any(|ain| crate::fritz::normalize_ain_for_selection(ain) == crate::fritz::normalize_ain_for_selection(&device.ain));
+                            let ain = device.ain.clone();
+                            content = content.push(widget::checkbox(selected)
+                                .label(device.name.clone())
+                                .on_toggle(move |checked| Message::ToggleDevice(ain.clone(), checked)));
+                        }
+                        if self.devices_loaded && self.devices.is_empty() {
+                            content = content.push(widget::text::caption("No compatible devices were found. You can continue and retry later in Settings → Devices."));
+                        }
+                    }
+                    3 => {
+                        content = content
+                            .push(widget::text::body("Enable local weather (optional)"))
+                            .push(widget::Row::new().align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::text::body("Show weather").width(cosmic::iced::Length::Fill))
+                                .push(widget::toggler(self.settings.weather_enabled).on_toggle(Message::WeatherEnabledChanged)))
+                            .push(widget::text::body("OpenWeatherMap API key"))
+                            .push(widget::secure_input("API key", &self.settings.openweathermap_api_key, None, true).on_input(Message::OpenWeatherMapApiKeyChanged))
+                            .push(widget::text::body("Location (city or latitude,longitude)"))
+                            .push(widget::text_input("e.g. Amsterdam or 52.37,4.90", &self.settings.weather_location).on_input(Message::WeatherLocationChanged))
+                            .push(widget::text::caption("Weather is independent of FRITZ!Box monitoring. You can skip this and configure it later."));
+                    }
+                    _ => {
+                        content = content
+                            .push(widget::text::body("Setup is complete. Your choices are saved automatically."))
+                            .push(widget::text::caption(format!("{} device(s) selected", self.selected_ains.len())));
+                    }
+                }
+                content = content.push(widget::divider::horizontal::default());
+                let mut actions = widget::Row::new().spacing(8).align_y(cosmic::iced::Alignment::Center);
+                if self.setup_step > 0 {
+                    actions = actions.push(widget::button::text("Back").on_press(Message::SetupBack));
+                }
+                actions = actions.push(widget::Space::new().width(cosmic::iced::Length::Fill));
+                if self.setup_step >= 4 {
+                    actions = actions.push(widget::button::suggested("Finish").on_press(Message::SetupFinish));
+                } else {
+                    actions = actions.push(widget::button::suggested(if self.setup_step == 3 { "Finish setup" } else { "Continue" }).on_press(if self.setup_step == 3 { Message::SetupFinish } else { Message::SetupNext }));
+                }
+                content = content.push(actions);
+            } else if self.active_settings_section.is_some() {
                 // The section title and back button are rendered in the sticky
                 // header below; keep only the selected section's controls here.
             } else {
@@ -5975,6 +6062,27 @@ impl cosmic::Application for AppModel {
             Message::ToggleSettings => {
                 self.settings_open = !self.settings_open;
                 self.settings_status = None;
+            }
+            Message::SetupNext => {
+                self.setup_step = self.setup_step.saturating_add(1).min(4);
+                if self.setup_step == 2 && !self.devices_loaded && !self.devices_loading {
+                    self.devices_loading = true;
+                    let settings = self.settings.clone();
+                    return Task::perform(discover_devices(settings), |result| {
+                        cosmic::Action::App(Message::DevicesLoaded(result))
+                    });
+                }
+            }
+            Message::SetupBack => {
+                self.setup_step = self.setup_step.saturating_sub(1);
+            }
+            Message::SetupFinish => {
+                self.settings.setup_completed = true;
+                self.setup_assistant = false;
+                self.setup_step = 0;
+                self.settings_open = true;
+                self.active_settings_section = None;
+                self.persist_settings();
             }
             Message::ToggleSettingsSection(section) => {
                 self.active_settings_section = Some(section);
