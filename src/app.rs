@@ -2039,6 +2039,20 @@ fn diagnostic_url_button(url: String) -> cosmic::Element<'static, Message> {
     .into()
 }
 
+fn diagnostic_section_heading(
+    title: String,
+    description: String,
+) -> cosmic::Element<'static, Message> {
+    surface_card(
+        widget::Column::new()
+            .spacing(3)
+            .push(widget::text::title3(title))
+            .push(widget::text::caption(description))
+            .into(),
+        10,
+    )
+}
+
 fn diagnostic_status_row(
     label: &'static str,
     status: impl ToString,
@@ -3964,10 +3978,10 @@ impl cosmic::Application for AppModel {
             if self.active_settings_section == Some("diagnostics") {
                 content = content
                     .push(widget::divider::horizontal::default())
-                    .push(widget::text::title3(crate::i18n::tr(
-                        &self.settings.language,
-                        "Application",
-                    )))
+                    .push(diagnostic_section_heading(
+                        crate::i18n::tr(&self.settings.language, "Application & updates"),
+                        crate::i18n::tr(&self.settings.language, "Installed version and release status"),
+                    ))
                     .push(diagnostic_info_row(
                         crate::i18n::tr(&self.settings.language, "Version"),
                         format!("v{}", env!("APP_VERSION")),
@@ -4078,7 +4092,10 @@ impl cosmic::Application for AppModel {
                 };
                 content = content
                     .push(widget::divider::horizontal::default())
-                    .push(widget::text::title3(crate::i18n::tr(&self.settings.language, "Connection security")))
+                    .push(diagnostic_section_heading(
+                        crate::i18n::tr(&self.settings.language, "FRITZ!Box connection"),
+                        crate::i18n::tr(&self.settings.language, "Address, transport security and authentication"),
+                    ))
                     .push(diagnostic_status_row(crate::i18n::tr(&self.settings.language, "HTTPS / TLS"), &tls_status, tls_ok))
                     .push(widget::text::caption(format!(
                         "{}: {}",
@@ -4086,7 +4103,10 @@ impl cosmic::Application for AppModel {
                         if endpoint.is_empty() { crate::i18n::tr(&self.settings.language, "Not configured") } else { endpoint }
                     )))
                     .push(widget::divider::horizontal::default())
-                    .push(widget::text::title3(crate::i18n::tr(&self.settings.language, "External resources")))
+                    .push(diagnostic_section_heading(
+                        crate::i18n::tr(&self.settings.language, "Weather services"),
+                        crate::i18n::tr(&self.settings.language, "Latest request status for weather, forecasts and background images"),
+                    ))
                     .push(widget::text::caption(
                         "Status from the latest real request. Opening Diagnostics does not trigger network requests.",
                     ))
@@ -4345,10 +4365,10 @@ impl cosmic::Application for AppModel {
                     });
                 content = content
                     .push(widget::divider::horizontal::default())
-                    .push(widget::text::title3(crate::i18n::tr(
-                        &self.settings.language,
-                        "System",
-                    )))
+                    .push(diagnostic_section_heading(
+                        crate::i18n::tr(&self.settings.language, "System & router"),
+                        crate::i18n::tr(&self.settings.language, "Host temperature and FRITZ!Box hardware information"),
+                    ))
                     .push(diagnostic_status_row(
                         crate::i18n::tr(&self.settings.language, "CPU temperature"),
                         &cpu_temperature_label,
@@ -4459,11 +4479,10 @@ impl cosmic::Application for AppModel {
                     ))
                     .push(widget::divider::horizontal::default());
                 content = content
-                    .push(widget::divider::horizontal::default())
-                    .push(widget::text::title3(crate::i18n::tr(
-                        &self.settings.language,
-                        "FRITZ!Box API",
-                    )))
+                    .push(diagnostic_section_heading(
+                        crate::i18n::tr(&self.settings.language, "FRITZ!Box API"),
+                        crate::i18n::tr(&self.settings.language, "Endpoint health and recent router requests"),
+                    ))
                     .push(diagnostic_status_row(
                         crate::i18n::tr(&self.settings.language, "Connection"),
                         &fritz_base_status.0,
@@ -4544,10 +4563,10 @@ impl cosmic::Application for AppModel {
                             self.settings.ains.len()
                         }
                     )));
-                content = content.push(widget::text::title3(crate::i18n::tr(
-                    &self.settings.language,
-                    "Current device readings",
-                )));
+                content = content.push(diagnostic_section_heading(
+                        crate::i18n::tr(&self.settings.language, "Live device data"),
+                        crate::i18n::tr(&self.settings.language, "Current power, temperature and switch state"),
+                    ));
                 if self.readings.is_empty() {
                     content = content.push(widget::text::caption(crate::i18n::tr(
                         &self.settings.language,
@@ -4578,10 +4597,10 @@ impl cosmic::Application for AppModel {
                 }
 
                 content = content.push(widget::divider::horizontal::default()).push(
-                    widget::text::title3(crate::i18n::tr(
-                        &self.settings.language,
-                        "Graph history retrieval",
-                    )),
+                    diagnostic_section_heading(
+                        crate::i18n::tr(&self.settings.language, "History storage"),
+                        crate::i18n::tr(&self.settings.language, "Inspect locally stored samples and graph availability"),
+                    ),
                 );
                 content = content.push(action_button(
                     if self.graph_history_diagnostics_expanded {
@@ -4767,10 +4786,10 @@ impl cosmic::Application for AppModel {
                 }
                 content = content
                     .push(widget::divider::horizontal::default())
-                    .push(widget::text::title3(crate::i18n::tr(
-                        &self.settings.language,
-                        "Diagnostic activity",
-                    )))
+                    .push(diagnostic_section_heading(
+                        crate::i18n::tr(&self.settings.language, "Activity & debug report"),
+                        crate::i18n::tr(&self.settings.language, "Recent HTTP responses, events and export tools"),
+                    ))
                     .push(widget::text::caption(crate::i18n::tr(
                         &self.settings.language,
                         "Live timeline of checks, requests, results and errors. Newest entries appear first.",
