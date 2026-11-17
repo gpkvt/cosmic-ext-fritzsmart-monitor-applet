@@ -2445,7 +2445,7 @@ impl cosmic::Application for AppModel {
                         "Panel item order",
                     )))
                     .push(widget::text::caption(
-                        "Move each reading independently. Changes are saved automatically.",
+                        "Reorder readings and choose which ones appear in the panel. Changes are saved automatically.",
                     ));
                 for (index, item) in self.settings.panel_order.iter().enumerate() {
                     let id = match item.as_str() {
