@@ -1233,11 +1233,14 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
                 "CURRENT POWER HISTORY",
             )))
             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-            .push(widget::icon::from_name(if history_collapsed {
-                "go-next-symbolic"
-            } else {
-                "go-down-symbolic"
-            }).size(16)),
+            .push(
+                widget::icon::from_name(if history_collapsed {
+                    "go-next-symbolic"
+                } else {
+                    "go-down-symbolic"
+                })
+                .size(16),
+            ),
     )
     .on_press(Message::ToggleMenuSection("current-power-history".into()))
     .width(cosmic::iced::Length::Fill)
@@ -1281,14 +1284,26 @@ fn collapsible_graph(
             .align_y(cosmic::iced::Alignment::Center)
             .push(widget::text::caption(title))
             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-            .push(widget::icon::from_name(if collapsed { "go-next-symbolic" } else { "go-down-symbolic" }).size(16)),
+            .push(
+                widget::icon::from_name(if collapsed {
+                    "go-next-symbolic"
+                } else {
+                    "go-down-symbolic"
+                })
+                .size(16),
+            ),
     )
     .on_press(Message::ToggleMenuSection(section_id.into()))
     .width(cosmic::iced::Length::Fill)
     .padding([4, 0])
     .class(cosmic::theme::Button::Text);
-    let mut section = widget::Column::new().spacing(4).width(cosmic::iced::Length::Fill).push(heading);
-    if !collapsed { section = section.push(graph); }
+    let mut section = widget::Column::new()
+        .spacing(4)
+        .width(cosmic::iced::Length::Fill)
+        .push(heading);
+    if !collapsed {
+        section = section.push(graph);
+    }
     section.into()
 }
 
@@ -1438,32 +1453,30 @@ fn total_power_overview(
                     format_elapsed_timespan(timespan)
                 ))
             });
-        let mut input_graph = widget::Column::new()
-            .spacing(8)
-            .push(collapsible_graph(
-                "POWER INPUT & TEMPERATURE",
-                "graph-total-input-pair",
-                collapsed_sections.contains("graph-total-input-pair"),
-                widget::Column::new()
-                    .spacing(8)
-                    .push(interactive_graph_with_axis(
-                        &settings.language,
-                        crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
-                        input_history.iter().map(|(_, value)| *value as f64),
-                        &settings.graph_style,
-                        "W",
-                        axis_start.clone(),
-                    ))
-                    .push(interactive_graph_with_axis(
-                        &settings.language,
-                        crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
-                        input_temperature_history.iter().map(|(_, value)| *value),
-                        &settings.graph_style,
-                        "°C",
-                        axis_start.clone(),
-                    ))
-                    .into(),
-            ));
+        let mut input_graph = widget::Column::new().spacing(8).push(collapsible_graph(
+            "POWER INPUT & TEMPERATURE",
+            "graph-total-input-pair",
+            collapsed_sections.contains("graph-total-input-pair"),
+            widget::Column::new()
+                .spacing(8)
+                .push(interactive_graph_with_axis(
+                    &settings.language,
+                    crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
+                    input_history.iter().map(|(_, value)| *value as f64),
+                    &settings.graph_style,
+                    "W",
+                    axis_start.clone(),
+                ))
+                .push(interactive_graph_with_axis(
+                    &settings.language,
+                    crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
+                    input_temperature_history.iter().map(|(_, value)| *value),
+                    &settings.graph_style,
+                    "°C",
+                    axis_start.clone(),
+                ))
+                .into(),
+        ));
         if let Some(summary) = input_energy_summary {
             input_graph = input_graph.push(summary);
         }
@@ -3425,12 +3438,12 @@ impl cosmic::Application for AppModel {
                     });
 
                 let requests = crate::fritz::http_request_diagnostics();
-                content = content
-                    .push(widget::divider::horizontal::default())
-                    .push(widget::text::title3(crate::i18n::tr(
+                content = content.push(widget::divider::horizontal::default()).push(
+                    widget::text::title3(crate::i18n::tr(
                         &self.settings.language,
                         "Recent FRITZ!Box HTTP requests",
-                    )));
+                    )),
+                );
                 if requests.is_empty() {
                     content = content.push(widget::text::caption(crate::i18n::tr(
                         &self.settings.language,
@@ -3446,7 +3459,11 @@ impl cosmic::Application for AppModel {
                             scheme,
                             request.status,
                             request.path,
-                            if (200..300).contains(&request.status) { "OK" } else { "FAILED" },
+                            if (200..300).contains(&request.status) {
+                                "OK"
+                            } else {
+                                "FAILED"
+                            },
                         );
                         content = content.push(
                             widget::selectable_text::selectable_text(line)
@@ -3918,74 +3935,75 @@ impl cosmic::Application for AppModel {
                     .and_then(|frame| self.weather_slideshow_handles.get(*frame))
                     .cloned()
                     .or_else(|| self.weather_background_handle.clone());
-                let weather_card: cosmic::Element<'_, Message> = if let Some(image_handle) = current_image_handle {
-                    let photo = widget::image::Image::new(image_handle)
-                        .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fixed(260.0))
-                        .content_fit(cosmic::iced::ContentFit::Fill);
-                    let details = widget::container(weather_content)
-                        .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fixed(260.0))
-                        .padding(10)
-                        .clip(true)
-                        .style(|_| cosmic::iced::widget::container::Style {
-                            // Keep the text layer transparent; the separate
-                            // background wash below it handles photo contrast.
-                            background: None,
-                            text_color: Some(cosmic::iced::Color::WHITE),
-                            ..Default::default()
-                        });
-                    // Keep the photograph and its readable details inside
-                    // one explicitly bounded, clipped weather surface. This
-                    // prevents the image layer from painting into adjacent
-                    // forecast or menu content when the popup is resized.
-                    let image_layer = widget::container(photo)
-                        .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fixed(260.0))
-                        .clip(true);
-                    let mut weather_layers = cosmic::iced::widget::Stack::new()
-                        .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fixed(260.0))
-                        .push(image_layer);
-                    // Add a subtle transparent star field to nighttime
-                    // weather scenes without replacing the condition-matched
-                    // photograph or obscuring its Commons attribution.
-                    if weather.icon_code.ends_with('n')
-                        && let Some(stars) = self.starry_night_handle.clone()
-                    {
-                        let star_layer = widget::container(
-                            widget::image::Image::new(stars)
-                                .width(cosmic::iced::Length::Fill)
-                                .height(cosmic::iced::Length::Fixed(260.0))
-                                .content_fit(cosmic::iced::ContentFit::Fill),
-                        )
-                        .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fixed(260.0))
-                        .clip(true);
-                        weather_layers = weather_layers.push(star_layer);
-                    }
-                    widget::container(weather_layers.push(details))
-                        .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fixed(260.0))
-                        .clip(true)
-                        .into()
-                } else {
-                    widget::container(weather_content)
-                        .padding(10)
-                        .style(|theme| {
-                            let cosmic = theme.cosmic();
-                            cosmic::iced::widget::container::Style {
-                                background: Some(
-                                    cosmic::iced::Color::from(
-                                        cosmic.background(false).small_widget,
-                                    )
-                                    .into(),
-                                ),
+                let weather_card: cosmic::Element<'_, Message> =
+                    if let Some(image_handle) = current_image_handle {
+                        let photo = widget::image::Image::new(image_handle)
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .content_fit(cosmic::iced::ContentFit::Fill);
+                        let details = widget::container(weather_content)
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .padding(10)
+                            .clip(true)
+                            .style(|_| cosmic::iced::widget::container::Style {
+                                // Keep the text layer transparent; the separate
+                                // background wash below it handles photo contrast.
+                                background: None,
+                                text_color: Some(cosmic::iced::Color::WHITE),
                                 ..Default::default()
-                            }
-                        })
-                        .into()
-                };
+                            });
+                        // Keep the photograph and its readable details inside
+                        // one explicitly bounded, clipped weather surface. This
+                        // prevents the image layer from painting into adjacent
+                        // forecast or menu content when the popup is resized.
+                        let image_layer = widget::container(photo)
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .clip(true);
+                        let mut weather_layers = cosmic::iced::widget::Stack::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .push(image_layer);
+                        // Add a subtle transparent star field to nighttime
+                        // weather scenes without replacing the condition-matched
+                        // photograph or obscuring its Commons attribution.
+                        if weather.icon_code.ends_with('n')
+                            && let Some(stars) = self.starry_night_handle.clone()
+                        {
+                            let star_layer = widget::container(
+                                widget::image::Image::new(stars)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .height(cosmic::iced::Length::Fixed(260.0))
+                                    .content_fit(cosmic::iced::ContentFit::Fill),
+                            )
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .clip(true);
+                            weather_layers = weather_layers.push(star_layer);
+                        }
+                        widget::container(weather_layers.push(details))
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .clip(true)
+                            .into()
+                    } else {
+                        widget::container(weather_content)
+                            .padding(10)
+                            .style(|theme| {
+                                let cosmic = theme.cosmic();
+                                cosmic::iced::widget::container::Style {
+                                    background: Some(
+                                        cosmic::iced::Color::from(
+                                            cosmic.background(false).small_widget,
+                                        )
+                                        .into(),
+                                    ),
+                                    ..Default::default()
+                                }
+                            })
+                            .into()
+                    };
                 weather_section = weather_section.push(weather_card);
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
@@ -4250,7 +4268,8 @@ impl cosmic::Application for AppModel {
                         .push(collapsible_graph(
                             "DOWNLOAD & UPLOAD HISTORY",
                             "graph-bandwidth-pair",
-                            self.collapsed_menu_sections.contains("graph-bandwidth-pair"),
+                            self.collapsed_menu_sections
+                                .contains("graph-bandwidth-pair"),
                             widget::Column::new()
                                 .spacing(8)
                                 .push(interactive_graph(
@@ -5400,7 +5419,11 @@ impl cosmic::Application for AppModel {
                                 Some(chrono::Local::now().format("%H:%M:%S").to_string());
                             record_diagnostic_event(
                                 &mut self.diagnostic_events,
-                                format!("FRITZ!Box refresh succeeded: {} reading(s) loaded; {} configured device(s) unavailable.", self.readings.len(), result.missing_devices.len()),
+                                format!(
+                                    "FRITZ!Box refresh succeeded: {} reading(s) loaded; {} configured device(s) unavailable.",
+                                    self.readings.len(),
+                                    result.missing_devices.len()
+                                ),
                             );
                         }
                     }
@@ -5469,7 +5492,10 @@ impl cosmic::Application for AppModel {
                 match &result {
                     Ok(version) => record_diagnostic_event(
                         &mut self.diagnostic_events,
-                        format!("Release check succeeded: latest stable version is {version}; installed version is {}.", env!("APP_VERSION")),
+                        format!(
+                            "Release check succeeded: latest stable version is {version}; installed version is {}.",
+                            env!("APP_VERSION")
+                        ),
                     ),
                     Err(error) => record_diagnostic_event(
                         &mut self.diagnostic_events,
@@ -5521,7 +5547,10 @@ impl cosmic::Application for AppModel {
                 let days = 7;
                 record_diagnostic_event(
                     &mut self.diagnostic_events,
-                    format!("Open-Meteo forecast check started: resolving {} for {days} days.", self.settings.weather_location),
+                    format!(
+                        "Open-Meteo forecast check started: resolving {} for {days} days.",
+                        self.settings.weather_location
+                    ),
                 );
                 self.weather_forecast_days = Some(days);
                 self.weather_forecast = None;
@@ -5577,7 +5606,10 @@ impl cosmic::Application for AppModel {
                     Ok(forecast) => {
                         record_diagnostic_event(
                             &mut self.diagnostic_events,
-                            format!("Open-Meteo forecast succeeded: {} day(s) received.", forecast.days.len()),
+                            format!(
+                                "Open-Meteo forecast succeeded: {} day(s) received.",
+                                forecast.days.len()
+                            ),
                         );
                         self.weather_forecast = Some(forecast);
                         self.weather_forecast_error = None;
@@ -5769,7 +5801,10 @@ impl cosmic::Application for AppModel {
                     Ok(mut weather) => {
                         record_diagnostic_event(
                             &mut self.diagnostic_events,
-                            format!("OpenWeatherMap refresh succeeded: current conditions received; {} background image(s) available.", weather.background_images.len()),
+                            format!(
+                                "OpenWeatherMap refresh succeeded: current conditions received; {} background image(s) available.",
+                                weather.background_images.len()
+                            ),
                         );
                         let (frames, sequence, frame_sources) = build_weather_slideshow_frames(
                             &weather.background_images,
@@ -5924,7 +5959,10 @@ impl cosmic::Application for AppModel {
                     self.devices_loading = true;
                     record_diagnostic_event(
                         &mut self.diagnostic_events,
-                        format!("Initial device discovery started against {}.", self.settings.url),
+                        format!(
+                            "Initial device discovery started against {}.",
+                            self.settings.url
+                        ),
                     );
                     let settings = self.settings.clone();
                     self.settings_status = Some("Connecting and loading devices…".into());
@@ -6079,7 +6117,10 @@ impl cosmic::Application for AppModel {
                         ));
                         record_diagnostic_event(
                             &mut self.diagnostic_events,
-                            format!("Device discovery succeeded: {} compatible power-meter device(s) found.", self.devices.len()),
+                            format!(
+                                "Device discovery succeeded: {} compatible power-meter device(s) found.",
+                                self.devices.len()
+                            ),
                         );
                     }
                     Err(error) => {

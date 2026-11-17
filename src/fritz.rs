@@ -358,8 +358,15 @@ fn parse_settings_section(value: &str) -> String {
 
 fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
     const SECTION_IDS: [&str; 9] = [
-        "summary", "weather", "internet-bandwidth", "total-power-output", "total-power-input", "current-power-history",
-        "graph-total-output-pair", "graph-total-input-pair", "graph-bandwidth-pair",
+        "summary",
+        "weather",
+        "internet-bandwidth",
+        "total-power-output",
+        "total-power-input",
+        "current-power-history",
+        "graph-total-output-pair",
+        "graph-total-input-pair",
+        "graph-bandwidth-pair",
     ];
     value
         .split(',')
@@ -1352,7 +1359,9 @@ mod tests {
     #[test]
     fn parses_persisted_collapsed_menu_sections_safely() {
         assert_eq!(
-            parse_collapsed_menu_sections("weather,unknown,summary,weather,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature,graph-total-output-pair,graph-total-input-pair,graph-bandwidth-pair"),
+            parse_collapsed_menu_sections(
+                "weather,unknown,summary,weather,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature,graph-total-output-pair,graph-total-input-pair,graph-bandwidth-pair"
+            ),
             vec![
                 "weather".to_string(),
                 "summary".to_string(),
