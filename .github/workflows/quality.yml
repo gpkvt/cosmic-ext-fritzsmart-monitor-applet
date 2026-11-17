@@ -17,6 +17,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  workflow-lint:
+    name: Validate GitHub Actions workflows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Lint workflow files
+        uses: raven-actions/actionlint@v2
+
   rust:
     name: Rust formatting, lint and tests
     runs-on: ubuntu-24.04
