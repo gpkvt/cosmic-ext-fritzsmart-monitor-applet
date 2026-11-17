@@ -2389,21 +2389,64 @@ impl cosmic::Application for AppModel {
                 ));
             }
         }
-        // Render panel readings independently so every configured row controls
-        // its actual position, rather than inheriting a fixed group's position.
+        // First apply the user's item order. Any readings missing from an older
+        // saved order are appended so newly introduced items remain visible.
+        let mut ordered_panel_items: Vec<(&str, cosmic::Element<'static, Message>)> =
+            Vec::with_capacity(panel_items.len());
         for item_id in &self.settings.panel_order {
             if let Some(index) = panel_items
                 .iter()
                 .position(|(existing_id, _)| *existing_id == item_id.as_str())
             {
-                let (_, item) = panel_items.remove(index);
-                content = content.push(item);
+                ordered_panel_items.push(panel_items.remove(index));
             }
         }
-        // Keep newly introduced or legacy-config readings visible even when
-        // they are not yet present in the persisted order.
-        for (_, item) in panel_items.drain(..) {
-            content = content.push(item);
+        ordered_panel_items.extend(panel_items.drain(..));
+
+        if self.settings.panel_multiline {
+            // Keep related readings together in multiline mode. The order of
+            // members inside each group follows the configured panel order;
+            // the group itself occupies the position of its first member.
+            let mut panel_groups: Vec<(
+                Option<&'static str>,
+                Vec<cosmic::Element<'static, Message>>,
+            )> = Vec::new();
+            for (id, item) in ordered_panel_items {
+                let group_key = match id {
+                    "weather" | "temperature" => Some("weather-temperature"),
+                    "power-consumption" | "solar-power" => Some("power-solar"),
+                    _ => None,
+                };
+                if let Some(key) = group_key {
+                    if let Some((_, members)) = panel_groups
+                        .iter_mut()
+                        .find(|(existing, _)| *existing == Some(key))
+                    {
+                        members.push(item);
+                    } else {
+                        panel_groups.push((Some(key), vec![item]));
+                    }
+                } else {
+                    panel_groups.push((None, vec![item]));
+                }
+            }
+
+            for (_, mut members) in panel_groups {
+                if members.len() == 1 {
+                    content = content.push(members.remove(0));
+                } else {
+                    let mut rows = widget::Column::new().spacing(0);
+                    for member in members {
+                        rows = rows.push(member);
+                    }
+                    content = content.push(rows);
+                }
+            }
+        } else {
+            // Single-line mode keeps every reading independently positionable.
+            for (_, item) in ordered_panel_items {
+                content = content.push(item);
+            }
         }
         // Keep connection health visible even when the popup is closed.
         if self.error.is_some() {
