@@ -493,10 +493,10 @@ async fn fetch_commons_background(
             let Ok(response) = client.get(image_url).send().await else { continue };
             if !response.status().is_success() { continue; }
             let Ok(bytes) = response.bytes().await else { continue };
-            // Keep nighttime scenes noticeably clearer so the stars and original photo
-            // remain visible beneath the translucent weather details.
-            let blur_radius = if icon_code.ends_with('n') { 1.5 } else { 6.0 };
-            let Some(image) = blur_background_image(bytes.to_vec(), blur_radius) else { continue };
+            // Create the soft, blocky mosaic used by image-backed profile headers:
+            // reduce the photo to a small grid, then enlarge with nearest-neighbour
+            // sampling. The dark translucent overlay is applied by the weather card.
+            let Some(image) = pixelate_background_image(bytes.to_vec(), 12) else { continue };
             let metadata = &info["extmetadata"];
             let artist = metadata["Artist"]["value"].as_str()
                 .or_else(|| metadata["Credit"]["value"].as_str())
@@ -630,11 +630,33 @@ fn generate_starry_night_background() -> Option<Vec<u8>> {
     Some(output.into_inner())
 }
 
-fn blur_background_image(bytes: Vec<u8>, blur_radius: f32) -> Option<Vec<u8>> {
-    let decoded = image::load_from_memory(&bytes).ok()?;
-    let blurred = decoded.blur(blur_radius).to_rgb8();
+fn pixelate_background_image(bytes: Vec<u8>, block_size: u32) -> Option<Vec<u8>> {
+    use image::imageops::FilterType;
+
+    let decoded = image::load_from_memory(&bytes)?.to_rgb8();
+    let (width, height) = decoded.dimensions();
+    if width == 0 || height == 0 {
+        return None;
+    }
+
+    let block_size = block_size.max(1);
+    let small_width = width.div_ceil(block_size).max(1);
+    let small_height = height.div_ceil(block_size).max(1);
+    let reduced = image::imageops::resize(
+        &decoded,
+        small_width,
+        small_height,
+        FilterType::Triangle,
+    );
+    let pixelated = image::imageops::resize(
+        &reduced,
+        width,
+        height,
+        FilterType::Nearest,
+    );
+
     let mut output = std::io::Cursor::new(Vec::new());
-    image::DynamicImage::ImageRgb8(blurred)
+    image::DynamicImage::ImageRgb8(pixelated)
         .write_to(&mut output, image::ImageFormat::Jpeg)
         .ok()?;
     Some(output.into_inner())
@@ -910,20 +932,22 @@ mod tests {
     }
 
     #[test]
-    fn blurs_background_photos_without_changing_their_dimensions() {
-        let source = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
+    fn pixelates_background_photos_without_changing_their_dimensions() {
+        let source = image::DynamicImage::ImageRgb8(image::RgbImage::from_fn(
+            24,
             16,
-            12,
-            image::Rgb([120, 80, 40]),
+            |x, y| image::Rgb([(x * 10) as u8, (y * 10) as u8, 40]),
         ));
         let mut encoded = std::io::Cursor::new(Vec::new());
         source
             .write_to(&mut encoded, image::ImageFormat::Png)
             .unwrap();
 
-        let blurred = blur_background_image(encoded.into_inner(), 6.0).unwrap();
-        let decoded = image::load_from_memory(&blurred).unwrap();
-        assert_eq!((decoded.width(), decoded.height()), (16, 12));
+        let pixelated = pixelate_background_image(encoded.into_inner(), 4).unwrap();
+        let decoded = image::load_from_memory(&pixelated).unwrap();
+        assert_eq!((decoded.width(), decoded.height()), (24, 16));
+        // Nearest-neighbour enlargement gives each source tile a flat colour.
+        assert_eq!(decoded.get_pixel(0, 0), decoded.get_pixel(1, 1));
     }
 
     #[test]
