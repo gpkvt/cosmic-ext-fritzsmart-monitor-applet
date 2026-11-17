@@ -1067,8 +1067,7 @@ pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<FritzDevice
                         "endpoint": endpoint_path,
                         "soap_action": format!("{SERVICE}#GetInfo"),
                         "status": status,
-                        "body_json": xml_response_as_json(&response_body),
-                        "body_raw": response_body,
+                        "body_json": redact_device_info_json(xml_response_as_json(&response_body)),
                     })),
                     Err(error) => endpoints.push(json!({
                         "name": "device_information",
@@ -1429,6 +1428,28 @@ async fn fetch_wan_link_info(client: &Client, base: &str) -> Option<FritzWanLink
     .await
     .ok()?;
     parse_wan_link_info(&xml)
+}
+
+fn redact_device_info_json(value: serde_json::Value) -> serde_json::Value {
+    use serde_json::Value;
+
+    match value {
+        Value::Object(mut object) => {
+            for key in ["NewSerialNumber", "NewProvisioningCode", "NewDeviceLog"] {
+                if object.contains_key(key) {
+                    object.insert(key.to_string(), Value::String("<redacted>".into()));
+                }
+            }
+            for child in object.values_mut() {
+                *child = redact_device_info_json(std::mem::take(child));
+            }
+            Value::Object(object)
+        }
+        Value::Array(values) => Value::Array(
+            values.into_iter().map(redact_device_info_json).collect(),
+        ),
+        other => other,
+    }
 }
 
 fn xml_response_as_json(xml: &str) -> serde_json::Value {
