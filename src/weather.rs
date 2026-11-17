@@ -242,7 +242,8 @@ pub async fn fetch_weather_background_images(
         .build()
         .map_err(|error| format!("Weather image client error: {error}"))?;
     let (mut images, attributions) = fetch_commons_background(&client, &icon_code).await;
-    if icon_code.ends_with('n') && images.is_empty()
+    if icon_code.ends_with('n')
+        && images.is_empty()
         && let Some(stars) = generate_starry_night_background()
     {
         images.push(stars);

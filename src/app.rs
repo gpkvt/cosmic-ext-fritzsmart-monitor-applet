@@ -6245,37 +6245,51 @@ impl cosmic::Application for AppModel {
                     Ok((images, attributions)) => {
                         if let Some(weather) = &mut self.weather {
                             if !images.is_empty() {
-                                let (frames, sequence, frame_sources) = build_weather_slideshow_frames(
-                                    &images,
-                                    self.settings.weather_slideshow_interval_seconds,
-                                );
+                                let (frames, sequence, frame_sources) =
+                                    build_weather_slideshow_frames(
+                                        &images,
+                                        self.settings.weather_slideshow_interval_seconds,
+                                    );
                                 weather.background_images = images;
                                 weather.image_attributions = attributions;
-                                weather.image_attribution = weather.image_attributions.first().cloned();
-                                weather.slideshow_frames = frames.iter()
+                                weather.image_attribution =
+                                    weather.image_attributions.first().cloned();
+                                weather.slideshow_frames = frames
+                                    .iter()
                                     .map(|frame| semi_transparent_weather_photo(frame))
                                     .collect();
                                 weather.slideshow_sequence = sequence;
                                 weather.slideshow_frame_sources = frame_sources;
-                                weather.background_image = weather.background_images.first()
+                                weather.background_image = weather
+                                    .background_images
+                                    .first()
                                     .map(|image| semi_transparent_weather_photo(image));
-                                self.weather_slideshow_handles = weather.slideshow_frames.iter()
+                                self.weather_slideshow_handles = weather
+                                    .slideshow_frames
+                                    .iter()
                                     .cloned()
                                     .map(widget::image::Handle::from_bytes)
                                     .collect();
-                                self.weather_background_handle = weather.background_image.as_ref()
+                                self.weather_background_handle = weather
+                                    .background_image
+                                    .as_ref()
                                     .map(|bytes| widget::image::Handle::from_bytes(bytes.clone()));
                                 self.weather_slideshow_index = 0;
-                                record_diagnostic_event(&mut self.diagnostic_events, format!(
-                                    "Weather slideshow image timeout reached; loaded {} new background image(s).",
-                                    weather.background_images.len()
-                                ));
+                                record_diagnostic_event(
+                                    &mut self.diagnostic_events,
+                                    format!(
+                                        "Weather slideshow image timeout reached; loaded {} new background image(s).",
+                                        weather.background_images.len()
+                                    ),
+                                );
                             }
                         }
                     }
                     Err(error) => {
-                        record_diagnostic_event(&mut self.diagnostic_events,
-                            format!("Weather slideshow image refresh failed: {error}"));
+                        record_diagnostic_event(
+                            &mut self.diagnostic_events,
+                            format!("Weather slideshow image refresh failed: {error}"),
+                        );
                     }
                 }
             }
