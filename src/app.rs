@@ -2527,29 +2527,77 @@ impl cosmic::Application for AppModel {
                 // The section title and back button are rendered in the sticky
                 // header below; keep only the selected section's controls here.
             } else {
-                content = content.push(widget::divider::horizontal::default()).push(
-                    widget::text::caption(crate::i18n::tr(&self.settings.language, "GENERAL")),
-                );
-                for (title, section) in [
-                    (
-                        crate::i18n::tr(&self.settings.language, "Language"),
-                        "language",
-                    ),
-                    ("Panel", "panel"),
-                    ("Graph history", "graph"),
-                    ("Automatic refresh", "refresh"),
-                    ("Weather", "weather"),
-                    ("Connection", "connection"),
-                    ("Devices", "device"),
-                    ("Menu order", "menu-order"),
-                    ("Panel order", "panel-order"),
-                    ("Diagnostics", "diagnostics"),
-                ] {
-                    content = content.push(settings_section_header(
-                        title,
-                        section,
+                // Settings landing page: group related controls into clear,
+                // scannable categories instead of one undifferentiated list.
+                content = content
+                    .push(widget::text::title3(crate::i18n::tr(
                         &self.settings.language,
-                    ));
+                        "Preferences",
+                    )))
+                    .push(widget::text::caption(crate::i18n::tr(
+                        &self.settings.language,
+                        "Configure the applet's appearance, data sources and behaviour. Changes are saved automatically.",
+                    )))
+                    .push(widget::divider::horizontal::default());
+
+                for (category, description, sections) in [
+                    (
+                        "Interface",
+                        "Language and visual presentation",
+                        vec![
+                            (crate::i18n::tr(&self.settings.language, "Language"), "language"),
+                        ],
+                    ),
+                    (
+                        "Display & updates",
+                        "Panel readings, graph history and refresh frequency",
+                        vec![
+                            ("Panel", "panel"),
+                            ("Graph history", "graph"),
+                            ("Automatic refresh", "refresh"),
+                        ],
+                    ),
+                    (
+                        "Data sources",
+                        "FRITZ!Box devices and local weather information",
+                        vec![
+                            ("Connection", "connection"),
+                            ("Devices", "device"),
+                            ("Weather", "weather"),
+                        ],
+                    ),
+                    (
+                        "Layout",
+                        "Choose what appears and in which order",
+                        vec![
+                            ("Menu order", "menu-order"),
+                            ("Panel order", "panel-order"),
+                        ],
+                    ),
+                    (
+                        "Support",
+                        "Connection health, diagnostics and version information",
+                        vec![("Diagnostics", "diagnostics")],
+                    ),
+                ] {
+                    content = content
+                        .push(widget::text::title3(crate::i18n::tr(
+                            &self.settings.language,
+                            category,
+                        )))
+                        .push(widget::text::caption(crate::i18n::tr(
+                            &self.settings.language,
+                            description,
+                        )));
+                    let mut category_content = widget::Column::new().spacing(2);
+                    for (title, section) in sections {
+                        category_content = category_content.push(settings_section_header(
+                            title,
+                            section,
+                            &self.settings.language,
+                        ));
+                    }
+                    content = content.push(surface_card(category_content.into(), 8));
                 }
             }
 
