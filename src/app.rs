@@ -903,6 +903,14 @@ fn surface_card<'a>(
         .into()
 }
 
+fn panel_value_with_unit(value: String, split_unit: bool) -> String {
+    if split_unit {
+        value.replacen(' ', "\n", 1)
+    } else {
+        value
+    }
+}
+
 fn keep_value_unit_together(value: String) -> String {
     value
         .rsplit_once(' ')
@@ -2213,7 +2221,11 @@ impl cosmic::Application for AppModel {
                     Some(widget::icon::from_name(weather.icon_name()).size(10).into()),
                     self.core
                         .applet
-                        .text(format!("{:.0} °C", weather.temperature_c))
+                        .text(panel_value_with_unit(
+                            format!("{:.0} °C", weather.temperature_c),
+                            self.settings.panel_multiline
+                                && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "temperature"),
+                        ))
                         .size(f32::from(self.settings.panel_text_size))
                         .into(),
                 )
@@ -2248,7 +2260,13 @@ impl cosmic::Application for AppModel {
                         ),
                         self.core
                             .applet
-                            .text(power)
+                            .text(panel_value_with_unit(
+                                power,
+                                self.settings.panel_multiline
+                                    && (self.settings.panel_net_power
+                                        || self.settings.hidden_panel_items.iter().any(|hidden| hidden == "solar-power")
+                                        || input_power.is_none()),
+                            ))
                             .size(f32::from(self.settings.panel_text_size))
                             .into(),
                     )
@@ -2282,7 +2300,11 @@ impl cosmic::Application for AppModel {
                         ),
                         self.core
                             .applet
-                            .text(input_power)
+                            .text(panel_value_with_unit(
+                                input_power,
+                                self.settings.panel_multiline
+                                    && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption"),
+                            ))
                             .size(f32::from(self.settings.panel_text_size))
                             .into(),
                     )
@@ -2381,7 +2403,13 @@ impl cosmic::Application for AppModel {
                         ),
                         self.core
                             .applet
-                            .text(temperature)
+                            .text(panel_value_with_unit(
+                                temperature,
+                                self.settings.panel_multiline
+                                    && (self.settings.hidden_panel_items.iter().any(|hidden| hidden == "weather")
+                                        || !self.settings.weather_enabled
+                                        || self.weather.is_none()),
+                            ))
                             .size(f32::from(self.settings.panel_text_size))
                             .into(),
                     )
