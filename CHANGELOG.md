@@ -2,6 +2,10 @@
 
 ### Changed
 
+- Display the weather pressure label and its hPa value on one horizontal line.
+
+### Changed
+
 - Increased vertical spacing between weather condition, humidity/cloud cover, wind/pressure, and visibility/sunrise details.
 
 ### Fixed
