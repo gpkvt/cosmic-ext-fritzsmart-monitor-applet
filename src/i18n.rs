@@ -3964,7 +3964,6 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Finish" => "Fertigstellen",
         "Finish setup" => "Einrichtung abschließen",
         "Continue" => "Weiter",
-        "FRITZ!Box connection" => "FRITZ!Box-Verbindung",
         "Outdoor temperature source" => "Quelle der Außentemperatur",
         "OpenWeatherMap" => "OpenWeatherMap",
         "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap." => {
