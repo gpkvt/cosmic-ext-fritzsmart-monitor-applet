@@ -8,12 +8,20 @@ Changes are tracked in date-based entries. See the [GitHub Releases](https://git
 
 ### Added
 
+- Added a first-run setup assistant for FRITZ!Box credentials, device discovery and optional weather configuration ([#498](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/498)).
+
+### Added
+
 - Added an animated solar/grid energy-flow view showing household consumption, solar generation, self-consumption and grid import/export ([#461](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/461)).
 - Added one-click application updates in Diagnostics for Flatpak, Debian packages, AppImages and source checkouts, with checksum verification where applicable ([#464](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/464)).
 - Added a timestamped Diagnostics activity timeline covering refreshes, device discovery, weather requests, release checks and update installation, including recent FRITZ!Box HTTP response details ([#479](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/479)).
 
 ### Changed
 
+- Redesigned the settings overview into clearly grouped Interface, Display & updates, Data sources, Layout and Support sections ([#497](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/497)).
+- Displayed forecast high and low temperatures on separate, right-aligned lines for easier scanning ([#495](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/495), [#496](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/496)).
+- Restored paired weather/temperature and consumption/solar readings in two-line panel mode while preserving configured item order ([#499](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/499)).
+- Stacked the unit below an unpaired panel value in two-line mode, keeping paired values and single-line mode compact ([#501](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/501)).
 - Made history graphs collapsible, individually or in related pairs, and persisted disclosure states across applet restarts; this includes current-power history, total input/output and temperature graphs, bandwidth graphs, and per-device power/temperature pairs ([#480](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/480), [#484](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/484), [#486](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/486), [#488](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/488), [#489](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/489), [#490](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/490), [#493](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/493)).
 - Reduced popup CPU usage by preprocessing and caching weather images and reducing redundant diagnostics, slideshow and energy-flow redraws ([#481](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/481), [#482](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/482), [#487](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/487)).
 - Changed the weather background on every manual reload while preserving the selected slideshow position when refreshed images arrive ([#477](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/477)).

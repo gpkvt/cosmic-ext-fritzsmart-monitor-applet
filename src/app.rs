@@ -2175,10 +2175,15 @@ impl cosmic::Application for AppModel {
         // right-aligned without restoring the excessive 88px gap.
         let panel_item = |label: &'static str,
                           icon: Option<cosmic::Element<'static, Message>>,
-                          value: cosmic::Element<'static, Message>| {
+                          value: cosmic::Element<'static, Message>,
+                          icon_at_top: bool| {
             let mut item = widget::Row::new()
                 .spacing(5)
-                .align_y(cosmic::iced::Alignment::Center);
+                .align_y(if icon_at_top {
+                    cosmic::iced::Alignment::Start
+                } else {
+                    cosmic::iced::Alignment::Center
+                });
             if let Some(icon) = icon {
                 item = item.push(
                     widget::container(icon)
@@ -2232,6 +2237,8 @@ impl cosmic::Application for AppModel {
                         ))
                         .size(f32::from(self.settings.panel_text_size))
                         .into(),
+                    self.settings.panel_multiline
+                        && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "temperature"),
                 )
                 .into(),
             ));
@@ -2273,6 +2280,10 @@ impl cosmic::Application for AppModel {
                             ))
                             .size(f32::from(self.settings.panel_text_size))
                             .into(),
+                        self.settings.panel_multiline
+                            && (self.settings.panel_net_power
+                                || self.settings.hidden_panel_items.iter().any(|hidden| hidden == "solar-power")
+                                || input_power.is_none()),
                     )
                     .into(),
                 ));
@@ -2311,6 +2322,8 @@ impl cosmic::Application for AppModel {
                             ))
                             .size(f32::from(self.settings.panel_text_size))
                             .into(),
+                        self.settings.panel_multiline
+                            && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption"),
                     )
                     .into(),
                 ));
@@ -2416,6 +2429,10 @@ impl cosmic::Application for AppModel {
                             ))
                             .size(f32::from(self.settings.panel_text_size))
                             .into(),
+                        self.settings.panel_multiline
+                            && (self.settings.hidden_panel_items.iter().any(|hidden| hidden == "weather")
+                                || !self.settings.weather_enabled
+                                || self.weather.is_none()),
                     )
                     .into(),
                 ));
@@ -2494,6 +2511,7 @@ impl cosmic::Application for AppModel {
                     .text("Connection error")
                     .size(f32::from(self.settings.panel_text_size))
                     .into(),
+                false,
             ));
         }
         if self.weather_error.is_some() {
@@ -2509,6 +2527,7 @@ impl cosmic::Application for AppModel {
                     .text("Weather unavailable")
                     .size(f32::from(self.settings.panel_text_size))
                     .into(),
+                false,
             ));
         }
 
