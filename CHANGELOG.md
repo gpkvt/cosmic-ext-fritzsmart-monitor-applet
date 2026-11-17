@@ -17,6 +17,7 @@ Changes are tracked in date-based entries. See the [GitHub Releases](https://git
 
 ### Changed
 
+- Halved panel reading font sizes in two-line mode to keep stacked values compact.
 - Redesigned the settings overview into clearly grouped Interface, Display & updates, Data sources, Layout and Support sections ([#497](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/497)).
 - Translated the first-run setup assistant and settings overview across all supported interface languages.
 - Displayed forecast high and low temperatures on separate, right-aligned lines for easier scanning ([#495](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/495), [#496](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/496)).

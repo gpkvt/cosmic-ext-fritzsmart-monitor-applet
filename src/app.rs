@@ -2188,6 +2188,10 @@ impl cosmic::Application for AppModel {
                 )
             });
 
+        // Use half-size text in two-line panel mode to keep stacked readings compact.
+        let panel_text_size = f32::from(self.settings.panel_text_size)
+            / if self.settings.panel_multiline { 2.0 } else { 1.0 };
+
         // Keep every reading at its intrinsic width. Expanding each child to
         // Fill inside the horizontal panel row pushes later readings off-screen.
         let panel_item = |label: &'static str,
@@ -2273,7 +2277,7 @@ impl cosmic::Application for AppModel {
                                     .iter()
                                     .any(|hidden| hidden == "temperature"),
                         ))
-                        .size(f32::from(self.settings.panel_text_size))
+                        .size(panel_text_size)
                         .into(),
                     self.settings.panel_multiline
                         && self
@@ -2320,7 +2324,7 @@ impl cosmic::Application for AppModel {
                                         || self.settings.hidden_panel_items.iter().any(|hidden| hidden == "solar-power")
                                         || input_power.is_none()),
                             ))
-                            .size(f32::from(self.settings.panel_text_size))
+                            .size(panel_text_size)
                             .into(),
                         self.settings.panel_multiline
                             && (self.settings.panel_net_power
@@ -2362,7 +2366,7 @@ impl cosmic::Application for AppModel {
                                 self.settings.panel_multiline
                                     && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption"),
                             ))
-                            .size(f32::from(self.settings.panel_text_size))
+                            .size(panel_text_size)
                             .into(),
                         self.settings.panel_multiline
                             && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption"),
@@ -2409,7 +2413,7 @@ impl cosmic::Application for AppModel {
                             // effective instead of aligning a shrink-wrapped label.
                             widget::container(
                                 widget::text::body(keep_value_unit_together(value))
-                                    .size(f32::from(self.settings.panel_text_size)),
+                                    .size(panel_text_size),
                             )
                             .width(cosmic::iced::Length::Shrink)
                             .align_bottom(24),
@@ -2476,7 +2480,7 @@ impl cosmic::Application for AppModel {
                                         || !self.settings.weather_enabled
                                         || self.weather.is_none()),
                             ))
-                            .size(f32::from(self.settings.panel_text_size))
+                            .size(panel_text_size)
                             .into(),
                         self.settings.panel_multiline
                             && (self.settings.hidden_panel_items.iter().any(|hidden| hidden == "weather")
