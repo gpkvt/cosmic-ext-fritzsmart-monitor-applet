@@ -2099,6 +2099,7 @@ impl cosmic::Application for AppModel {
                 },
                 history,
                 device_history,
+                history_storage_diagnostics,
                 collapsed_menu_sections,
                 expanded_devices,
                 quick_options_expanded,
