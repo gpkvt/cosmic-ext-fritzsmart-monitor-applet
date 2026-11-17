@@ -198,8 +198,7 @@ fn notify_missing_devices(names: &[String], language: &str) {
     if names.is_empty() {
         return;
     }
-    let body = names.join("
-");
+    let body = names.join("\n");
     let _ = notify_rust::Notification::new()
         .summary(if names.len() == 1 {
             crate::i18n::tr(language, "FRITZ!Box device unavailable")
