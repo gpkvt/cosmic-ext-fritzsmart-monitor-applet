@@ -2322,22 +2322,19 @@ impl cosmic::Application for AppModel {
             && let Some((title, values, unit, axis_start)) = &self.expanded_graph
         {
             let graph_page = widget::Column::new()
-                .spacing(4)
+                .spacing(6)
                 .padding(8)
                 .width(cosmic::iced::Length::Fill)
                 .height(cosmic::iced::Length::Fill)
-                .push(graph_visual_large(
-                    values.iter().copied(),
-                    &self.settings.graph_style,
-                    unit,
-                    axis_start.clone(),
-                ))
+                // Keep the expanded graph's information hierarchy consistent
+                // with compact graphs: title first, then MIN/MAX/CURRENT,
+                // the plot, and finally the time axis. Only the plot size differs.
                 .push(
                     widget::Row::new()
                         .spacing(10)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(
-                            widget::text::title2(title.clone())
+                            widget::text::body(title.clone())
                                 .width(cosmic::iced::Length::Fill),
                         )
                         .push(
@@ -2347,7 +2344,7 @@ impl cosmic::Application for AppModel {
                                     .align_y(cosmic::iced::Alignment::Center)
                                     .push(
                                         widget::icon::from_name("window-close-symbolic")
-                                            .size(18),
+                                            .size(16),
                                     )
                                     .push(widget::text::caption(crate::i18n::tr(
                                         &self.settings.language,
@@ -2355,10 +2352,16 @@ impl cosmic::Application for AppModel {
                                     ))),
                             )
                             .on_press(Message::CloseGraph)
-                            .padding(8)
+                            .padding(6)
                             .class(cosmic::theme::Button::Text),
                         ),
-                );
+                )
+                .push(graph_visual_large(
+                    values.iter().copied(),
+                    &self.settings.graph_style,
+                    unit,
+                    axis_start.clone(),
+                ));
             // Applet popup surfaces do not receive the normal desktop
             // window background automatically. Apply COSMIC's window
             // background style to the entire graph surface so it has a
