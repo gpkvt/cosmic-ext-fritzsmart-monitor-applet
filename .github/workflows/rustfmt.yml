@@ -1,0 +1,51 @@
+name: Format Rust sources
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/*.rs"
+      - ".github/workflows/rustfmt.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rustfmt-main
+  cancel-in-progress: false
+
+jobs:
+  format:
+    if: ${{ !startsWith(github.event.head_commit.message, 'style(rustfmt):') }}
+    name: Apply rustfmt formatting
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Install Rust formatter
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Format Rust sources
+        run: cargo fmt --all
+
+      - name: Commit formatting changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "All Rust sources are already formatted."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- '*.rs'
+          git commit -m "style(rustfmt): format Rust sources"
+          git push origin HEAD:main
