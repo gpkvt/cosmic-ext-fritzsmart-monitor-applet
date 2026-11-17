@@ -1180,6 +1180,7 @@ struct LivePowerSummaryData {
     language: String,
     axis_start: String,
     history_collapsed: bool,
+    collapsed_sections: HashSet<String>,
 }
 
 fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Message> {
@@ -1193,6 +1194,7 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
         language,
         axis_start,
         history_collapsed,
+        collapsed_sections,
     } = data;
     // The section already identifies these readings; avoid repeating a
     // separate "Current power" heading above the values.
@@ -4163,6 +4165,7 @@ impl cosmic::Application for AppModel {
                     history_collapsed: self
                         .collapsed_menu_sections
                         .contains("current-power-history"),
+                    collapsed_sections: self.collapsed_menu_sections.clone(),
                 });
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
