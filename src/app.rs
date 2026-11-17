@@ -2391,7 +2391,7 @@ impl cosmic::Application for AppModel {
                 panel_items.push((
                     "power-consumption",
                     panel_item(
-                        if self.settings.panel_net_power {
+                        if self.settings.panel_net_power && input_power.is_some() {
                             "Net power"
                         } else {
                             "Power consumption"
@@ -2741,6 +2741,11 @@ impl cosmic::Application for AppModel {
 
         // The applet popup keeps its compact layout; expanded graphs use the
         // dedicated native window above.
+        let has_input_device = self.readings.iter().any(|reading| {
+            self.settings
+                .input_ains
+                .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+        });
         let mut content = widget::Column::new()
             .spacing(10)
             .padding(12)
@@ -3040,8 +3045,9 @@ impl cosmic::Application for AppModel {
                                 )
                                 .padding([8, 10]),
                             ),
-                    )
-                    .push(
+                    );
+                if has_input_device {
+                    content = content.push(
                         widget::Row::new()
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(
@@ -3061,20 +3067,21 @@ impl cosmic::Application for AppModel {
                                 )
                                 .padding([8, 10]),
                             ),
-                    )
-                    .push(
-                        widget::Row::new()
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(
-                                widget::Column::new()
-                                    .spacing(3)
-                                    .width(cosmic::iced::Length::Fill)
-                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Average temperature")))
-                                    .push(widget::text::caption(
-                                        "When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.",
-                                    )),
-                            )
-                            .push(
+                    );
+                }
+                content = content.push(
+                    widget::Row::new()
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(
+                            widget::Column::new()
+                                .spacing(3)
+                                .width(cosmic::iced::Length::Fill)
+                                .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Average temperature")))
+                                .push(widget::text::caption(
+                                    "When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.",
+                                )),
+                        )
+                        .push(
                                 widget::container(
                                     widget::toggler(self.settings.panel_average_temperature)
                                         .on_toggle(Message::PanelAverageTemperatureChanged),
@@ -3082,7 +3089,7 @@ impl cosmic::Application for AppModel {
                                 .padding([8, 10]),
                             ),
                     );
-                if self.settings.panel_average_temperature {
+                if self.settings.panel_average_temperature && has_input_device {
                     content = content.push(
                         widget::Row::new()
                             .align_y(cosmic::iced::Alignment::Center)
@@ -3320,7 +3327,13 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption(
                         "Reorder readings and choose which ones appear in the panel. Changes are saved automatically.",
                     ));
-                for (index, item) in self.settings.panel_order.iter().enumerate() {
+                let visible_panel_order: Vec<_> = self
+                    .settings
+                    .panel_order
+                    .iter()
+                    .filter(|item| item.as_str() != "solar-power" || has_input_device)
+                    .collect();
+                for (index, item) in visible_panel_order.iter().enumerate() {
                     let id = match item.as_str() {
                         "weather" => "weather",
                         "power-consumption" => "power-consumption",
@@ -3359,7 +3372,7 @@ impl cosmic::Application for AppModel {
                         Message::MovePanelItem(id, false),
                     ));
                     content = content.push(row);
-                    if index + 1 < self.settings.panel_order.len() {
+                    if index + 1 < visible_panel_order.len() {
                         content = content.push(widget::divider::horizontal::default());
                     }
                 }
