@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- Removed the visible gap between the two lines in the compact panel layout by rendering the stepped value as one multiline text widget.
+
+## [17.11.2026]
+
+### Fixed
+
 - Indented the second line of two-line panel values by two non-breaking spaces for the requested stepped layout.
 
 ## [17.11.2026]
