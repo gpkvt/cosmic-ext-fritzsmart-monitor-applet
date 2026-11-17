@@ -620,12 +620,12 @@ fn graph_visual_with_dimensions(
     .width(cosmic::iced::Length::Fill)
     .height(widget_height);
 
-    let y_axis_label = if unit == "°C" {
+    let y_axis_label = if unit == "°C" || unit == "W" {
         unit.to_string()
     } else if unit.contains("/s") {
         format!("BANDWIDTH ({unit})")
     } else {
-        format!("POWER ({unit})")
+        unit.to_string()
     };
     let axis_values = widget::Row::new()
         .width(cosmic::iced::Length::Fill)
