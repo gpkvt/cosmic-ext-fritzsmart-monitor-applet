@@ -2122,7 +2122,7 @@ impl cosmic::Application for AppModel {
                 };
                 content = content
                     .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Interface language")))
-                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.")))
+                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.")))
                     .push(widget::Column::new().spacing(8)
                         .push(widget::Row::new().spacing(8)
                             .push(language_button(crate::i18n::tr(&self.settings.language, "System default"), "system"))
@@ -2141,7 +2141,10 @@ impl cosmic::Application for AppModel {
                             .push(language_button(crate::i18n::tr(&self.settings.language, "Polish"), "pl")))
                         .push(widget::Row::new().spacing(8)
                             .push(language_button(crate::i18n::tr(&self.settings.language, "Danish"), "da"))
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "Norwegian"), "no"))))
+                            .push(language_button(crate::i18n::tr(&self.settings.language, "Norwegian"), "no")))
+                        .push(widget::Row::new().spacing(8)
+                            .push(language_button(crate::i18n::tr(&self.settings.language, "Japanese"), "ja"))
+                            .push(language_button(crate::i18n::tr(&self.settings.language, "Korean"), "ko")))
                     .push(widget::divider::horizontal::default());
             }
             if self.active_settings_section == Some("panel") {
