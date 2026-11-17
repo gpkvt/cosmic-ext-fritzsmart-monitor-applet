@@ -618,6 +618,8 @@ fn graph_visual_with_dimensions(
 
     let y_axis_label = if unit == "°C" {
         format!("TEMPERATURE ({unit})")
+    } else if unit.contains("/s") {
+        format!("BANDWIDTH ({unit})")
     } else {
         format!("POWER ({unit})")
     };
@@ -625,8 +627,10 @@ fn graph_visual_with_dimensions(
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
         .push(widget::text::caption(y_axis_label).width(cosmic::iced::Length::Fill))
+        .push(widget::text::caption(format!("MIN {minimum:.1} {unit}")))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(8.0)))
         .push(widget::text::caption(format!("MAX {maximum:.1} {unit}")))
-        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(12.0)))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(8.0)))
         .push(widget::text::caption(format!("CURRENT {current_value:.1} {unit}")));
     let x_axis = widget::Row::new()
         .width(cosmic::iced::Length::Fill)
