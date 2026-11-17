@@ -72,13 +72,13 @@ for page in pages:
 
     # Markdown belongs in source .md files, not rendered Pages HTML.
     # Ignore code samples, scripts and styles, where Markdown punctuation is valid.
-    visible_text = "\\n".join(parser.text_parts)
+    visible_text = "\n".join(parser.text_parts)
     markdown_residue = (
-        (r"\\*\\*[^*\\n]+\\*\\*", "Markdown bold markers"),
-        (r"(?<!\\x60)\\x60[^\\x60\\n]+\\x60(?!\\x60)", "Markdown inline-code markers"),
-        (r"!\\[[^]]*\\]\\([^)]+\\)", "Markdown image syntax"),
-        (r"(?<!!)\\[[^]]+\\]\\([^)]+\\)", "Markdown link syntax"),
-        (r"(?m)^\\s{0,3}#{1,6}\\s+\\S", "Markdown heading syntax"),
+        (r"\*\*[^*\n]+\*\*", "Markdown bold markers"),
+        (r"(?<!\x60)\x60[^\x60\n]+\x60(?!\x60)", "Markdown inline-code markers"),
+        (r"!\[[^]]*\]\([^)]+\)", "Markdown image syntax"),
+        (r"(?<!!)\[[^]]+\]\([^)]+\)", "Markdown link syntax"),
+        (r"(?m)^\s{0,3}#{1,6}\s+\S", "Markdown heading syntax"),
     )
     for pattern, description in markdown_residue:
         if re.search(pattern, visible_text):
