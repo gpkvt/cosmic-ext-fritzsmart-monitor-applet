@@ -363,7 +363,7 @@
 </footer>
   <script>
     const progress=document.getElementById('scroll-progress');
-    const updateProgress=()=>{const max=document.documentElement.scrollHeight-innerHeight;progress.style.width=(max>0?scrollY/max*100:0)+'%'};
+    const updateProgress=()=>{if(!progress)return;const max=document.documentElement.scrollHeight-innerHeight;progress.style.width=(max>0?scrollY/max*100:0)+'%'};
     addEventListener('scroll',updateProgress,{passive:true});updateProgress();
     const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('visible');observer.unobserve(entry.target)}}),{threshold:.08});
     document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
@@ -389,15 +389,11 @@
     const showScreenshot=index=>{
       currentScreenshot=(index+screenshots.length)%screenshots.length;
       const shot=screenshots[currentScreenshot];
-      galleryImage.src=shot.src;
-      galleryImage.alt=shot.alt;
-      galleryCaption.replaceChildren();
-      const title=document.createElement('strong');
-      title.textContent=shot.title;
-      galleryCaption.append(title,document.createTextNode(shot.description));
-      galleryCount.textContent=(currentScreenshot+1)+' / '+screenshots.length;
+      if(galleryImage){galleryImage.src=shot.src;galleryImage.alt=shot.alt;}
+      if(galleryCaption){galleryCaption.replaceChildren();const title=document.createElement('strong');title.textContent=shot.title;galleryCaption.append(title,document.createTextNode(shot.description));}
+      if(galleryCount)galleryCount.textContent=(currentScreenshot+1)+' / '+screenshots.length;
     };
-    const openGalerie=index=>{showScreenshot(index??0);if(!screenshotDialog.open)screenshotDialog.showModal()};
+    const openGalerie=index=>{showScreenshot(index??0);if(screenshotDialog&&!screenshotDialog.open)screenshotDialog.showModal()};
     const heroGalerie=document.querySelector('.hero-gallery');
     const heroCards=[...document.querySelectorAll('.hero-shot')];
     const seenHeroImages=new Set();
@@ -424,15 +420,15 @@
     });
     requestAnimationFrame(()=>heroGalerie?.classList.add('cards-dealt'));
     document.querySelectorAll('[data-open-gallery]:not(.hero-shot)').forEach(el=>el.addEventListener('click',()=>openGalerie(0)));
-    previousButton.addEventListener('click',()=>showScreenshot(currentScreenshot-1));
-    nextButton.addEventListener('click',()=>showScreenshot(currentScreenshot+1));
+    previousButton?.addEventListener('click',()=>showScreenshot(currentScreenshot-1));
+    nextButton?.addEventListener('click',()=>showScreenshot(currentScreenshot+1));
     document.querySelectorAll('[data-close-gallery]').forEach(el=>el.addEventListener('click',()=>screenshotDialog.close()));
-    screenshotDialog.addEventListener('click',event=>{if(event.target===screenshotDialog)screenshotDialog.close()});
-    screenshotDialog.addEventListener('keydown',event=>{
+    screenshotDialog?.addEventListener('click',event=>{if(event.target===screenshotDialog)screenshotDialog.close()});
+    screenshotDialog?.addEventListener('keydown',event=>{
       if(event.key==='ArrowLeft'){event.preventDefault();showScreenshot(currentScreenshot-1)}
       else if(event.key==='ArrowRight'){event.preventDefault();showScreenshot(currentScreenshot+1)}
     });
-    showScreenshot(0);
+    if(galleryImage||galleryCaption||galleryCount)showScreenshot(0);
 
 
   </script>
