@@ -1331,7 +1331,9 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
     let mut device_xml = None;
     match device_response {
         Ok(response) => {
-            let status = response.status().as_u16();
+            let status = response.status();
+            record_http_response_with_method(response.url(), status, "GET");
+            let status = status.as_u16();
             let body = response.text().await.unwrap_or_else(|error| format!("<body read error: {error}>"));
             device_xml = Some(body.clone());
             endpoints.push(json!({
@@ -1364,7 +1366,9 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                     .await;
                 match response {
                     Ok(response) => {
-                        let status = response.status().as_u16();
+                        let status = response.status();
+                        record_http_response_with_method(response.url(), status, "GET");
+                        let status = status.as_u16();
                         let body = response.text().await.unwrap_or_else(|error| format!("<body read error: {error}>"));
                         endpoints.push(json!({
                             "name": "device_switch_state",
@@ -1406,7 +1410,9 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
             .body(body)
             .send().await {
             Ok(response) => {
-                let status = response.status().as_u16();
+                let status = response.status();
+                record_http_response_with_method(response.url(), status, "POST");
+                let status = status.as_u16();
                 let response_body = response.text().await.unwrap_or_else(|error| format!("<body read error: {error}>"));
                 endpoints.push(json!({
                     "name": "wan_common_interface_link_properties",
