@@ -3386,7 +3386,7 @@ impl cosmic::Application for AppModel {
                         .height(cosmic::iced::Length::Fixed(260.0))
                         .style(|_| cosmic::iced::widget::container::Style {
                             background: Some(
-                                cosmic::iced::Color::from_rgba(0.06, 0.07, 0.09, 0.50).into(),
+                                cosmic::iced::Color::from_rgba(0.0, 0.0, 0.0, 0.50).into(),
                             ),
                             ..Default::default()
                         });
