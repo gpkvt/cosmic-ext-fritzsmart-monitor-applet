@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - main
+  merge_group:
+    types: [checks_requested]
   workflow_dispatch:
 
 permissions:
@@ -29,8 +31,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install package build dependencies
+        shell: bash
         run: |
-          sudo apt-get update -o Acquire::Retries=3
+          set -euo pipefail
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
           sudo apt-get install --yes -o Acquire::Retries=3 \
             appstream desktop-file-utils flatpak flatpak-builder python3-venv \
             libdbus-1-dev libdisplay-info-dev libgbm-dev libinput-dev libseat-dev \
@@ -42,8 +46,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fritz-power-monitor") | .version')"
-          test -n "$version"
+          version="$(cargo metadata --locked --no-deps --format-version 1 | jq -er '.packages[] | select(.name == "fritz-power-monitor") | .version')"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Build Debian, AppImage and Flatpak packages
@@ -68,7 +72,10 @@ jobs:
           test -s "$flatpak"
           test -s dist/SHA256SUMS
 
-          dpkg-deb --info "$deb"
+          [[ "$(dpkg-deb --field "$deb" Package)" == "fritz-power-monitor" ]]
+          [[ "$(dpkg-deb --field "$deb" Version)" == "$VERSION" ]]
+          [[ "$(dpkg-deb --field "$deb" Architecture)" == "amd64" ]]
+          dpkg-deb --contents "$deb" | grep -Fq './usr/bin/fritz-power-monitor'
           file "$appimage"
           (cd dist && sha256sum --check SHA256SUMS)
 
