@@ -613,7 +613,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Deutsch" => "Deutsch",
         "Interface language" => "Sprache der Benutzeroberfläche",
         "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian." => {
-            "System folgt der Sprache Ihres Desktops. Englisch und Deutsch sind derzeit verfügbar."
+            "System folgt der Sprache Ihres Desktops. Verfügbare Sprachen: Englisch, Deutsch, Spanisch, Niederländisch, Französisch, Italienisch, Schwedisch, Portugiesisch, Polnisch, Dänisch und Norwegisch."
         }
         "Adjusts the power and temperature text in the panel" => {
             "Passt die Schriftgröße der Leistungs- und Temperaturwerte im Panel an"
