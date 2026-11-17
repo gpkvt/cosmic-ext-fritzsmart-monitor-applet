@@ -4866,10 +4866,47 @@ impl cosmic::Application for AppModel {
                     .width(cosmic::iced::Length::Fill)
                     .padding([8, 12])
                     .class(cosmic::theme::Button::ListItem(heading_radius));
+                    let history_button: cosmic::Element<'_, Message> =
+                        if let Some(samples) = device_history.filter(|samples| !samples.is_empty()) {
+                            let values = samples
+                                .iter()
+                                .map(|(_, power, _)| *power as f64)
+                                .collect::<Vec<_>>();
+                            let axis_start = format_graph_axis_start(
+                                self.settings.graph_timespan_minutes,
+                                samples.front().map(|(timestamp, _, _)| {
+                                    Instant::now()
+                                        .duration_since(*timestamp)
+                                        .as_secs()
+                                        .div_ceil(60)
+                                }),
+                            );
+                            widget::button::custom(
+                                widget::icon::from_name("office-chart-line-symbolic").size(16),
+                            )
+                            .on_press(Message::ShowGraph(
+                                format!(
+                                    "{} · {}",
+                                    reading.name,
+                                    crate::i18n::tr(&self.settings.language, "POWER (W)")
+                                ),
+                                values,
+                                "W".into(),
+                                Some(axis_start),
+                            ))
+                            .padding([8, 8])
+                            .class(cosmic::theme::Button::Text)
+                            .into()
+                        } else {
+                            widget::Space::new()
+                                .width(cosmic::iced::Length::Fixed(32.0))
+                                .into()
+                        };
                     let device_heading = widget::Row::new()
                         .width(cosmic::iced::Length::Fill)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(device_heading_button)
+                        .push(history_button)
                         .push(power_toggle);
                     let metrics = widget::Row::new()
                         .spacing(8)
