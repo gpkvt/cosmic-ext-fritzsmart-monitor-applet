@@ -2,6 +2,21 @@
 
 use std::env;
 
+/// Keep an explicitly selected supported language instead of silently resetting it to system.
+pub fn language_setting(value: &str) -> &'static str {
+    match value {
+        "en" | "de" | "es" | "nl" | "fr" | "it" | "sv" | "pt" | "pl" | "da" | "no" | "ja" | "ko" | "system" => {
+            match value {
+                "en" => "en", "de" => "de", "es" => "es", "nl" => "nl",
+                "fr" => "fr", "it" => "it", "sv" => "sv", "pt" => "pt",
+                "pl" => "pl", "da" => "da", "no" => "no", "ja" => "ja",
+                "ko" => "ko", _ => "system",
+            }
+        }
+        _ => "system",
+    }
+}
+
 /// Resolve the configured language. `system` follows the desktop locale.
 pub fn language(setting: &str) -> &'static str {
     fn from_locale(value: &str) -> Option<&'static str> {
@@ -2085,7 +2100,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::tr;
+    use super::{language_setting, tr};
 
     #[test]
     fn explicit_language_overrides_desktop_locale() {
@@ -2152,6 +2167,15 @@ mod tests {
                 assert_ne!(tr(locale, name), name, "{locale}: {name}");
             }
         }
+    }
+
+
+    #[test]
+    fn every_language_picker_choice_is_persisted_as_selected() {
+        for language in ["system", "en", "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko"] {
+            assert_eq!(language_setting(language), language);
+        }
+        assert_eq!(language_setting("unsupported"), "system");
     }
 
     #[test]
