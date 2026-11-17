@@ -311,6 +311,18 @@ fn graph_history_window(minutes: u32) -> Duration {
     Duration::from_secs(u64::from(minutes.clamp(5, 2_102_400)) * 60)
 }
 
+fn max_device_history_minutes(samples: &VecDeque<(Instant, i64, f64)>, now: Instant) -> u32 {
+    samples
+        .front()
+        .map(|(timestamp, _, _)| {
+            now.duration_since(*timestamp)
+                .as_secs()
+                .div_ceil(60)
+                .clamp(5, 2_102_400) as u32
+        })
+        .unwrap_or(5)
+}
+
 // Keep up to 30 days on disk so changing a device graph's range can load
 // older samples instead of being limited to the previously selected range.
 fn graph_history_storage_window(minutes: u32) -> Duration {
@@ -458,6 +470,14 @@ fn format_graph_timespan(minutes: u32) -> String {
         format!("{years} {}", if years == 1 { "year" } else { "years" })
     } else if days > 0 && minutes.is_multiple_of(1440) {
         format!("{days} {}", if days == 1 { "day" } else { "days" })
+    } else if days > 0 {
+        let hours = (minutes % 1440) / 60;
+        let remaining_minutes = minutes % 60;
+        if remaining_minutes == 0 {
+            format!("{days}d {hours}h")
+        } else {
+            format!("{days}d {hours}h {remaining_minutes}m")
+        }
     } else if minutes.is_multiple_of(60) {
         let hours = minutes / 60;
         format!("{hours} {}", if hours == 1 { "hour" } else { "hours" })
@@ -2829,22 +2849,34 @@ impl cosmic::Application for AppModel {
                 .push({
                     let controls: cosmic::Element<'_, Message> =
                         if self.history_graph_index.is_some() {
-                            let presets = [
-                                ("15m", 15),
-                                ("1h", 60),
-                                ("6h", 360),
-                                ("24h", 1_440),
-                                ("7d", 10_080),
-                                ("30d", 43_200),
+                            let max_minutes = self
+                                .history_graph_index
+                                .and_then(|index| self.history_graph_devices.get(index))
+                                .and_then(|(key, _)| self.device_history.get(key))
+                                .map(|samples| max_device_history_minutes(samples, Instant::now()))
+                                .unwrap_or(5);
+                            let mut presets = vec![
+                                ("15m".to_string(), 15),
+                                ("1h".to_string(), 60),
+                                ("6h".to_string(), 360),
+                                ("24h".to_string(), 1_440),
+                                ("7d".to_string(), 10_080),
                             ];
+                            presets.retain(|(_, minutes)| *minutes <= max_minutes);
+                            if !presets.iter().any(|(_, minutes)| *minutes == max_minutes) {
+                                presets.push((format_graph_timespan(max_minutes), max_minutes));
+                            }
                             let mut ranges = widget::Row::new()
                                 .spacing(6)
                                 .align_y(cosmic::iced::Alignment::Center);
                             for (label, minutes) in presets {
-                                let caption = if self.settings.graph_timespan_minutes == minutes {
+                                let is_selected = self.settings.graph_timespan_minutes == minutes
+                                    || (minutes == max_minutes
+                                        && self.settings.graph_timespan_minutes >= max_minutes);
+                                let caption = if is_selected {
                                     format!("✓ {label}")
                                 } else {
-                                    label.to_string()
+                                    label
                                 };
                                 ranges = ranges.push(
                                     widget::button::custom(widget::text::caption(caption))
@@ -7946,6 +7978,23 @@ mod history_tests {
         let (energy_wh, timespan) = input_energy_and_timespan(&history).unwrap();
         assert_eq!(energy_wh, 0.0);
         assert_eq!(timespan, Duration::ZERO);
+    }
+
+    #[test]
+    fn device_history_max_range_uses_oldest_available_sample() {
+        let now = Instant::now();
+        let samples = VecDeque::from([
+            (now - Duration::from_secs(3 * 24 * 60 * 60 + 90), 100, 20.0),
+            (now, 200, 21.0),
+        ]);
+        assert_eq!(max_device_history_minutes(&samples, now), 4_321);
+        assert_eq!(max_device_history_minutes(&VecDeque::new(), now), 5);
+    }
+
+    #[test]
+    fn graph_timespan_label_formats_partial_days() {
+        assert_eq!(format_graph_timespan(1_500), "1d 1h");
+        assert_eq!(format_graph_timespan(1_501), "1d 1h 1m");
     }
 
     #[test]
