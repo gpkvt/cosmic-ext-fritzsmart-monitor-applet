@@ -233,9 +233,9 @@ fn notify_missing_devices(names: &[String], language: &str) {
     let body = names.join("\n");
     let _ = notify_rust::Notification::new()
         .summary(if names.len() == 1 {
-            crate::i18n::tr(&language, "FRITZ!Box device unavailable")
+            crate::i18n::tr(language, "FRITZ!Box device unavailable")
         } else {
-            crate::i18n::tr(&language, "FRITZ!Box devices unavailable")
+            crate::i18n::tr(language, "FRITZ!Box devices unavailable")
         })
         .body(&body)
         .show();
@@ -249,19 +249,19 @@ fn notify_temperature_alert(
 ) {
     let (summary, body) = if temperature > f64::from(thresholds.high_c) {
         (
-            format!("{}: {name}", crate::i18n::tr(&language, "High temperature")),
+            format!("{}: {name}", crate::i18n::tr(language, "High temperature")),
             format!(
                 "{temperature:.1} °C ({}: {} °C)",
-                crate::i18n::tr(&language, "maximum"),
+                crate::i18n::tr(language, "maximum"),
                 thresholds.high_c
             ),
         )
     } else {
         (
-            format!("{}: {name}", crate::i18n::tr(&language, "Low temperature")),
+            format!("{}: {name}", crate::i18n::tr(language, "Low temperature")),
             format!(
                 "{temperature:.1} °C ({}: {} °C)",
-                crate::i18n::tr(&language, "minimum"),
+                crate::i18n::tr(language, "minimum"),
                 thresholds.low_c
             ),
         )
@@ -1299,7 +1299,7 @@ fn collapsible_graph(
                 .size(16),
             ),
     )
-    .on_press(Message::ToggleMenuSection(section_id.into()))
+    .on_press(Message::ToggleMenuSection(section_id))
     .width(cosmic::iced::Length::Fill)
     .padding([4, 0])
     .class(cosmic::theme::Button::Text);
@@ -1432,7 +1432,7 @@ fn total_power_overview(
                     .width(cosmic::iced::Length::Fill),
                 ),
         )
-        .push(graph_panel(output_graph.into()));
+        .push(graph_panel(output_graph));
     let output_section = total_power_section(
         "TOTAL POWER OUTPUT",
         total_power,
@@ -1612,7 +1612,7 @@ fn settings_section_header<'a>(
         "diagnostics" => ("dialog-information-symbolic", "Connection and save status"),
         _ => ("preferences-system-symbolic", "Applet preferences"),
     };
-    let description = crate::i18n::tr(&language, description);
+    let description = crate::i18n::tr(language, description);
     let section_row: cosmic::Element<'a, Message> = widget::button::custom(
         widget::Row::new()
             .spacing(12)
