@@ -19,11 +19,24 @@ jobs:
   cargo-audit:
     name: Audit Rust dependencies
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust dependencies and build artifacts
+        uses: Swatinem/rust-cache@v2
       - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if cargo install cargo-audit --locked; then
+              exit 0
+            fi
+            echo "cargo-audit installation failed (attempt $attempt/3)." >&2
+            sleep $((attempt * 5))
+          done
+          exit 1
       - name: Check dependency advisories
         run: cargo audit --deny warnings
 

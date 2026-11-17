@@ -25,10 +25,13 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust dependencies and build artifacts
+        uses: Swatinem/rust-cache@v2
+
       - name: Install package build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes \
+          sudo apt-get update -o Acquire::Retries=3
+          sudo apt-get install --yes -o Acquire::Retries=3 \
             appstream desktop-file-utils flatpak flatpak-builder python3-venv \
             libdbus-1-dev libdisplay-info-dev libgbm-dev libinput-dev libseat-dev \
             libsystemd-dev libudev-dev libvulkan-dev libwayland-dev libxkbcommon-dev \

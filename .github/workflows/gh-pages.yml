@@ -17,6 +17,7 @@ jobs:
   publish:
     name: Build, validate and publish site
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
@@ -28,8 +29,8 @@ jobs:
 
       - name: Install Markdown renderer
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes python3-markdown
+          sudo apt-get update -o Acquire::Retries=3
+          sudo apt-get install --yes -o Acquire::Retries=3 python3-markdown
 
       - name: Determine latest published release
         id: release
@@ -37,7 +38,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)"
+          for attempt in 1 2 3; do
+            if tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name 2>/dev/null)" && [[ -n "$tag" ]]; then
+              break
+            fi
+            echo "Could not retrieve the latest release (attempt $attempt/3)." >&2
+            sleep $((attempt * 5))
+          done
+          test -n "${tag:-}" || { echo "No published GitHub release is available." >&2; exit 1; }
           version="${tag#v}"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
           echo "version=$version" >> "$GITHUB_OUTPUT"
