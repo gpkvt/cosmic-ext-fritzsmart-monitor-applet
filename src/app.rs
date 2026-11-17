@@ -6518,7 +6518,10 @@ impl cosmic::Application for AppModel {
                     ),
                     Err(error) => record_diagnostic_event(
                         &mut self.diagnostic_events,
-                        format!("Could not write debug report to {}: {error}", path.display()),
+                        format!(
+                            "Could not write debug report to {}: {error}",
+                            path.display()
+                        ),
                     ),
                 }
             }
