@@ -1933,6 +1933,16 @@ mod tests {
     }
 
     #[test]
+    fn language_picker_names_are_localized_for_every_supported_locale() {
+        let languages = ["English", "German", "Spanish", "Dutch", "French", "Italian", "Swedish", "Portuguese", "Polish", "Danish", "Norwegian"];
+        for locale in ["en", "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no"] {
+            for name in languages {
+                assert_ne!(tr(locale, name), name, "{locale}: {name}");
+            }
+        }
+    }
+
+    #[test]
     fn unknown_translations_fall_back_to_source_text() {
         assert_eq!(tr("de", "A newly added label"), "A newly added label");
     }
