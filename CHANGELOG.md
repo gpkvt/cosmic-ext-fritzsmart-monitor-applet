@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- Fetch fresh weather background images whenever the configured per-image slideshow duration expires, independently of the weather-data refresh schedule.
+
+### Fixed
+
 - Advance the weather background after every successful weather reload, including scheduled reloads, using the configured weather refresh interval.
 
 ### Fixed

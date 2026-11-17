@@ -233,6 +233,23 @@ pub async fn fetch_weather_forecast(
     Ok(WeatherForecast { days })
 }
 
+pub async fn fetch_weather_background_images(
+    icon_code: String,
+) -> Result<(Vec<Vec<u8>>, Vec<CommonsAttribution>), String> {
+    let client = Client::builder()
+        .user_agent("FRITZ-Power-Monitor")
+        .timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|error| format!("Weather image client error: {error}"))?;
+    let (mut images, attributions) = fetch_commons_background(&client, &icon_code).await;
+    if icon_code.ends_with('n') && images.is_empty()
+        && let Some(stars) = generate_starry_night_background()
+    {
+        images.push(stars);
+    }
+    Ok((images, attributions))
+}
+
 pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherData, String> {
     if api_key.trim().is_empty() {
         return Err("OpenWeatherMap API key is empty".into());

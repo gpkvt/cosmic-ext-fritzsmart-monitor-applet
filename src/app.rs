@@ -52,6 +52,7 @@ pub struct AppModel {
     refresh_started_at: Option<Instant>,
     weather: Option<WeatherData>,
     weather_slideshow_index: usize,
+    weather_images_loading: bool,
     weather_slideshow_handles: Vec<widget::image::Handle>,
     weather_background_handle: Option<widget::image::Handle>,
     starry_night_handle: Option<widget::image::Handle>,
@@ -124,6 +125,7 @@ pub enum Message {
     TemperatureAlertHighChanged(String, i16),
     TemperatureAlertLowChanged(String, i16),
     WeatherUpdated(Box<Result<WeatherData, String>>),
+    WeatherImagesUpdated(Result<(Vec<Vec<u8>>, Vec<crate::weather::CommonsAttribution>), String>),
     WeatherSlideshowTick,
     ToggleWeatherForecast,
     ToggleWeatherAttribution,
@@ -6218,8 +6220,63 @@ impl cosmic::Application for AppModel {
                     && let Some(weather) = &self.weather
                     && !weather.slideshow_sequence.is_empty()
                 {
-                    self.weather_slideshow_index =
-                        (self.weather_slideshow_index + 1) % weather.slideshow_sequence.len();
+                    let current = self.weather_slideshow_index % weather.slideshow_sequence.len();
+                    let next = (current + 1) % weather.slideshow_sequence.len();
+                    let current_frame = weather.slideshow_sequence[current];
+                    let next_frame = weather.slideshow_sequence[next];
+                    let current_sources = weather.slideshow_frame_sources.get(current_frame);
+                    let next_sources = weather.slideshow_frame_sources.get(next_frame);
+                    let image_timeout = current_sources.is_some_and(|sources| sources.len() == 1)
+                        && next_sources.is_some_and(|sources| sources.len() == 2);
+                    self.weather_slideshow_index = next;
+                    if image_timeout && !self.weather_images_loading {
+                        self.weather_images_loading = true;
+                        let icon_code = weather.icon_code.clone();
+                        return Task::perform(
+                            crate::weather::fetch_weather_background_images(icon_code),
+                            |result| cosmic::Action::App(Message::WeatherImagesUpdated(result)),
+                        );
+                    }
+                }
+            }
+            Message::WeatherImagesUpdated(result) => {
+                self.weather_images_loading = false;
+                match result {
+                    Ok((images, attributions)) => {
+                        if let Some(weather) = &mut self.weather {
+                            if !images.is_empty() {
+                                let (frames, sequence, frame_sources) = build_weather_slideshow_frames(
+                                    &images,
+                                    self.settings.weather_slideshow_interval_seconds,
+                                );
+                                weather.background_images = images;
+                                weather.image_attributions = attributions;
+                                weather.image_attribution = weather.image_attributions.first().cloned();
+                                weather.slideshow_frames = frames.iter()
+                                    .map(|frame| semi_transparent_weather_photo(frame))
+                                    .collect();
+                                weather.slideshow_sequence = sequence;
+                                weather.slideshow_frame_sources = frame_sources;
+                                weather.background_image = weather.background_images.first()
+                                    .map(|image| semi_transparent_weather_photo(image));
+                                self.weather_slideshow_handles = weather.slideshow_frames.iter()
+                                    .cloned()
+                                    .map(widget::image::Handle::from_bytes)
+                                    .collect();
+                                self.weather_background_handle = weather.background_image.as_ref()
+                                    .map(|bytes| widget::image::Handle::from_bytes(bytes.clone()));
+                                self.weather_slideshow_index = 0;
+                                record_diagnostic_event(&mut self.diagnostic_events, format!(
+                                    "Weather slideshow image timeout reached; loaded {} new background image(s).",
+                                    weather.background_images.len()
+                                ));
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        record_diagnostic_event(&mut self.diagnostic_events,
+                            format!("Weather slideshow image refresh failed: {error}"));
+                    }
                 }
             }
             Message::WeatherUpdated(result) => {
