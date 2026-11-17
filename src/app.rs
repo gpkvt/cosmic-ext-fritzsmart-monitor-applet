@@ -2788,7 +2788,8 @@ impl cosmic::Application for AppModel {
                     )
                 })
                 .push({
-                    if self.history_graph_index.is_some() {
+                    let controls: cosmic::Element<'_, Message> =
+                        if self.history_graph_index.is_some() {
                         let presets = [
                             ("15m", 15),
                             ("1h", 60),
@@ -2813,12 +2814,13 @@ impl cosmic::Application for AppModel {
                                     .class(cosmic::theme::Button::Text),
                             );
                         }
-                        widget::container(ranges)
-                            .width(cosmic::iced::Length::Fill)
-                            .into()
-                    } else {
-                        widget::Space::new().height(0).into()
-                    }
+                            widget::container(ranges)
+                                .width(cosmic::iced::Length::Fill)
+                                .into()
+                        } else {
+                            widget::Space::new().height(0).into()
+                        };
+                    controls
                 })
                 .push(graph_visual_large(
                     values.iter().copied(),
