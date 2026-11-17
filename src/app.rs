@@ -2177,13 +2177,11 @@ impl cosmic::Application for AppModel {
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>,
                           icon_at_top: bool| {
-            let mut item = widget::Row::new()
-                .spacing(5)
-                .align_y(if icon_at_top {
-                    cosmic::iced::Alignment::Start
-                } else {
-                    cosmic::iced::Alignment::Center
-                });
+            let mut item = widget::Row::new().spacing(5).align_y(if icon_at_top {
+                cosmic::iced::Alignment::Start
+            } else {
+                cosmic::iced::Alignment::Center
+            });
             if let Some(icon) = icon {
                 item = item.push(
                     widget::container(icon)
@@ -2238,7 +2236,11 @@ impl cosmic::Application for AppModel {
                         .size(f32::from(self.settings.panel_text_size))
                         .into(),
                     self.settings.panel_multiline
-                        && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "temperature"),
+                        && self
+                            .settings
+                            .hidden_panel_items
+                            .iter()
+                            .any(|hidden| hidden == "temperature"),
                 )
                 .into(),
             ));
