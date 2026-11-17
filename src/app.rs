@@ -943,6 +943,7 @@ fn live_power_summary(
 fn total_power_section(
     title: &'static str,
     value_w: i64,
+    temperature: Option<String>,
     section_id: &'static str,
     collapsed: bool,
     content: cosmic::Element<'static, Message>,
@@ -957,6 +958,9 @@ fn total_power_section(
         heading = heading.push(widget::text::title3(keep_value_unit_together(format!(
             "{value_w} W"
         ))));
+        if let Some(temperature) = temperature {
+            heading = heading.push(widget::text::caption(temperature));
+        }
     }
     let heading = widget::button::custom(
         heading.push(
@@ -1065,6 +1069,9 @@ fn total_power_overview(
     let output_section = total_power_section(
         "TOTAL POWER OUTPUT",
         total_power,
+        output_temperature_history
+            .back()
+            .map(|(_, value)| format!("{value:.1} °C")),
         "total-power-output",
         collapsed_sections.contains("total-power-output"),
         output_content.into(),
@@ -1125,6 +1132,9 @@ fn total_power_overview(
         let input_section = total_power_section(
             "TOTAL POWER INPUT",
             input_power,
+            input_temperature_history
+                .back()
+                .map(|(_, value)| format!("{value:.1} °C")),
             "total-power-input",
             collapsed_sections.contains("total-power-input"),
             input_content.into(),
@@ -4057,12 +4067,31 @@ impl cosmic::Application for AppModel {
                     let collapsed_value = if collapsed {
                         match section.0 {
                             "summary" => displayed_power_w(&self.readings, &self.selected_ains)
-                                .map(|value| format!("{value} W")),
-                            "weather" => self
-                                .weather
-                                .as_ref()
-                                .map(|weather| format!("{:.0} °C", weather.temperature_c)),
-                            "internet-bandwidth" => Some(
+                                .map(|value| {
+                                    let primary = self
+                                        .selected_ains
+                                        .first()
+                                        .and_then(|selected| {
+                                            self.readings.iter().find(|reading| {
+                                                crate::fritz::normalize_ain_for_selection(&reading.ain)
+                                                    == crate::fritz::normalize_ain_for_selection(selected)
+                                            })
+                                        })
+                                        .or_else(|| self.readings.first());
+                                    let temperature = if self.settings.panel_average_temperature {
+                                        average_temperature_c(
+                                            &self.readings,
+                                            self.settings.panel_exclude_solar_temperature,
+                                        )
+                                    } else {
+                                        primary.map(|reading| reading.temperature_c)
+                                    };
+                                    (
+                                        format!("{value} W"),
+                                        temperature.map(|value| format!("{value:.1} °C")),
+                                    )
+                                }),
+                            "internet-bandwidth" => Some((
                                 self.internet_bandwidth
                                     .as_ref()
                                     .map(|bandwidth| {
@@ -4079,7 +4108,8 @@ impl cosmic::Application for AppModel {
                                         )
                                     })
                                     .unwrap_or_else(|| "…".to_string()),
-                            ),
+                                None,
+                            )),
                             _ => None,
                         }
                     } else {
@@ -4090,11 +4120,16 @@ impl cosmic::Application for AppModel {
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::text::body(section.1))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
-                    let heading_row = if let Some(value) = collapsed_value {
-                        if section.0 == "internet-bandwidth" {
-                            heading_row.push(widget::text::caption(value))
+                    let heading_row = if let Some((power, temperature)) = collapsed_value {
+                        let heading_row = if section.0 == "internet-bandwidth" {
+                            heading_row.push(widget::text::caption(power))
                         } else {
-                            heading_row.push(widget::text::title3(value))
+                            heading_row.push(widget::text::title3(power))
+                        };
+                        if let Some(temperature) = temperature {
+                            heading_row.push(widget::text::caption(temperature))
+                        } else {
+                            heading_row
                         }
                     } else {
                         heading_row
