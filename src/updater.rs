@@ -256,7 +256,7 @@ mod tests {
 
     #[test]
     fn checksum_lookup_matches_the_exact_asset_name() {
-        let sums = "0123456789abcdef  app.deb\\nabcdef0123456789 *app.AppImage\\n";
+        let sums = "0123456789abcdef  app.deb\nabcdef0123456789 *app.AppImage\n";
         assert_eq!(checksum_for_asset(sums, "app.deb"), Some("0123456789abcdef"));
         assert_eq!(checksum_for_asset(sums, "app.AppImage"), Some("abcdef0123456789"));
         assert_eq!(checksum_for_asset(sums, "other.deb"), None);
