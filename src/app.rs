@@ -120,6 +120,7 @@ pub enum Message {
     ToggleMenuSection(String),
     MoveMenuElement(&'static str, bool),
     ToggleMenuElementVisibility(&'static str, bool),
+    TogglePanelItemVisibility(&'static str, bool),
     MovePanelItem(&'static str, bool),
     QuickRefreshIntervalPreview(u32),
     CommitQuickRefreshInterval,
@@ -1676,7 +1677,13 @@ impl cosmic::Application for AppModel {
             .align_y(cosmic::iced::Alignment::Center);
         let mut panel_items: Vec<(&str, cosmic::Element<'static, Message>)> = Vec::new();
 
-        if self.settings.weather_enabled {
+        if self.settings.weather_enabled
+            && !self
+                .settings
+                .hidden_panel_items
+                .iter()
+                .any(|hidden| hidden == "weather")
+        {
             if let Some(weather) = &self.weather {
                 panel_items.push((
                     "weather",
@@ -1694,34 +1701,47 @@ impl cosmic::Application for AppModel {
             }
         }
         if self.error.is_none() {
-            panel_items.push((
-                "power-consumption",
-                panel_item(
-                    if self.settings.panel_net_power {
-                        "Net power"
-                    } else {
-                        "Power consumption"
-                    },
-                    Some(
-                        widget::svg(widget::svg::Handle::from_memory(
-                            br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5M16 3v5"/><path d="M6 8h12v3a6 6 0 0 1-6 6h0a6 6 0 0 1-6-6V8Z"/><path d="M12 17v2a3 3 0 0 0 3 3h1"/></svg>"#.to_vec(),
-                        ))
-                        .width(10)
-                        .height(10)
-                        .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
-                            color: Some(theme.cosmic().on_bg_color().into()),
-                        }))
-                        .into(),
-                    ),
-                    self.core
-                        .applet
-                        .text(power)
-                        .size(f32::from(self.settings.panel_text_size))
-                        .into(),
-                )
-                .into(),
-            ));
-            if !self.settings.panel_net_power {
+            if !self
+                .settings
+                .hidden_panel_items
+                .iter()
+                .any(|hidden| hidden == "power-consumption")
+            {
+                panel_items.push((
+                    "power-consumption",
+                    panel_item(
+                        if self.settings.panel_net_power {
+                            "Net power"
+                        } else {
+                            "Power consumption"
+                        },
+                        Some(
+                            widget::svg(widget::svg::Handle::from_memory(
+                                br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5M16 3v5"/><path d="M6 8h12v3a6 6 0 0 1-6 6h0a6 6 0 0 1-6-6V8Z"/><path d="M12 17v2a3 3 0 0 0 3 3h1"/></svg>"#.to_vec(),
+                            ))
+                            .width(10)
+                            .height(10)
+                            .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
+                                color: Some(theme.cosmic().on_bg_color().into()),
+                            }))
+                            .into(),
+                        ),
+                        self.core
+                            .applet
+                            .text(power)
+                            .size(f32::from(self.settings.panel_text_size))
+                            .into(),
+                    )
+                    .into(),
+                ));
+            }
+            if !self.settings.panel_net_power
+                && !self
+                    .settings
+                    .hidden_panel_items
+                    .iter()
+                    .any(|hidden| hidden == "solar-power")
+            {
                 if let Some(input_power) = input_power {
                     panel_items.push((
                         "solar-power",
@@ -1751,7 +1771,13 @@ impl cosmic::Application for AppModel {
                 }
             }
 
-            if self.settings.panel_internet_bandwidth {
+            if self.settings.panel_internet_bandwidth
+                && !self
+                    .settings
+                    .hidden_panel_items
+                    .iter()
+                    .any(|hidden| hidden == "internet-bandwidth")
+            {
                 let (download, upload) = self
                     .internet_bandwidth
                     .as_ref()
@@ -1812,7 +1838,13 @@ impl cosmic::Application for AppModel {
                         .into(),
                 ));
             }
-            if let Some(temperature) = temperature {
+            if let Some(temperature) = temperature.filter(|_| {
+                !self
+                    .settings
+                    .hidden_panel_items
+                    .iter()
+                    .any(|hidden| hidden == "temperature")
+            }) {
                 panel_items.push((
                     "temperature",
                     panel_item(
@@ -2444,7 +2476,7 @@ impl cosmic::Application for AppModel {
                         "Panel item order",
                     )))
                     .push(widget::text::caption(
-                        "Move each reading independently. Changes are saved automatically.",
+                        "Reorder readings and choose which ones appear in the panel. Changes are saved automatically.",
                     ));
                 for (index, item) in self.settings.panel_order.iter().enumerate() {
                     let id = match item.as_str() {
@@ -2455,6 +2487,11 @@ impl cosmic::Application for AppModel {
                         "temperature" => "temperature",
                         _ => continue,
                     };
+                    let visible = !self
+                        .settings
+                        .hidden_panel_items
+                        .iter()
+                        .any(|hidden| hidden == id);
                     let mut row = widget::Row::new()
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
@@ -2464,6 +2501,10 @@ impl cosmic::Application for AppModel {
                                 panel_item_label(id),
                             ))
                             .width(cosmic::iced::Length::Fill),
+                        )
+                        .push(
+                            widget::toggler(visible)
+                                .on_toggle(move |value| Message::TogglePanelItemVisibility(id, value)),
                         );
                     row = row.push(icon_action_button(
                         "+",
@@ -4804,6 +4845,15 @@ impl cosmic::Application for AppModel {
             Message::ToggleMenuElementVisibility(element, visible) => {
                 self.settings.hidden_menu_elements.retain(|hidden| hidden != element);
                 if !visible { self.settings.hidden_menu_elements.push(element.to_string()); }
+                self.persist_settings();
+            }
+            Message::TogglePanelItemVisibility(item, visible) => {
+                self.settings
+                    .hidden_panel_items
+                    .retain(|hidden| hidden != item);
+                if !visible {
+                    self.settings.hidden_panel_items.push(item.to_string());
+                }
                 self.persist_settings();
             }
             Message::MovePanelItem(item, move_up) => {
