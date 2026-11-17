@@ -2255,9 +2255,12 @@ impl cosmic::Application for AppModel {
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>,
                           icon_at_top: bool| {
-            // A split number/unit value needs two text lines. The previous
-            // fixed 24px item height clipped those lines in multiline mode.
-            let item_height = if icon_at_top { 28.0 } else { 24.0 };
+            let line_height = (panel_text_size * 0.85).max(1.0);
+            let item_height = if icon_at_top {
+                (line_height * 2.0).max(24.0)
+            } else {
+                24.0
+            };
             let mut item = widget::Row::new()
                 .width(cosmic::iced::Length::Shrink)
                 .spacing(5)
@@ -2267,26 +2270,28 @@ impl cosmic::Application for AppModel {
                     cosmic::iced::Alignment::Center
                 });
             if let Some(icon) = icon {
-                // Keep the icon beside the first line when a value wraps.
+                // In two-line mode, center the icon on the first text line;
+                // in single-line mode, center it on the value itself.
+                let icon_height = if icon_at_top {
+                    line_height
+                } else {
+                    item_height
+                };
                 let icon_column = widget::container(icon)
                     .width(cosmic::iced::Length::Fixed(16.0))
-                    .height(cosmic::iced::Length::Fixed(if icon_at_top {
-                        18.0
-                    } else {
-                        item_height
-                    }))
-                    .center_x(16);
-                item = item.push(if icon_at_top {
-                    icon_column
-                } else {
-                    icon_column.center_y(item_height as u16)
-                });
+                    .height(cosmic::iced::Length::Fixed(icon_height))
+                    .center_x(16)
+                    .center_y(icon_height as u16);
+                item = item.push(icon_column);
             }
             // Keep the value shrink-wrapped so it cannot consume the space
-            // needed by subsequent readings.
-            let value = widget::container(value)
-                .width(cosmic::iced::Length::Shrink)
-                .align_bottom(item_height as u16);
+            // needed by subsequent readings. Multiline values start at the
+            // same top edge as their icon; single-line values are centered.
+            let mut value = widget::container(value)
+                .width(cosmic::iced::Length::Shrink);
+            if !icon_at_top {
+                value = value.center_y(item_height as u16);
+            }
             item = item.height(cosmic::iced::Length::Fixed(item_height));
             self.core.applet.applet_tooltip(
                 item.push(value),

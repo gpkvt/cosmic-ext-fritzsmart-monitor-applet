@@ -1,5 +1,11 @@
 # Changelog
 
+## [17.11.2026]
+
+### Fixed
+
+- Vertically aligned panel icons with their corresponding values; in two-line mode, icons now align with the first text line while single-line values remain vertically centered.
+
 All notable changes to FRITZ!Power Monitor are documented here.
 
 Changes are tracked in date-based entries. See the [GitHub Releases](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases) for published versions.
