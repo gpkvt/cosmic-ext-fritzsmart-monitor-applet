@@ -72,7 +72,7 @@ jobs:
           test -s dist/SHA256SUMS
           dpkg-deb --info "$deb"
           file "$appimage"
-          sha256sum --check dist/SHA256SUMS
+          (cd dist && sha256sum --check SHA256SUMS)
 
       - name: Upload packages
         uses: actions/upload-artifact@v7
