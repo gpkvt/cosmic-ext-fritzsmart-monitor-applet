@@ -40,18 +40,18 @@ def render(source: Path, destination: Path, title: str) -> None:
     )
     nav = (
         '<a class="brand" href="index.html"><img src="logo.svg" alt="">'
-        'FRITZ!Power Monitor</a><nav class="nav-links" aria-label="Main navigation">'
-        '<a href="index.html">Overview</a><a href="guide.html">User guide</a>'
-        '<a href="readme.html">README</a><a href="security.html">Security</a>'
+        'FRITZ!Power Monitor</a><nav class="nav-links" aria-label="Hauptnavigation">'
+        '<a href="index.html">Übersicht</a><a href="guide.html">Benutzerhandbuch</a>'
+        '<a href="readme.html">README</a><a href="security.html">Sicherheit</a>'
         '</nav>'
     )
     page = f"""<!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#10131a">
-<meta name="description" content="{escape(title)} — FRITZ!Power Monitor documentation.">
+<meta name="description" content="{escape(title)} — Dokumentation zu FRITZ!Power Monitor.">
 <title>{escape(title)} — FRITZ!Power Monitor</title>
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <style>{STYLE}</style>
@@ -59,7 +59,7 @@ def render(source: Path, destination: Path, title: str) -> None:
 <body>
 <header class="topbar"><div class="wrap nav">{nav}</div></header>
 <main class="wrap"><article><h1>{escape(title)}</h1>{body}
-<div class="page-foot"><a href="index.html">← Back to project overview</a></div>
+<div class="page-foot"><a href="index.html">← Zurück zur Projektübersicht</a></div>
 </article></main>
 </body>
 </html>
@@ -103,16 +103,21 @@ def main() -> None:
     print("Copied LICENSE -> docs/LICENSE")
 
     sources = {
-        ROOT / "README.md": DOCS / "readme.html",
-        ROOT / "SECURITY.md": DOCS / "security.html",
+        DOCS / "readme.de.md": DOCS / "readme.html",
+        DOCS / "security.de.md": DOCS / "security.html",
     }
     for source in sorted(DOCS.rglob("*.md")):
+        if source in sources:
+            continue
         relative = source.relative_to(DOCS)
         sources[source] = (DOCS / relative).with_suffix(".html")
 
     for source, destination in sources.items():
         default_title = source.stem.replace("-", " ").replace("_", " ").title()
-        title = {ROOT / "README.md": "Cosmic FRITZ!Power Monitor Applet", ROOT / "SECURITY.md": "Security Policy"}.get(source, default_title)
+        title = {
+            DOCS / "readme.de.md": "COSMIC-FRITZ!Power-Monitor-Applet",
+            DOCS / "security.de.md": "Sicherheitsrichtlinie",
+        }.get(source, default_title)
         render(source, destination, title)
         print(f"Rendered {source.relative_to(ROOT)} -> {destination.relative_to(ROOT)}")
 
