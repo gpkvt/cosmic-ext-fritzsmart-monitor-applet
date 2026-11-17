@@ -2268,7 +2268,6 @@ impl cosmic::Application for AppModel {
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>,
                           icon_at_top: bool| {
-            let line_height = (panel_text_size * 0.65).max(1.0);
             let item_height = if icon_at_top {
                 // The unpaired two-line item gets a deliberately prominent icon.
                 // Reserve enough height for the full 28 px glyph instead of clipping it.
