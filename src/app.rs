@@ -2741,6 +2741,11 @@ impl cosmic::Application for AppModel {
 
         // The applet popup keeps its compact layout; expanded graphs use the
         // dedicated native window above.
+        let has_input_device = self.readings.iter().any(|reading| {
+            self.settings
+                .input_ains
+                .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+        });
         let mut content = widget::Column::new()
             .spacing(10)
             .padding(12)
@@ -3041,7 +3046,9 @@ impl cosmic::Application for AppModel {
                                 .padding([8, 10]),
                             ),
                     )
-                    .push(
+                    ;
+                if has_input_device {
+                    content = content.push(
                         widget::Row::new()
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(
@@ -3061,7 +3068,8 @@ impl cosmic::Application for AppModel {
                                 )
                                 .padding([8, 10]),
                             ),
-                    )
+                    );
+                }
                     .push(
                         widget::Row::new()
                             .align_y(cosmic::iced::Alignment::Center)
@@ -3082,7 +3090,7 @@ impl cosmic::Application for AppModel {
                                 .padding([8, 10]),
                             ),
                     );
-                if self.settings.panel_average_temperature {
+                if self.settings.panel_average_temperature && has_input_device {
                     content = content.push(
                         widget::Row::new()
                             .align_y(cosmic::iced::Alignment::Center)
@@ -3321,6 +3329,9 @@ impl cosmic::Application for AppModel {
                         "Reorder readings and choose which ones appear in the panel. Changes are saved automatically.",
                     ));
                 for (index, item) in self.settings.panel_order.iter().enumerate() {
+                    if item == "solar-power" && !has_input_device {
+                        continue;
+                    }
                     let id = match item.as_str() {
                         "weather" => "weather",
                         "power-consumption" => "power-consumption",
