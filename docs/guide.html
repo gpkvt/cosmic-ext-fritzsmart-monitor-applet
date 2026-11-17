@@ -8,18 +8,21 @@
   <title>Benutzerhandbuch — FRITZ!Power Monitor</title>
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <style>
-    :root{color-scheme:dark;--bg:#0b0e14;--surface:#121722;--surface2:#171e2b;--text:#f2f5fa;--muted:#a2adbd;--soft:#748195;--line:#293344;--mint:#8be0c4;--max:1040px}
-    *{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:90px}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.75 system-ui,sans-serif}
-    a{color:var(--mint);text-underline-offset:3px}.wrap{width:min(var(--max),calc(100% - 40px));margin:auto}
-    .topbar{position:sticky;top:0;z-index:5;border-bottom:1px solid #ffffff18;background:#0b0e14ed;backdrop-filter:blur(16px)}.nav{height:68px;display:flex;align-items:center;justify-content:space-between;gap:20px}.brand{display:flex;align-items:center;gap:10px;color:var(--text);font-weight:800;text-decoration:none}.brand img{width:32px;height:32px}.nav a:last-child{font-size:14px}
+    :root{color-scheme:light;--bg:#f4f5f8;--surface:#fff;--surface2:#f8f9fc;--text:#242432;--muted:#5e6271;--soft:#7d8190;--line:#dfe2ea;--mint:#6857d9;--max:1040px}
+    *{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:90px}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.75 system-ui,sans-serif}body:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 75% 0%,#dedbff88,transparent 34rem)}
+    a{color:var(--mint);text-underline-offset:3px}p,li{color:#505667}code{background:#e9eaf0;color:#413d65}pre{background:#202333;color:#f0f1f7;border-color:#dfe2ea}.note{background:#6857d90c}.wrap{width:min(var(--max),calc(100% - 40px));margin:auto}
+    .topbar{position:sticky;top:0;z-index:5;border-bottom:1px solid #dfe2ea;background:#f4f5f8ed;backdrop-filter:blur(16px)}.nav{height:68px;display:flex;align-items:center;justify-content:space-between;gap:20px}.brand{display:flex;align-items:center;gap:10px;color:var(--text);font-weight:800;text-decoration:none}.brand img{width:32px;height:32px}.nav a:last-child{font-size:14px}
     main{padding:64px 0 100px}.eyebrow{color:var(--mint);font:12px monospace;letter-spacing:.14em;text-transform:uppercase}.intro{max-width:760px;margin-bottom:48px}.intro h1{font-size:clamp(38px,6vw,64px);line-height:1.05;letter-spacing:-.06em;margin:16px 0}.intro p{font-size:18px;color:var(--muted)}
     .layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:56px;align-items:start}.toc{position:sticky;top:92px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}.toc strong{display:block;margin-bottom:10px}.toc a{display:block;padding:5px 9px;border-left:2px solid transparent;border-radius:0 6px 6px 0;color:var(--muted);font-size:13px;text-decoration:none;transition:color .18s ease,background .18s ease,border-color .18s ease}.toc a:hover{color:var(--mint)}.toc a[aria-current="location"]{border-left-color:var(--mint);background:#8be0c414;color:var(--mint);font-weight:650}
     article section{padding:0 0 34px;margin:0 0 36px;border-bottom:1px solid var(--line);scroll-margin-top:100px}h2{font-size:27px;letter-spacing:-.04em;margin:0 0 14px}h3{font-size:18px;margin:25px 0 8px}p,li{color:#c5ceda}ul,ol{padding-left:23px}li{margin:7px 0}code{padding:2px 6px;border-radius:5px;background:#ffffff12;color:#d7e8e2;font:.9em monospace}pre{overflow:auto;padding:18px;border:1px solid var(--line);border-radius:12px;background:#080c12;color:#d7e8e2;line-height:1.6}pre code{padding:0;background:none}.note{padding:14px 17px;border-left:3px solid var(--mint);border-radius:0 10px 10px 0;background:#8be0c40d;color:var(--muted)}.back{display:inline-block;margin-top:18px;color:var(--mint)}
     @media(max-width:760px){.layout{grid-template-columns:1fr;gap:28px}.toc{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 14px}.toc strong{grid-column:1/-1}.nav{height:60px}}
+    .site-controls{display:flex;align-items:center;gap:8px}.site-controls select{min-height:34px;padding:5px 26px 5px 9px;border:1px solid #d9dbe5;border-radius:9px;background:#fff;color:#343548;font:600 12px system-ui;cursor:pointer}.site-controls select:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+    html[data-theme="dark"]{color-scheme:dark;--bg:#11131b;--surface:#191c27;--surface2:#202432;--text:#f0f1f7;--muted:#b3b7c6;--soft:#8b90a2;--line:#303546;--mint:#b4a7ff}
+    html[data-theme="dark"] body{background:var(--bg);color:var(--text)}html[data-theme="dark"] .topbar{background:#11131bed;border-color:#303546}html[data-theme="dark"] p,html[data-theme="dark"] li{color:#c5ceda}html[data-theme="dark"] code{background:#ffffff12;color:#d7e8e2}html[data-theme="dark"] pre{background:#080c12;color:#d7e8e2;border-color:var(--line)}html[data-theme="dark"] .note{background:#b4a7ff12}html[data-theme="dark"] .site-controls select{background:#1b1f2b;border-color:#41465a;color:#f0f1f7}
   </style>
 </head>
 <body>
-<header class="topbar"><div class="wrap nav"><a class="brand" href="index.html"><img src="logo.svg" alt="">FRITZ!Power Monitor</a><nav style="display:flex;gap:16px;flex-wrap:wrap"><a href="index.html">← Projektübersicht</a><a href="readme.html">README</a><a href="security.html">Sicherheit</a></nav></div></header>
+<header class="topbar"><div class="wrap nav"><a class="brand" href="index.html"><img src="logo.svg" alt="">FRITZ!Power Monitor</a><nav style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><a href="index.html">← Projektübersicht</a><a href="readme.html">README</a><a href="security.html">Sicherheit</a><span class="site-controls"><select id="theme-picker" aria-label="Darstellung"><option value="light">Hell</option><option value="dark">Dunkel</option><option value="system">System</option></select><select id="language-picker" aria-label="Sprache"><option value="de">Deutsch</option><option value="en">English</option></select></span></nav></div></header>
 <main class="wrap">
   <div class="intro"><div class="eyebrow">Benutzerdokumentation</div><h1>Behalte deinen Energieverbrauch im Blick.</h1><p>Installiere FRITZ!Power Monitor, verbinde das Applet mit deiner FRITZ!Box, wähle die zu überwachenden Geräte aus und passe die Anzeige an deinen COSMIC-Desktop an.</p></div>
   <div class="layout">
@@ -44,6 +47,18 @@ cargo build --release</code></pre><p>Alle Paketvoraussetzungen und Optionen steh
   </div>
   <a class="back" href="index.html">← Zurück zur Projektübersicht</a>
 </main>
+<script>
+(()=>{
+ const root=document.documentElement,theme=document.getElementById('theme-picker'),language=document.getElementById('language-picker');
+ const applyTheme=value=>{root.dataset.theme=value==='system'?(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'):value;theme.value=value};
+ applyTheme(localStorage.getItem('fritz-power-monitor-theme')||'light');
+ theme.addEventListener('change',()=>{localStorage.setItem('fritz-power-monitor-theme',theme.value);applyTheme(theme.value)});
+ matchMedia('(prefers-color-scheme:dark)').addEventListener?.('change',()=>{if(theme.value==='system')applyTheme('system')});
+ const labels={en:{back:'← Project overview',readme:'README',security:'Security',eyebrow:'User documentation',title:'Keep your energy use in view.',intro:'Install FRITZ!Power Monitor, connect the applet to your FRITZ!Box, choose the devices to monitor and tailor the display to your COSMIC desktop.',toc:'On this page',sections:['Requirements','Installation','First launch','Router connection','Devices and power','Panel and menu','Weather','Temperature alerts','Graphs and history','Security and privacy','Troubleshooting']}};
+ const applyLanguage=lang=>{root.lang=lang;language.value=lang;const en=lang==='en';const nav=document.querySelector('.nav nav');if(nav){nav.children[0].textContent=en?labels.en.back:'← Projektübersicht';nav.children[2].textContent=en?labels.en.security:'Sicherheit';}const intro=document.querySelector('.intro');if(intro&&en){intro.querySelector('.eyebrow').textContent=labels.en.eyebrow;intro.querySelector('h1').textContent=labels.en.title;intro.querySelector('p').textContent=labels.en.intro;}const toc=document.querySelector('.toc');if(toc&&en){toc.querySelector('strong').textContent=labels.en.toc;toc.querySelectorAll('a').forEach((a,i)=>a.textContent=labels.en.sections[i]||a.textContent);}localStorage.setItem('fritz-power-monitor-language',lang);};
+ applyLanguage(localStorage.getItem('fritz-power-monitor-language')||'de');language.addEventListener('change',()=>applyLanguage(language.value));
+})();
+</script>
 <script>
 const tocLinks=[...document.querySelectorAll('.toc a[href^="#"]')];
 const tocSections=tocLinks.map(link=>document.getElementById(decodeURIComponent(link.hash.slice(1)))).filter(Boolean);

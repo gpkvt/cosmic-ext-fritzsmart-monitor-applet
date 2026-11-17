@@ -108,7 +108,7 @@
     }
   
     /* 2026 visual refresh: a calmer, COSMIC-inspired editorial layout. */
-    :root{color-scheme:light dark;--bg:#f4f5f8;--surface:#fff;--surface2:#f8f9fc;--surface3:#eceef4;--text:#20212b;--muted:#5e6271;--soft:#7d8190;--line:#dfe2ea;--mint:#6857d9;--blue:#5278c9;--amber:#a66b19;--violet:#8064c8;--max:1200px;--radius:22px}
+    :root{color-scheme:light;--bg:#f4f5f8;--surface:#fff;--surface2:#f8f9fc;--surface3:#eceef4;--text:#20212b;--muted:#5e6271;--soft:#7d8190;--line:#dfe2ea;--mint:#6857d9;--blue:#5278c9;--amber:#a66b19;--violet:#8064c8;--max:1200px;--radius:22px}
     html{scroll-padding-top:84px}
     body{background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;line-height:1.65}
     body:before{z-index:0;opacity:.75;background:radial-gradient(ellipse at 76% 4%,#dcd8ff99,transparent 36rem),radial-gradient(ellipse at 4% 34%,#dce9f799,transparent 38rem)}
@@ -203,34 +203,74 @@
     .detail.reveal.visible{opacity:1!important;transform:translateY(0)!important}
     @media(max-width:900px){.navlinks{gap:13px}.hero{grid-template-columns:1fr;gap:22px;padding-top:58px}.hero-copy{max-width:680px}.hero-gallery{max-width:760px;width:100%;margin:0 auto;min-height:310px}.hero-shot{min-height:245px}.hero-shot img{height:145px!important}.showcase,.showcase:nth-of-type(even){grid-template-columns:1fr;gap:28px}.showcase:nth-of-type(even) .showcase-copy{order:0}.install-band{grid-template-columns:1fr;gap:28px}}
     @media(max-width:650px){.wrap{width:min(var(--max),calc(100% - 34px))}.nav{height:auto;min-height:66px;align-items:flex-start;padding:13px 0;flex-direction:column;gap:9px}.navlinks{width:100%;gap:8px 16px;flex-wrap:wrap;font-size:11px}.nav-cta{padding:5px 10px}.hero{padding:48px 0 52px;min-height:0}.hero h1{font-size:clamp(48px,14vw,66px)}.hero-copy{font-size:16px}.hero-gallery{gap:7px;min-height:0;padding:8px 0 22px}.hero-shot{min-height:190px;padding:6px;border-radius:12px}.hero-shot:nth-child(2){margin-top:20px}.hero-shot:nth-child(3){margin-top:40px}.hero-shot img{height:105px!important}.hero-card-title{font-size:10px;padding-top:8px}.hero-card-type{font-size:7px}.hero-card-description{font-size:8px;-webkit-line-clamp:2}.hero-meta{gap:10px;font-size:9px}section{padding:64px 0}.section-head{margin-bottom:28px}.section-head h2{font-size:36px}.section-head p{font-size:14px}.feature-grid{grid-template-columns:1fr 1fr;gap:10px}.feature{min-height:0;padding:17px}.feature h3{font-size:14px;margin-top:13px}.feature p{font-size:12px}.feature-icon{width:36px;height:36px}.details-grid,.steps{grid-template-columns:1fr}.detail{padding:20px}.install-band{padding:24px;border-radius:18px}.install-band h2{font-size:35px}.terminal pre{font-size:10px;padding:13px}.screenshot-dialog{width:96vw;max-width:96vw;padding:14px!important;border-radius:16px!important}.gallery-viewer{grid-template-columns:32px minmax(0,1fr) 32px;gap:5px}.gallery-control{width:30px;height:36px;font-size:20px}.gallery-stage img{height:58vh}.gallery-dialog-foot{font-size:10px}.footer-inner{align-items:flex-start}.footer-links{gap:10px 14px}}
-    @media(prefers-color-scheme:dark){
-      :root{color-scheme:dark;--bg:#11131b;--surface:#191c27;--surface2:#202432;--surface3:#292e3e;--text:#f0f1f7;--muted:#b3b7c6;--soft:#8b90a2;--line:#303546;--mint:#a99afc;--blue:#9bb8fa;--amber:#edc17d;--violet:#c4adff}
-      body{background:#11131b;color:#f0f1f7}body:before{opacity:.7;background:radial-gradient(ellipse at 76% 4%,#51458a55,transparent 36rem),radial-gradient(ellipse at 4% 34%,#294d6655,transparent 38rem)}
-      .topbar{background:#11131beF;border-color:#ffffff18}.brand,.footer-brand{color:#f0f1f7}.navlinks{color:#b0b4c3}.nav-cta{color:#b6aaff;border-color:#a99afc66}
-      .hero h1 span,.eyebrow{color:#b2a5ff}.hero-copy,.section-head p,.feature p,.showcase p,.checklist li,.detail p,.faq p,.final-cta p{color:#b1b5c4}
-      .btn{background:#7867df;color:#fff}.btn:hover{background:#8979ee;color:#fff}.btn.secondary{background:#ffffff09;border-color:#41465a;color:#f0f1f7}
-      .hero-shot,.feature,.step,.detail{background:#1b1f2b;border-color:#34394b;box-shadow:0 8px 25px #0003}
-      .hero-shot img{background:#111520}.hero-card-title,.feature h3,.step h3,.detail h3,.faq summary,.section-head h2,.showcase h3,.install-band h2,.final-cta h2{color:#f0f1f7}
-      .hero-card-type,.hero-card-description{color:#aeb3c4}.feature-icon,.detail-icon{background:#2b2745;border-color:#49416f;color:#b4a7ff}
-      .trustline{background:#171a24;border-color:#303546}.trust-inner{color:#9da2b4}
-      section{border-color:#303546}.install-band{background:linear-gradient(125deg,#292442,#202432 60%,#1c3039);border-color:#4a426b}
-      .terminal{background:#0b0d14}.terminal-head{color:#aeb3c4}.terminal pre{color:#e1e4ef}
-      .shot{background:linear-gradient(145deg,#292f40,#181b27);border-color:#3b4154}
-      .package-command{background:#10131c;border-color:#34394b}.package-command code{color:#e0e3ed}
-      .faq details{border-color:#303546}.faq summary:after{color:#b4a7ff}
-      footer{background:#0d0f16;color:#969bad}.legal-notice{color:#9297a9}.legal-notice a{color:#b4b8c8}
-      .detail-icon img{filter:brightness(0) invert(1)}
-      .dot{background:#55cda5;box-shadow:0 0 0 4px #55cda520}
-    }
+    /* Explicit dark theme; light is the default regardless of OS preference. */
+html[data-theme="dark"]{color-scheme:dark;--bg:#11131b;--surface:#191c27;--surface2:#202432;--surface3:#292e3e;--text:#f0f1f7;--muted:#b3b7c6;--soft:#8b90a2;--line:#303546;--mint:#a99afc;--blue:#9bb8fa;--amber:#edc17d;--violet:#c4adff}
+html[data-theme="dark"] body{background:#11131b;color:#f0f1f7}
+html[data-theme="dark"] body:before{opacity:.7;background:radial-gradient(ellipse at 76% 4%,#51458a55,transparent 36rem),radial-gradient(ellipse at 4% 34%,#294d6655,transparent 38rem)}
+html[data-theme="dark"] .topbar{background:#11131beF;border-color:#ffffff18}
+html[data-theme="dark"] .brand,
+html[data-theme="dark"] .footer-brand{color:#f0f1f7}
+html[data-theme="dark"] .navlinks{color:#b0b4c3}
+html[data-theme="dark"] .nav-cta{color:#b6aaff;border-color:#a99afc66}
+html[data-theme="dark"] .hero h1 span,
+html[data-theme="dark"] .eyebrow{color:#b2a5ff}
+html[data-theme="dark"] .hero-copy,
+html[data-theme="dark"] .section-head p,
+html[data-theme="dark"] .feature p,
+html[data-theme="dark"] .showcase p,
+html[data-theme="dark"] .checklist li,
+html[data-theme="dark"] .detail p,
+html[data-theme="dark"] .faq p,
+html[data-theme="dark"] .final-cta p{color:#b1b5c4}
+html[data-theme="dark"] .btn{background:#7867df;color:#fff}
+html[data-theme="dark"] .btn:hover{background:#8979ee;color:#fff}
+html[data-theme="dark"] .btn.secondary{background:#ffffff09;border-color:#41465a;color:#f0f1f7}
+html[data-theme="dark"] .hero-shot,
+html[data-theme="dark"] .feature,
+html[data-theme="dark"] .step,
+html[data-theme="dark"] .detail{background:#1b1f2b;border-color:#34394b;box-shadow:0 8px 25px #0003}
+html[data-theme="dark"] .hero-shot img{background:#111520}
+html[data-theme="dark"] .hero-card-title,
+html[data-theme="dark"] .feature h3,
+html[data-theme="dark"] .step h3,
+html[data-theme="dark"] .detail h3,
+html[data-theme="dark"] .faq summary,
+html[data-theme="dark"] .section-head h2,
+html[data-theme="dark"] .showcase h3,
+html[data-theme="dark"] .install-band h2,
+html[data-theme="dark"] .final-cta h2{color:#f0f1f7}
+html[data-theme="dark"] .hero-card-type,
+html[data-theme="dark"] .hero-card-description{color:#aeb3c4}
+html[data-theme="dark"] .feature-icon,
+html[data-theme="dark"] .detail-icon{background:#2b2745;border-color:#49416f;color:#b4a7ff}
+html[data-theme="dark"] .trustline{background:#171a24;border-color:#303546}
+html[data-theme="dark"] .trust-inner{color:#9da2b4}
+html[data-theme="dark"] section{border-color:#303546}
+html[data-theme="dark"] .install-band{background:linear-gradient(125deg,#292442,#202432 60%,#1c3039);border-color:#4a426b}
+html[data-theme="dark"] .terminal{background:#0b0d14}
+html[data-theme="dark"] .terminal-head{color:#aeb3c4}
+html[data-theme="dark"] .terminal pre{color:#e1e4ef}
+html[data-theme="dark"] .shot{background:linear-gradient(145deg,#292f40,#181b27);border-color:#3b4154}
+html[data-theme="dark"] .package-command{background:#10131c;border-color:#34394b}
+html[data-theme="dark"] .package-command code{color:#e0e3ed}
+html[data-theme="dark"] .faq details{border-color:#303546}
+html[data-theme="dark"] .faq summary:after{color:#b4a7ff}
+html[data-theme="dark"] footer{background:#0d0f16;color:#969bad}
+html[data-theme="dark"] .legal-notice{color:#9297a9}
+html[data-theme="dark"] .legal-notice a{color:#b4b8c8}
+html[data-theme="dark"] .detail-icon img{filter:brightness(0) invert(1)}
+html[data-theme="dark"] .dot{background:#55cda5;box-shadow:0 0 0 4px #55cda520}
+
     @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.reveal,.hero-shot,.feature,.btn{transition:none!important;animation:none!important}.reveal{opacity:1;transform:none}}
 
+  .site-controls{display:flex;align-items:center;gap:8px;margin-left:8px}.site-controls label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.site-controls select{min-height:36px;padding:6px 28px 6px 10px;border:1px solid #d9dbe5;border-radius:10px;background:#fff;color:#343548;font:600 12px system-ui;cursor:pointer}.site-controls select:focus-visible{outline:2px solid var(--mint);outline-offset:2px}html[data-theme="dark"] .site-controls select{background:#1b1f2b;border-color:#41465a;color:#f0f1f7}@media(max-width:650px){.site-controls{margin:0}.site-controls select{min-height:32px}}
   </style>
 </head>
 <body>
   <div id="scroll-progress" aria-hidden="true"></div>
   <div class="topbar"><div class="wrap nav">
     <a class="brand" href="#top"><img src="logo.svg" alt=""><span>FRITZ!Power Monitor</span></a>
-    <nav class="navlinks" aria-label="Hauptnavigation"><a href="#features">Funktionen</a><a href="#tour">Galerie</a><a href="guide.html">Dokumentation</a><a href="#install">Installieren</a><a href="#downloads">Downloads</a><a href="#compatibility">Kompatibilität</a><a href="#faq">FAQ</a><a class="nav-cta" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet">GitHub ↗</a></nav>
+    <nav class="navlinks" aria-label="Hauptnavigation"><a href="#features">Funktionen</a><a href="#tour">Galerie</a><a href="guide.html">Dokumentation</a><a href="#install">Installieren</a><a href="#downloads">Downloads</a><a href="#compatibility">Kompatibilität</a><a href="#faq">FAQ</a><a class="nav-cta" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet">GitHub ↗</a><span class="site-controls"><label for="theme-picker">Darstellung</label><select id="theme-picker" aria-label="Darstellung"><option value="light">Hell</option><option value="dark">Dunkel</option><option value="system">System</option></select><label for="language-picker">Sprache</label><select id="language-picker" aria-label="Sprache"><option value="de">Deutsch</option><option value="en">English</option></select></span></nav>
   </div></div>
   <main id="top">
     <div class="wrap hero">
@@ -361,6 +401,84 @@
   <footer><div class="wrap footer-inner"><a class="footer-brand" href="#top"><img src="logo.svg" alt="">FRITZ!Power Monitor</a><span>Open Source unter MIT-Lizenz.</span><div class="footer-links"><a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet">Quellcode</a><a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues">Probleme</a><a href="guide.html">Benutzerhandbuch</a><a href="readme.html">README</a><a href="security.html">Sicherheit</a><a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases">Releases</a><a href="#top">Nach oben ↑</a></div></div>
   <div class="wrap legal-notice"><p><strong>Unabhängiges Projekt; nicht mit FRITZ! verbunden und nicht von FRITZ! unterstützt.</strong> FRITZ!Power Monitor ist ein unabhängiges, gemeinschaftlich entwickeltes Projekt. Es ist nicht mit der FRITZ! GmbH (ehemals AVM GmbH) oder deren Tochtergesellschaften verbunden und wird von diesen weder gesponsert noch autorisiert oder unterstützt. AVM, FRITZ! und FRITZ!Box sind Marken oder eingetragene Marken der FRITZ! GmbH und werden hier ausschließlich zur Kennzeichnung kompatibler Produkte verwendet. Alle Marken verbleiben im Eigentum ihrer jeweiligen Inhaber. Siehe die <a href="https://fritz.com/en/policies/legal-notice" target="_blank" rel="noopener">offiziellen FRITZ!-Rechtshinweise</a>.</p></div>
 </footer>
+  <script>
+(()=>{
+ const root=document.documentElement;
+ const themePicker=document.getElementById('theme-picker');
+ const languagePicker=document.getElementById('language-picker');
+ const savedTheme=localStorage.getItem('fritz-power-monitor-theme')||'light';
+ const applyTheme=value=>{const resolved=value==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):value;root.dataset.theme=resolved;if(themePicker)themePicker.value=value;};
+ applyTheme(savedTheme);
+ themePicker?.addEventListener('change',()=>{localStorage.setItem('fritz-power-monitor-theme',themePicker.value);applyTheme(themePicker.value)});
+ matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>{if(themePicker?.value==='system')applyTheme('system')});
+ const translations={
+  en:{
+   'nav:1':'Features','nav:2':'Gallery','nav:3':'Guide','nav:4':'Install','nav:5':'Downloads','nav:6':'Compatibility','nav:7':'FAQ',
+   'hero:kicker':'A native COSMIC desktop applet','hero:title':'Energy at a glance.<br>Right on your<br><span>COSMIC desktop.</span>',
+   'hero:copy':'See your household power readings, device temperatures and optional weather directly in your desktop panel. Clear live values, useful history and no cloud account required for core monitoring.',
+   'hero:install':'Install applet ↗','hero:discover':'Explore the interface ↓',
+   'features:kicker':'At a glance','features:title':'Everything that matters.<br>Without the clutter.','features:copy':'A compact panel display for a quick check. A clear menu for details, with independently collapsible sections that keep key live values visible.',
+   'feature:1':'Live power in the panel','feature:1p':'Shows current wattage and temperature directly in the COSMIC panel, with adjustable text size and optional average temperature.',
+   'feature:2':'Input, output and difference','feature:2p':'Track input and output power as separate totals, plus the net difference in its own view. Individual device readings remain available.',
+   'feature:3':'History at a glance','feature:3p':'Power and temperature history for each selected device, plus net and input history over a configurable period.',
+   'feature:4':'Device control','feature:4p':'Discover compatible devices, select and arrange them, inspect details and control supported FRITZ!Box switches.',
+   'feature:5':'Temperature alerts','feature:5p':'Optional desktop notifications when a device leaves its configured temperature range. Alerts re-arm when it returns to range.',
+   'feature:6':'Weather, if you want it','feature:6p':'Optional OpenWeatherMap conditions and temperature in the panel, with a detailed weather card and independent refresh interval.',
+   'tour:kicker':'A closer look','tour:title':'The applet in real use.','tour:copy':'Real screenshots captured on the COSMIC desktop — no mock-ups. Open the gallery to explore all ten views.',
+   'tour:button':'View all screenshots ↗','install:kicker':'Getting started','install:title':'Keep your household energy use in view.','install:copy':'Install the applet from source with a few commands. No root privileges are needed for a user-local installation.',
+   'install:steps':'Ready in three steps.','install:stepscopy':'Add the installed applet to your panel and connect it to your router.',
+   'step:1':'Add to the panel','step:1p':'Open COSMIC Settings, find the panel applets list and add FRITZ!Power Monitor. Reopen Settings or sign out and back in if the list has not refreshed.',
+   'step:2':'Connect your router','step:2p':'Open the applet settings, enter the FRITZ!Box URL and an account with Smart Home access, then choose Load devices.',
+   'step:3':'Choose what to monitor','step:3p':'Select compatible devices, set their order and decide whether a device should count as an input.',
+   'downloads:kicker':'Ready to install','downloads:title':'Choose your Linux package.','downloads:copy':'Download the package that matches your preferred installation method. Links point directly to the published release.',
+   'details:kicker':'Made for real homes','details:title':'Thoughtful details.<br>Practical safeguards.','details:copy':'Monitoring should be reliable, transparent and configurable. Here are some important technical details to know before installing.',
+   'compat:kicker':'Before installing','compat:title':'Check compatibility first.','compat:copy':'FRITZ!Power Monitor is built for the COSMIC desktop and reads the values exposed by your FRITZ!Box Smart Home devices.',
+   'faq:kicker':'Good to know','faq:title':'Frequently asked questions.','faq:copy':'Quick answers about compatibility, data and how the applet works.',
+   'cta:kicker':'Open source · MIT licensed','cta:title':'Make your energy use visible.','cta:copy':'Explore the source, follow development or install FRITZ!Power Monitor on your COSMIC desktop.',
+   'footer:license':'Open source under the MIT license.','footer:source':'Source code','footer:issues':'Issues','footer:guide':'User guide','footer:readme':'README','footer:security':'Security','footer:releases':'Releases','footer:top':'Back to top ↑',
+   'gallery:title':'FRITZ!Power Monitor — Screenshots','gallery:close':'Close screenshot gallery','gallery:prev':'Previous screenshot','gallery:next':'Next screenshot'
+  }
+ };
+ const selectorMap={
+  'nav:1':'.navlinks>a:nth-child(1)','nav:2':'.navlinks>a:nth-child(2)','nav:3':'.navlinks>a:nth-child(3)','nav:4':'.navlinks>a:nth-child(4)','nav:5':'.navlinks>a:nth-child(5)','nav:6':'.navlinks>a:nth-child(6)','nav:7':'.navlinks>a:nth-child(7)',
+  'hero:kicker':'.hero .eyebrow','hero:title':'.hero h1','hero:copy':'.hero-copy','hero:install':'.hero .actions .btn:first-child','hero:discover':'.hero .actions .btn.secondary',
+  'features:kicker':'#features .section-head .eyebrow','features:title':'#features .section-head h2','features:copy':'#features .section-head p',
+  'tour:kicker':'#tour .section-head .eyebrow','tour:title':'#tour .section-head h2','tour:copy':'#tour .section-head p','tour:button':'#tour [data-open-gallery]',
+  'install:kicker':'#install .install-band .eyebrow','install:title':'#install .install-band h2','install:copy':'#install .install-band .muted','install:steps':'#install .section-head h2','install:stepscopy':'#install .section-head p',
+  'downloads:kicker':'#downloads .section-head .eyebrow','downloads:title':'#downloads .section-head h2','downloads:copy':'#downloads .section-head p',
+  'details:kicker':'#details .section-head .eyebrow','details:title':'#details .section-head h2','details:copy':'#details .section-head p',
+  'compat:kicker':'#compatibility .section-head .eyebrow','compat:title':'#compatibility .section-head h2','compat:copy':'#compatibility .section-head p',
+  'faq:kicker':'#faq .section-head .eyebrow','faq:title':'#faq .section-head h2','faq:copy':'#faq .section-head p',
+  'cta:kicker':'.final-cta .eyebrow','cta:title':'.final-cta h2','cta:copy':'.final-cta p'
+ };
+ const featureTexts=[
+  ['feature:1','feature:1p'],['feature:2','feature:2p'],['feature:3','feature:3p'],['feature:4','feature:4p'],['feature:5','feature:5p'],['feature:6','feature:6p']
+ ];
+ const featureCards=[...document.querySelectorAll('.feature-grid .feature')];
+ const stepTexts=[['step:1','step:1p'],['step:2','step:2p'],['step:3','step:3p']];
+ const stepCards=[...document.querySelectorAll('#install .steps .step')];
+ const applyLanguage=lang=>{
+  root.lang=lang;
+  if(languagePicker)languagePicker.value=lang;
+  const english=lang==='en',dict=translations.en;
+  Object.entries(selectorMap).forEach(([key,selector])=>{const el=document.querySelector(selector);if(el&&english&&dict[key])el.innerHTML=dict[key];});
+  featureCards.forEach((card,i)=>{if(!english)return;const [h,p]=featureTexts[i];card.querySelector('h3').textContent=dict[h];card.querySelector('p').textContent=dict[p];});
+  stepCards.forEach((card,i)=>{if(!english)return;const [h,p]=stepTexts[i];card.querySelector('h3').textContent=dict[h];card.querySelector('p').textContent=dict[p];});
+  const labels=languagePicker?.options;
+  if(labels){labels[0].textContent='Deutsch';labels[1].textContent='English';}
+  const themeLabels=themePicker?.options;if(themeLabels){themeLabels[0].textContent=english?'Light':'Hell';themeLabels[1].textContent=english?'Dark':'Dunkel';themeLabels[2].textContent=english?'System':'System';}
+  const galleryTitle=document.getElementById('gallery-title');if(galleryTitle)galleryTitle.textContent=english?dict['gallery:title']:'FRITZ!Power Monitor – Bildschirmfotos';
+  const close=document.querySelector('[data-close-gallery]');if(close)close.setAttribute('aria-label',english?dict['gallery:close']:'Bildschirmfoto-Galerie schließen');
+  document.getElementById('gallery-previous')?.setAttribute('aria-label',english?dict['gallery:prev']:'Vorheriges Bildschirmfoto');
+  document.getElementById('gallery-next')?.setAttribute('aria-label',english?dict['gallery:next']:'Nächstes Bildschirmfoto');
+  const footer=document.querySelector('.footer-inner>span');if(footer)footer.textContent=english?dict['footer:license']:'Open Source unter MIT-Lizenz.';
+  const links=document.querySelectorAll('.footer-links a');const de=['Quellcode','Probleme','Benutzerhandbuch','README','Sicherheit','Releases','Nach oben ↑'];const en=['Source code','Issues','User guide','README','Security','Releases','Back to top ↑'];links.forEach((a,i)=>{if(i<7)a.textContent=english?en[i]:de[i]});
+  localStorage.setItem('fritz-power-monitor-language',lang);
+ };
+ const lang=localStorage.getItem('fritz-power-monitor-language')||'de';applyLanguage(lang);
+ languagePicker?.addEventListener('change',()=>applyLanguage(languagePicker.value));
+})();
+</script>
   <script>
     const progress=document.getElementById('scroll-progress');
     const updateProgress=()=>{if(!progress)return;const max=document.documentElement.scrollHeight-innerHeight;progress.style.width=(max>0?scrollY/max*100:0)+'%'};
