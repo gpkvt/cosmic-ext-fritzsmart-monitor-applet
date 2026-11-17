@@ -1156,20 +1156,9 @@ fn parse_fetch_result_xml(xml: &str, selected_ains: &[String]) -> Result<FritzFe
             }
         }
     }
-    if readings.is_empty() {
-        return Err(if missing_devices.is_empty() {
-            "No selected devices returned usable readings".into()
-        } else {
-            format!(
-                "No selected devices returned usable readings: {}",
-                missing_devices
-                    .iter()
-                    .map(|(_, name)| name.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
-        });
-    }
+    // Keep an empty reading set when every selected device is missing. The
+    // app layer uses missing_devices to notify once per outage and displays
+    // the existing connection/error state without retaining stale readings.
     Ok(FritzFetchResult {
         readings,
         missing_devices,
@@ -1761,6 +1750,25 @@ mod tests {
         assert_eq!(
             result.missing_devices,
             vec![("222222222222".into(), "222222222222".into())]
+        );
+    }
+
+    #[test]
+    fn fetch_result_reports_all_selected_devices_as_missing() {
+        let xml = r#"<devicelist></devicelist>"#;
+        let result = parse_fetch_result_xml(
+            xml,
+            &["111111111111".into(), "222222222222".into()],
+        )
+        .unwrap();
+
+        assert!(result.readings.is_empty());
+        assert_eq!(
+            result.missing_devices,
+            vec![
+                ("111111111111".into(), "111111111111".into()),
+                ("222222222222".into(), "222222222222".into()),
+            ]
         );
     }
 
