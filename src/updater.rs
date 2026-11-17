@@ -37,9 +37,7 @@ fn normalize_release_version(tag: &str) -> Result<&str, String> {
     let version = tag.trim().trim_start_matches(['v', 'V']);
     let components: Vec<&str> = version.split('.').collect();
     if components.len() != 3
-        || components
-            .iter()
-            .any(|part| {
+        || components.iter().any(|part| {
             part.is_empty() || !part.chars().all(|character| character.is_ascii_digit())
         })
     {
@@ -52,14 +50,21 @@ fn checksum_for_asset<'a>(checksums: &'a str, name: &str) -> Option<&'a str> {
     checksums.lines().find_map(|line| {
         let mut fields = line.split_whitespace();
         let checksum = fields.next()?;
-        let filename = fields.next()?.trim_start_matches('*').trim_start_matches("./");
+        let filename = fields
+            .next()?
+            .trim_start_matches('*')
+            .trim_start_matches("./");
         (filename == name).then_some(checksum)
     })
 }
 
 fn client() -> Result<Client, String> {
     Client::builder()
-        .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!(
+            env!("CARGO_PKG_NAME"),
+            "/",
+            env!("CARGO_PKG_VERSION")
+        ))
         .timeout(std::time::Duration::from_secs(120))
         .build()
         .map_err(|error| error.to_string())
@@ -204,9 +209,7 @@ async fn install_source_update(source: &Path) -> Result<String, String> {
     if !status.success() {
         return Err(format!("The source installer exited with status {status}"));
     }
-    Ok(
-        "The latest source version was built and installed. The COSMIC panel is reloading.".into(),
-    )
+    Ok("The latest source version was built and installed. The COSMIC panel is reloading.".into())
 }
 
 async fn install_flatpak_update() -> Result<String, String> {
@@ -266,8 +269,14 @@ mod tests {
     #[test]
     fn checksum_lookup_matches_the_exact_asset_name() {
         let sums = "0123456789abcdef  ./app.deb\nabcdef0123456789 *./app.AppImage\n";
-        assert_eq!(checksum_for_asset(sums, "app.deb"), Some("0123456789abcdef"));
-        assert_eq!(checksum_for_asset(sums, "app.AppImage"), Some("abcdef0123456789"));
+        assert_eq!(
+            checksum_for_asset(sums, "app.deb"),
+            Some("0123456789abcdef")
+        );
+        assert_eq!(
+            checksum_for_asset(sums, "app.AppImage"),
+            Some("abcdef0123456789")
+        );
         assert_eq!(checksum_for_asset(sums, "other.deb"), None);
     }
 
