@@ -69,6 +69,7 @@ pub struct AppModel {
     quick_graph_timespan: u32,
     expanded_graph: Option<(String, Vec<f64>, String, Option<String>)>,
     next_weather_refresh_at: Option<Instant>,
+    next_weather_image_fetch_at: Option<Instant>,
     pending_power_changes: HashSet<String>,
     pending_power_targets: HashMap<String, bool>,
     latest_version: Option<Result<String, String>>,
@@ -4421,21 +4422,18 @@ impl cosmic::Application for AppModel {
                 // surrounding weather section retains its normal spacing.
                 let mut weather_visual = widget::Column::new().spacing(0).push(weather_card);
                 if has_background_image && self.settings.weather_enabled {
-                    let refresh_interval = Duration::from_secs(
-                        u64::from(self.settings.weather_refresh_interval_minutes.clamp(5, 60)) * 60,
+                    let image_fetch_interval = Duration::from_secs(
+                        u64::from(self.settings.weather_slideshow_interval_seconds.clamp(5, 300)),
                     );
-                    // A missing deadline means the request is currently in flight.
-                    // Keep the line full until the response arrives and starts the
-                    // next interval, so it resets only after the image fetch completes.
-                    // This is a countdown: start full and recede toward empty
-                    // as the next image refresh approaches.
+                    // This countdown follows the per-image timeout that triggers
+                    // the Commons fetch, not the independent weather-data refresh.
                     let progress = self
-                        .next_weather_refresh_at
+                        .next_weather_image_fetch_at
                         .map(|deadline| {
                             let remaining = deadline
                                 .saturating_duration_since(Instant::now())
                                 .as_secs_f32();
-                            remaining / refresh_interval.as_secs_f32()
+                            remaining / image_fetch_interval.as_secs_f32()
                         })
                         .unwrap_or(0.0)
                         .clamp(0.0, 1.0);
@@ -6231,6 +6229,12 @@ impl cosmic::Application for AppModel {
                     self.weather_slideshow_index = next;
                     if image_timeout && !self.weather_images_loading {
                         self.weather_images_loading = true;
+                        self.next_weather_image_fetch_at = Some(
+                            Instant::now()
+                                + Duration::from_secs(u64::from(
+                                    self.settings.weather_slideshow_interval_seconds.clamp(5, 300),
+                                )),
+                        );
                         let icon_code = weather.icon_code.clone();
                         return Task::perform(
                             crate::weather::fetch_weather_background_images(icon_code),
@@ -6275,6 +6279,12 @@ impl cosmic::Application for AppModel {
                                     .as_ref()
                                     .map(|bytes| widget::image::Handle::from_bytes(bytes.clone()));
                                 self.weather_slideshow_index = 0;
+                                self.next_weather_image_fetch_at = Some(
+                                    Instant::now()
+                                        + Duration::from_secs(u64::from(
+                                            self.settings.weather_slideshow_interval_seconds.clamp(5, 300),
+                                        )),
+                                );
                                 record_diagnostic_event(
                                     &mut self.diagnostic_events,
                                     format!(
@@ -6348,6 +6358,12 @@ impl cosmic::Application for AppModel {
                             0
                         };
                         self.weather_error = None;
+                        self.next_weather_image_fetch_at = Some(
+                            Instant::now()
+                                + Duration::from_secs(u64::from(
+                                    self.settings.weather_slideshow_interval_seconds.clamp(5, 300),
+                                )),
+                        );
                     }
                     Err(error) => {
                         record_diagnostic_event(
@@ -6372,6 +6388,7 @@ impl cosmic::Application for AppModel {
                 self.settings.weather_enabled = enabled;
                 self.next_weather_refresh_at = None;
                 if !enabled {
+                    self.next_weather_image_fetch_at = None;
                     self.weather = None;
                     self.weather_slideshow_handles.clear();
                     self.weather_background_handle = None;
@@ -6410,6 +6427,10 @@ impl cosmic::Application for AppModel {
             }
             Message::WeatherSlideshowDurationChanged(value) => {
                 self.settings.weather_slideshow_interval_seconds = value.clamp(5, 300);
+                self.next_weather_image_fetch_at = Some(
+                    Instant::now()
+                        + Duration::from_secs(u64::from(self.settings.weather_slideshow_interval_seconds)),
+                );
                 if let Some(weather) = &mut self.weather {
                     let (frames, sequence, frame_sources) = build_weather_slideshow_frames(
                         &weather.background_images,
