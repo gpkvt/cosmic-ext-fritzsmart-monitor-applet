@@ -1,5 +1,9 @@
 # Changelog
 
+### Fixed
+
+- Reduce CPU usage by limiting refresh-spinner redraws to four per second and using the existing app clock for the weather countdown instead of a separate 10 fps timer.
+
 ### Changed
 
 - Display the weather pressure label and its hPa value on one horizontal line.
