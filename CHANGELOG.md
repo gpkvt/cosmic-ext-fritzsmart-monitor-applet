@@ -2,7 +2,7 @@
 
 ### Fixed
 
-- Animate the weather background countdown as a smooth 30 fps sweep over the full image duration; hold it at zero during image fetching and restart after the request completes.
+- Animate the weather background countdown as a low-overhead 10 fps sweep over the full image duration; hold it at zero during image fetching and restart after the request completes.
 
 ### Fixed
 

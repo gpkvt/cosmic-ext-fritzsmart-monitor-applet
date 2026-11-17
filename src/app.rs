@@ -2008,12 +2008,13 @@ fn flow_animation_ticks() -> impl futures::Stream<Item = Message> {
 }
 
 fn weather_image_countdown_ticks() -> impl futures::Stream<Item = Message> {
-    // Re-render at 30 fps for one continuous sweep instead of one-second steps.
+    // Re-render at 10 fps: frequent enough for a visibly smooth countdown line
+    // without forcing a full applet redraw at 30 fps.
     // This subscription runs only while the weather popup and countdown are visible.
     cosmic::iced::stream::channel(
         2,
         |mut output: futures::channel::mpsc::Sender<Message>| async move {
-            let mut interval = tokio::time::interval(Duration::from_millis(33));
+            let mut interval = tokio::time::interval(Duration::from_millis(100));
             interval.tick().await;
             loop {
                 interval.tick().await;
