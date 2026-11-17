@@ -33,6 +33,7 @@ jobs:
   version:
     name: Bump version and create release tag
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: write
       actions: write
@@ -112,8 +113,6 @@ jobs:
           git tag --annotate "$tag" HEAD --message "Release $tag"
           git push origin "refs/tags/$tag"
 
-          # GITHUB_TOKEN pushes do not trigger other workflows automatically.
-          GH_TOKEN="${{ github.token }}" gh workflow run gh-pages.yml --ref main
           echo "version=$new_version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -122,6 +121,7 @@ jobs:
     name: Build and verify Linux packages
     needs: version
     runs-on: ubuntu-24.04
+    timeout-minutes: 120
     permissions:
       contents: read
     steps:
@@ -132,10 +132,13 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust dependencies and build artifacts
+        uses: Swatinem/rust-cache@v2
+
       - name: Install package build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes \
+          sudo apt-get update -o Acquire::Retries=3
+          sudo apt-get install --yes -o Acquire::Retries=3 \
             appstream desktop-file-utils flatpak flatpak-builder python3-venv \
             libdbus-1-dev libdisplay-info-dev libgbm-dev libinput-dev libseat-dev \
             libsystemd-dev libudev-dev libvulkan-dev libwayland-dev libxkbcommon-dev \
@@ -198,8 +201,10 @@ jobs:
       - version
       - packages
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -244,3 +249,21 @@ jobs:
               exit 1
             }
           done
+
+      # GITHUB_TOKEN pushes do not start other workflows. Publish Pages only
+      # after the release exists so its download links target the new version.
+      - name: Trigger GitHub Pages publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if gh workflow run gh-pages.yml --ref main; then
+              exit 0
+            fi
+            echo "Could not dispatch GitHub Pages (attempt $attempt/3)." >&2
+            sleep $((attempt * 5))
+          done
+          echo "Release was published, but GitHub Pages dispatch failed." >&2
+          exit 1
