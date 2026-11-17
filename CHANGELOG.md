@@ -19,6 +19,7 @@ Changes are tracked in date-based entries. See the [GitHub Releases](https://git
 
 - Tightened line height and vertical spacing for stacked two-line panel readings.
 - Right-aligned text within stacked two-line panel readings.
+- Vertically aligned the upper line to the bottom and the lower line to the top of separate line slots.
 - Halved panel reading font sizes in two-line mode to keep stacked values compact.
 - Redesigned the settings overview into clearly grouped Interface, Display & updates, Data sources, Layout and Support sections ([#497](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/497)).
 - Translated the first-run setup assistant and settings overview across all supported interface languages.
