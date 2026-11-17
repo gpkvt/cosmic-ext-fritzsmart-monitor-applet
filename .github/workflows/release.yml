@@ -123,9 +123,11 @@ jobs:
           fi
           test "$remote_tag" = "$(git rev-parse HEAD)"
 
-          echo "version=$new_version" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$new_version"
+            echo "tag=$tag"
+            echo "commit=$(git rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
 
   packages:
     name: Build and verify Linux packages
@@ -186,7 +188,7 @@ jobs:
           tar -czf "dist/${name}.tar.gz" -C dist "${name}"
           sha256sum "dist/${name}.tar.gz" > "dist/${name}.tar.gz.sha256"
 
-          (cd dist && sha256sum *.deb *.AppImage *.flatpak *.tar.gz > SHA256SUMS)
+          (cd dist && sha256sum ./*.deb ./*.AppImage ./*.flatpak ./*.tar.gz > SHA256SUMS)
           (cd dist && sha256sum --check SHA256SUMS)
           for asset in \
             "dist/fritz-power-monitor_${VERSION}_amd64.deb" \
