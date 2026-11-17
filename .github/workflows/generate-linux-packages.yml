@@ -20,6 +20,7 @@ jobs:
   build:
     name: Build Debian, AppImage and Flatpak
     runs-on: ubuntu-24.04
+    timeout-minutes: 120
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -29,6 +30,9 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies and build artifacts
+        uses: Swatinem/rust-cache@v2
 
       - name: Determine package version
         id: version
