@@ -749,7 +749,9 @@ pub fn build_weather_slideshow_frames(
     let mut frames = Vec::new();
     let mut sequence = Vec::new();
     let mut frame_sources = Vec::new();
-    let hold_ticks = usize::from(display_seconds.clamp(5, 300)) * 4;
+    // Slideshow ticks run once per second; do not enqueue four redraws per second
+    // merely to hold the same still image on screen.
+    let hold_ticks = usize::from(display_seconds.clamp(5, 300));
     for (index, current) in decoded.iter().enumerate() {
         let mut output = std::io::Cursor::new(Vec::new());
         if DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(current.clone()).to_rgb8())
