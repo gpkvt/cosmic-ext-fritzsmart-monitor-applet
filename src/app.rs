@@ -3,8 +3,8 @@ use crate::fritz::{
     TemperatureAlertThresholds, discover_devices, fetch_fritz_data,
 };
 use crate::weather::{
-    WeatherData, WeatherForecast, build_weather_slideshow_frames, chessboard_background_overlay,
-    fetch_weather, fetch_weather_forecast, starry_night_overlay,
+    WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather,
+    fetch_weather_forecast, starry_night_overlay,
 };
 use cosmic::iced::{
     Limits, Subscription, futures,
@@ -3420,20 +3420,6 @@ impl cosmic::Application for AppModel {
                             .clip(true);
                             weather_layers = weather_layers.push(star_layer);
                         }
-                    }
-                    // A black chessboard texture replaces image pixelation:
-                    // alternating squares are 50% opaque and fully transparent.
-                    if let Some(pattern) = chessboard_background_overlay() {
-                        let pattern_layer = widget::container(
-                            widget::image::Image::new(widget::image::Handle::from_bytes(pattern))
-                                .width(cosmic::iced::Length::Fill)
-                                .height(cosmic::iced::Length::Fixed(260.0))
-                                .content_fit(cosmic::iced::ContentFit::Fill),
-                        )
-                        .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fixed(260.0))
-                        .clip(true);
-                        weather_layers = weather_layers.push(pattern_layer);
                     }
                     widget::container(weather_layers.push(details))
                         .width(cosmic::iced::Length::Fill)
