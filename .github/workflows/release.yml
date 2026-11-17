@@ -8,10 +8,8 @@ on:
       - "docs/**"
       - "README.md"
       - "SECURITY.md"
-      - "scripts/build-pages.py"
-      - "scripts/validate-pages.py"
-      - ".github/workflows/gh-pages.yml"
-      - ".github/workflows/release.yml"
+      - "scripts/**"
+      - ".github/workflows/**"
   workflow_dispatch:
     inputs:
       bump_type:
