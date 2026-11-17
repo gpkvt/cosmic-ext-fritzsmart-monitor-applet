@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Increased line spacing between the number and unit in unpaired two-line panel values while keeping other panel readings compact.
+
 - Removed the residual vertical gap between the two lines of multiline panel values while preserving the configured font size.
 
 ## [17.11.2026]
