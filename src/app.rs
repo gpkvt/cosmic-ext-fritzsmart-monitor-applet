@@ -2299,11 +2299,7 @@ impl cosmic::Application for AppModel {
             if let Some(icon) = icon {
                 // In two-line mode, center the icon on the first text line;
                 // in single-line mode, center it on the value itself.
-                let icon_height = if icon_at_top {
-                    28.0
-                } else {
-                    item_height
-                };
+                let icon_height = if icon_at_top { 28.0 } else { item_height };
                 let icon_width = if icon_at_top { 32.0 } else { 16.0 };
                 let icon_column = widget::container(icon)
                     .width(cosmic::iced::Length::Fixed(icon_width))
@@ -2356,13 +2352,19 @@ impl cosmic::Application for AppModel {
                     "Weather",
                     Some(
                         widget::icon::from_name(weather.icon_name())
-                            .size(if self.settings.panel_multiline
-                                && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "temperature")
-                            {
-                                28
-                            } else {
-                                10
-                            })
+                            .size(
+                                if self.settings.panel_multiline
+                                    && self
+                                        .settings
+                                        .hidden_panel_items
+                                        .iter()
+                                        .any(|hidden| hidden == "temperature")
+                                {
+                                    28
+                                } else {
+                                    10
+                                },
+                            )
                             .into(),
                     ),
                     panel_value(panel_value_with_unit(
