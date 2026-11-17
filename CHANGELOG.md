@@ -1,5 +1,9 @@
 # Changelog
 
+### Fixed
+
+- Apply the configured panel text size consistently to split and multiline values; remove the hidden 10% font enlargement.
+
 ## [17.11.2026]
 
 ### Fixed

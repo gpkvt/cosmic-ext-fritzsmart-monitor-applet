@@ -2197,11 +2197,9 @@ impl cosmic::Application for AppModel {
         // so the number and unit share the same right edge as single-line values.
         let panel_value = |value: String| -> cosmic::Element<'static, Message> {
             let multiline = value.contains('\n');
-            let font_size = if multiline {
-                panel_text_size * 1.1
-            } else {
-                panel_text_size
-            };
+            // The panel text-size setting is authoritative in every layout.
+            // Multiline mode changes arrangement and line height, not font size.
+            let font_size = panel_text_size;
             let width = value
                 .lines()
                 .map(|line| line.chars().count())
