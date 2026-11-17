@@ -76,11 +76,19 @@ def sync_package_download_version() -> None:
         raise RuntimeError("Could not read [package].version from Cargo.toml")
     index = DOCS / "index.html"
     content = index.read_text(encoding="utf-8")
-    if "@APP_VERSION@" not in content:
-        raise RuntimeError("docs/index.html is missing @APP_VERSION@ package link placeholders")
-    content = content.replace("@APP_VERSION@", match.group(1))
-    index.write_text(content, encoding="utf-8")
-    print(f"Updated package download links for fritz-power-monitor {match.group(1)}")
+    version = match.group(1)
+    if "@APP_VERSION@" in content:
+        content = content.replace("@APP_VERSION@", version)
+        index.write_text(content, encoding="utf-8")
+        print(f"Updated package download links for fritz-power-monitor {version}")
+        return
+    if f"releases/download/v{version}/" in content:
+        print(f"Package download links already match fritz-power-monitor {version}")
+        return
+    raise RuntimeError(
+        "docs/index.html has neither version placeholders nor links matching "
+        f"Cargo.toml version {version}; restore the source template before building"
+    )
 
 def main() -> None:
     sync_package_download_version()
