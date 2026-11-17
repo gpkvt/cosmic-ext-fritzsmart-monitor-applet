@@ -2241,7 +2241,15 @@ impl cosmic::Application for AppModel {
                     )
                     .into()
             } else {
-                panel_text(value).into()
+                let width = text_width(&value);
+                widget::container(
+                    panel_text(value)
+                        .width(cosmic::iced::Length::Fill)
+                        .align_x(cosmic::iced::Alignment::End),
+                )
+                .width(cosmic::iced::Length::Fixed(width))
+                .align_x(cosmic::iced::Alignment::End)
+                .into()
             }
         };
 
