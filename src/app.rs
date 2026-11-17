@@ -2815,9 +2815,8 @@ impl cosmic::Application for AppModel {
                         }
                         widget::container(ranges)
                             .width(cosmic::iced::Length::Fill)
-                            .into()
                     } else {
-                        widget::Space::new().height(0).into()
+                        widget::Space::new().height(0)
                     }
                 })
                 .push(graph_visual_large(
