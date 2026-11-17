@@ -322,6 +322,27 @@ fn quick_slider_anchor_labels(labels: [&'static str; 5]) -> cosmic::Element<'sta
     row.into()
 }
 
+
+/// Reduce weather-photo opacity so the COSMIC surface behind the card shows through.
+fn semi_transparent_weather_photo(bytes: &[u8]) -> Vec<u8> {
+    let Ok(decoded) = image::load_from_memory(bytes) else {
+        return bytes.to_vec();
+    };
+    let mut rgba = decoded.to_rgba8();
+    for pixel in rgba.pixels_mut() {
+        pixel[3] /= 2;
+    }
+    let mut output = std::io::Cursor::new(Vec::new());
+    if image::DynamicImage::ImageRgba8(rgba)
+        .write_to(&mut output, image::ImageFormat::Png)
+        .is_ok()
+    {
+        output.into_inner()
+    } else {
+        bytes.to_vec()
+    }
+}
+
 fn format_panel_temperature(temperature_c: f64) -> String {
     format!("{} °C", format_compact_decimal(temperature_c))
 }
@@ -3374,8 +3395,9 @@ impl cosmic::Application for AppModel {
                     .and_then(|frame| weather.slideshow_frames.get(*frame))
                     .or(weather.background_image.as_ref())
                 {
+                    let photo_bytes = semi_transparent_weather_photo(image_bytes);
                     let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
-                        image_bytes.clone(),
+                        photo_bytes,
                     ))
                     .width(cosmic::iced::Length::Fill)
                     .height(cosmic::iced::Length::Fixed(260.0))
