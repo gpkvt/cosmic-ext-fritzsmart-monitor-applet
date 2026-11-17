@@ -1291,6 +1291,43 @@ async fn fetch_internet_bandwidth(client: &Client, base: &str) -> Option<FritzIn
     parse_internet_bandwidth(&xml)
 }
 
+fn xml_response_as_json(xml: &str) -> serde_json::Value {
+    use serde_json::{Map, Value, json};
+
+    fn node_value(node: Node<'_, '_>) -> Value {
+        let mut object = Map::new();
+        for attribute in node.attributes() {
+            object.insert(format!("@{}", attribute.name()), json!(attribute.value()));
+        }
+        for child in node.children().filter(|child| child.is_element()) {
+            let name = child.tag_name().name().to_string();
+            let value = node_value(child);
+            match object.get_mut(&name) {
+                Some(Value::Array(values)) => values.push(value),
+                Some(existing) => {
+                    let previous = std::mem::replace(existing, Value::Null);
+                    *existing = Value::Array(vec![previous, value]);
+                }
+                None => { object.insert(name, value); }
+            }
+        }
+        let text = node.text().unwrap_or("").trim();
+        if object.is_empty() {
+            json!(text)
+        } else {
+            if !text.is_empty() {
+                object.insert("#text".into(), json!(text));
+            }
+            Value::Object(object)
+        }
+    }
+
+    Document::parse(xml)
+        .ok()
+        .map(|document| node_value(document.root_element()))
+        .unwrap_or_else(|| json!({"raw": xml}))
+}
+
 /// Collect a fresh, credential-safe FRITZ!Box endpoint dump for diagnostics.
 /// Authentication responses are intentionally represented by status metadata only:
 /// they contain a live SID and must never be written to a shareable report.
@@ -1341,7 +1378,8 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                 "method": "GET",
                 "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
                 "status": status,
-                "body": body,
+                "body_json": xml_response_as_json(&body),
+                "body_raw": body,
             }));
         }
         Err(error) => endpoints.push(json!({
@@ -1377,7 +1415,8 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                             "device_name": device.children().find(|node| node.has_tag_name("name")).and_then(|node| node.text()).unwrap_or("Unnamed device"),
                             "device_ain": ain,
                             "status": status,
-                            "body": body,
+                            "body_json": xml_response_as_json(&body),
+                            "body_raw": body,
                         }));
                     }
                     Err(error) => endpoints.push(json!({
@@ -1420,7 +1459,8 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                     "endpoint": endpoint_path,
                     "soap_action": format!("{SERVICE}#GetCommonLinkProperties"),
                     "status": status,
-                    "body": response_body,
+                    "body_json": xml_response_as_json(&response_body),
+                    "body_raw": response_body,
                 }));
             }
             Err(error) => endpoints.push(json!({
