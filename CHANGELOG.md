@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- Reduce weather slideshow CPU and memory use by downscaling source photos to the weather-card display limit and applying photo opacity during frame encoding, avoiding a second full decode/encode pass for every frame.
+
+### Fixed
+
 - Reduce idle CPU usage by polling scheduled refresh deadlines every five seconds, switching to one-second updates only near deadlines or while settings feedback is active.
 
 ### Fixed
