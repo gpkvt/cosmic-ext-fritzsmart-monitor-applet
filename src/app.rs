@@ -1246,28 +1246,41 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
     content = content.push(history_heading);
     if !history_collapsed {
         content = content
-            .push(interactive_graph_with_axis(
-                &language,
-                crate::i18n::tr(&language, "CURRENT POWER"),
-                history.into_iter(),
-                &graph_style,
-                "W",
-                axis_start.clone(),
+            .push(collapsible_graph(
+                "CURRENT POWER (W)", "graph-current-power",
+                collapsed_sections.contains("graph-current-power"),
+                interactive_graph_with_axis(&language, crate::i18n::tr(&language, "CURRENT POWER"), history.into_iter(), &graph_style, "W", axis_start.clone()),
             ))
-            .push(widget::text::caption(crate::i18n::tr(
-                &language,
-                "AVERAGE TEMPERATURE HISTORY (°C)",
-            )))
-            .push(interactive_graph_with_axis(
-                &language,
-                crate::i18n::tr(&language, "AVERAGE TEMPERATURE"),
-                temperature_history.into_iter(),
-                &graph_style,
-                "°C",
-                axis_start,
+            .push(collapsible_graph(
+                "AVERAGE TEMPERATURE HISTORY (°C)", "graph-current-temperature",
+                collapsed_sections.contains("graph-current-temperature"),
+                interactive_graph_with_axis(&language, crate::i18n::tr(&language, "AVERAGE TEMPERATURE"), temperature_history.into_iter(), &graph_style, "°C", axis_start),
             ));
     }
     surface_card(content.into(), 14)
+}
+
+fn collapsible_graph(
+    title: &'static str,
+    section_id: &'static str,
+    collapsed: bool,
+    graph: cosmic::Element<'static, Message>,
+) -> cosmic::Element<'static, Message> {
+    let heading = widget::button::custom(
+        widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::text::caption(title))
+            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+            .push(widget::icon::from_name(if collapsed { "go-next-symbolic" } else { "go-down-symbolic" }).size(16)),
+    )
+    .on_press(Message::ToggleMenuSection(section_id.into()))
+    .width(cosmic::iced::Length::Fill)
+    .padding([4, 0])
+    .class(cosmic::theme::Button::Text);
+    let mut section = widget::Column::new().spacing(4).width(cosmic::iced::Length::Fill).push(heading);
+    if !collapsed { section = section.push(graph); }
+    section.into()
 }
 
 fn total_power_section(
@@ -1342,24 +1355,14 @@ fn total_power_overview(
     );
 
     let output_graph = widget::Column::new()
-        .spacing(4)
-        .push(widget::text::caption("TOTAL POWER OUTPUT (W)"))
-        .push(interactive_graph_with_axis(
-            &settings.language,
-            crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-            history.iter().map(|(_, value)| *value as f64),
-            &settings.graph_style,
-            "W",
-            axis_start.clone(),
+        .spacing(8)
+        .push(collapsible_graph(
+            "TOTAL POWER OUTPUT (W)", "graph-total-power-output", collapsed_sections.contains("graph-total-power-output"),
+            interactive_graph_with_axis(&settings.language, crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"), history.iter().map(|(_, value)| *value as f64), &settings.graph_style, "W", axis_start.clone()),
         ))
-        .push(widget::text::caption("AVERAGE TEMPERATURE (°C)"))
-        .push(interactive_graph_with_axis(
-            &settings.language,
-            crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
-            output_temperature_history.iter().map(|(_, value)| *value),
-            &settings.graph_style,
-            "°C",
-            axis_start.clone(),
+        .push(collapsible_graph(
+            "AVERAGE TEMPERATURE (°C)", "graph-total-output-temperature", collapsed_sections.contains("graph-total-output-temperature"),
+            interactive_graph_with_axis(&settings.language, crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"), output_temperature_history.iter().map(|(_, value)| *value), &settings.graph_style, "°C", axis_start.clone()),
         ));
     let output_content = widget::Column::new()
         .spacing(8)
@@ -1413,29 +1416,18 @@ fn total_power_overview(
                 ))
             });
         let mut input_graph = widget::Column::new()
-            .spacing(4)
-            .push(widget::text::caption("TOTAL POWER INPUT (W)"))
-            .push(interactive_graph_with_axis(
-                &settings.language,
-                crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
-                input_history.iter().map(|(_, value)| *value as f64),
-                &settings.graph_style,
-                "W",
-                axis_start.clone(),
+            .spacing(8)
+            .push(collapsible_graph(
+                "TOTAL POWER INPUT (W)", "graph-total-power-input", collapsed_sections.contains("graph-total-power-input"),
+                interactive_graph_with_axis(&settings.language, crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"), input_history.iter().map(|(_, value)| *value as f64), &settings.graph_style, "W", axis_start.clone()),
             ));
         if let Some(summary) = input_energy_summary {
             input_graph = input_graph.push(summary);
         }
-        input_graph = input_graph
-            .push(widget::text::caption("AVERAGE TEMPERATURE (°C)"))
-            .push(interactive_graph_with_axis(
-                &settings.language,
-                crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
-                input_temperature_history.iter().map(|(_, value)| *value),
-                &settings.graph_style,
-                "°C",
-                axis_start,
-            ));
+        input_graph = input_graph.push(collapsible_graph(
+            "AVERAGE TEMPERATURE (°C)", "graph-total-input-temperature", collapsed_sections.contains("graph-total-input-temperature"),
+            interactive_graph_with_axis(&settings.language, crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"), input_temperature_history.iter().map(|(_, value)| *value), &settings.graph_style, "°C", axis_start),
+        ));
         let input_content = widget::Column::new()
             .spacing(8)
             .width(cosmic::iced::Length::Fill)
