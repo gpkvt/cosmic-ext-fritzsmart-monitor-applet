@@ -4122,7 +4122,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
                     let heading_row = if let Some((power, temperature)) = collapsed_value {
                         let heading_row = if section.0 == "internet-bandwidth" {
-                            heading_row.push(widget::text::caption(power))
+                            heading_row.push(widget::text::body(power))
                         } else {
                             heading_row.push(widget::text::body(power))
                         };
