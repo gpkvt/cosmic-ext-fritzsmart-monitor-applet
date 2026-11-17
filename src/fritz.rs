@@ -1308,7 +1308,9 @@ fn xml_response_as_json(xml: &str) -> serde_json::Value {
                     let previous = std::mem::replace(existing, Value::Null);
                     *existing = Value::Array(vec![previous, value]);
                 }
-                None => { object.insert(name, value); }
+                None => {
+                    object.insert(name, value);
+                }
             }
         }
         let text = node.text().unwrap_or("").trim();
@@ -1371,7 +1373,10 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
             let status = response.status();
             record_http_response_with_method(response.url(), status, "GET");
             let status = status.as_u16();
-            let body = response.text().await.unwrap_or_else(|error| format!("<body read error: {error}>"));
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|error| format!("<body read error: {error}>"));
             device_xml = Some(body.clone());
             endpoints.push(json!({
                 "name": "device_list_and_all_device_data",
@@ -1394,12 +1399,23 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
     // in the full inventory response, not just devices selected for the panel.
     if let Some(xml) = device_xml.as_deref() {
         if let Ok(document) = Document::parse(xml) {
-            for device in document.descendants().filter(|node| node.has_tag_name("device")) {
-                let Some(ain) = device.attribute("identifier") else { continue };
-                if !device.descendants().any(|node| node.has_tag_name("switch")) { continue; }
+            for device in document
+                .descendants()
+                .filter(|node| node.has_tag_name("device"))
+            {
+                let Some(ain) = device.attribute("identifier") else {
+                    continue;
+                };
+                if !device.descendants().any(|node| node.has_tag_name("switch")) {
+                    continue;
+                }
                 let response = client
                     .get(format!("{base}/webservices/homeautoswitch.lua"))
-                    .query(&[("sid", sid.as_str()), ("switchcmd", "getswitchstate"), ("ain", ain)])
+                    .query(&[
+                        ("sid", sid.as_str()),
+                        ("switchcmd", "getswitchstate"),
+                        ("ain", ain),
+                    ])
                     .send()
                     .await;
                 match response {
@@ -1407,7 +1423,10 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                         let status = response.status();
                         record_http_response_with_method(response.url(), status, "GET");
                         let status = status.as_u16();
-                        let body = response.text().await.unwrap_or_else(|error| format!("<body read error: {error}>"));
+                        let body = response
+                            .text()
+                            .await
+                            .unwrap_or_else(|error| format!("<body read error: {error}>"));
                         endpoints.push(json!({
                             "name": "device_switch_state",
                             "method": "GET",
@@ -1443,16 +1462,25 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
             </s:Envelope>"#
         );
         let endpoint_path = endpoint.path().to_string();
-        match client.post(endpoint)
+        match client
+            .post(endpoint)
             .header(reqwest::header::CONTENT_TYPE, "text/xml; charset=\"utf-8\"")
-            .header("SOAPACTION", format!("\"{SERVICE}#GetCommonLinkProperties\""))
+            .header(
+                "SOAPACTION",
+                format!("\"{SERVICE}#GetCommonLinkProperties\""),
+            )
             .body(body)
-            .send().await {
+            .send()
+            .await
+        {
             Ok(response) => {
                 let status = response.status();
                 record_http_response_with_method(response.url(), status, "POST");
                 let status = status.as_u16();
-                let response_body = response.text().await.unwrap_or_else(|error| format!("<body read error: {error}>"));
+                let response_body = response
+                    .text()
+                    .await
+                    .unwrap_or_else(|error| format!("<body read error: {error}>"));
                 endpoints.push(json!({
                     "name": "wan_common_interface_link_properties",
                     "method": "POST",

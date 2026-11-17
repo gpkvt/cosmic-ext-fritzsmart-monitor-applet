@@ -6512,8 +6512,9 @@ impl cosmic::Application for AppModel {
                 return Task::perform(
                     async move {
                         let dump = collect_fritzbox_debug_dump(settings).await;
-                        serde_json::to_string_pretty(&dump)
-                            .unwrap_or_else(|error| format!("Could not serialize FRITZ!Box dump: {error}"))
+                        serde_json::to_string_pretty(&dump).unwrap_or_else(|error| {
+                            format!("Could not serialize FRITZ!Box dump: {error}")
+                        })
                     },
                     Message::DebugDumpGenerated,
                 );
@@ -6527,11 +6528,17 @@ impl cosmic::Application for AppModel {
                 match std::fs::write(&path, report) {
                     Ok(()) => record_diagnostic_event(
                         &mut self.diagnostic_events,
-                        format!("Debug report with FRITZ!Box endpoint dump written to {}.", path.display()),
+                        format!(
+                            "Debug report with FRITZ!Box endpoint dump written to {}.",
+                            path.display()
+                        ),
                     ),
                     Err(error) => record_diagnostic_event(
                         &mut self.diagnostic_events,
-                        format!("Could not write debug report to {}: {error}", path.display()),
+                        format!(
+                            "Could not write debug report to {}: {error}",
+                            path.display()
+                        ),
                     ),
                 }
             }
