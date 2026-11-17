@@ -4882,7 +4882,14 @@ impl cosmic::Application for AppModel {
                                 }),
                             );
                             widget::button::custom(
-                                widget::icon::from_name("office-chart-line-symbolic").size(16),
+                                widget::Row::new()
+                                    .spacing(5)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(16))
+                                    .push(widget::text::caption(crate::i18n::tr(
+                                        &self.settings.language,
+                                        "History",
+                                    ))),
                             )
                             .on_press(Message::ShowGraph(
                                 format!(
