@@ -1845,6 +1845,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("es", "Reload now") => "Recargar ahora",
             ("es", "TOTAL POWER INPUT") => "POTENCIA TOTAL DE ENTRADA",
             ("es", "TOTAL POWER OUTPUT") => "POTENCIA TOTAL DE SALIDA",
+            ("es", "TOTAL ENERGY") => "ENERGÍA TOTAL",
             ("es", "Open-Meteo · forecast") => "Open-Meteo · pronóstico",
             ("es", "Open-Meteo · geocoding") => "Open-Meteo · geocodificación",
             ("es", "OpenWeatherMap · current weather") => "OpenWeatherMap · tiempo actual",
@@ -1854,6 +1855,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("nl", "Reload now") => "Nu opnieuw laden",
             ("nl", "TOTAL POWER INPUT") => "TOTAAL VERMOGEN IN",
             ("nl", "TOTAL POWER OUTPUT") => "TOTAAL VERMOGEN UIT",
+            ("nl", "TOTAL ENERGY") => "TOTALE ENERGIE",
             ("nl", "Open-Meteo · forecast") => "Open-Meteo · verwachting",
             ("nl", "Open-Meteo · geocoding") => "Open-Meteo · geocodering",
             ("nl", "OpenWeatherMap · current weather") => "OpenWeatherMap · huidig weer",
@@ -1863,6 +1865,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("fr", "Reload now") => "Recharger maintenant",
             ("fr", "TOTAL POWER INPUT") => "PUISSANCE TOTALE ENTRANTE",
             ("fr", "TOTAL POWER OUTPUT") => "PUISSANCE TOTALE SORTANTE",
+            ("fr", "TOTAL ENERGY") => "ÉNERGIE TOTALE",
             ("fr", "Open-Meteo · forecast") => "Open-Meteo · prévisions",
             ("fr", "Open-Meteo · geocoding") => "Open-Meteo · géocodage",
             ("fr", "OpenWeatherMap · current weather") => "OpenWeatherMap · météo actuelle",
@@ -1872,6 +1875,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("it", "Reload now") => "Ricarica ora",
             ("it", "TOTAL POWER INPUT") => "POTENZA TOTALE IN INGRESSO",
             ("it", "TOTAL POWER OUTPUT") => "POTENZA TOTALE IN USCITA",
+            ("it", "TOTAL ENERGY") => "ENERGIA TOTALE",
             ("it", "Open-Meteo · forecast") => "Open-Meteo · previsioni",
             ("it", "Open-Meteo · geocoding") => "Open-Meteo · geocodifica",
             ("it", "OpenWeatherMap · current weather") => "OpenWeatherMap · meteo attuale",
@@ -1881,6 +1885,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("sv", "Reload now") => "Läs in igen",
             ("sv", "TOTAL POWER INPUT") => "TOTAL EFFEKT IN",
             ("sv", "TOTAL POWER OUTPUT") => "TOTAL EFFEKT UT",
+            ("sv", "TOTAL ENERGY") => "TOTAL ENERGI",
             ("sv", "Open-Meteo · forecast") => "Open-Meteo · prognos",
             ("sv", "Open-Meteo · geocoding") => "Open-Meteo · geokodning",
             ("sv", "OpenWeatherMap · current weather") => "OpenWeatherMap · aktuellt väder",
@@ -1890,6 +1895,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("pt", "Reload now") => "Recarregar agora",
             ("pt", "TOTAL POWER INPUT") => "POTÊNCIA TOTAL DE ENTRADA",
             ("pt", "TOTAL POWER OUTPUT") => "POTÊNCIA TOTAL DE SAÍDA",
+            ("pt", "TOTAL ENERGY") => "ENERGIA TOTAL",
             ("pt", "Open-Meteo · forecast") => "Open-Meteo · previsão",
             ("pt", "Open-Meteo · geocoding") => "Open-Meteo · geocodificação",
             ("pt", "OpenWeatherMap · current weather") => "OpenWeatherMap · meteorologia atual",
@@ -1899,6 +1905,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("pl", "Reload now") => "Wczytaj ponownie",
             ("pl", "TOTAL POWER INPUT") => "CAŁKOWITA MOC WEJŚCIOWA",
             ("pl", "TOTAL POWER OUTPUT") => "CAŁKOWITA MOC WYJŚCIOWA",
+            ("pl", "TOTAL ENERGY") => "CAŁKOWITA ENERGIA",
             ("pl", "Open-Meteo · forecast") => "Open-Meteo · prognoza",
             ("pl", "Open-Meteo · geocoding") => "Open-Meteo · geokodowanie",
             ("pl", "OpenWeatherMap · current weather") => "OpenWeatherMap · bieżąca pogoda",
@@ -1908,6 +1915,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("da", "Reload now") => "Genindlæs nu",
             ("da", "TOTAL POWER INPUT") => "SAMLET EFFEKT IND",
             ("da", "TOTAL POWER OUTPUT") => "SAMLET EFFEKT UD",
+            ("da", "TOTAL ENERGY") => "SAMLET ENERGI",
             ("da", "Open-Meteo · forecast") => "Open-Meteo · vejrudsigt",
             ("da", "Open-Meteo · geocoding") => "Open-Meteo · geokodning",
             ("da", "OpenWeatherMap · current weather") => "OpenWeatherMap · aktuelt vejr",
@@ -1917,6 +1925,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("no", "Reload now") => "Last inn på nytt",
             ("no", "TOTAL POWER INPUT") => "TOTAL EFFEKT INN",
             ("no", "TOTAL POWER OUTPUT") => "TOTAL EFFEKT UT",
+            ("no", "TOTAL ENERGY") => "TOTAL ENERGI",
             ("no", "Open-Meteo · forecast") => "Open-Meteo · værvarsel",
             ("no", "Open-Meteo · geocoding") => "Open-Meteo · geokoding",
             ("no", "OpenWeatherMap · current weather") => "OpenWeatherMap · nåværende vær",
@@ -2018,7 +2027,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("ja", "TOTAL POWER INPUT") => "総入力電力",
             ("ko", "TOTAL POWER INPUT") => "총 입력 전력",
             ("ja", "TOTAL POWER OUTPUT") => "総出力電力",
+            ("ja", "TOTAL ENERGY") => "総エネルギー",
             ("ko", "TOTAL POWER OUTPUT") => "총 출력 전력",
+            ("ko", "TOTAL ENERGY") => "총 에너지",
             ("ja", "UPLOAD HISTORY") => "アップロード履歴",
             ("ko", "UPLOAD HISTORY") => "업로드 기록",
             ("ja", "Use current weather icon") => "現在の天気アイコンを使用",
@@ -2358,6 +2369,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean." => "Das System folgt der Sprache Ihres Desktops. Verfügbare Sprachen: Englisch, Deutsch, Spanisch, Niederländisch, Französisch, Italienisch, Schwedisch, Portugiesisch, Polnisch, Dänisch, Norwegisch, Japanisch und Koreanisch.",
         "TOTAL POWER INPUT" => "GESAMTE LEISTUNGSEINSPEISUNG",
         "TOTAL POWER OUTPUT" => "GESAMTE LEISTUNGSABGABE",
+            "TOTAL ENERGY" => "GESAMTENERGIE",
         "Weather location not configured" => "Wetterstandort nicht konfiguriert",
         "Wikimedia Commons · image search and download" => "Wikimedia Commons · Bildersuche und Download",
         _ => key,
@@ -2448,6 +2460,13 @@ mod tests {
     fn unknown_translations_fall_back_to_source_text() {
         assert_eq!(tr("de", "A newly added label"), "A newly added label");
     }
+    #[test]
+    fn total_energy_label_is_translated_for_all_supported_languages() {
+        for language in ["de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko"] {
+            assert_ne!(tr(language, "TOTAL ENERGY"), "TOTAL ENERGY", "{language}");
+        }
+    }
+
     #[test]
     fn every_app_interface_string_has_a_translation_for_each_supported_language() {
         let keys = [
