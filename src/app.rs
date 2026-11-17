@@ -67,6 +67,8 @@ pub struct AppModel {
     pending_power_targets: HashMap<String, bool>,
     latest_version: Option<Result<String, String>>,
     latest_version_loading: bool,
+    update_installing: bool,
+    update_status: Option<String>,
     flow_animation_frame: u8,
 }
 
@@ -121,6 +123,8 @@ pub enum Message {
     FetchForecastFromDiagnostics,
     CheckLatestVersion,
     LatestVersionChecked(Result<String, String>),
+    InstallLatestUpdate,
+    LatestUpdateInstalled(Result<String, String>),
     SelectWeatherForecast(u8),
     WeatherForecastUpdated(u8, Result<WeatherForecast, String>),
     OpenCommonsPage(String),
@@ -3031,6 +3035,26 @@ impl cosmic::Application for AppModel {
                         crate::i18n::tr(&self.settings.language, "Check for updates"),
                         Message::CheckLatestVersion,
                     ));
+                if self.latest_version.as_ref().is_some_and(|result| {
+                    result
+                        .as_ref()
+                        .is_ok_and(|version| is_newer_version(version, env!("APP_VERSION")))
+                }) {
+                    content = content.push(action_button(
+                        "software-update-available-symbolic",
+                        crate::i18n::tr(&self.settings.language, "Install update"),
+                        Message::InstallLatestUpdate,
+                    ));
+                }
+                if self.update_installing {
+                    content = content.push(widget::text::caption(crate::i18n::tr(
+                        &self.settings.language,
+                        "Installing update…",
+                    )));
+                }
+                if let Some(status) = &self.update_status {
+                    content = content.push(widget::text::caption(status.clone()));
+                }
 
                 let endpoint = self.settings.url.trim();
                 let uses_https = endpoint.to_ascii_lowercase().starts_with("https://");
@@ -5206,6 +5230,32 @@ impl cosmic::Application for AppModel {
             Message::LatestVersionChecked(result) => {
                 self.latest_version_loading = false;
                 self.latest_version = Some(result);
+                self.update_status = None;
+            }
+            Message::InstallLatestUpdate => {
+                if self.update_installing {
+                    return Task::none();
+                }
+                let Some(Ok(version)) = self.latest_version.as_ref() else {
+                    return Task::none();
+                };
+                self.update_installing = true;
+                self.update_status = None;
+                let version = version.clone();
+                return Task::perform(
+                    crate::updater::install_update(version),
+                    |result| cosmic::Action::App(Message::LatestUpdateInstalled(result)),
+                );
+            }
+            Message::LatestUpdateInstalled(result) => {
+                self.update_installing = false;
+                self.update_status = Some(match result {
+                    Ok(message) => message,
+                    Err(error) => format!(
+                        "{}: {error}",
+                        crate::i18n::tr(&self.settings.language, "Update installation failed")
+                    ),
+                });
             }
             Message::FetchForecastFromDiagnostics => {
                 let days = 7;
