@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- Align values in paired multiline panel rows to a shared right edge while keeping icons left-aligned and standalone items naturally sized.
+
+### Fixed
+
 - Apply the configured panel text size consistently to split and multiline values; remove the hidden 10% font enlargement.
 
 ## [17.11.2026]
