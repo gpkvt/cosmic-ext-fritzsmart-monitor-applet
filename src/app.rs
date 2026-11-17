@@ -120,6 +120,7 @@ pub enum Message {
     ToggleMenuSection(String),
     MoveMenuElement(&'static str, bool),
     ToggleMenuElementVisibility(&'static str, bool),
+    TogglePanelItemVisibility(&'static str, bool),
     MovePanelItem(&'static str, bool),
     QuickRefreshIntervalPreview(u32),
     CommitQuickRefreshInterval,
@@ -1676,7 +1677,7 @@ impl cosmic::Application for AppModel {
             .align_y(cosmic::iced::Alignment::Center);
         let mut panel_items: Vec<(&str, cosmic::Element<'static, Message>)> = Vec::new();
 
-        if self.settings.weather_enabled {
+        if self.settings.weather_enabled && !self.settings.hidden_panel_items.iter().any(|hidden| hidden == "weather") {
             if let Some(weather) = &self.weather {
                 panel_items.push((
                     "weather",
@@ -1694,7 +1695,7 @@ impl cosmic::Application for AppModel {
             }
         }
         if self.error.is_none() {
-            panel_items.push((
+            if !self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption") { panel_items.push((
                 "power-consumption",
                 panel_item(
                     if self.settings.panel_net_power {
@@ -1720,8 +1721,8 @@ impl cosmic::Application for AppModel {
                         .into(),
                 )
                 .into(),
-            ));
-            if !self.settings.panel_net_power {
+            )); }
+            if !self.settings.panel_net_power && !self.settings.hidden_panel_items.iter().any(|hidden| hidden == "solar-power") {
                 if let Some(input_power) = input_power {
                     panel_items.push((
                         "solar-power",
@@ -1751,7 +1752,7 @@ impl cosmic::Application for AppModel {
                 }
             }
 
-            if self.settings.panel_internet_bandwidth {
+            if self.settings.panel_internet_bandwidth && !self.settings.hidden_panel_items.iter().any(|hidden| hidden == "internet-bandwidth") {
                 let (download, upload) = self
                     .internet_bandwidth
                     .as_ref()
@@ -1812,7 +1813,7 @@ impl cosmic::Application for AppModel {
                         .into(),
                 ));
             }
-            if let Some(temperature) = temperature {
+            if let Some(temperature) = temperature.filter(|_| !self.settings.hidden_panel_items.iter().any(|hidden| hidden == "temperature")) {
                 panel_items.push((
                     "temperature",
                     panel_item(
@@ -2455,6 +2456,7 @@ impl cosmic::Application for AppModel {
                         "temperature" => "temperature",
                         _ => continue,
                     };
+                    let visible = !self.settings.hidden_panel_items.iter().any(|hidden| hidden == id);
                     let mut row = widget::Row::new()
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
@@ -2464,7 +2466,8 @@ impl cosmic::Application for AppModel {
                                 panel_item_label(id),
                             ))
                             .width(cosmic::iced::Length::Fill),
-                        );
+                        )
+                        .push(widget::toggler(visible).on_toggle(move |value| Message::TogglePanelItemVisibility(id, value)));
                     row = row.push(icon_action_button(
                         "+",
                         crate::i18n::tr(&self.settings.language, "Move up"),
@@ -4804,6 +4807,11 @@ impl cosmic::Application for AppModel {
             Message::ToggleMenuElementVisibility(element, visible) => {
                 self.settings.hidden_menu_elements.retain(|hidden| hidden != element);
                 if !visible { self.settings.hidden_menu_elements.push(element.to_string()); }
+                self.persist_settings();
+            }
+            Message::TogglePanelItemVisibility(item, visible) => {
+                self.settings.hidden_panel_items.retain(|hidden| hidden != item);
+                if !visible { self.settings.hidden_panel_items.push(item.to_string()); }
                 self.persist_settings();
             }
             Message::MovePanelItem(item, move_up) => {
