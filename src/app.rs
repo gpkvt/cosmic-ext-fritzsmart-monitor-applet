@@ -2040,8 +2040,8 @@ fn diagnostic_url_button(url: String) -> cosmic::Element<'static, Message> {
 }
 
 fn diagnostic_section_heading(
-    title: String,
-    description: String,
+    title: &'static str,
+    description: &'static str,
 ) -> cosmic::Element<'static, Message> {
     surface_card(
         widget::Column::new()
