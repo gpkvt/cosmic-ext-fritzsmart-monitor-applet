@@ -1,5 +1,9 @@
 # Changelog
 
+### Changed
+
+- Increased vertical spacing between weather condition, humidity/cloud cover, wind/pressure, and visibility/sunrise details.
+
 ### Fixed
 
 - Keep weather image refresh ticks running when the initial weather response contains no usable background, and advance Wikimedia search results by a full page on each fetch so short slideshow intervals do not repeat the same result window.

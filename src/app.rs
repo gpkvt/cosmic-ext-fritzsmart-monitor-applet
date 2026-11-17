@@ -4220,7 +4220,8 @@ impl cosmic::Application for AppModel {
                         .class(cosmic::theme::Button::Standard),
                     );
                 }
-                let mut weather_details = widget::Column::new().spacing(6).push(date_row);
+                // Separate the condition summary from the detailed readings for clearer scanning.
+                let mut weather_details = widget::Column::new().spacing(12).push(date_row);
                 if self.weather_attribution_expanded {
                     for credit in current_attributions {
                         weather_details = weather_details.push(widget::text::caption(format!(
