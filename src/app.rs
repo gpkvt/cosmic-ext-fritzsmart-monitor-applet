@@ -5952,14 +5952,11 @@ impl cosmic::Application for AppModel {
                         if let Some(index) = self.history_graph_index {
                             if let Some((key, name)) = self.history_graph_devices.get(index).cloned() {
                                 if let Some(samples) = self.device_history.get(&key) {
-                                    let visible: Vec<_> = samples
-                                        .iter()
-                                        .filter(|(timestamp, _, _)| now.duration_since(*timestamp) <= window)
-                                        .collect();
-                                    let values = visible.iter().map(|(_, power, _)| *power as f64).collect();
+                                    let values =
+                                        samples.iter().map(|(_, power, _)| *power as f64).collect();
                                     let axis_start = format_graph_axis_start(
                                         minutes,
-                                        visible.first().map(|(timestamp, _, _)| {
+                                        samples.front().map(|(timestamp, _, _)| {
                                             now.duration_since(*timestamp).as_secs().div_ceil(60)
                                         }),
                                     );
