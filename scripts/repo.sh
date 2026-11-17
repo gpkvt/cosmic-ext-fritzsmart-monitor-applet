@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 REPO="${GITHUB_REPOSITORY:-gpkvt/cosmic-ext-fritzsmart-monitor-applet}"
-GH=(gh --repo "$REPO")
+GH=(gh)
 
 usage() {
   cat <<'EOF'
@@ -38,14 +38,14 @@ die() { printf 'Error: %s\n' "$*" >&2; exit 1; }
 require_gh() {
   command -v gh >/dev/null 2>&1 || die "GitHub CLI (gh) is required."
   gh auth status >/dev/null 2>&1 || die "Authenticate first with: gh auth login"
-  "${GH[@]}" repo view --json nameWithOwner --jq .nameWithOwner >/dev/null ||
+  "${GH[@]}" repo view "$REPO" --json nameWithOwner --jq .nameWithOwner >/dev/null ||
     die "Cannot access repository $REPO."
 }
 dispatch() {
   local workflow="$1"
   shift
   printf 'Dispatching %s in %s...\n' "$workflow" "$REPO"
-  "${GH[@]}" workflow run "$workflow" --ref main "$@"
+  "${GH[@]}" workflow run "$workflow" --repo "$REPO" --ref main "$@"
   printf 'Workflow dispatched. Follow it with: make workflow-runs or make workflow-watch RUN_ID=<id>\n'
 }
 
@@ -76,21 +76,21 @@ case "$command" in
     ;;
   workflows)
     require_gh
-    "${GH[@]}" workflow list
+    "${GH[@]}" workflow list --repo "$REPO"
     ;;
   runs|workflow-runs)
     require_gh
     if [[ $# -gt 1 ]]; then die "runs accepts at most one workflow filter."; fi
     if [[ $# -eq 1 ]]; then
-      "${GH[@]}" run list --workflow "$1" --limit 20
+      "${GH[@]}" run list --repo "$REPO" --workflow "$1" --limit 20
     else
-      "${GH[@]}" run list --limit 20
+      "${GH[@]}" run list --repo "$REPO" --limit 20
     fi
     ;;
   watch|workflow-watch)
     [[ $# -eq 1 && "$1" =~ ^[0-9]+$ ]] || die "Usage: repo.sh watch RUN_ID"
     require_gh
-    "${GH[@]}" run watch "$1" --exit-status
+    "${GH[@]}" run watch "$1" --repo "$REPO" --exit-status
     ;;
   *)
     usage >&2
