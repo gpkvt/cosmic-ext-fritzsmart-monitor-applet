@@ -538,9 +538,12 @@ fn graph_visual_with_dimensions(
                 .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
         )
         .push(graph)
-        .push(widget::text::caption(format!(
-            "CURRENT {current_value:.1} {unit}"
-        )));
+        .push(
+            widget::Column::new()
+                .spacing(2)
+                .push(widget::text::caption("CURRENT"))
+                .push(widget::text(format!("{current_value:.1} {unit}"))),
+        );
     if matches!(widget_height, cosmic::iced::Length::Fill) {
         content.height(cosmic::iced::Length::Fill).into()
     } else {
