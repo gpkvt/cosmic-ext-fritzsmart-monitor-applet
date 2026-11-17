@@ -94,8 +94,8 @@ pub fn default_external_temperature_ain(devices: &[FritzDevice]) -> Option<Strin
     devices
         .iter()
         .find(|device| device.name.to_lowercase().contains("solar"))
-        .map(|device| normalize_ain_for_selection(&device.ain))
-        .filter(|ain| !ain.is_empty())
+        .map(|device| device.ain.clone())
+        .filter(|ain| !normalize_ain_for_selection(ain).is_empty())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -526,7 +526,8 @@ impl FritzSettings {
             openweathermap_api_key: get("OPENWEATHERMAP_API_KEY"),
             weather_location: get("WEATHER_LOCATION"),
             weather_temperature_ain: get("WEATHER_TEMPERATURE_AIN"),
-            weather_temperature_source_initialized: get("WEATHER_TEMPERATURE_SOURCE_INITIALIZED").eq_ignore_ascii_case("true")
+            weather_temperature_source_initialized: get("WEATHER_TEMPERATURE_SOURCE_INITIALIZED")
+                .eq_ignore_ascii_case("true")
                 || !get("WEATHER_TEMPERATURE_AIN").trim().is_empty(),
             weather_refresh_interval_minutes: get("WEATHER_REFRESH_INTERVAL_MINUTES")
                 .parse::<u16>()
@@ -1384,7 +1385,7 @@ mod tests {
             FritzDevice { name: "Roof SOLAR meter".into(), ain: "22:22".into() },
             FritzDevice { name: "Solar battery".into(), ain: "33:33".into() },
         ];
-        assert_eq!(default_external_temperature_ain(&devices), Some("2222".into()));
+        assert_eq!(default_external_temperature_ain(&devices), Some("22:22".into()));
         assert_eq!(default_external_temperature_ain(&devices[..1]), None);
     }
 
