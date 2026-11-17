@@ -77,6 +77,7 @@ pub struct AppModel {
     update_installing: bool,
     update_status: Option<String>,
     diagnostic_events: VecDeque<String>,
+    history_storage_diagnostics: serde_json::Value,
     flow_animation_frame: u8,
 }
 
@@ -2047,8 +2048,9 @@ impl cosmic::Application for AppModel {
         if setup_assistant && settings.url.trim().is_empty() {
             settings.url = "http://fritz.box".into();
         }
-        let (history, device_history) =
-            crate::history::load(graph_history_window(settings.graph_timespan_minutes));
+        let history_window = graph_history_window(settings.graph_timespan_minutes);
+        let (history, device_history) = crate::history::load(history_window);
+        let history_storage_diagnostics = crate::history::diagnostics(history_window);
         let collapsed_menu_sections = settings.collapsed_menu_sections.iter().cloned().collect();
         let expanded_devices = settings.expanded_devices.iter().cloned().collect();
         let quick_options_expanded = settings.quick_options_expanded;
@@ -4028,6 +4030,61 @@ impl cosmic::Application for AppModel {
                         }
                     )));
 
+                let now = Instant::now();
+                let device_history_json: Vec<serde_json::Value> = self.readings.iter().map(|reading| {
+                    let ain = crate::fritz::normalize_ain_for_selection(&reading.ain);
+                    let samples = self.device_history.get(&ain);
+                    let (sample_count, first_age_seconds, last_age_seconds, min_power_w, max_power_w) =
+                        if let Some(samples) = samples {
+                            let first_age = samples.front().map(|(timestamp, _, _)| now.saturating_duration_since(*timestamp).as_secs());
+                            let last_age = samples.back().map(|(timestamp, _, _)| now.saturating_duration_since(*timestamp).as_secs());
+                            let min = samples.iter().map(|(_, power, _)| *power).min();
+                            let max = samples.iter().map(|(_, power, _)| *power).max();
+                            (samples.len(), first_age, last_age, min, max)
+                        } else {
+                            (0, None, None, None, None)
+                        };
+                    serde_json::json!({
+                        "name": reading.name,
+                        "ain": reading.ain,
+                        "normalized_ain": ain,
+                        "current_reading_available": true,
+                        "current_power_w": reading.power_w,
+                        "current_temperature_c": reading.temperature_c,
+                        "history_entry_found": samples.is_some(),
+                        "sample_count": sample_count,
+                        "first_sample_age_seconds": first_age_seconds,
+                        "last_sample_age_seconds": last_age_seconds,
+                        "min_power_w": min_power_w,
+                        "max_power_w": max_power_w,
+                        "graph_power_values_retrievable": sample_count > 0
+                    })
+                }).collect();
+                let graph_diagnostics = serde_json::json!({
+                    "history_storage": self.history_storage_diagnostics,
+                    "runtime": {
+                        "configured_timespan_minutes": self.settings.graph_timespan_minutes,
+                        "current_readings": self.readings.len(),
+                        "device_history_entries": self.device_history.len(),
+                        "device_histories": device_history_json,
+                        "overall_power_history_samples": self.history.len()
+                    }
+                });
+                let graph_diagnostics_text = serde_json::to_string_pretty(&graph_diagnostics)
+                    .unwrap_or_else(|error| format!("{{\"serialization_error\":\"{error}\"}}"));
+                content = content
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3(crate::i18n::tr(
+                        &self.settings.language,
+                        "Graph history retrieval (JSON)",
+                    )))
+                    .push(widget::text::caption(crate::i18n::tr(
+                        &self.settings.language,
+                        "Shows whether history was read from disk, matched to each live device and converted into graph values.",
+                    )))
+                    .push(widget::selectable_text::selectable_text(graph_diagnostics_text)
+                        .width(cosmic::iced::Length::Fill));
+
                 let refresh_indicator = if self.refresh_started_at.is_some() {
                     icon_action_button(
                         self.refresh_started_at
@@ -5898,7 +5955,14 @@ impl cosmic::Application for AppModel {
                                 crate::history::save(&self.history, &self.device_history)
                             {
                                 eprintln!("Could not persist graph history: {error}");
+                                record_diagnostic_event(
+                                    &mut self.diagnostic_events,
+                                    format!("Graph history save failed: {error}"),
+                                );
                             }
+                            self.history_storage_diagnostics = crate::history::diagnostics(
+                                graph_history_window(self.settings.graph_timespan_minutes),
+                            );
                             self.error = None;
                             self.updated =
                                 Some(chrono::Local::now().format("%H:%M:%S").to_string());
