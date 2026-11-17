@@ -558,7 +558,6 @@ fn interactive_graph(
     let values: Vec<f64> = values.collect();
     let graph = widget::Column::new()
         .spacing(6)
-        .push(graph_visual(values.iter().copied(), style, unit))
         .push(
             widget::Row::new()
                 .align_y(cosmic::iced::Alignment::Center)
@@ -568,7 +567,8 @@ fn interactive_graph(
                     language,
                     "Open graph",
                 ))),
-        );
+        )
+        .push(graph_visual(values.iter().copied(), style, unit));
     widget::button::custom(graph)
         .on_press(Message::ShowGraph(
             title.to_string(),
@@ -997,8 +997,7 @@ fn total_power_overview(
             &settings.graph_style,
             "W",
         ))
-        .push(
-            widget::Row::new()
+        .push(            widget::Row::new()
                 .width(cosmic::iced::Length::Fill)
                 .push(widget::text::caption(axis_start.clone()))
                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
@@ -1997,8 +1996,7 @@ impl cosmic::Application for AppModel {
                                         .align_y(cosmic::iced::Alignment::Center)
                                         .push(
                                             widget::icon::from_name("window-close-symbolic")
-                                                .size(18),
-                                        )
+                                                .size(18),                                        )
                                         .push(widget::text::caption(crate::i18n::tr(
                                             &self.settings.language,
                                             "Close",
@@ -2997,8 +2995,7 @@ impl cosmic::Application for AppModel {
                             "SETTINGS NOT SAVED"
                         } else {
                             "CONNECTION FAILED"
-                        };
-                        let message = status
+                        };                        let message = status
                             .split_once(':')
                             .map(|(_, message)| message.trim())
                             .unwrap_or(status);
@@ -3997,8 +3994,7 @@ impl cosmic::Application for AppModel {
                     else if key == "bandwidth" { "internet-bandwidth" }
                     else if key.starts_with("2-") { "devices" }
                     else if key.starts_with("3-") { "total-power-output" }
-                    else if key.starts_with("4-") { "total-power-input" }
-                    else { "devices" };
+                    else if key.starts_with("4-") { "total-power-input" }                    else { "devices" };
                     !self.settings.hidden_menu_elements.iter().any(|hidden| hidden == element)
                 });
                 // Sort popup sections by the user's saved order while preserving device order.
@@ -4997,8 +4993,7 @@ impl cosmic::Application for AppModel {
                 self.settings.allow_invalid_certs = value;
                 self.persist_settings();
             }
-            Message::CaCertPathChanged(value) => {
-                self.settings.ca_cert_path = value;
+            Message::CaCertPathChanged(value) => {                self.settings.ca_cert_path = value;
                 self.persist_settings();
             }
             Message::PanelTextSizeChanged(value) => {
