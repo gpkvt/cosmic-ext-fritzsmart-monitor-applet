@@ -2202,7 +2202,7 @@ impl cosmic::Application for AppModel {
                 .applet
                 .text(value)
                 .size(panel_text_size)
-                .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
+                .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.65))
         };
         let panel_value = |value: String| -> cosmic::Element<'static, Message> {
             // Keep text at its natural width and position it inside a shared
@@ -2242,7 +2242,7 @@ impl cosmic::Application for AppModel {
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>,
                           icon_at_top: bool| {
-            let line_height = (panel_text_size * 0.85).max(1.0);
+            let line_height = (panel_text_size * 0.65).max(1.0);
             let item_height = if icon_at_top {
                 (line_height * 2.0).max(24.0)
             } else {
