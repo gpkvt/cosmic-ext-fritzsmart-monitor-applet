@@ -51,7 +51,7 @@ def render(source: Path, destination: Path, title: str) -> None:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#10131a">
-<meta name="description" content="{escape(title)} — FRITZ!Power Monitor documentation.">
+<meta name="description" content="{escape(title)} — Dokumentation zu FRITZ!Power Monitor.">
 <title>{escape(title)} — FRITZ!Power Monitor</title>
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <style>{STYLE}</style>
