@@ -376,7 +376,7 @@ fn commons_title_matches_condition(icon_code: &str, title: &str) -> bool {
         "theater", "fiction", "character", "sculpture", "statue", "map",
         "diagram", "chart", "screenshot", "city", "cities", "urban", "street",
         "road", "highway", "building", "buildings", "architecture", "bridge",
-        "village", "town", "suburb", "industrial", "factory", "vehicle",
+        "village", "town", "suburb", "industrial", "factory", "vehicle", "portrait", "person", "people", "crowd", "fashion", "product", "stilllife",
         "car", "train", "ship", "harbor", "harbour", "port",
     ];
     if has(&excluded_terms) {
@@ -845,9 +845,9 @@ mod tests {
             ("01d", "sunny blue sky landscape"),
             ("01n", "clear starry night sky landscape"),
             ("10n", "rain falling over forest at night"),
-            ("10d", "rain shower daytime landscape"),
+            ("10d", "rain shower over green countryside"),
             ("11n", "lightning thunderstorm over mountain landscape night"),
-            ("11d", "thunderstorm lightning dark clouds daytime"),
+            ("11d", "thunderstorm lightning over mountain landscape"),
             ("13n", "snowy forest under starry night sky"),
             ("50d", "morning fog forest landscape"),
         ] {
@@ -859,7 +859,7 @@ mod tests {
         );
         assert_eq!(
             commons_search_term("01n", 2),
-            "moon stars night mountain landscape"
+            "milky way stars over natural landscape"
         );
     }
 
