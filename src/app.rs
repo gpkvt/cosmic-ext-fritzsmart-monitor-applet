@@ -4541,6 +4541,18 @@ impl cosmic::Application for AppModel {
                 let mut tasks = vec![Task::perform(fetch_fritz_data(), |result| {
                     cosmic::Action::App(Message::Updated(result))
                 })];
+
+                // A manual reload must refresh the discovered device inventory
+                // as well as the selected devices' live readings. This picks up
+                // newly connected/renamed devices without reopening Settings.
+                if !self.devices_loading {
+                    self.devices_loading = true;
+                    let settings = self.settings.clone();
+                    tasks.push(Task::perform(discover_devices(settings), |result| {
+                        cosmic::Action::App(Message::DevicesLoaded(result))
+                    }));
+                }
+
                 if self.settings.weather_enabled
                     && !self.settings.openweathermap_api_key.trim().is_empty()
                     && !self.settings.weather_location.trim().is_empty()
