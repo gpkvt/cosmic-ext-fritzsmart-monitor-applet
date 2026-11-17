@@ -1356,10 +1356,12 @@ mod tests {
     #[test]
     fn parses_persisted_collapsed_menu_sections_safely() {
         assert_eq!(
-            parse_collapsed_menu_sections("weather,unknown,summary,weather,total-power-input,current-power-history"),
+            parse_collapsed_menu_sections("weather,unknown,summary,weather,internet-bandwidth,total-power-output,total-power-input,current-power-history"),
             vec![
                 "weather".to_string(),
                 "summary".to_string(),
+                "internet-bandwidth".to_string(),
+                "total-power-output".to_string(),
                 "total-power-input".to_string(),
                 "current-power-history".to_string(),
             ]
