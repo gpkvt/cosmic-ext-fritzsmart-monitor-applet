@@ -4422,7 +4422,7 @@ impl cosmic::Application for AppModel {
                         .unwrap_or(1.0)
                         .clamp(0.0, 1.0);
                     weather_section = weather_section.push(
-                        widget::progress_bar(0.0..=1.0, progress)
+                        widget::progress_bar::ProgressBar::new(0.0..=1.0, progress)
                             .height(cosmic::iced::Length::Fixed(2.0)),
                     );
                 }
