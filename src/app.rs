@@ -2310,21 +2310,21 @@ impl cosmic::Application for AppModel {
                     "Weather",
                     Some(widget::icon::from_name(weather.icon_name()).size(10).into()),
                     panel_value(panel_value_with_unit(
-                            format!(
-                                "{:.0} °C",
-                                selected_weather_temperature(
-                                    &self.readings,
-                                    &self.settings.weather_temperature_ain,
-                                    weather.temperature_c,
-                                )
-                            ),
-                            self.settings.panel_multiline
-                                && self
-                                    .settings
-                                    .hidden_panel_items
-                                    .iter()
-                                    .any(|hidden| hidden == "temperature"),
-                        )),
+                        format!(
+                            "{:.0} °C",
+                            selected_weather_temperature(
+                                &self.readings,
+                                &self.settings.weather_temperature_ain,
+                                weather.temperature_c,
+                            )
+                        ),
+                        self.settings.panel_multiline
+                            && self
+                                .settings
+                                .hidden_panel_items
+                                .iter()
+                                .any(|hidden| hidden == "temperature"),
+                    )),
                     self.settings.panel_multiline
                         && self
                             .settings
