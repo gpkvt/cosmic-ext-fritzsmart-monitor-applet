@@ -4389,22 +4389,22 @@ impl cosmic::Application for AppModel {
             }
         }
 
-        content = content.push(
-            widget::Row::new()
-                .width(cosmic::iced::Length::Fill)
-                .align_y(cosmic::iced::Alignment::Center)
-                .push(
-                    widget::Space::new().width(cosmic::iced::Length::Fill),
-                )
-                .push(
-                    widget::button::custom(widget::text::caption("Source code ↗"))
-                        .on_press(Message::OpenCommonsPage(
-                            "https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet".into(),
-                        ))
-                        .padding([4, 8])
-                        .class(cosmic::theme::Button::Text),
-                ),
-        );
+        let sticky_footer = widget::Row::new()
+            .width(cosmic::iced::Length::Fill)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::text::caption(format!(
+                "FRITZ!Power Monitor · v{}",
+                env!("APP_VERSION")
+            )))
+            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+            .push(
+                widget::button::custom(widget::text::caption("Source code ↗"))
+                    .on_press(Message::OpenCommonsPage(
+                        "https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet".into(),
+                    ))
+                    .padding([4, 8])
+                    .class(cosmic::theme::Button::Text),
+            );
         // Keep the popup content transparent so COSMIC can render its
         // compositor-backed frosted-glass surface behind the complete menu.
         // Only the main-menu title bar stays outside the scrollable area.
@@ -4460,6 +4460,8 @@ impl cosmic::Application for AppModel {
                 .push(widget::container(sticky_header).padding([8, 12]))
                 .push(widget::divider::horizontal::default())
                 .push(scrollable_content)
+                .push(widget::divider::horizontal::default())
+                .push(widget::container(sticky_footer).padding([4, 8]))
         } else {
             let title_bar = widget::container(
                 widget::Row::new()
@@ -4511,6 +4513,8 @@ impl cosmic::Application for AppModel {
                 .push(title_bar)
                 .push(widget::divider::horizontal::default())
                 .push(scrollable_content)
+                .push(widget::divider::horizontal::default())
+                .push(widget::container(sticky_footer).padding([4, 8]))
         };
 
         // Keep the popup within a practical height. The main-menu title bar
