@@ -121,7 +121,6 @@ jobs:
           ref: ${{ needs.version.outputs.commit }}
 
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
 
       - name: Install package build dependencies
         run: |
