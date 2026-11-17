@@ -1,6 +1,6 @@
 use reqwest::Client;
 use std::sync::LazyLock;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommonsAttribution {
@@ -650,6 +650,20 @@ async fn fetch_commons_background(
                 ("gsrsearch", search),
                 ("gsrnamespace", "6"),
                 ("gsrlimit", "20"),
+                // Wikimedia's search ranking is stable. Advance through
+                // result windows so successive slideshow refreshes can show
+                // different relevant photographs instead of the same first hits.
+                (
+                    "gsroffset",
+                    &((SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                        / 30
+                        * 5)
+                        % 1000)
+                        .to_string(),
+                ),
                 ("prop", "imageinfo|categories"),
                 ("iiprop", "url|extmetadata"),
                 ("cllimit", "20"),
