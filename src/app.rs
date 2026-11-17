@@ -4119,7 +4119,10 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
                     .push(diagnostic_section_heading(
                         crate::i18n::tr(&self.settings.language, "Weather services"),
-                        crate::i18n::tr(&self.settings.language, "Latest request status for weather, forecasts and background images"),
+                        crate::i18n::tr(
+                            &self.settings.language,
+                            "Latest request status for weather, forecasts and background images",
+                        ),
                     ))
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::title3(crate::i18n::tr(
