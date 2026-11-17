@@ -25,7 +25,7 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.ref }}
           fetch-depth: 0
 
       - name: Install Rust
