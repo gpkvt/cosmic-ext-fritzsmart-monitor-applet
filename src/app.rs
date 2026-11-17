@@ -5743,9 +5743,10 @@ impl cosmic::Application for AppModel {
                             .iter()
                             .map(|frame| semi_transparent_weather_photo(frame))
                             .collect();
-                        if let Some(background) = weather.background_image.as_mut() {
-                            *background = semi_transparent_weather_photo(background);
-                        }
+                        weather.background_image = weather
+                            .background_image
+                            .take()
+                            .map(|background| semi_transparent_weather_photo(&background));
                         weather.slideshow_sequence = sequence;
                         weather.slideshow_frame_sources = frame_sources;
                         let slideshow_len = weather.slideshow_sequence.len();
