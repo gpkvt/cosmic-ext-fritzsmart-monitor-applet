@@ -1733,8 +1733,8 @@ impl cosmic::Application for AppModel {
                             .into(),
                     )
                     .into(),
-                    ));
-                }
+                ));
+            }
             if !self.settings.panel_net_power
                 && !self
                     .settings
