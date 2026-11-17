@@ -2301,14 +2301,16 @@ impl cosmic::Application for AppModel {
                     .center_y(icon_height as u16);
                 item = item.push(icon_column);
             }
-            // Paired rows put flexible space between the left-aligned icon
-            // and the right-aligned value. This makes the numeric values share
-            // a common right edge without widening standalone panel items.
-            if align_value_column {
-                item = item.push(widget::Space::new().width(cosmic::iced::Length::Fill));
-            }
+            // Give the value the remaining item width and align its contents
+            // to the right. In paired rows this creates a shared right edge;
+            // standalone rows retain their intrinsic width because the row
+            // itself remains shrink-wrapped.
             let mut value = widget::container(value)
-                .width(cosmic::iced::Length::Shrink)
+                .width(if align_value_column {
+                    cosmic::iced::Length::Fill
+                } else {
+                    cosmic::iced::Length::Shrink
+                })
                 .align_x(cosmic::iced::Alignment::End);
             if !icon_at_top {
                 value = value.center_y(item_height as u16);
