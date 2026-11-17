@@ -265,8 +265,14 @@ fn build_debug_report(app: &AppModel, fritzbox_dump: &str) -> String {
         .unwrap_or_else(|| "Not available".into());
     let history_diagnostics = serde_json::to_string_pretty(&app.history_storage_diagnostics)
         .unwrap_or_else(|error| format!("Could not serialize history diagnostics: {error}"));
+    let fritzbox_system_info = serde_json::from_str::<serde_json::Value>(fritzbox_dump)
+        .ok()
+        .and_then(|dump| dump.get("system_info").cloned())
+        .filter(|value| !value.is_null())
+        .and_then(|value| serde_json::to_string_pretty(&value).ok())
+        .unwrap_or_else(|| "Not available (see FRITZ!Box endpoint errors below)".into());
     format!(
-        "FRITZ!Power Monitor debug report\nGenerated: {}\nApplication version: {}\nOperating system: {}\nCPU temperature: {}\n\n[Connection]\nFRITZ!Box URL: {}\nUsername configured: {}\nPassword configured: {}\nInvalid certificates allowed: {}\nCustom CA configured: {}\nLast FRITZ!Box error: {}\n\n[Weather]\nEnabled: {}\nLast weather error: {}\nForecast error: {}\n\n[Settings]\nRefresh interval: {} seconds\nGraph range: {} minutes\nGraph style: {}\nSelected devices: {}\nDiscovered devices: {}\n\n[Current readings]\n{}\n\n[FRITZ!Box endpoint JSON dump]\n{}\n\n[HTTP requests]\n{}\n\n[Diagnostic activity]\n{}\n\n[History storage diagnostics]\n{}\n",
+        "FRITZ!Power Monitor debug report\nGenerated: {}\nApplication version: {}\nOperating system: {}\nCPU temperature: {}\n\n[Connection]\nFRITZ!Box URL: {}\nUsername configured: {}\nPassword configured: {}\nInvalid certificates allowed: {}\nCustom CA configured: {}\nLast FRITZ!Box error: {}\n\n[Weather]\nEnabled: {}\nLast weather error: {}\nForecast error: {}\n\n[Settings]\nRefresh interval: {} seconds\nGraph range: {} minutes\nGraph style: {}\nSelected devices: {}\nDiscovered devices: {}\n\n[Current readings]\n{}\n\n[FRITZ!Box system information]\n{}\n\n[FRITZ!Box endpoint JSON dump]\n{}\n\n[HTTP requests]\n{}\n\n[Diagnostic activity]\n{}\n\n[History storage diagnostics]\n{}\n",
         chrono::Local::now().format("%Y-%m-%d %H:%M:%S %:z"),
         env!("APP_VERSION"),
         os_release,
