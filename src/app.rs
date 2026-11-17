@@ -4413,21 +4413,25 @@ impl cosmic::Application for AppModel {
                     // A missing deadline means the request is currently in flight.
                     // Keep the line full until the response arrives and starts the
                     // next interval, so it resets only after the image fetch completes.
+                    // This is a countdown: start full and recede toward empty
+                    // as the next image refresh approaches.
                     let progress = self
                         .next_weather_refresh_at
                         .map(|deadline| {
                             let remaining = deadline
                                 .saturating_duration_since(Instant::now())
                                 .as_secs_f32();
-                            1.0 - remaining / refresh_interval.as_secs_f32()
+                            remaining / refresh_interval.as_secs_f32()
                         })
-                        .unwrap_or(1.0)
+                        .unwrap_or(0.0)
                         .clamp(0.0, 1.0);
                     weather_visual = weather_visual.push(
                         widget::progress_bar::linear::Linear::new()
-                            .girth(2.0)
+                            .girth(1.0)
                             .progress(progress)
-                            .width(cosmic::iced::Length::Fill),
+                            .width(cosmic::iced::Length::Fill)
+                            .track_color(cosmic::iced::Color::TRANSPARENT)
+                            .border_radius(0.0),
                     );
                 }
                 weather_section = weather_section.push(weather_visual);
