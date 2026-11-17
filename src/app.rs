@@ -4437,7 +4437,16 @@ impl cosmic::Application for AppModel {
             }
         }
 
-        content = content.push(
+        // Keep the popup content transparent so COSMIC can render its
+        // compositor-backed frosted-glass surface behind the complete menu.
+        // Only the main-menu title bar stays outside the scrollable area.
+        // This keeps the applet name and both actions visible while the device
+        // cards and graphs scroll independently beneath it.
+        let scrollable_content = widget::scrollable(content)
+            .width(cosmic::iced::Length::Fill)
+            .height(cosmic::iced::Length::Fill);
+
+        let menu_footer = widget::container(
             widget::Row::new()
                 .width(cosmic::iced::Length::Fill)
                 .align_y(cosmic::iced::Alignment::Center)
@@ -4454,15 +4463,9 @@ impl cosmic::Application for AppModel {
                         .padding([4, 8])
                         .class(cosmic::theme::Button::Text),
                 ),
-        );
-        // Keep the popup content transparent so COSMIC can render its
-        // compositor-backed frosted-glass surface behind the complete menu.
-        // Only the main-menu title bar stays outside the scrollable area.
-        // This keeps the applet name and both actions visible while the device
-        // cards and graphs scroll independently beneath it.
-        let scrollable_content = widget::scrollable(content)
-            .width(cosmic::iced::Length::Fill)
-            .height(cosmic::iced::Length::Fill);
+        )
+        .padding([4, 12])
+        .width(cosmic::iced::Length::Fill);
 
         let popup_content = if self.settings_open {
             let sticky_header = if let Some(section) = self.active_settings_section {
@@ -4561,6 +4564,8 @@ impl cosmic::Application for AppModel {
                 .push(title_bar)
                 .push(widget::divider::horizontal::default())
                 .push(scrollable_content)
+                .push(widget::divider::horizontal::default())
+                .push(menu_footer)
         };
 
         // Keep the popup within a practical height. The main-menu title bar
