@@ -128,7 +128,6 @@ pub enum Message {
     WeatherUpdated(Box<Result<WeatherData, String>>),
     WeatherImagesUpdated(Result<(Vec<Vec<u8>>, Vec<crate::weather::CommonsAttribution>), String>),
     WeatherSlideshowTick,
-    WeatherImageCountdownTick,
     ToggleWeatherForecast,
     ToggleWeatherAttribution,
     TestNotification,
@@ -1986,9 +1985,9 @@ fn diagnostics_clock_ticks() -> impl futures::Stream<Item = Message> {
 }
 
 fn animation_ticks() -> impl futures::Stream<Item = Message> {
-    // A 10 fps spinner is visually smooth enough at this small size and avoids
-    // forcing a full applet redraw at display refresh rate while requests run.
-    clock_ticks(Duration::from_millis(100))
+    // Four updates per second keep the refresh indicator responsive without
+    // repeatedly rebuilding the full applet while a request is in flight.
+    clock_ticks(Duration::from_millis(250))
 }
 
 fn flow_animation_ticks() -> impl futures::Stream<Item = Message> {
@@ -2000,29 +1999,6 @@ fn flow_animation_ticks() -> impl futures::Stream<Item = Message> {
             loop {
                 interval.tick().await;
                 if output.send(Message::FlowAnimationTick).await.is_err() {
-                    break;
-                }
-            }
-        },
-    )
-}
-
-fn weather_image_countdown_ticks() -> impl futures::Stream<Item = Message> {
-    // Re-render at 10 fps: frequent enough for a visibly smooth countdown line
-    // without forcing a full applet redraw at 30 fps.
-    // This subscription runs only while the weather popup and countdown are visible.
-    cosmic::iced::stream::channel(
-        2,
-        |mut output: futures::channel::mpsc::Sender<Message>| async move {
-            let mut interval = tokio::time::interval(Duration::from_millis(100));
-            interval.tick().await;
-            loop {
-                interval.tick().await;
-                if output
-                    .send(Message::WeatherImageCountdownTick)
-                    .await
-                    .is_err()
-                {
                     break;
                 }
             }
@@ -2151,9 +2127,6 @@ impl cosmic::Application for AppModel {
 
         let mut subscriptions = vec![clock];
         if self.popup.is_some() {
-            if self.next_weather_image_fetch_at.is_some() {
-                subscriptions.push(Subscription::run(weather_image_countdown_ticks));
-            }
             if energy_flow_values(&self.readings, &self.settings.input_ains).is_some() {
                 subscriptions.push(Subscription::run(flow_animation_ticks));
             }
@@ -6249,7 +6222,6 @@ impl cosmic::Application for AppModel {
                     self.persist_settings();
                 }
             }
-            Message::WeatherImageCountdownTick => {}
             Message::WeatherSlideshowTick => {
                 if self.popup.is_some() {
                     // Advance the visual slideshow independently of image fetching.
