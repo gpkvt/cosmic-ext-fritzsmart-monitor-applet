@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- Drive the weather image countdown from the configured slideshow image duration and the next Commons background-image fetch, independently of the OpenWeatherMap data refresh interval.
+
+### Fixed
+
 - Fetch fresh weather background images whenever the configured per-image slideshow duration expires, independently of the weather-data refresh schedule.
 
 ### Fixed
