@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- Aligned the unit line of split panel values directly beneath the number, without adding a second indentation on top of the icon column.
+
+## [17.11.2026]
+
+### Fixed
+
 - Corrected split-unit formatting for unpaired readings in two-line panel mode while keeping the two lines tightly stacked.
 
 ## [17.11.2026]
