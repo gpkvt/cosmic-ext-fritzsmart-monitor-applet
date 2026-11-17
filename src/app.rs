@@ -2183,18 +2183,19 @@ impl cosmic::Application for AppModel {
                 cosmic::iced::Alignment::Center
             });
             if let Some(icon) = icon {
+                // Reserve the same icon column for every panel item so all
+                // readings begin at an identical horizontal position.
                 item = item.push(
                     widget::container(icon)
-                        .width(cosmic::iced::Length::Fixed(12.0))
+                        .width(cosmic::iced::Length::Fixed(16.0))
                         .height(cosmic::iced::Length::Fixed(24.0))
-                        .padding([0, 0, 0, 2])
+                        .center_x(16)
                         .center_y(24),
                 );
             }
-            // Let each value reserve its natural width. A fixed 52px column
-            // wraps larger readings when the panel text size is increased.
-            let value =
-                widget::container(value).align_x(cosmic::iced::alignment::Horizontal::Right);
+            // Keep values left-aligned within their natural-width area. This
+            // gives every panel item the same text origin without forcing a
+            // fixed-width column that could wrap larger readings.
             self.core.applet.applet_tooltip(
                 item.push(value),
                 label,
@@ -2355,17 +2356,17 @@ impl cosmic::Application for AppModel {
                         .spacing(5)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(
+                            // Match the shared 16px icon column used by all
+                            // other panel readings.
                             widget::container(widget::icon::from_name(icon).size(10))
-                                .width(cosmic::iced::Length::Fixed(12.0)),
+                                .width(cosmic::iced::Length::Fixed(16.0))
+                                .center_x(16),
                         )
                         .push(
                             // Keep the value and unit together at every configured
                             // font size; the panel row grows to fit instead of wrapping.
-                            widget::container(
-                                widget::text::body(keep_value_unit_together(value))
-                                    .size(f32::from(self.settings.panel_text_size)),
-                            )
-                            .align_x(cosmic::iced::alignment::Horizontal::Right),
+                            widget::text::body(keep_value_unit_together(value))
+                                .size(f32::from(self.settings.panel_text_size)),
                         )
                 };
                 let bandwidth_rows: cosmic::Element<'static, Message> =
@@ -2383,7 +2384,7 @@ impl cosmic::Application for AppModel {
                             .push(bandwidth_row("go-up-symbolic", upload))
                             .into()
                     };
-                let bandwidth_item = widget::container(bandwidth_rows).padding([0, 0, 0, 2]);
+                let bandwidth_item = widget::container(bandwidth_rows);
                 panel_items.push((
                     "internet-bandwidth",
                     self.core
