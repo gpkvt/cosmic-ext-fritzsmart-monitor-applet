@@ -4,6 +4,7 @@
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+import os
 import re
 import sys
 
@@ -68,7 +69,7 @@ for page in pages:
         version_match = re.search(r'(?ms)^\[package\]\s+.*?^version\s*=\s*"([^"]+)"', cargo)
         if not version_match:
             fail("could not read package version from Cargo.toml")
-        version = version_match.group(1)
+        version = os.environ.get("APP_RELEASE_VERSION", version_match.group(1))
         if "@APP_VERSION@" in content:
             fail("index.html: unresolved package download version placeholder")
         expected_downloads = (
@@ -110,7 +111,7 @@ for page in pages:
             fail(f"index.html: expected ten screenshot cards, found {hero_cards}")
         if '.hero-gallery .hero-shot{display:none}' in content:
             fail("index.html: screenshot deck must not be hidden")
-        for feature in ("card-deal", "openGallery(index)", "gallery-enter", "gallery-image-enter", ".hero-shot:hover", "border-color:#8be0c4aa"):
+        for feature in ("card-deal", "openGalerie(index)", "gallery-enter", "gallery-image-enter", ".hero-shot:hover", "border-color:#8be0c4aa"):
             if feature not in content:
                 fail(f"index.html: screenshot gallery interaction or styling is missing {feature}")
         hover_rule = re.search(r"\.hero-shot:hover[^\{]*\{([^}]*)\}", content)
