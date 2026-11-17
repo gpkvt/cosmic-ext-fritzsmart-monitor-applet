@@ -377,6 +377,20 @@ fn format_graph_timespan(minutes: u32) -> String {
     }
 }
 
+fn input_display_range(history: &VecDeque<(Instant, i64)>) -> (i64, i64) {
+    let low = history
+        .iter()
+        .map(|(_, value)| *value)
+        .max()
+        .unwrap_or_default();
+    let high = history
+        .iter()
+        .map(|(_, value)| *value)
+        .min()
+        .unwrap_or_default();
+    (low, high)
+}
+
 fn input_energy_and_timespan(history: &VecDeque<(Instant, i64)>) -> Option<(f64, Duration)> {
     let (first_timestamp, _) = history.front()?;
     let (last_timestamp, _) = history.back()?;
@@ -1055,16 +1069,7 @@ fn total_power_overview(
         rebuild_temperature_history(device_history, &settings.input_ains, false);
     let input_temperature_history =
         rebuild_temperature_history(device_history, &settings.input_ains, true);
-    let input_low = input_history
-        .iter()
-        .map(|(_, value)| *value)
-        .min()
-        .unwrap_or_default();
-    let input_high = input_history
-        .iter()
-        .map(|(_, value)| *value)
-        .max()
-        .unwrap_or_default();
+    let (input_low, input_high) = input_display_range(&input_history);
     let total_power = output_power_w(readings, &settings.input_ains);
     let input_power = input_power_w(readings, &settings.input_ains);
     let axis_start = format_graph_axis_start(
@@ -5865,6 +5870,19 @@ mod history_tests {
         assert_eq!(format_countdown(60), "1m 00s");
         assert_eq!(format_countdown(3599), "59m 59s");
         assert_eq!(format_countdown(3600), "1h 00m 00s");
+    }
+
+    #[test]
+    fn input_high_and_low_metrics_are_inverted_for_negative_power_values() {
+        let start = Instant::now();
+        let history = VecDeque::from([
+            (start, -500),
+            (start + Duration::from_secs(60), -200),
+            (start + Duration::from_secs(120), -100),
+        ]);
+
+        assert_eq!(input_display_range(&history), (-100, -500));
+        assert_eq!(input_display_range(&VecDeque::new()), (0, 0));
     }
 
     #[test]
