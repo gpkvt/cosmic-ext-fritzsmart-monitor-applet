@@ -374,7 +374,10 @@ fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
         .filter(|id| {
             SECTION_IDS.contains(id)
                 || id.strip_prefix("device-graph-pair-").is_some_and(|ain| {
-                    !ain.is_empty() && ain.chars().all(|character| character.is_ascii_alphanumeric())
+                    !ain.is_empty()
+                        && ain
+                            .chars()
+                            .all(|character| character.is_ascii_alphanumeric())
                 })
         })
         .map(str::to_string)
