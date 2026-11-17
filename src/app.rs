@@ -2193,10 +2193,15 @@ impl cosmic::Application for AppModel {
                         .center_y(24),
                 );
             }
-            // Align every reading to the right and bottom of its value area.
+            // Give the value a real, expanding layout area. Alignment on a
+            // shrink-wrapped container is a no-op, so the item and value both
+            // fill their available panel column.
             let value = widget::container(value)
-                .align_x(cosmic::iced::alignment::Horizontal::Right)
-                .align_y(cosmic::iced::Alignment::End);
+                .align_right(cosmic::iced::Length::Fill)
+                .align_bottom(24);
+            item = item
+                .width(cosmic::iced::Length::Fill)
+                .height(cosmic::iced::Length::Fixed(24.0));
             self.core.applet.applet_tooltip(
                 item.push(value),
                 label,
@@ -2207,6 +2212,7 @@ impl cosmic::Application for AppModel {
         };
 
         let mut content = widget::Row::new()
+            .width(cosmic::iced::Length::Fill)
             .spacing(f32::from(self.settings.panel_item_spacing))
             .align_y(cosmic::iced::Alignment::Center);
         let mut panel_items: Vec<(&str, cosmic::Element<'static, Message>)> = Vec::new();
@@ -2354,24 +2360,27 @@ impl cosmic::Application for AppModel {
                 // with a modest gap after each direction icon.
                 let bandwidth_row = |icon: &'static str, value: String| {
                     widget::Row::new()
+                        .width(cosmic::iced::Length::Fill)
+                        .height(cosmic::iced::Length::Fixed(24.0))
                         .spacing(5)
-                        .align_y(cosmic::iced::Alignment::Center)
+                        .align_y(cosmic::iced::Alignment::End)
                         .push(
                             // Match the shared 16px icon column used by all
                             // other panel readings.
                             widget::container(widget::icon::from_name(icon).size(10))
                                 .width(cosmic::iced::Length::Fixed(16.0))
-                                .center_x(16),
+                                .center_x(16)
+                                .align_bottom(24),
                         )
                         .push(
-                            // Keep the value and unit together at every configured
-                            // font size; the panel row grows to fit instead of wrapping.
+                            // The fill-width value area makes right alignment
+                            // effective instead of aligning a shrink-wrapped label.
                             widget::container(
                                 widget::text::body(keep_value_unit_together(value))
                                     .size(f32::from(self.settings.panel_text_size)),
                             )
-                            .align_x(cosmic::iced::alignment::Horizontal::Right)
-                            .align_y(cosmic::iced::Alignment::End),
+                            .align_right(cosmic::iced::Length::Fill)
+                            .align_bottom(24),
                         )
                 };
                 let bandwidth_rows: cosmic::Element<'static, Message> =
