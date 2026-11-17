@@ -2193,9 +2193,10 @@ impl cosmic::Application for AppModel {
                         .center_y(24),
                 );
             }
-            // Keep values left-aligned within their natural-width area. This
-            // gives every panel item the same text origin without forcing a
-            // fixed-width column that could wrap larger readings.
+            // Align every reading to the right and bottom of its value area.
+            let value = widget::container(value)
+                .align_x(cosmic::iced::alignment::Horizontal::Right)
+                .align_y(cosmic::iced::Alignment::End);
             self.core.applet.applet_tooltip(
                 item.push(value),
                 label,
@@ -2365,8 +2366,12 @@ impl cosmic::Application for AppModel {
                         .push(
                             // Keep the value and unit together at every configured
                             // font size; the panel row grows to fit instead of wrapping.
-                            widget::text::body(keep_value_unit_together(value))
-                                .size(f32::from(self.settings.panel_text_size)),
+                            widget::container(
+                                widget::text::body(keep_value_unit_together(value))
+                                    .size(f32::from(self.settings.panel_text_size)),
+                            )
+                            .align_x(cosmic::iced::alignment::Horizontal::Right)
+                            .align_y(cosmic::iced::Alignment::End),
                         )
                 };
                 let bandwidth_rows: cosmic::Element<'static, Message> =
