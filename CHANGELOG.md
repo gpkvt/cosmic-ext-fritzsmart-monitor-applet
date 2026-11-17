@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- Reduce idle CPU usage by polling scheduled refresh deadlines every five seconds, switching to one-second updates only near deadlines or while settings feedback is active.
+
+### Fixed
+
 - Reduce CPU usage by limiting refresh-spinner redraws to four per second and using the existing app clock for the weather countdown instead of a separate 10 fps timer.
 
 ### Changed
