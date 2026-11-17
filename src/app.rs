@@ -65,6 +65,8 @@ pub struct AppModel {
     next_weather_refresh_at: Option<Instant>,
     pending_power_changes: HashSet<String>,
     pending_power_targets: HashMap<String, bool>,
+    latest_version: Option<Result<String, String>>,
+    latest_version_loading: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -115,6 +117,8 @@ pub enum Message {
     TestNotification,
     CopyDiagnosticUrl(String),
     FetchForecastFromDiagnostics,
+    CheckLatestVersion,
+    LatestVersionChecked(Result<String, String>),
     SelectWeatherForecast(u8),
     WeatherForecastUpdated(u8, Result<WeatherForecast, String>),
     OpenCommonsPage(String),
@@ -1537,6 +1541,59 @@ fn clock_ticks(interval_duration: Duration) -> impl futures::Stream<Item = Messa
     )
 }
 
+async fn fetch_latest_release_version() -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
+        .timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|error| error.to_string())?;
+    let response = client
+        .get("https://api.github.com/repos/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/latest")
+        .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+        .send()
+        .await
+        .map_err(|error| error.to_string())?
+        .error_for_status()
+        .map_err(|error| error.to_string())?;
+    let release: serde_json::Value = response.json().await.map_err(|error| error.to_string())?;
+    release
+        .get("tag_name")
+        .and_then(serde_json::Value::as_str)
+        .filter(|tag| !tag.trim().is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| "GitHub release response did not contain a tag name".to_string())
+}
+
+fn version_components(version: &str) -> Vec<u64> {
+    version
+        .trim()
+        .trim_start_matches(['v', 'V'])
+        .split('.')
+        .map(|part| {
+            part.chars()
+                .take_while(char::is_ascii_digit)
+                .collect::<String>()
+                .parse()
+                .unwrap_or(0)
+        })
+        .collect()
+}
+
+fn is_newer_version(candidate: &str, current: &str) -> bool {
+    let candidate = version_components(candidate);
+    let current = version_components(current);
+    let length = candidate.len().max(current.len());
+    (0..length)
+        .map(|index| {
+            (
+                candidate.get(index).copied().unwrap_or(0),
+                current.get(index).copied().unwrap_or(0),
+            )
+        })
+        .find(|(candidate, current)| candidate != current)
+        .is_some_and(|(candidate, current)| candidate > current)
+}
+
 fn regular_clock_ticks() -> impl futures::Stream<Item = Message> {
     clock_ticks(Duration::from_secs(1))
 }
@@ -2708,6 +2765,41 @@ impl cosmic::Application for AppModel {
                         crate::i18n::tr(&self.settings.language, "Version"),
                         &format!("v{}", env!("APP_VERSION")),
                         None,
+                    ))
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "Latest version"),
+                        if self.latest_version_loading {
+                            crate::i18n::tr(&self.settings.language, "Checking for updates…")
+                                .to_string()
+                        } else if let Some(Ok(latest)) = &self.latest_version {
+                            if is_newer_version(latest, env!("APP_VERSION")) {
+                                format!(
+                                    "{} · {latest}",
+                                    crate::i18n::tr(&self.settings.language, "Update available")
+                                )
+                            } else {
+                                format!(
+                                    "{} · {latest}",
+                                    crate::i18n::tr(&self.settings.language, "Up to date")
+                                )
+                            }
+                        } else if let Some(Err(error)) = &self.latest_version {
+                            format!(
+                                "{}: {error}",
+                                crate::i18n::tr(&self.settings.language, "Version check failed")
+                            )
+                        } else {
+                            crate::i18n::tr(&self.settings.language, "Not checked yet").to_string()
+                        },
+                        self.latest_version.as_ref().map(|result| match result {
+                            Ok(version) => !is_newer_version(version, env!("APP_VERSION")),
+                            Err(_) => false,
+                        }),
+                    ))
+                    .push(action_button(
+                        "view-refresh-symbolic",
+                        crate::i18n::tr(&self.settings.language, "Check for updates"),
+                        Message::CheckLatestVersion,
                     ));
 
                 let endpoint = self.settings.url.trim();
@@ -4875,6 +4967,20 @@ impl cosmic::Application for AppModel {
                     ))
                     .show();
             }
+            Message::CheckLatestVersion => {
+                if self.latest_version_loading {
+                    return Task::none();
+                }
+                self.latest_version_loading = true;
+                self.latest_version = None;
+                return Task::perform(fetch_latest_release_version(), |result| {
+                    cosmic::Action::App(Message::LatestVersionChecked(result))
+                });
+            }
+            Message::LatestVersionChecked(result) => {
+                self.latest_version_loading = false;
+                self.latest_version = Some(result);
+            }
             Message::FetchForecastFromDiagnostics => {
                 let days = 7;
                 self.weather_forecast_days = Some(days);
@@ -5874,6 +5980,15 @@ mod history_tests {
         assert_eq!(format_countdown(60), "1m 00s");
         assert_eq!(format_countdown(3599), "59m 59s");
         assert_eq!(format_countdown(3600), "1h 00m 00s");
+    }
+
+    #[test]
+    fn version_comparison_handles_release_tags_and_different_component_lengths() {
+        assert!(is_newer_version("v0.8.68", "0.8.67"));
+        assert!(is_newer_version("0.9.0", "0.8.99"));
+        assert!(!is_newer_version("v0.8.67", "0.8.67"));
+        assert!(!is_newer_version("v0.8.6", "0.8.67"));
+        assert!(!is_newer_version("v1.0", "1.0.0"));
     }
 
     #[test]

@@ -2904,6 +2904,14 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Notify above the upper limit or below the lower limit" => {
             "Bei Überschreitung des oberen oder Unterschreitung des unteren Grenzwerts benachrichtigen"
         }
+        "Application" => "Anwendung",
+        "Version" => "Version",
+        "Latest version" => "Neueste Version",
+        "Check for updates" => "Auf Aktualisierungen prüfen",
+        "Checking for updates…" => "Suche nach Aktualisierungen…",
+        "Update available" => "Aktualisierung verfügbar",
+        "Up to date" => "Aktuell",
+        "Version check failed" => "Versionsprüfung fehlgeschlagen",
         "Connection security" => "Verbindungssicherheit",
         "HTTPS / TLS" => "HTTPS / TLS",
         "External resources" => "Externe Dienste",
