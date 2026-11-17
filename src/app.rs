@@ -1096,8 +1096,8 @@ fn energy_flow_label(language: &str, label: &'static str) -> &'static str {
 }
 
 fn energy_flow_animation_glyph(frame: u8, reverse: bool) -> &'static str {
-    const FORWARD: [&str; 4] = ["● · · →", "· ● · →", "· · ● →", "· ● · →"];
-    const REVERSE: [&str; 4] = ["← · · ●", "← · ● ·", "← ● · ·", "← · ● ·"];
+    const FORWARD: [&str; 4] = ["● · · →", "· ● · →", "· · ● →", "· · · →"];
+    const REVERSE: [&str; 4] = ["← · · ●", "← · ● ·", "← ● · ·", "← · · ·"];
     let index = usize::from(frame % 4);
     if reverse {
         REVERSE[index]
@@ -7066,6 +7066,18 @@ impl cosmic::Application for AppModel {
 #[cfg(test)]
 mod history_tests {
     use super::*;
+
+    #[test]
+    fn energy_flow_animation_moves_in_one_direction_without_bouncing() {
+        assert_eq!(energy_flow_animation_glyph(0, false), "● · · →");
+        assert_eq!(energy_flow_animation_glyph(1, false), "· ● · →");
+        assert_eq!(energy_flow_animation_glyph(2, false), "· · ● →");
+        assert_eq!(energy_flow_animation_glyph(3, false), "· · · →");
+        assert_eq!(energy_flow_animation_glyph(0, true), "← · · ●");
+        assert_eq!(energy_flow_animation_glyph(1, true), "← · ● ·");
+        assert_eq!(energy_flow_animation_glyph(2, true), "← ● · ·");
+        assert_eq!(energy_flow_animation_glyph(3, true), "← · · ·");
+    }
 
     #[test]
     fn device_rows_only_round_the_outer_list_corners() {
