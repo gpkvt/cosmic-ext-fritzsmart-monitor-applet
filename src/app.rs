@@ -2698,6 +2698,18 @@ impl cosmic::Application for AppModel {
             }
 
             if self.active_settings_section == Some("diagnostics") {
+                content = content
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3(crate::i18n::tr(
+                        &self.settings.language,
+                        "Application",
+                    )))
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "Version"),
+                        &format!("v{}", env!("APP_VERSION")),
+                        None,
+                    ));
+
                 let endpoint = self.settings.url.trim();
                 let uses_https = endpoint.to_ascii_lowercase().starts_with("https://");
                 let (tls_status, tls_ok) = if uses_https {
