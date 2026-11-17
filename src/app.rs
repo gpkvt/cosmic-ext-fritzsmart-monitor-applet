@@ -299,7 +299,9 @@ fn cpu_temperature_c() -> Option<f64> {
         if !["coretemp", "k10temp", "zenpower", "cpu_thermal"].contains(&name.as_str()) {
             continue;
         }
-        let entries = std::fs::read_dir(device.path()).ok()?;
+        let Ok(entries) = std::fs::read_dir(device.path()) else {
+            continue;
+        };
         for entry in entries.flatten() {
             let file_name = entry.file_name().to_string_lossy().to_string();
             if !file_name.starts_with("temp") || !file_name.ends_with("_input") { continue; }
