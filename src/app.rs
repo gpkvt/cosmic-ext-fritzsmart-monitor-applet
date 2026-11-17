@@ -4267,7 +4267,7 @@ impl cosmic::Application for AppModel {
                         &cpu_temperature_label,
                         cpu_temperature.map(|temperature| Some(temperature < 90.0)).unwrap_or(None),
                     ))
-                    .push(widget::divider::horizontal::default())
+                    .push(widget::divider::horizontal::default());
                 content = content
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::title3(crate::i18n::tr(
