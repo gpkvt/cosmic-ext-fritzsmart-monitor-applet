@@ -124,6 +124,7 @@ async fn install_appimage_update(
         .map_err(|error| format!("Could not write the downloaded AppImage: {error}"))?;
     use std::os::unix::fs::PermissionsExt;
     fs::set_permissions(&replacement, std::fs::Permissions::from_mode(0o755))
+        .await
         .map_err(|error| format!("Could not mark the AppImage executable: {error}"))?;
     if let Err(error) = fs::rename(&replacement, &current).await {
         let _ = fs::remove_file(&replacement).await;
