@@ -3887,40 +3887,6 @@ impl cosmic::Application for AppModel {
                         .into()
                     });
 
-                let requests = crate::fritz::http_request_diagnostics();
-                content = content.push(widget::divider::horizontal::default()).push(
-                    widget::text::title3(crate::i18n::tr(
-                        &self.settings.language,
-                        "Recent FRITZ!Box HTTP requests",
-                    )),
-                );
-                if requests.is_empty() {
-                    content = content.push(widget::text::caption(crate::i18n::tr(
-                        &self.settings.language,
-                        "No HTTP responses recorded yet. Failed requests without an HTTP response are shown in Diagnostic activity.",
-                    )));
-                } else {
-                    for request in requests.iter().rev().take(15) {
-                        let scheme = if request.https { "HTTPS" } else { "HTTP" };
-                        let line = format!(
-                            "{} · {} · {} {} · {} {}",
-                            request.timestamp,
-                            request.method,
-                            scheme,
-                            request.status,
-                            request.path,
-                            if (200..300).contains(&request.status) {
-                                "OK"
-                            } else {
-                                "FAILED"
-                            },
-                        );
-                        content = content.push(
-                            widget::selectable_text::selectable_text(line)
-                                .width(cosmic::iced::Length::Fill),
-                        );
-                    }
-                }
                 let fritz_base = endpoint.trim_end_matches('/');
                 let fritz_endpoint_status = |path: &str| {
                     requests
@@ -4245,6 +4211,30 @@ impl cosmic::Application for AppModel {
                         &self.settings.language,
                         "Live timeline of checks, requests, results and errors. Newest entries appear first.",
                     )));
+                let requests = crate::fritz::http_request_diagnostics();
+                if requests.is_empty() {
+                    content = content.push(widget::text::caption(crate::i18n::tr(
+                        &self.settings.language,
+                        "No HTTP responses recorded yet. Failed requests without an HTTP response are shown in Diagnostic activity.",
+                    )));
+                } else {
+                    for request in requests.iter().rev().take(15) {
+                        let scheme = if request.https { "HTTPS" } else { "HTTP" };
+                        let line = format!(
+                            "{} · {} · {} {} · {} {}",
+                            request.timestamp,
+                            request.method,
+                            scheme,
+                            request.status,
+                            request.path,
+                            if (200..300).contains(&request.status) { "OK" } else { "FAILED" },
+                        );
+                        content = content.push(
+                            widget::selectable_text::selectable_text(line)
+                                .width(cosmic::iced::Length::Fill),
+                        );
+                    }
+                }
                 if self.diagnostic_events.is_empty() {
                     content = content.push(widget::text::caption(crate::i18n::tr(
                         &self.settings.language,
