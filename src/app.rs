@@ -2662,23 +2662,23 @@ impl cosmic::Application for AppModel {
                     }
                     1 => {
                         content = content
-                            .push(widget::text::body("FRITZ!Box address"))
-                            .push(widget::text_input("http://fritz.box or https://fritz.box", &self.settings.url).on_input(Message::UrlChanged))
+                            .push(widget::text::body(crate::i18n::tr(&self.settings.language, "FRITZ!Box address")))
+                            .push(widget::text_input(crate::i18n::tr(&self.settings.language, "http://fritz.box or https://fritz.box"), &self.settings.url).on_input(Message::UrlChanged))
                             .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Username")))
-                            .push(widget::text_input("Username", &self.settings.username).on_input(Message::UsernameChanged))
+                            .push(widget::text_input(crate::i18n::tr(&self.settings.language, "Username"), &self.settings.username).on_input(Message::UsernameChanged))
                             .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Password")))
-                            .push(widget::secure_input("Password", &self.settings.password, None, true).on_input(Message::PasswordChanged))
-                            .push(widget::text::caption("Use the FRITZ!Box user credentials that have permission to access smart-home devices."));
+                            .push(widget::secure_input(crate::i18n::tr(&self.settings.language, "Password"), &self.settings.password, None, true).on_input(Message::PasswordChanged))
+                            .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Use the FRITZ!Box user credentials that have permission to access smart-home devices.")));
                     }
                     2 => {
                         content = content
-                            .push(widget::text::caption("Discover compatible FRITZ! smart-home devices, then select the devices to monitor."))
-                            .push(action_button("view-refresh-symbolic", "Discover devices", Message::DiscoverDevices));
+                            .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Discover compatible FRITZ! smart-home devices, then select the devices to monitor.")))
+                            .push(action_button("view-refresh-symbolic", crate::i18n::tr(&self.settings.language, "Discover devices"), Message::DiscoverDevices));
                         if self.devices_loading {
                             content =
-                                content.push(widget::text::caption("Searching your FRITZ!Box…"));
+                                content.push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Searching your FRITZ!Box…")));
                         } else if let Some(error) = &self.error {
-                            content = content.push(error_notice("FRITZ!Box connection", error));
+                            content = content.push(error_notice(crate::i18n::tr(&self.settings.language, "FRITZ!Box connection"), error));
                         }
                         for device in &self.devices {
                             let selected = self.selected_ains.iter().any(|ain| {
@@ -2695,29 +2695,30 @@ impl cosmic::Application for AppModel {
                             );
                         }
                         if self.devices_loaded && self.devices.is_empty() {
-                            content = content.push(widget::text::caption("No compatible devices were found. You can continue and retry later in Settings → Devices."));
+                            content = content.push(widget::text::caption(crate::i18n::tr(&self.settings.language, "No compatible devices were found. You can continue and retry later in Settings → Devices.")));
                         }
                     }
                     3 => {
                         content = content
-                            .push(widget::text::body("Enable local weather (optional)"))
+                            .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Enable local weather (optional)")))
                             .push(widget::Row::new().align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::text::body("Show weather").width(cosmic::iced::Length::Fill))
+                                .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Show weather")).width(cosmic::iced::Length::Fill))
                                 .push(widget::toggler(self.settings.weather_enabled).on_toggle(Message::WeatherEnabledChanged)))
-                            .push(widget::text::body("OpenWeatherMap API key"))
-                            .push(widget::secure_input("API key", &self.settings.openweathermap_api_key, None, true).on_input(Message::OpenWeatherMapApiKeyChanged))
-                            .push(widget::text::body("Location (city or latitude,longitude)"))
-                            .push(widget::text_input("e.g. Amsterdam or 52.37,4.90", &self.settings.weather_location).on_input(Message::WeatherLocationChanged))
-                            .push(widget::text::caption("Weather is independent of FRITZ!Box monitoring. You can skip this and configure it later."));
+                            .push(widget::text::body(crate::i18n::tr(&self.settings.language, "OpenWeatherMap API key")))
+                            .push(widget::secure_input(crate::i18n::tr(&self.settings.language, "API key"), &self.settings.openweathermap_api_key, None, true).on_input(Message::OpenWeatherMapApiKeyChanged))
+                            .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Location (city or latitude,longitude)")))
+                            .push(widget::text_input(crate::i18n::tr(&self.settings.language, "e.g. Amsterdam or 52.37,4.90"), &self.settings.weather_location).on_input(Message::WeatherLocationChanged))
+                            .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Weather is independent of FRITZ!Box monitoring. You can skip this and configure it later.")));
                     }
                     _ => {
                         content = content
                             .push(widget::text::body(
-                                "Setup is complete. Your choices are saved automatically.",
+                                crate::i18n::tr(&self.settings.language, "Setup is complete. Your choices are saved automatically."),
                             ))
                             .push(widget::text::caption(format!(
-                                "{} device(s) selected",
-                                self.selected_ains.len()
+                                "{} {}",
+                                self.selected_ains.len(),
+                                crate::i18n::tr(&self.settings.language, "devices selected")
                             )));
                     }
                 }
@@ -2727,18 +2728,18 @@ impl cosmic::Application for AppModel {
                     .align_y(cosmic::iced::Alignment::Center);
                 if self.setup_step > 0 {
                     actions =
-                        actions.push(widget::button::text("Back").on_press(Message::SetupBack));
+                        actions.push(widget::button::text(crate::i18n::tr(&self.settings.language, "Back")).on_press(Message::SetupBack));
                 }
                 actions = actions.push(widget::Space::new().width(cosmic::iced::Length::Fill));
                 if self.setup_step >= 4 {
                     actions =
-                        actions.push(widget::button::text("Finish").on_press(Message::SetupFinish));
+                        actions.push(widget::button::text(crate::i18n::tr(&self.settings.language, "Finish")).on_press(Message::SetupFinish));
                 } else {
                     actions = actions.push(
                         widget::button::text(if self.setup_step == 3 {
-                            "Finish setup"
+                            crate::i18n::tr(&self.settings.language, "Finish setup")
                         } else {
-                            "Continue"
+                            crate::i18n::tr(&self.settings.language, "Continue")
                         })
                         .on_press(if self.setup_step == 3 {
                             Message::SetupFinish
