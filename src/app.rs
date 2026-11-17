@@ -1111,7 +1111,8 @@ fn total_power_overview(
         let input_energy_summary = input_energy_and_timespan(&input_history)
             .map(|(energy_wh, timespan)| {
                 widget::text::caption(format!(
-                    "TOTAL ENERGY: {energy_wh:.1} Wh · {}",
+                    "{}: {energy_wh:.1} Wh · {}",
+                    crate::i18n::tr(&settings.language, "TOTAL ENERGY"),
                     format_elapsed_timespan(timespan)
                 ))
             });
