@@ -2749,13 +2749,22 @@ impl cosmic::Application for AppModel {
                         .on_press(Message::NavigateDeviceHistory(1))
                         .padding(6)
                         .class(cosmic::theme::Button::Text);
-                        header = header
-                            .push(if index > 0 { previous.into() } else {
-                                widget::Space::new().width(cosmic::iced::Length::Fixed(82.0)).into()
-                            })
-                            .push(if index + 1 < self.history_graph_devices.len() { next.into() } else {
-                                widget::Space::new().width(cosmic::iced::Length::Fixed(58.0)).into()
-                            });
+                        let previous: cosmic::Element<'_, Message> = if index > 0 {
+                            previous.into()
+                        } else {
+                            widget::Space::new()
+                                .width(cosmic::iced::Length::Fixed(82.0))
+                                .into()
+                        };
+                        let next: cosmic::Element<'_, Message> =
+                            if index + 1 < self.history_graph_devices.len() {
+                                next.into()
+                            } else {
+                                widget::Space::new()
+                                    .width(cosmic::iced::Length::Fixed(58.0))
+                                    .into()
+                            };
+                        header = header.push(previous).push(next);
                     }
                     header.push(
                         widget::button::custom(
