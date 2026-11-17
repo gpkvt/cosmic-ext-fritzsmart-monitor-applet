@@ -2212,26 +2212,11 @@ impl cosmic::Application for AppModel {
                 (text.chars().count() as f32 * panel_text_size * 0.62).max(panel_text_size)
             };
             if let Some((upper, lower)) = value.split_once('\n') {
-                let line_height = (panel_text_size * 0.85).max(1.0);
-                // In two-line mode, keep the first line at the value column
-                // edge and visibly indent the second line. Non-breaking
-                // spaces preserve the intentional leading whitespace.
-                let lower = format!("\u{00a0}\u{00a0}{lower}");
-                let width = text_width(upper).max(text_width(&lower));
-                widget::Column::new()
-                    .spacing(0)
-                    .width(cosmic::iced::Length::Fixed(width))
-                    .push(
-                        widget::container(panel_text(upper.to_string()))
-                            .height(cosmic::iced::Length::Fixed(line_height))
-                            .align_y(cosmic::iced::Alignment::End),
-                    )
-                    .push(
-                        widget::container(panel_text(lower))
-                            .height(cosmic::iced::Length::Fixed(line_height))
-                            .align_y(cosmic::iced::Alignment::Start),
-                    )
-                    .into()
+                // Render both lines in one text widget so the toolkit uses a
+                // single continuous line-height calculation with no gap
+                // introduced by separate row containers.
+                let stepped_value = format!("{upper}\n\u{00a0}\u{00a0}{lower}");
+                panel_text(stepped_value).into()
             } else {
                 let width = text_width(&value);
                 widget::container(
