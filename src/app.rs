@@ -121,6 +121,7 @@ pub enum Message {
     ShowGraph(String, Vec<f64>, String, Option<String>),
     ShowDeviceHistoryGraph(String),
     NavigateDeviceHistory(isize),
+    GraphHistoryTimespanChanged(u32),
     CloseGraph,
     RefreshIntervalChanged(u32),
     DiscoverDevices,
@@ -2785,6 +2786,39 @@ impl cosmic::Application for AppModel {
                         .padding(6)
                         .class(cosmic::theme::Button::Text),
                     )
+                })
+                .push({
+                    if self.history_graph_index.is_some() {
+                        let presets = [
+                            ("15m", 15),
+                            ("1h", 60),
+                            ("6h", 360),
+                            ("24h", 1_440),
+                            ("7d", 10_080),
+                            ("30d", 43_200),
+                        ];
+                        let mut ranges = widget::Row::new()
+                            .spacing(6)
+                            .align_y(cosmic::iced::Alignment::Center);
+                        for (label, minutes) in presets {
+                            let caption = if self.settings.graph_timespan_minutes == minutes {
+                                format!("✓ {label}")
+                            } else {
+                                label.to_string()
+                            };
+                            ranges = ranges.push(
+                                widget::button::custom(widget::text::caption(caption))
+                                    .on_press(Message::GraphHistoryTimespanChanged(minutes))
+                                    .padding([6, 10])
+                                    .class(cosmic::theme::Button::Text),
+                            );
+                        }
+                        widget::container(ranges)
+                            .width(cosmic::iced::Length::Fill)
+                            .into()
+                    } else {
+                        widget::Space::new().height(0).into()
+                    }
                 })
                 .push(graph_visual_large(
                     values.iter().copied(),
@@ -5901,6 +5935,49 @@ impl cosmic::Application for AppModel {
                         .max_width(800.0)
                         .max_height(600.0);
                     return get_popup(settings);
+                }
+            }
+            Message::GraphHistoryTimespanChanged(minutes) => {
+                if self.history_graph_index.is_some() {
+                    let minutes = minutes.clamp(5, 2_102_400);
+                    if self.settings.graph_timespan_minutes != minutes {
+                        self.settings.graph_timespan_minutes = minutes;
+                        let now = Instant::now();
+                        let window = graph_history_window(minutes);
+                        self.history
+                            .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
+                        for samples in self.device_history.values_mut() {
+                            samples.retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
+                        }
+                        if let Some(index) = self.history_graph_index {
+                            if let Some((key, name)) = self.history_graph_devices.get(index).cloned() {
+                                if let Some(samples) = self.device_history.get(&key) {
+                                    let values =
+                                        samples.iter().map(|(_, power, _)| *power as f64).collect();
+                                    let axis_start = format_graph_axis_start(
+                                        minutes,
+                                        samples.front().map(|(timestamp, _, _)| {
+                                            now.duration_since(*timestamp).as_secs().div_ceil(60)
+                                        }),
+                                    );
+                                    self.expanded_graph = Some((
+                                        format!(
+                                            "{} · {}",
+                                            name,
+                                            crate::i18n::tr(&self.settings.language, "POWER (W)")
+                                        ),
+                                        values,
+                                        "W".into(),
+                                        Some(axis_start),
+                                    ));
+                                }
+                            }
+                        }
+                        if let Err(error) = crate::history::save(&self.history, &self.device_history) {
+                            eprintln!("Could not persist graph history: {error}");
+                        }
+                        self.persist_settings();
+                    }
                 }
             }
             Message::NavigateDeviceHistory(delta) => {
