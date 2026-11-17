@@ -152,6 +152,7 @@ pub enum Message {
     WeatherEnabledChanged(bool),
     OpenWeatherMapApiKeyChanged(String),
     WeatherLocationChanged(String),
+    WeatherTemperatureDeviceChanged(String),
     WeatherRefreshIntervalChanged(u16),
     WeatherSlideshowDurationChanged(u16),
 }
@@ -368,6 +369,15 @@ fn semi_transparent_weather_photo(bytes: &[u8]) -> Vec<u8> {
     } else {
         bytes.to_vec()
     }
+}
+
+fn selected_weather_temperature(readings: &[FritzReading], selected_ain: &str, fallback_c: f64) -> f64 {
+    if selected_ain.trim().is_empty() { return fallback_c; }
+    let selected = crate::fritz::normalize_ain_for_selection(selected_ain);
+    readings.iter()
+        .find(|reading| crate::fritz::normalize_ain_for_selection(&reading.ain) == selected)
+        .map(|reading| reading.temperature_c)
+        .unwrap_or(fallback_c)
 }
 
 fn format_panel_temperature(temperature_c: f64) -> String {
@@ -2233,7 +2243,7 @@ impl cosmic::Application for AppModel {
                     self.core
                         .applet
                         .text(panel_value_with_unit(
-                            format!("{:.0} °C", weather.temperature_c),
+                            format!("{:.0} °C", selected_weather_temperature(&self.readings, &self.settings.weather_temperature_ain, weather.temperature_c)),
                             self.settings.panel_multiline
                                 && self
                                     .settings
@@ -2726,7 +2736,20 @@ impl cosmic::Application for AppModel {
                                 .push(widget::toggler(self.settings.weather_enabled).on_toggle(Message::WeatherEnabledChanged)))
                             .push(widget::text::body(crate::i18n::tr(&self.settings.language, "OpenWeatherMap API key")))
                             .push(widget::secure_input(crate::i18n::tr(&self.settings.language, "API key"), &self.settings.openweathermap_api_key, None, true).on_input(Message::OpenWeatherMapApiKeyChanged))
-                            .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Location (city or latitude,longitude)")))
+                            .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Outdoor temperature source")))
+                    .push({
+                        let mut labels = vec![crate::i18n::tr(&self.settings.language, "OpenWeatherMap").to_string()];
+                        labels.extend(self.devices.iter().map(|device| device.name.clone()));
+                        let selected = self.settings.weather_temperature_ain.as_str();
+                        let selected_index = if selected.is_empty() { 0 } else {
+                            self.devices.iter().position(|device| crate::fritz::normalize_ain_for_selection(&device.ain) == crate::fritz::normalize_ain_for_selection(selected)).map(|index| index + 1).unwrap_or(0)
+                        };
+                        let ains: Vec<String> = std::iter::once(String::new()).chain(self.devices.iter().map(|device| device.ain.clone())).collect();
+                        widget::dropdown::dropdown(labels, Some(selected_index), move |index| Message::WeatherTemperatureDeviceChanged(ains[index].clone()))
+                            .width(cosmic::iced::Length::Fill)
+                    })
+                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.")))
+                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Location (city or latitude,longitude)")))
                             .push(widget::text_input(crate::i18n::tr(&self.settings.language, "e.g. Amsterdam or 52.37,4.90"), &self.settings.weather_location).on_input(Message::WeatherLocationChanged))
                             .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Weather is independent of FRITZ!Box monitoring. You can skip this and configure it later.")));
                     }
@@ -4205,7 +4228,7 @@ impl cosmic::Application for AppModel {
                         )
                         .push(widget::text::title2(format!(
                             "{:.0} °C",
-                            weather.temperature_c
+                            selected_weather_temperature(&self.readings, &self.settings.weather_temperature_ain, weather.temperature_c)
                         )))
                         .push(
                             widget::icon::from_name(if self.weather_forecast_expanded {
@@ -6187,6 +6210,10 @@ impl cosmic::Application for AppModel {
                 self.weather_forecast_loading = false;
                 self.weather_error = None;
                 self.next_weather_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::WeatherTemperatureDeviceChanged(ain) => {
+                self.settings.weather_temperature_ain = ain;
                 self.persist_settings();
             }
             Message::WeatherRefreshIntervalChanged(value) => {
