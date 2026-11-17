@@ -1784,6 +1784,7 @@ impl AppModel {
         self.settings.expanded_devices.sort();
         self.settings.quick_options_expanded = self.quick_options_expanded;
         self.settings.weather_forecast_expanded = self.weather_forecast_expanded;
+        self.settings.weather_attribution_expanded = self.weather_attribution_expanded;
         self.settings.settings_section = self.active_settings_section.unwrap_or_default().into();
         self.persist_settings();
     }
@@ -1964,6 +1965,7 @@ impl cosmic::Application for AppModel {
         let expanded_devices = settings.expanded_devices.iter().cloned().collect();
         let quick_options_expanded = settings.quick_options_expanded;
         let weather_forecast_expanded = settings.weather_forecast_expanded;
+        let weather_attribution_expanded = settings.weather_attribution_expanded;
         let active_settings_section = match settings.settings_section.as_str() {
             "language" => Some("language"),
             "panel" => Some("panel"),
@@ -2003,6 +2005,7 @@ impl cosmic::Application for AppModel {
                 expanded_devices,
                 quick_options_expanded,
                 weather_forecast_expanded,
+                weather_attribution_expanded,
                 quick_refresh_interval,
                 quick_graph_timespan,
                 weather_forecast_days: restore_forecast.then_some(7),
@@ -5496,6 +5499,7 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleWeatherAttribution => {
                 self.weather_attribution_expanded = !self.weather_attribution_expanded;
+                self.persist_layout_state();
             }
             Message::ToggleWeatherForecast => {
                 self.weather_forecast_expanded = !self.weather_forecast_expanded;
