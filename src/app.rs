@@ -1679,6 +1679,36 @@ fn diagnostic_status_row(
     )
 }
 
+fn diagnostic_info_row(
+    label: &'static str,
+    status: impl ToString,
+) -> cosmic::Element<'static, Message> {
+    let status = status.to_string();
+    let indicator = widget::container(widget::text("●").size(18))
+        .width(cosmic::iced::Length::Fixed(24.0))
+        .center_x(24)
+        .style(|_| cosmic::iced::widget::container::Style {
+            text_color: Some(cosmic::iced::Color::WHITE),
+            ..Default::default()
+        });
+    surface_card(
+        widget::Row::new()
+            .spacing(12)
+            .align_y(cosmic::iced::Alignment::Center)
+            .width(cosmic::iced::Length::Fill)
+            .push(indicator)
+            .push(
+                widget::Column::new()
+                    .spacing(4)
+                    .width(cosmic::iced::Length::Fill)
+                    .push(widget::text::body(label))
+                    .push(widget::text::caption(status)),
+            )
+            .into(),
+        10,
+    )
+}
+
 fn is_error_status(status: &str) -> bool {
     status.starts_with("Could not save settings:")
         || status.starts_with("Weather unavailable:")
@@ -3003,10 +3033,9 @@ impl cosmic::Application for AppModel {
                         &self.settings.language,
                         "Application",
                     )))
-                    .push(diagnostic_status_row(
+                    .push(diagnostic_info_row(
                         crate::i18n::tr(&self.settings.language, "Version"),
                         &format!("v{}", env!("APP_VERSION")),
-                        None,
                     ))
                     .push(diagnostic_status_row(
                         crate::i18n::tr(&self.settings.language, "Latest version"),
