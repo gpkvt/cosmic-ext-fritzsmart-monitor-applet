@@ -4261,7 +4261,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::Space::new().height(cosmic::iced::Length::Fill))
                     .push(
                         widget::Column::new()
-                            .spacing(4)
+                            .spacing(6)
                             .push(
                                 widget::Row::new()
                                     .spacing(12)
@@ -4274,37 +4274,31 @@ impl cosmic::Application for AppModel {
                                         "{}  {}%",
                                         crate::i18n::tr(&self.settings.language, "Clouds"),
                                         weather.cloudiness_percent
+                                    )))
+                                    .push(widget::text::body(format!(
+                                        "{}  {} hPa",
+                                        crate::i18n::tr(&self.settings.language, "Pressure"),
+                                        weather.pressure_hpa
                                     ))),
                             )
                             .push(
                                 widget::Row::new()
                                     .spacing(12)
                                     .push(widget::text::body(format!(
-                                        "{}  {} hPa",
-                                        crate::i18n::tr(&self.settings.language, "Pressure"),
-                                        weather.pressure_hpa
-                                    )))
-                                    .push(widget::text::body(format!(
                                         "{}  {:.1} m/s · {}",
                                         crate::i18n::tr(&self.settings.language, "Wind"),
                                         weather.wind_speed_mps,
                                         wind_direction
+                                    )))
+                                    .push(widget::text::body(format!(
+                                        "{}  {sunrise}",
+                                        crate::i18n::tr(&self.settings.language, "Sunrise")
+                                    )))
+                                    .push(widget::text::body(format!(
+                                        "{}  {sunset}",
+                                        crate::i18n::tr(&self.settings.language, "Sunset")
                                     ))),
                             ),
-                    )
-                    .push(
-                        widget::Row::new()
-                            .spacing(8)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(widget::text::caption(format!(
-                                "{}  {sunrise}",
-                                crate::i18n::tr(&self.settings.language, "Sunrise")
-                            )))
-                            .push(widget::text::caption(format!(
-                                "{}  {sunset}",
-                                crate::i18n::tr(&self.settings.language, "Sunset")
-                            ))),
                     );
                 let weather_heading = widget::button::custom(
                     widget::Row::new()
