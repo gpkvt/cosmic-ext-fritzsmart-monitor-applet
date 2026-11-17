@@ -2665,9 +2665,9 @@ impl cosmic::Application for AppModel {
                             .push(widget::text::body(crate::i18n::tr(&self.settings.language, "FRITZ!Box address")))
                             .push(widget::text_input(crate::i18n::tr(&self.settings.language, "http://fritz.box or https://fritz.box"), &self.settings.url).on_input(Message::UrlChanged))
                             .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Username")))
-                            .push(widget::text_input("Username", &self.settings.username).on_input(Message::UsernameChanged))
+                            .push(widget::text_input(crate::i18n::tr(&self.settings.language, "Username"), &self.settings.username).on_input(Message::UsernameChanged))
                             .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Password")))
-                            .push(widget::secure_input("Password", &self.settings.password, None, true).on_input(Message::PasswordChanged))
+                            .push(widget::secure_input(crate::i18n::tr(&self.settings.language, "Password"), &self.settings.password, None, true).on_input(Message::PasswordChanged))
                             .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Use the FRITZ!Box user credentials that have permission to access smart-home devices.")));
                     }
                     2 => {
@@ -2716,8 +2716,9 @@ impl cosmic::Application for AppModel {
                                 crate::i18n::tr(&self.settings.language, "Setup is complete. Your choices are saved automatically."),
                             ))
                             .push(widget::text::caption(format!(
-                                "{} device(s) selected",
-                                self.selected_ains.len()
+                                "{} {}",
+                                self.selected_ains.len(),
+                                crate::i18n::tr(&self.settings.language, "devices selected")
                             )));
                     }
                 }
