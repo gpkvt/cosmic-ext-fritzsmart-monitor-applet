@@ -3851,6 +3851,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Finish setup" => "Einrichtung abschließen",
         "Continue" => "Weiter",
         "FRITZ!Box connection" => "FRITZ!Box-Verbindung",
+        "Outdoor temperature source" => "Quelle der Außentemperatur",
+        "OpenWeatherMap" => "OpenWeatherMap",
+        "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap." => "Verwende den Sensorwert eines ausgewählten FRITZ!Box-Geräts statt der von OpenWeatherMap gemeldeten Außentemperatur.",
         _ => key,
     }
 }
@@ -4087,6 +4090,9 @@ mod tests {
             "Open-Meteo · forecast",
             "Open-Meteo · geocoding",
             "OpenWeatherMap API key",
+            "Outdoor temperature source",
+            "OpenWeatherMap",
+            "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
             "OpenWeatherMap · current weather",
             "Panel item spacing",
             "Panel text size",
