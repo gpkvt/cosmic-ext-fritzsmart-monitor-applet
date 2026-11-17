@@ -3282,17 +3282,17 @@ impl cosmic::Application for AppModel {
                             .padding(10)
                             .clip(true)
                             .style(|_| cosmic::iced::widget::container::Style {
-                                // A soft light-gray wash keeps the photo visible while
-                                // providing consistent contrast for the weather text.
+                                // A dark translucent wash keeps the photo visible
+                                // while providing strong contrast for white weather text.
                                 background: Some(
                                     cosmic::iced::Color::from_rgba(
-                                        0.82,
-                                        0.84,
-                                        0.87,
-                                        if weather.icon_code.ends_with('n') { 0.68 } else { 0.62 },
+                                        0.06,
+                                        0.07,
+                                        0.09,
+                                        if weather.icon_code.ends_with('n') { 0.62 } else { 0.58 },
                                     ).into(),
                                 ),
-                                text_color: Some(cosmic::iced::Color::from_rgb(0.12, 0.14, 0.17)),
+                                text_color: Some(cosmic::iced::Color::WHITE),
                                 ..Default::default()
                             });
                         // Keep the photograph and its readable details inside
