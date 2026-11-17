@@ -2188,13 +2188,9 @@ impl cosmic::Application for AppModel {
                 )
             });
 
-        // Use half-size text in two-line panel mode to keep stacked readings compact.
-        let panel_text_size = f32::from(self.settings.panel_text_size)
-            / if self.settings.panel_multiline {
-                2.0
-            } else {
-                1.0
-            };
+        // Keep the configured panel font size in both single-line and
+        // two-line layouts; multiline mode changes arrangement, not typography.
+        let panel_text_size = f32::from(self.settings.panel_text_size);
 
         // Split readings into two independently aligned line slots: the upper
         // line sits on the bottom of its slot, and the lower line starts at
