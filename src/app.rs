@@ -6516,7 +6516,7 @@ impl cosmic::Application for AppModel {
                             format!("Could not serialize FRITZ!Box dump: {error}")
                         })
                     },
-                    Message::DebugDumpGenerated,
+                    |dump| cosmic::Action::App(Message::DebugDumpGenerated(dump)),
                 );
             }
             Message::DebugDumpGenerated(fritzbox_dump) => {
