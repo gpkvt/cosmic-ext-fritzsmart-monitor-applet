@@ -241,19 +241,26 @@ fn notify_temperature_alert(
         .show();
 }
 
-fn format_graph_axis_start(minutes: u32) -> String {
+fn format_graph_axis_start(configured_minutes: u32, actual_minutes: Option<u64>) -> String {
+    let minutes = actual_minutes
+        .map(|actual| actual.min(u64::from(configured_minutes)))
+        .unwrap_or(u64::from(configured_minutes));
     let days = minutes / 1440;
-    if days >= 365 && days % 365 == 0 {
-        format!("{}y ago", days / 365)
-    } else if days > 0 {
-        format!("{days}d ago")
-    } else if minutes % 60 == 0 {
-        format!("{}h ago", minutes / 60)
-    } else if minutes > 60 {
-        format!("{}h {}m ago", minutes / 60, minutes % 60)
-    } else {
-        format!("{minutes}m ago")
+    let hours = (minutes % 1440) / 60;
+    let remaining_minutes = minutes % 60;
+    let mut parts = Vec::new();
+
+    if days > 0 {
+        parts.push(format!("{days}d"));
     }
+    if hours > 0 {
+        parts.push(format!("{hours}h"));
+    }
+    if remaining_minutes > 0 || parts.is_empty() {
+        parts.push(format!("{remaining_minutes}m"));
+    }
+
+    format!("{} ago", parts.join(" "))
 }
 
 fn graph_history_window(minutes: u32) -> Duration {
@@ -966,7 +973,12 @@ fn total_power_overview(
         .unwrap_or_default();
     let total_power = output_power_w(readings, &settings.input_ains);
     let input_power = input_power_w(readings, &settings.input_ains);
-    let axis_start = format_graph_axis_start(settings.graph_timespan_minutes);
+    let axis_start = format_graph_axis_start(
+        settings.graph_timespan_minutes,
+        history.front().map(|(timestamp, _)| {
+            Instant::now().duration_since(*timestamp).as_secs() / 60
+        }),
+    );
 
     let output_graph = widget::Column::new()
         .spacing(4)
@@ -3495,7 +3507,12 @@ impl cosmic::Application for AppModel {
                         .collect(),
                     &self.settings.graph_style,
                     &self.settings.language,
-                    format_graph_axis_start(self.settings.graph_timespan_minutes),
+                    format_graph_axis_start(
+                        self.settings.graph_timespan_minutes,
+                        self.history.front().map(|(timestamp, _)| {
+                            Instant::now().duration_since(*timestamp).as_secs() / 60
+                        }),
+                    ),
                 );
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
@@ -3748,8 +3765,15 @@ impl cosmic::Application for AppModel {
                                                         .width(cosmic::iced::Length::Fill)
                                                         .push(widget::text::caption(
                                                             format_graph_axis_start(
-                                                                self.settings
-                                                                    .graph_timespan_minutes,
+                                                                self.settings.graph_timespan_minutes,
+                                                                device_history.and_then(|samples| {
+                                                                    samples.front().map(|(timestamp, _, _)| {
+                                                                        Instant::now()
+                                                                            .duration_since(*timestamp)
+                                                                            .as_secs()
+                                                                            .div_ceil(60)
+                                                                    })
+                                                                }),
                                                             ),
                                                         ))
                                                         .push(
@@ -3839,8 +3863,15 @@ impl cosmic::Application for AppModel {
                                                         .width(cosmic::iced::Length::Fill)
                                                         .push(widget::text::caption(
                                                             format_graph_axis_start(
-                                                                self.settings
-                                                                    .graph_timespan_minutes,
+                                                                self.settings.graph_timespan_minutes,
+                                                                device_history.and_then(|samples| {
+                                                                    samples.front().map(|(timestamp, _, _)| {
+                                                                        Instant::now()
+                                                                            .duration_since(*timestamp)
+                                                                            .as_secs()
+                                                                            .div_ceil(60)
+                                                                    })
+                                                                }),
                                                             ),
                                                         ))
                                                         .push(
@@ -5605,12 +5636,14 @@ mod history_tests {
     }
 
     #[test]
-    fn graph_x_axis_start_matches_configured_timespan() {
-        assert_eq!(format_graph_axis_start(15), "15m ago");
-        assert_eq!(format_graph_axis_start(60), "1h ago");
-        assert_eq!(format_graph_axis_start(90), "1h 30m ago");
-        assert_eq!(format_graph_axis_start(1440), "1d ago");
-        assert_eq!(format_graph_axis_start(2_102_400), "4y ago");
+    fn graph_x_axis_uses_actual_history_when_it_is_shorter_than_configured() {
+        assert_eq!(format_graph_axis_start(1440, Some(180)), "3h ago");
+        assert_eq!(format_graph_axis_start(1440, Some(1500)), "1d ago");
+        assert_eq!(format_graph_axis_start(2880, Some(1590)), "1d 2h 30m ago");
+        assert_eq!(format_graph_axis_start(4320, Some(3032)), "2d 2h 32m ago");
+        assert_eq!(format_graph_axis_start(90, Some(35)), "35m ago");
+        assert_eq!(format_graph_axis_start(60, None), "1h ago");
+        assert_eq!(format_graph_axis_start(2_102_400, Some(60)), "1h ago");
     }
 
     #[test]
