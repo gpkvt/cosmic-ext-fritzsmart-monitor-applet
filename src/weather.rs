@@ -55,6 +55,13 @@ impl WeatherData {
     }
 }
 
+/// Convert a meteorological wind bearing into an eight-point compass label.
+/// Labels use the east abbreviation "O" (Oost/Ost).
+pub fn wind_direction_compass(degrees: Option<u16>) -> Option<&'static str> {
+    const DIRECTIONS: [&str; 8] = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
+    degrees.map(|bearing| DIRECTIONS[((usize::from(bearing % 360) + 22) / 45) % 8])
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct WeatherForecast {
     pub days: Vec<WeatherForecastDay>,
@@ -1198,6 +1205,22 @@ mod tests {
         let bytes = generate_starry_night_background().expect("star field should render");
         let decoded = image::load_from_memory(&bytes).expect("fallback must be a valid image");
         assert_eq!((decoded.width(), decoded.height()), (1200, 520));
+    }
+
+    #[test]
+    fn wind_direction_uses_eight_compass_points() {
+        for (degrees, expected) in [
+            (0, "N"), (22, "N"), (23, "NO"), (45, "NO"),
+            (67, "NO"), (68, "O"), (90, "O"), (112, "O"),
+            (113, "SO"), (135, "SO"), (158, "SO"), (159, "S"),
+            (180, "S"), (202, "S"), (203, "SW"), (225, "SW"),
+            (247, "SW"), (248, "W"), (270, "W"), (292, "W"),
+            (293, "NW"), (315, "NW"), (337, "NW"), (338, "N"),
+            (359, "N"), (360, "N"),
+        ] {
+            assert_eq!(wind_direction_compass(Some(degrees)), Some(expected));
+        }
+        assert_eq!(wind_direction_compass(None), None);
     }
 
     #[test]
