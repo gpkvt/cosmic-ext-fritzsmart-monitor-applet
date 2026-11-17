@@ -1,170 +1,198 @@
-# Cosmic FRITZ!Power Monitor Applet
+# FRITZ!Power Monitor
 
-A native COSMIC panel applet for monitoring live power and temperature readings
-from compatible FRITZ!Box Smart Home devices. It communicates with the FRITZ!Box
-directly and does **not** execute or depend on `fritz_solar.sh`.
+A native COSMIC panel applet for monitoring power, temperature and optional weather data from FRITZ!Box Smart Home devices.
 
-![COSMIC FRITZ!Power Monitor applet](docs/Screenshot_2026-11-16_18-17-17.png)
+FRITZ!Power Monitor connects directly to your router. It brings household power readings, device status and historical graphs into the COSMIC desktop without requiring an external monitoring service.
 
-## Contents
+<p align="center">
+  <img src="docs/Screenshot_2026-11-16_18-17-17.png" alt="FRITZ!Power Monitor showing the live overview" width="720">
+</p>
 
-- [Features](#features)
-- [Requirements](#requirements)
-- [Install](#install)
-- [Build from source](#build-from-source)
-- [Configure the applet](#configure-the-applet)
-  - [Panel and device selection](#panel-and-device-selection)
-  - [Power inputs and calculations](#power-inputs-and-calculations)
-  - [Temperature alerts](#temperature-alerts)
-  - [FRITZ!Box connection and TLS](#fritzbox-connection-and-tls)
-  - [Weather integration](#weather-integration)
-- [History and limitations](#history-and-limitations)
-- [Releases and packages](#releases-and-packages)
-- [Security and privacy](#security-and-privacy)
+<p align="center">
+  <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases">Downloads</a> ·
+  <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues">Report a problem</a> ·
+  <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/blob/main/LICENSE">MIT license</a>
+</p>
 
-## Features
+## At a glance
 
-### Live monitoring
-
-- Show live power (W) and temperature readings in the COSMIC panel.
-- Monitor multiple selected FRITZ!Box power-meter devices.
-- Display each device in its own expandable card with live metrics, a power
-  switch when supported, and separate power and temperature history graphs.
-- Show total power output, optional input power, and power difference in
-  independent summaries and graphs.
-- Keep the last successful readings visible when a later refresh fails.
-- Skip devices with missing or invalid measurements without discarding readings
-  from healthy devices.
-
-### Panel and popup
-
-- Configure panel text size (10–24 pt).
-- Show live FRITZ!Box internet download and upload rates in Mbps, with separate
-  down/up icons; enable this optional reading in Panel settings.
-- Optionally combine total power consumption and solar generation into one net
-  power value (consumption minus solar generation) in the panel.
-- Show the average temperature across selected devices, with an option to
-  exclude devices whose names contain `solar`.
-- Reorder popup sections (summary, weather, devices and power overviews) in Settings; the chosen order is saved across restarts.
-- Collapse top-level popup sections independently; collapsed headings retain
-  their primary live value. Collapsed device rows continue to show power and
-  temperature.
-- Use the popup's sticky title bar for Refresh and Settings. Its content scrolls
-  independently when needed.
-- View a live refresh countdown and configure automatic refresh from
-  30 seconds to 1 hour (default: 60 seconds).
-
-### Alerts and device controls
-
-- Enable per-device temperature alerts for readings outside configurable
-  upper and lower limits. Defaults are 40 °C and −10 °C.
-- Receive a notification when a selected device disappears or stops returning
-  usable readings. Repeated refreshes do not repeat the same alert; alerts are
-  re-armed after recovery.
-- Switch compatible devices directly from the popup. The control stays
-  disabled while the command is verified and until fresh readings arrive.
-
-### Weather
-
-- Optionally show the current OpenWeatherMap condition icon and temperature in
-  the panel, plus a detailed weather card in the popup.
-- View feels-like temperature, humidity, wind, pressure, cloud cover,
-  visibility, sunrise and sunset.
-- Use an illustrative Wikimedia Commons photograph matching the reported
-  weather, with attribution and a link to its file-description page.
-- Configure an independent 5–60 minute weather refresh interval
-  (default: 10 minutes). Weather failures do not interrupt FRITZ!Box readings.
-
-### Connection and diagnostics
-
-- Use FRITZ!Box challenge-response authentication and HTTPS certificate
-  validation by default.
-- Optionally trust a router-specific PEM CA certificate without disabling
-  hostname verification.
-- Review connection and device information in the dedicated Diagnostics
-  settings category.
-
-### Localization
-
+- Live power and temperature readings from selected FRITZ!Box Smart Home devices.
+- Separate power input, output and net-difference summaries, with device-level history.
+- Optional internet download and upload rates in the COSMIC panel.
+- Optional OpenWeatherMap conditions, forecast and weather-matched Wikimedia Commons imagery.
+- Configurable refresh intervals, graph retention, panel display and popup layout.
+- Temperature alerts and supported smart-home device switching.
 - English and German interface translations.
-- Follow the COSMIC desktop language automatically by default.
-- Override the detected language in Settings → Language; the choice is saved across restarts.
 
-## Requirements
+## Screenshots
 
-- COSMIC desktop session with panel applet support.
-- Rust toolchain compatible with the current `libcosmic` Git dependency.
-- GNU Make and standard GNU install utilities.
-- FRITZ!Box with Smart Home support and at least one device exposing power and
-  temperature measurements.
-- FRITZ!Box user account permitted to access Smart Home data.
+The screenshots below show the applet in the COSMIC desktop. Open the [screenshot gallery](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/tree/main/docs) for the complete set.
 
-## Install
+| Live overview | Weather |
+| --- | --- |
+| ![Live overview](docs/Screenshot_2026-11-16_18-17-17.png) | ![Weather details](docs/Screenshot_2026-11-16_18-17-33.png) |
+| **Power history** | **Device settings** |
+| ![Power history](docs/Screenshot_2026-11-16_18-17-51.png) | ![Device settings](docs/Screenshot_2026-11-16_18-18-04.png) |
 
-The recommended user-local installation requires no root privileges:
+## Installation
+
+### Download a release
+
+Prebuilt Linux x86_64 packages are published on the [GitHub Releases page](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases).
+
+| Package | Install / launch |
+| --- | --- |
+| Debian package | `sudo apt install ./fritz-power-monitor_VERSION_amd64.deb` |
+| AppImage | `chmod +x fritz-power-monitor-VERSION-x86_64.AppImage && ./fritz-power-monitor-VERSION-x86_64.AppImage` |
+| Flatpak bundle | `flatpak install --user ./fritz-power-monitor-VERSION.flatpak` |
+| Portable archive | Extract the archive and run the included `bin/fritz-power-monitor` executable. |
+
+Replace `VERSION` with the version in the downloaded filename. Packages are currently built for x86_64 Linux. Check each release for its artifacts and SHA-256 checksums.
+
+The Flatpak bundle can be installed independently of any app-store listing. Availability in a software store depends on publication of the package by that store.
+
+### Build and install from source
+
+**Requirements**
+
+- A COSMIC desktop session with panel applet support.
+- Rust and Cargo compatible with the project's Rust 2024 edition and current `libcosmic` Git dependency.
+- GNU Make and standard GNU installation utilities.
+- A FRITZ!Box with Smart Home support and a user account authorized to access it.
+
+Clone the repository and install:
 
 ```sh
+git clone https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet.git
+cd cosmic-ext-fritzsmart-monitor-applet
 make install
 ```
 
-Run this command from a Git checkout with a configured upstream. The install
-target first runs `git pull --ff-only`, then builds and installs the applet.
+The default install target updates the checkout with `git pull --ff-only`, builds the optimized executable and installs it for the current user. It then restarts the COSMIC panel so the applet can be reloaded; panel configuration and applet placement are preserved.
 
-It installs:
-
-| File | Location |
-| --- | --- |
-| Executable | `~/.local/bin/fritz-power-monitor` |
-| COSMIC desktop entry | `~/.local/share/applications/com.gpkvt.FritzPowerMonitor.desktop` |
-| Application icon | `~/.local/share/icons/hicolor/scalable/apps/` |
-
-The desktop entry uses the absolute executable path and includes the COSMIC
-applet discovery keys, allowing the applet to appear in COSMIC Settings.
-
-To use a different installation prefix:
+To build without updating the checkout first:
 
 ```sh
-make install PREFIX=/opt/fritz-power-monitor
+make install UPDATE=0
 ```
 
-Reload the installed applet without removing and re-adding it in COSMIC
-Settings with:
+To build only:
 
-```bash
+```sh
+cargo build --release
+```
+
+The default user-local installation uses:
+
+| Item | Location |
+| --- | --- |
+| Executable | `~/.local/bin/fritz-power-monitor` |
+| Desktop entry | `~/.local/share/applications/com.gpkvt.FritzPowerMonitor.desktop` |
+| Application icon | `~/.local/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg` |
+
+After installation, open **COSMIC Settings → Desktop → Panel** (wording may vary by COSMIC version) and add **FRITZ!Power Monitor** to a panel. If it is not listed immediately, reopen Settings or log out and back in.
+
+To reload the panel manually after a build:
+
+```sh
 make reload
 ```
 
-This restarts `cosmic-panel` so it launches the installed applet again. Your panel
-configuration and applet placement are preserved. The `make install` target also
-runs this reload automatically after installing the new build.
-
-Remove the user-local installation with:
+To remove the user-local installation:
 
 ```sh
 make uninstall
 ```
 
-After installation, reopen COSMIC Settings and add **FRITZ!Power Monitor**
-from the panel applet list. If it does not appear, log out and back in.
+## First-time setup
 
-### COSMIC Store (Flatpak)
+1. Add **FRITZ!Power Monitor** to a COSMIC panel.
+2. Open the applet and choose **Settings**.
+3. In **Connection**, enter the FRITZ!Box URL, username and password.
+4. Select **Load devices**, then choose the devices to monitor.
+5. Configure the panel display, refresh intervals and graph history to suit your setup.
 
-The Flatpak is being prepared for the official COSMIC Flatpak repository, which
-is the distribution channel for COSMIC panel applets. Once the submission is
-accepted and published, install it from the COSMIC Store or use:
+Use a router hostname that resolves on your local network. HTTPS is supported and certificate validation is enabled by default.
 
-```sh
-flatpak remote-add --if-not-exists --user cosmic https://apt.pop-os.org/cosmic/cosmic.flatpakrepo
-flatpak install --user cosmic com.gpkvt.FritzPowerMonitor
+## Features and configuration
+
+### Power monitoring
+
+The popup provides a live overview and individual cards for selected devices. Power readings are grouped into independent views:
+
+- **Total power out** — generated/output power.
+- **Total power in** — signed input power from devices configured as inputs.
+- **Power difference** — the combined net value.
+
+Input devices do not silently alter the output total. Configure the **Input** option for each device according to what it measures. Devices with “solar” in their name are initially suggested as inputs when discovered; manual choices are retained.
+
+Depending on the device and firmware, the popup can also provide a supported power switch. The control is verified against the router and refreshed device state.
+
+### Panel and popup
+
+Panel settings control the displayed text size and optional metrics:
+
+- Show internet download and upload rates separately.
+- Show an average temperature across selected devices.
+- Exclude devices whose names contain “solar” from that average.
+- Optionally combine consumption and solar generation into a net panel value.
+
+The popup sections can be arranged in Settings and collapsed independently. Device cards show their current power and temperature values and can expose individual history graphs.
+
+### Refresh and history
+
+Power monitoring and weather use independent refresh schedules. Power refresh can be configured from 30 seconds to one hour (default: 60 seconds); weather refresh can be configured from 5 to 60 minutes (default: 10 minutes).
+
+Graph history retention is configurable from 5 minutes up to 4 years. Samples are stored locally and restored after restarting the applet. Sampling adapts to the selected retention period and is bounded to keep storage manageable. Graphs visualize recorded readings; they do not calculate daily energy yield or provide forecasts.
+
+History is stored at:
+
+```text
+~/.local/share/fritz-power-monitor/history.json
 ```
 
-The submission manifest and its offline Cargo dependency sources are maintained
-in `packaging/cosmic-flatpak/`. The standalone `.flatpak` bundle attached to
-GitHub releases remains available independently of the COSMIC Store.
+### Temperature alerts
 
-## Build from source
+Temperature alerts can be enabled per device. Notifications are sent when a reading crosses the configured upper or lower limit. An alert is re-armed after the device returns to the safe range.
 
-Run formatting, tests and an optimized build independently:
+### Weather
+
+Weather is optional and requires an [OpenWeatherMap API key](https://openweathermap.org/api).
+
+1. Enable the weather integration in **Weather** settings.
+2. Enter the API key.
+3. Enter a location as a city name or `latitude,longitude`.
+4. Set the independent weather refresh interval.
+
+The weather card can show current conditions, feels-like temperature, humidity, wind, pressure, cloud cover, visibility, sunrise and sunset, and the forecast. Its illustrative background image is selected to match the reported weather condition and is sourced from Wikimedia Commons; it is not a live camera view of the configured location. If image lookup is unavailable, the card falls back to its normal appearance.
+
+Weather is optional. Weather service failures are independent of FRITZ!Box monitoring.
+
+### Connection, TLS and diagnostics
+
+FRITZ!Box login uses the router's challenge-response authentication. HTTPS certificate verification is enabled by default.
+
+For a router using a self-signed certificate, provide its PEM certificate as a trusted CA certificate in **Connection** settings. This adds a trust anchor while retaining certificate-chain and hostname validation. The option to allow invalid certificates is provided for compatibility, but disabling verification is not recommended.
+
+The **Diagnostics** settings category provides connection and device information to help investigate problems. Do not share diagnostic output containing private network details or credentials publicly.
+
+### Language
+
+The interface is available in English and German. By default, it follows the COSMIC desktop language; an explicit language can also be selected in Settings.
+
+## Building release packages
+
+The packaging script builds Debian, AppImage and Flatpak packages on an x86_64 Linux host. Install its required build tools first (including Cargo, curl, dpkg tooling, Flatpak and flatpak-builder, Git, Python 3 with venv support, and desktop-file utilities).
+
+Run:
+
+```sh
+APP_VERSION=0.8.35 bash packaging/build-linux-packages.sh
+```
+
+The script writes the packages and a `SHA256SUMS` file to `dist/` by default. Set `OUTPUT_DIR` to use another destination. The version shown is an example; use the version you intend to package.
+
+Basic project checks:
 
 ```sh
 cargo fmt --all -- --check
@@ -172,179 +200,57 @@ cargo test
 cargo build --release
 ```
 
-Build all distributable Linux packages (Debian `.deb`, AppImage and Flatpak) with one command on an x86_64 Linux host. The script builds the optimized binary, prepares Flatpak's offline Cargo sources, installs the required Flatpak runtime/SDK, and writes packages plus `SHA256SUMS` to `dist/` by default:
+GitHub Actions also runs project checks and packaging-related validation for changes to the repository.
+
+## Data, security and privacy
+
+- Core monitoring communicates directly with the configured FRITZ!Box on your network.
+- Router authentication uses the FRITZ!Box challenge-response mechanism.
+- HTTPS certificate validation is enabled by default; a custom CA can be configured.
+- Router credentials and the optional weather API key are stored in the user's configuration with owner-only permissions.
+- Graph history is stored locally in the user's data directory.
+- The optional weather integration contacts OpenWeatherMap. Weather imagery is retrieved from Wikimedia Commons.
+
+The applet does not need a third-party cloud service for its core FRITZ!Box monitoring. Keep credentials, API keys, router addresses and diagnostic details private when reporting issues.
+
+## Troubleshooting
+
+**The applet does not appear in COSMIC Settings**
+
+Confirm that the installation completed, then reopen COSMIC Settings or log out and back in. The panel reload target can also restart the running panel:
 
 ```sh
-APP_VERSION=0.6.2 bash packaging/build-linux-packages.sh
+make reload
 ```
 
-Override `OUTPUT_DIR` to choose another destination. Required tools include Cargo, curl, dpkg tooling, Flatpak/flatpak-builder, Git, Python 3 with venv support, and desktop-file-utils.
+**No devices are listed**
 
-Development builds display the numeric package version (for example, `0.3.0`);
-release builds use the version supplied by the release tag.
+Check that the FRITZ!Box URL is reachable, the account is allowed to access Smart Home data, and the router has compatible devices paired. Then use **Load devices** again.
 
-GitHub Actions runs formatting, tests, compilation, packaging and installation
-checks for pull requests and pushes to `main`.
+**HTTPS connection fails**
 
-## Configure the applet
+Use a hostname covered by the router certificate. If the router uses a self-signed certificate, configure its PEM certificate as a trusted CA rather than disabling TLS verification.
 
-Open the applet popup and select **Settings**. Settings are grouped into focused
-categories: Panel, Graph history, Automatic refresh, Weather, Connection,
-Devices, Menu order and Diagnostics.
+**A device has no power or temperature value**
 
-### Panel and device selection
+The applet can only display measurements exposed by the device and FRITZ!Box firmware. Confirm that the device provides the relevant measurement and inspect the Diagnostics settings.
 
-1. Set **Panel text size** (10–24 pt).
-2. Optionally enable **Show internet bandwidth** to add separate download and
-   upload rates (Mbps) with directional icons. Rates are read from the
-   FRITZ!Box WAN interface statistics; firmware that does not expose them leaves
-   the values unavailable without interrupting device monitoring.
-3. Optionally enable **Show average temperature in panel**. This displays the
-   mean temperature across selected devices instead of the first device's
-   temperature.
-4. If using the average, optionally enable **Exclude solar devices** to omit
-   devices whose names contain `solar`.
-5. Set the automatic refresh interval (30 seconds to 1 hour; default: 60
-   seconds).
-6. Enter the FRITZ!Box URL, username and password, then choose **Load devices**.
-7. Select the devices to monitor.
-8. In **Panel** settings, enable **Combine consumption and solar power** to
-   replace the separate panel readings with one net value. Solar generation is
-   subtracted from total consumption; positive values indicate net consumption
-   and negative values indicate net export.
+**Weather is unavailable**
 
-Use **Menu order** in Settings to arrange the live power summary, weather, device cards, Total power out, Total power in and Power difference independently. Device cards retain their relative order. Device settings list available devices in the order returned by the FRITZ!Box.
-Each selected device appears separately in the popup with its own readings and
-history graphs.
+Check the API key, location and network access. Weather is optional and can be disabled without affecting FRITZ!Box monitoring.
 
-### Power inputs and calculations
+## Contributing and support
 
-Enable **Input (subtract from total)** for devices that measure consumption
-rather than generation.
+Bug reports, feature requests and contributions are welcome:
 
-- Input wattage is tracked separately as a signed measurement.
-- Input wattage does not change **Total power output**.
-- **Power difference** combines output with signed input wattage.
-- Each input device has its own history graph.
-- Devices with `solar` in their name are automatically marked as inputs when
-  first discovered. This default is applied only once; manual changes are
-  preserved.
+- [Open an issue](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues)
+- [Browse the source](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet)
+- [View releases](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases)
 
-### Temperature alerts
+When reporting a problem, include your COSMIC version, FRITZ!OS version, applet version and relevant diagnostics. Redact passwords, API keys, public IP addresses and other private information.
 
-Enable **Temperature alerts** for an individual device to receive desktop
-notifications when its temperature leaves the configured range.
+## License and trademarks
 
-| Limit | Default | Allowed range |
-| --- | ---: | ---: |
-| Upper | 40 °C | 0–40 °C |
-| Lower | −10 °C | −10–0 °C |
+FRITZ!Power Monitor is released under the [MIT License](LICENSE).
 
-Alerts are disabled by default. A notification is sent when a device crosses
-either limit and is re-armed after the temperature returns to the safe range.
-
-### FRITZ!Box connection and TLS
-
-Enter the router URL, username and password in **Connection** settings.
-Credentials are stored in `~/.config/fritz_solar.cfg` with owner-only
-permissions.
-
-TLS certificate validation is enabled by default. If the router uses a
-self-signed certificate, provide its PEM certificate in **Trusted CA
-certificate**. The certificate is added as an additional trust anchor; normal
-certificate-chain and hostname validation remain enabled.
-
-For example, extract the router certificate with OpenSSL:
-
-```sh
-openssl s_client -connect fritz.box:443 -showcerts
-```
-
-Save the appropriate PEM certificate in a user-readable file such as
-`~/.config/fritzbox-ca.pem`, then enter that path in the applet. Use a URL
-hostname present in the certificate's Subject Alternative Name (SAN), such as
-`https://fritz.box/`, and ensure it resolves to the local router.
-
-**Allow invalid TLS certificates** is retained for compatibility only. Enabling
-it disables certificate verification; keep it off when using a trusted
-certificate.
-
-Existing simple `KEY=VALUE` configuration files remain readable. The applet
-manages the configuration file.
-
-### Weather integration
-
-Weather is optional and requires an OpenWeatherMap API key.
-
-1. Enable **Use current weather icon**.
-2. Enter the API key.
-3. Enter a city name or coordinates in `latitude,longitude` format.
-4. Choose the independent weather refresh interval (5–60 minutes;
-   default: 10 minutes).
-
-When enabled, the panel shows the current weather condition icon and
-OpenWeatherMap temperature. The popup includes a detailed summary with
-feels-like temperature, humidity, wind speed and direction, pressure, cloud
-cover, visibility, sunrise and sunset in local time.
-
-The background photograph is an illustrative Wikimedia Commons image selected
-for the reported weather type, not a live camera image of the configured
-location. Attribution links to the exact Commons file-description page.
-If photo lookup fails, the applet falls back to its normal themed card.
-The API key is stored in the owner-only configuration file.
-
-## History and limitations
-
-- Configure graph history retention in Settings from 5 minutes up to 4 years.
-  The same retention window controls which samples are shown in graphs. Both
-  the saved samples and the selected retention period survive applet restarts.
-- Total-power and per-device readings are refreshed normally; history keeps
-  the latest reading in an adaptive interval. Sampling automatically becomes
-  less frequent for longer retention windows and is capped at about 50,000
-  samples per history series.
-- The popup shows net-power low/high values, per-device power and temperature
-  sparklines, and a separate signed power graph for each input device.
-- Sparklines are evenly downsampled to 12 columns to fit their cards.
-- Graph samples are stored locally in
-  `~/.local/share/fritz-power-monitor/history.json` and restored after restarting
-  the applet. The history file is owner-readable only. The configured retention
-  window (5 minutes to 4 years) is retained across restarts. Long-term history
-  uses adaptive sampling (up to about 50,000 samples per series); it cannot show daily yield, forecasts
-  or inverter-specific statistics.
-- The FRITZ!Box device must expose both `powermeter/power` and
-  `temperature/celsius` in its device XML.
-
-## Releases and packages
-
-Push a version tag such as `v0.6.2` to build Linux x86_64 release packages and
-publish them on the GitHub Releases page.
-
-Each release includes SHA-256 checksums and the following artifacts:
-
-| Package | Contents |
-| --- | --- |
-| Debian `.deb` | Applet, COSMIC desktop entry and icon; runtime dependencies detected from the executable |
-| AppImage | Self-contained application with shared-library dependencies bundled |
-| Portable `.tar.gz` | Applet binary, desktop entry, icon, README and license |
-| Flatpak | Sandboxed COSMIC applet bundle |
-
-The Flatpak uses the Freedesktop 26.08 runtime and Rust SDK extension. It
-requests Wayland and network access for FRITZ!Box/OpenWeatherMap connections,
-plus desktop-notification permission.
-
-## Security and privacy
-
-- FRITZ!Box authentication uses the challenge-response login mechanism.
-- HTTPS certificate validation is enabled by default.
-- Router-specific CA certificates can be trusted without disabling hostname
-  verification.
-- Credentials and the weather API key are stored in a user-owned configuration
-  file with owner-only permissions.
-- The invalid-certificate option is available for compatibility, but is not
-  recommended.
-
-## Project status
-
-This project is an implementation baseline. A successful build and runtime
-validation on a COSMIC desktop and against the target FRITZ!Box model and
-FRITZ!OS version are required before considering a release fully validated.
+This is an independent, community-developed project. It is not affiliated with, sponsored, authorized or endorsed by FRITZ! GmbH. FRITZ!, FRITZ!Box and related marks are trademarks or registered trademarks of their respective owners and are used only to identify compatible products.
