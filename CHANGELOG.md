@@ -16,6 +16,7 @@ Changes are tracked in date-based entries. See the [GitHub Releases](https://git
 ### Changed
 
 - Redesigned the settings overview into clearly grouped Interface, Display & updates, Data sources, Layout and Support sections ([#497](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/497)).
+- Translated the first-run setup assistant and settings overview across all supported interface languages.
 - Displayed forecast high and low temperatures on separate, right-aligned lines for easier scanning ([#495](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/495), [#496](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/496)).
 - Restored paired weather/temperature and consumption/solar readings in two-line panel mode while preserving configured item order ([#499](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/499)).
 - Stacked the unit below an unpaired panel value in two-line mode, keeping paired values and single-line mode compact ([#501](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/501)).
