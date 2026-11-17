@@ -1,0 +1,35 @@
+name: Format Rust sources (temporary repair)
+on:
+  push:
+    branches:
+      - fix/format-rust-sources
+permissions:
+  contents: write
+concurrency:
+  group: rust-format-repair
+  cancel-in-progress: true
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Rust formatter
+        run: rustup component add rustfmt
+      - name: Format Rust sources
+        run: cargo fmt --all
+      - name: Commit formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "Rust sources already formatted."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- '*.rs'
+          git commit -m "style: format Rust sources"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
