@@ -215,9 +215,9 @@ fn notify_missing_devices(names: &[String], language: &str) {
     let body = names.join("\n");
     let _ = notify_rust::Notification::new()
         .summary(if names.len() == 1 {
-            crate::i18n::tr(language, "FRITZ!Box device unavailable")
+            crate::i18n::tr(&language, "FRITZ!Box device unavailable")
         } else {
-            crate::i18n::tr(language, "FRITZ!Box devices unavailable")
+            crate::i18n::tr(&language, "FRITZ!Box devices unavailable")
         })
         .body(&body)
         .show();
@@ -231,19 +231,19 @@ fn notify_temperature_alert(
 ) {
     let (summary, body) = if temperature > f64::from(thresholds.high_c) {
         (
-            format!("{}: {name}", crate::i18n::tr(language, "High temperature")),
+            format!("{}: {name}", crate::i18n::tr(&language, "High temperature")),
             format!(
                 "{temperature:.1} °C ({}: {} °C)",
-                crate::i18n::tr(language, "maximum"),
+                crate::i18n::tr(&language, "maximum"),
                 thresholds.high_c
             ),
         )
     } else {
         (
-            format!("{}: {name}", crate::i18n::tr(language, "Low temperature")),
+            format!("{}: {name}", crate::i18n::tr(&language, "Low temperature")),
             format!(
                 "{temperature:.1} °C ({}: {} °C)",
-                crate::i18n::tr(language, "minimum"),
+                crate::i18n::tr(&language, "minimum"),
                 thresholds.low_c
             ),
         )
@@ -1216,7 +1216,7 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
         )))
         .push(interactive_graph_with_axis(
             &language,
-            crate::i18n::tr(language, "CURRENT POWER"),
+            crate::i18n::tr(&language, "CURRENT POWER"),
             history.into_iter(),
             &graph_style,
             "W",
@@ -1227,8 +1227,8 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
             "AVERAGE TEMPERATURE HISTORY (°C)",
         )))
         .push(interactive_graph_with_axis(
-            language,
-            crate::i18n::tr(language, "AVERAGE TEMPERATURE"),
+            &language,
+            crate::i18n::tr(&language, "AVERAGE TEMPERATURE"),
             temperature_history.into_iter(),
             &graph_style,
             "°C",
@@ -1528,7 +1528,7 @@ fn settings_section_header<'a>(
         "diagnostics" => ("dialog-information-symbolic", "Connection and save status"),
         _ => ("preferences-system-symbolic", "Applet preferences"),
     };
-    let description = crate::i18n::tr(language, description);
+    let description = crate::i18n::tr(&language, description);
     let section_row: cosmic::Element<'a, Message> = widget::button::custom(
         widget::Row::new()
             .spacing(12)
