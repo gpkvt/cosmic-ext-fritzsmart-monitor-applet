@@ -22,7 +22,7 @@ FRITZ!Power Monitor connects directly to your router. It brings household power 
 - Optional OpenWeatherMap conditions, forecast and weather-matched Wikimedia Commons imagery.
 - Configurable refresh intervals, graph retention, panel display and popup layout.
 - Temperature alerts and supported smart-home device switching.
-- English and German interface translations.
+- Interface translations for English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian. Untranslated strings fall back to English.
 
 ## Screenshots
 
@@ -178,7 +178,7 @@ The **Diagnostics** settings category provides connection and device information
 
 ### Language
 
-The interface is available in English and German. By default, it follows the COSMIC desktop language; an explicit language can also be selected in Settings.
+The interface supports English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian. By default, it follows the COSMIC desktop language; an explicit language can also be selected in Settings. Translation coverage is being expanded, and strings not yet translated fall back to English.
 
 ## Building release packages
 

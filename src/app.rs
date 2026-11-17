@@ -2084,19 +2084,33 @@ impl cosmic::Application for AppModel {
             }
 
             if self.active_settings_section == Some("language") {
+                let language_button = |label: &'static str, code: &'static str| {
+                    widget::button::custom(widget::text::body(label))
+                        .on_press(Message::LanguageChanged(code.into()))
+                        .class(cosmic::theme::Button::Standard)
+                };
                 content = content
                     .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Interface language")))
-                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "System follows your desktop language. English and German are currently available.")))
-                    .push(widget::Row::new().spacing(8)
-                        .push(widget::button::custom(widget::text::body(crate::i18n::tr(&self.settings.language, "System default")))
-                            .on_press(Message::LanguageChanged("system".into()))
-                            .class(cosmic::theme::Button::Standard))
-                        .push(widget::button::custom(widget::text::body(crate::i18n::tr(&self.settings.language, "English")))
-                            .on_press(Message::LanguageChanged("en".into()))
-                            .class(cosmic::theme::Button::Standard))
-                        .push(widget::button::custom(widget::text::body(crate::i18n::tr(&self.settings.language, "Deutsch")))
-                            .on_press(Message::LanguageChanged("de".into()))
-                            .class(cosmic::theme::Button::Standard)))
+                    .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.")))
+                    .push(widget::Column::new().spacing(8)
+                        .push(widget::Row::new().spacing(8)
+                            .push(language_button(crate::i18n::tr(&self.settings.language, "System default"), "system"))
+                            .push(language_button("English", "en")))
+                        .push(widget::Row::new().spacing(8)
+                            .push(language_button("Deutsch", "de"))
+                            .push(language_button("Español", "es")))
+                        .push(widget::Row::new().spacing(8)
+                            .push(language_button("Nederlands", "nl"))
+                            .push(language_button("Français", "fr")))
+                        .push(widget::Row::new().spacing(8)
+                            .push(language_button("Italiano", "it"))
+                            .push(language_button("Svenska", "sv")))
+                        .push(widget::Row::new().spacing(8)
+                            .push(language_button("Português", "pt"))
+                            .push(language_button("Polski", "pl")))
+                        .push(widget::Row::new().spacing(8)
+                            .push(language_button("Dansk", "da"))
+                            .push(language_button("Norsk", "no"))))
                     .push(widget::divider::horizontal::default());
             }
             if self.active_settings_section == Some("panel") {
