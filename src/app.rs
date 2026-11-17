@@ -1898,7 +1898,7 @@ fn regular_clock_ticks() -> impl futures::Stream<Item = Message> {
 }
 
 fn diagnostics_clock_ticks() -> impl futures::Stream<Item = Message> {
-    clock_ticks(Duration::from_millis(250))
+    clock_ticks(Duration::from_secs(1))
 }
 
 fn animation_ticks() -> impl futures::Stream<Item = Message> {
@@ -1911,7 +1911,7 @@ fn flow_animation_ticks() -> impl futures::Stream<Item = Message> {
     cosmic::iced::stream::channel(
         2,
         |mut output: futures::channel::mpsc::Sender<Message>| async move {
-            let mut interval = tokio::time::interval(Duration::from_millis(220));
+            let mut interval = tokio::time::interval(Duration::from_secs(1));
             interval.tick().await;
             loop {
                 interval.tick().await;
@@ -1927,7 +1927,7 @@ fn weather_slideshow_ticks() -> impl futures::Stream<Item = Message> {
     cosmic::iced::stream::channel(
         2,
         |mut output: futures::channel::mpsc::Sender<Message>| async move {
-            let mut interval = tokio::time::interval(Duration::from_millis(250));
+            let mut interval = tokio::time::interval(Duration::from_secs(1));
             interval.tick().await;
             loop {
                 interval.tick().await;
