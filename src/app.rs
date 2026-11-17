@@ -2194,31 +2194,38 @@ impl cosmic::Application for AppModel {
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>,
                           icon_at_top: bool| {
+            // A split number/unit value needs two text lines. The previous
+            // fixed 24px item height clipped those lines in multiline mode.
+            let item_height = if icon_at_top { 40.0 } else { 24.0 };
             let mut item = widget::Row::new().spacing(5).align_y(if icon_at_top {
                 cosmic::iced::Alignment::Start
             } else {
                 cosmic::iced::Alignment::Center
             });
             if let Some(icon) = icon {
-                // Reserve the same icon column for every panel item so all
-                // readings begin at an identical horizontal position.
-                item = item.push(
-                    widget::container(icon)
-                        .width(cosmic::iced::Length::Fixed(16.0))
-                        .height(cosmic::iced::Length::Fixed(24.0))
-                        .center_x(16)
-                        .center_y(24),
-                );
+                // Keep the icon beside the first line when a value wraps.
+                let icon_column = widget::container(icon)
+                    .width(cosmic::iced::Length::Fixed(16.0))
+                    .height(cosmic::iced::Length::Fixed(if icon_at_top {
+                        18.0
+                    } else {
+                        item_height
+                    }))
+                    .center_x(16);
+                item = item.push(if icon_at_top {
+                    icon_column
+                } else {
+                    icon_column.center_y(item_height as u16)
+                });
             }
-            // Give the value a real, expanding layout area. Alignment on a
-            // shrink-wrapped container is a no-op, so the item and value both
-            // fill their available panel column.
+            // Give the value a real, expanding layout area so right/bottom
+            // alignment works for both one-line and two-line readings.
             let value = widget::container(value)
                 .align_right(cosmic::iced::Length::Fill)
-                .align_bottom(24);
+                .align_bottom(item_height as u16);
             item = item
                 .width(cosmic::iced::Length::Fill)
-                .height(cosmic::iced::Length::Fixed(24.0));
+                .height(cosmic::iced::Length::Fixed(item_height));
             self.core.applet.applet_tooltip(
                 item.push(value),
                 label,
