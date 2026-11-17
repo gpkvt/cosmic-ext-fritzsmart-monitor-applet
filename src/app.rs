@@ -3070,7 +3070,7 @@ impl cosmic::Application for AppModel {
                             ),
                     );
                 }
-                    .push(
+                    content = content.push(
                         widget::Row::new()
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(
