@@ -4211,7 +4211,7 @@ impl cosmic::Application for AppModel {
                 }
                 // Separate the condition summary from the detailed readings for clearer scanning.
                 let mut weather_details = widget::Column::new()
-                    .spacing(12)
+                    .spacing(8)
                     .height(cosmic::iced::Length::Fill)
                     .push(date_row);
                 if self.weather_attribution_expanded {
@@ -4261,10 +4261,10 @@ impl cosmic::Application for AppModel {
                     .push(widget::Space::new().height(cosmic::iced::Length::Fill))
                     .push(
                         widget::Column::new()
-                            .spacing(6)
+                            .spacing(4)
                             .push(
                                 widget::Row::new()
-                                    .spacing(16)
+                                    .spacing(12)
                                     .push(widget::text::body(format!(
                                         "{}  {}%",
                                         crate::i18n::tr(&self.settings.language, "Humidity"),
@@ -4283,7 +4283,7 @@ impl cosmic::Application for AppModel {
                             )
                             .push(
                                 widget::Row::new()
-                                    .spacing(16)
+                                    .spacing(12)
                                     .push(widget::text::body(format!(
                                         "{}  {:.1} m/s",
                                         crate::i18n::tr(&self.settings.language, "Wind speed"),
@@ -4299,21 +4299,22 @@ impl cosmic::Application for AppModel {
                     .push(
                         widget::Row::new()
                             .spacing(8)
-                            .push(widget::text::body(format!(
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::text::caption(format!(
                                 "{}  {:.1} km",
                                 crate::i18n::tr(&self.settings.language, "Visibility"),
                                 f64::from(weather.visibility_m) / 1000.0
                             )))
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(widget::text::body(format!(
+                            .push(widget::text::caption(format!(
                                 "{}  {sunrise}",
                                 crate::i18n::tr(&self.settings.language, "Sunrise")
+                            )))
+                            .push(widget::text::caption(format!(
+                                "{}  {sunset}",
+                                crate::i18n::tr(&self.settings.language, "Sunset")
                             ))),
-                    )
-                    .push(widget::text::body(format!(
-                        "{}  {sunset}",
-                        crate::i18n::tr(&self.settings.language, "Sunset")
-                    )));
+                    );
                 let weather_heading = widget::button::custom(
                     widget::Row::new()
                         .spacing(8)
