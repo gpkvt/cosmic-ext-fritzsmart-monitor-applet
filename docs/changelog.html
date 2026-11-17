@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#10131a">
+<meta name="description" content="Release notes and changelog for FRITZ!Power Monitor, the COSMIC desktop applet.">
+<title>Changelog — FRITZ!Power Monitor</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<style>
+:root{color-scheme:dark;--bg:#0b0e14;--surface:#121722;--text:#f2f5fa;--muted:#a2adbd;--soft:#748195;--line:#293344;--mint:#8be0c4;--max:900px}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.75 system-ui,sans-serif}.wrap{width:min(var(--max),calc(100% - 40px));margin:auto}
+header{position:sticky;top:0;background:#0b0e14e8;backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+nav{min-height:68px;display:flex;align-items:center;justify-content:space-between;gap:20px}.brand{font-weight:800;letter-spacing:-.03em}.brand img{width:30px;height:30px;vertical-align:middle;margin-right:9px}
+nav a,.back{color:var(--mint);text-decoration:none;font-weight:700}nav a:hover,.back:hover{text-decoration:underline}
+main{padding:58px 0 90px}h1{font-size:clamp(38px,6vw,58px);line-height:1.05;letter-spacing:-.06em;margin:0 0 14px}main>p{color:var(--muted);margin:0 0 34px}
+article h2{font-size:25px;letter-spacing:-.03em;margin:48px 0 16px;padding-top:22px;border-top:1px solid var(--line)}article h3{font-size:16px;color:var(--mint);margin:28px 0 10px}article p{color:var(--muted);margin:0 0 12px}article ul{padding-left:23px;margin:10px 0 22px}article li{padding:0 0 12px 5px;color:var(--muted)}article a{color:var(--mint);text-underline-offset:3px}article a:hover{color:var(--text)}footer{border-top:1px solid var(--line);padding:25px 0;color:var(--soft);font-size:13px}
+@media(max-width:600px){main{padding-top:38px}nav{min-height:60px}}
+</style>
+</head>
+<body>
+<header><nav class="wrap" aria-label="Main navigation"><a class="brand" href="index.html"><img src="logo.svg" alt="">FRITZ!Power Monitor</a><a href="guide.html">Documentation</a></nav></header>
+<main class="wrap"><a class="back" href="index.html">← Project overview</a><article><h1>Changelog</h1>
+<p>All notable changes to FRITZ!Power Monitor are documented here.</p>
+<p>Changes are tracked in date-based entries. See the <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases">GitHub Releases</a> for published versions.</p>
+<h2>[17.11.2026]</h2>
+<h3>Added</h3>
+<ul>
+<li>Added an animated solar/grid energy-flow view showing household consumption, solar generation, self-consumption and grid import/export (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/461">#461</a>).</li>
+<li>Added one-click application updates in Diagnostics for Flatpak, Debian packages, AppImages and source checkouts, with checksum verification where applicable (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/464">#464</a>).</li>
+<li>Added a timestamped Diagnostics activity timeline covering refreshes, device discovery, weather requests, release checks and update installation, including recent FRITZ!Box HTTP response details (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/479">#479</a>).</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li>Made history graphs collapsible, individually or in related pairs, and persisted disclosure states across applet restarts; this includes current-power history, total input/output and temperature graphs, bandwidth graphs, and per-device power/temperature pairs (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/480">#480</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/484">#484</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/486">#486</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/488">#488</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/489">#489</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/490">#490</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/493">#493</a>).</li>
+<li>Reduced popup CPU usage by preprocessing and caching weather images and reducing redundant diagnostics, slideshow and energy-flow redraws (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/481">#481</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/482">#482</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/487">#487</a>).</li>
+<li>Changed the weather background on every manual reload while preserving the selected slideshow position when refreshed images arrive (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/477">#477</a>).</li>
+<li>Added metric axes and MIN/MAX/CURRENT values to compact and expanded graphs, simplified power and temperature unit labels, and aligned expanded graph layout with compact graphs (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/462">#462</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/467">#467</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/469">#469</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/470">#470</a>).</li>
+<li>Restricted Wikimedia weather backgrounds to natural scenery and astronomy, removed the chessboard overlay and made photo backgrounds translucent (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/448">#448</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/449">#449</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/483">#483</a>).</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Fixed repository selection in the workflow CLI and release lockfile resolution; corrected the AppImage updater's asynchronous permission update (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/466">#466</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/471">#471</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/476">#476</a>).</li>
+<li>Fixed TLS diagnostics severity when certificate validation is explicitly disabled, and clarified installed/latest version status indicators (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/472">#472</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/475">#475</a>).</li>
+<li>Fixed broken README and security-policy links on the website and user guide (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/474">#474</a>).</li>
+</ul>
+<h3>Documentation and Website</h3>
+<ul>
+<li>Added persistent light/dark/system theme and German/English language controls to the landing page and user guide (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/444">#444</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/454">#454</a>).</li>
+<li>Added CLI commands and Make targets for publishing Pages, publishing releases, building packages, listing workflows and watching workflow runs (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/468">#468</a>).</li>
+</ul></article></main>
+<footer><div class="wrap">FRITZ!Power Monitor · Open source COSMIC desktop applet · <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet">GitHub repository</a></div></footer>
+</body></html>
