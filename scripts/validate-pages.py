@@ -70,6 +70,9 @@ for page in pages:
             fail(f"index.html: missing gallery elements: {', '.join(sorted(missing))}")
         if parser.gallery_images != 1:
             fail(f"index.html: expected one gallery image element, found {parser.gallery_images}")
+        safeguard_icons = re.findall(r'<div class="detail-icon"[^>]*>\s*<span>.+?</span>\s*</div>', content)
+        if len(safeguard_icons) != 6:
+            fail(f"index.html: expected six visible safeguard icons, found {len(safeguard_icons)}")
         if not re.search(r"event\.key\s*===\s*['\"]ArrowLeft['\"]", content):
             fail("index.html: left-arrow keyboard navigation is missing")
         if not re.search(r"event\.key\s*===\s*['\"]ArrowRight['\"]", content):
