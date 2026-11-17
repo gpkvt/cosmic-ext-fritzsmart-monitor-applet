@@ -64,6 +64,23 @@ for page in pages:
                 fail(f"{page.name}: missing anchor in {reference}")
 
     if page.name == "index.html":
+        cargo = (ROOT.parent / "Cargo.toml").read_text(encoding="utf-8")
+        version_match = re.search(r'(?ms)^\[package\]\s+.*?^version\s*=\s*"([^"]+)"', cargo)
+        if not version_match:
+            fail("could not read package version from Cargo.toml")
+        version = version_match.group(1)
+        if "@APP_VERSION@" in content:
+            fail("index.html: unresolved package download version placeholder")
+        expected_downloads = (
+            f"/releases/download/v{version}/",
+            f"fritz-power-monitor_{version}_amd64.deb",
+            f"fritz-power-monitor-{version}-x86_64.AppImage",
+            f"fritz-power-monitor-{version}.flatpak",
+            f"fritz-power-monitor-v{version}-x86_64-unknown-linux-gnu.tar.gz",
+        )
+        for expected in expected_downloads:
+            if expected not in content:
+                fail(f"index.html: package download links are not synchronized with Cargo version {version}: {expected}")
         required_ids = {"screenshot-dialog", "gallery-image", "gallery-previous", "gallery-next", "gallery-count"}
         missing = required_ids - parser.ids
         if missing:

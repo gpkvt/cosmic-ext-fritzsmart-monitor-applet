@@ -68,7 +68,23 @@ def render(source: Path, destination: Path, title: str) -> None:
     destination.write_text(page, encoding="utf-8")
 
 
+def sync_package_download_version() -> None:
+    """Keep website package links aligned with the Cargo package version."""
+    cargo = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
+    match = re.search(r'(?ms)^\[package\]\s+.*?^version\s*=\s*"([^"]+)"', cargo)
+    if not match:
+        raise RuntimeError("Could not read [package].version from Cargo.toml")
+    index = DOCS / "index.html"
+    content = index.read_text(encoding="utf-8")
+    if "@APP_VERSION@" not in content:
+        raise RuntimeError("docs/index.html is missing @APP_VERSION@ package link placeholders")
+    content = content.replace("@APP_VERSION@", match.group(1))
+    index.write_text(content, encoding="utf-8")
+    print(f"Updated package download links for fritz-power-monitor {match.group(1)}")
+
 def main() -> None:
+    sync_package_download_version()
+
     # README.md links to the repository license using the relative URL
     # "LICENSE". Since README is rendered under docs/, publish the license
     # alongside the generated HTML so that link remains valid on GitHub Pages.
