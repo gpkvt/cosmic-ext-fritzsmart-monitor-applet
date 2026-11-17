@@ -2218,7 +2218,7 @@ impl cosmic::Application for AppModel {
                 (text.chars().count() as f32 * panel_text_size * 0.62).max(panel_text_size)
             };
             if let Some((upper, lower)) = value.split_once('\n') {
-                let line_height = 14.0;
+                let line_height = (panel_text_size * 0.85).max(1.0);
                 let width = text_width(upper).max(text_width(lower));
                 widget::Column::new()
                     .spacing(0)

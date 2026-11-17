@@ -8,6 +8,10 @@ Changes are tracked in date-based entries. See the [GitHub Releases](https://git
 
 ### Fixed
 
+- Matched the spacing between split number/unit lines to the configured panel text line height, removing the oversized gap in odd multiline panel items.
+
+### Fixed
+
 - Right-aligned panel values within content-sized columns, including matching right edges for both lines of multiline readings.
 
 ### Changed
