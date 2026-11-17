@@ -198,7 +198,8 @@ fn notify_missing_devices(names: &[String], language: &str) {
     if names.is_empty() {
         return;
     }
-    let body = names.join("\n");
+    let body = names.join("
+");
     let _ = notify_rust::Notification::new()
         .summary(if names.len() == 1 {
             crate::i18n::tr(language, "FRITZ!Box device unavailable")
@@ -973,7 +974,12 @@ fn total_power_overview(
         .unwrap_or_default();
     let total_power = output_power_w(readings, &settings.input_ains);
     let input_power = input_power_w(readings, &settings.input_ains);
-    let axis_start = format_graph_axis_start(\n        settings.graph_timespan_minutes,\n        history.front().map(|(timestamp, _)| {\n            Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)\n        }),\n    );
+    let axis_start = format_graph_axis_start(
+        settings.graph_timespan_minutes,
+        history.front().map(|(timestamp, _)| {
+            Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)
+        }),
+    );
 
     let output_graph = widget::Column::new()
         .spacing(4)
@@ -3502,7 +3508,12 @@ impl cosmic::Application for AppModel {
                         .collect(),
                     &self.settings.graph_style,
                     &self.settings.language,
-                    format_graph_axis_start(\n                        self.settings.graph_timespan_minutes,\n                        self.history.front().map(|(timestamp, _)| {\n                            Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)\n                        }),\n                    ),
+                    format_graph_axis_start(
+                        self.settings.graph_timespan_minutes,
+                        self.history.front().map(|(timestamp, _)| {
+                            Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)
+                        }),
+                    ),
                 );
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
