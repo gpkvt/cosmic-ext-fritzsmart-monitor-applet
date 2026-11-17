@@ -81,10 +81,10 @@ for page in pages:
         for expected in expected_downloads:
             if expected not in content:
                 fail(f"index.html: package download links are not synchronized with Cargo version {version}: {expected}")
-        required_ids = {"screenshot-dialog", "gallery-image", "gallery-previous", "gallery-next", "gallery-count"}
+        required_ids = {"screenshot-dialog", "gallery-image", "gallery-previous", "gallery-next", "gallery-count", "release-assets"}
         missing = required_ids - parser.ids
         if missing:
-            fail(f"index.html: missing gallery elements: {', '.join(sorted(missing))}")
+            fail(f"index.html: missing required elements: {', '.join(sorted(missing))}")
         if parser.gallery_images != 1:
             fail(f"index.html: expected one gallery image element, found {parser.gallery_images}")
         safeguard_icons = re.findall(
