@@ -497,7 +497,8 @@ fn record_bandwidth_sample(
     if let Some((timestamp, previous_download, previous_upload)) = history.back_mut() {
         if now.duration_since(*timestamp) < sample_interval {
             *previous_download = download;
-            *previous_upload = upload;        } else {
+            *previous_upload = upload;
+        } else {
             history.push_back((now, download, upload));
         }
     } else {
@@ -996,7 +997,8 @@ fn range_metric_tile<'a>(
             widget::Row::new()
                 .spacing(6)
                 .align_y(cosmic::iced::Alignment::Center)
-                .push(widget::icon::from_name(icon).size(14))                .push(widget::text::caption(label)),
+                .push(widget::icon::from_name(icon).size(14))
+                .push(widget::text::caption(label)),
         )
         .push(widget::text::title2(keep_value_unit_together(value)));
     surface_card(content.into(), 12)
@@ -1495,7 +1497,8 @@ fn total_power_overview(
                     &settings.graph_style,
                     "W",
                     axis_start.clone(),
-                ))                .push(interactive_graph_with_axis(
+                ))
+                .push(interactive_graph_with_axis(
                     &settings.language,
                     crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
                     input_temperature_history.iter().map(|(_, value)| *value),
@@ -1994,7 +1997,8 @@ fn flow_animation_ticks() -> impl futures::Stream<Item = Message> {
                 interval.tick().await;
                 if output.send(Message::FlowAnimationTick).await.is_err() {
                     break;
-                }            }
+                }
+            }
         },
     )
 }
@@ -2184,8 +2188,8 @@ impl cosmic::Application for AppModel {
                 )
             });
 
-        // Keep every reading at its intrinsic width. Expanding each child to
-        // Fill inside the horizontal panel row pushes later readings off-screen.
+        // Use a compact, consistent value column: this keeps stacked readings
+        // right-aligned without restoring the excessive 88px gap.
         let panel_item = |label: &'static str,
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>,
@@ -2217,8 +2221,8 @@ impl cosmic::Application for AppModel {
                     icon_column.center_y(item_height as u16)
                 });
             }
-            // Keep the value shrink-wrapped so it cannot consume the space
-            // needed by subsequent readings.
+            // Give the value a real, expanding layout area so right/bottom
+            // alignment works for both one-line and two-line readings.
             let value = widget::container(value)
                 .width(cosmic::iced::Length::Shrink)
                 .align_bottom(item_height as u16);
@@ -2494,7 +2498,8 @@ impl cosmic::Application for AppModel {
             {
                 ordered_panel_items.push(panel_items.remove(index));
             }
-        }        ordered_panel_items.extend(panel_items.drain(..));
+        }
+        ordered_panel_items.extend(panel_items.drain(..));
 
         if self.settings.panel_multiline {
             // Keep related readings together in multiline mode. The order of
@@ -2993,7 +2998,8 @@ impl cosmic::Application for AppModel {
                                 widget::Column::new()
                                     .spacing(3)
                                     .width(cosmic::iced::Length::Fill)
-                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Show internet bandwidth")))                                    .push(widget::text::caption(
+                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Show internet bandwidth")))
+                                    .push(widget::text::caption(
                                         "Display the maximum download and upload link speeds reported by your FRITZ!Box connection in Mb/s.",
                                     )),
                             )
@@ -3492,7 +3498,8 @@ impl cosmic::Application for AppModel {
                         crate::i18n::tr(&self.settings.language, "Version"),
                         format!("v{}", env!("APP_VERSION")),
                     ))
-                    .push(diagnostic_status_row(                        crate::i18n::tr(&self.settings.language, "Latest version"),
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "Latest version"),
                         if self.latest_version_loading {
                             crate::i18n::tr(&self.settings.language, "Checking for updates…")
                                 .to_string()
@@ -3991,7 +3998,8 @@ impl cosmic::Application for AppModel {
                         error,
                     ));
                 }
-                if let Some(status) = &self.settings_status {                    if is_error_status(status) {
+                if let Some(status) = &self.settings_status {
+                    if is_error_status(status) {
                         let title = if status.starts_with("Weather unavailable:") {
                             "WEATHER UNAVAILABLE"
                         } else if status.starts_with("Could not save settings:") {
@@ -4490,7 +4498,8 @@ impl cosmic::Application for AppModel {
                                             day.precipitation_probability_percent,
                                             crate::i18n::tr(&self.settings.language, "rain")
                                         )))
-                                        .push(widget::text::caption(format!(                                            "{:.0} km/h",
+                                        .push(widget::text::caption(format!(
+                                            "{:.0} km/h",
                                             day.wind_speed_kmh
                                         ))),
                                 );
@@ -4989,7 +4998,8 @@ impl cosmic::Application for AppModel {
                                         border: cosmic::iced::Border {
                                             radius: device_corner_radius,
                                             ..Default::default()
-                                        },                                        ..Default::default()
+                                        },
+                                        ..Default::default()
                                     }
                                 }),
                             )
@@ -5488,7 +5498,8 @@ impl cosmic::Application for AppModel {
                     // applet popup API. window::open() creates a local window
                     // rather than a host-compositor popup and can resize the
                     // panel's layer surface on Wayland.
-                    let Some(main_window_id) = self.core.main_window_id() else {                        self.expanded_graph = None;
+                    let Some(main_window_id) = self.core.main_window_id() else {
+                        self.expanded_graph = None;
                         return Task::none();
                     };
                     let id = Id::unique();
@@ -5987,7 +5998,8 @@ impl cosmic::Application for AppModel {
                     index.checked_sub(1)
                 } else if index + 1 < self.settings.menu_order.len() {
                     Some(index + 1)
-                } else {                    None
+                } else {
+                    None
                 };
                 if let Some(target) = target {
                     self.settings.menu_order.swap(index, target);
@@ -6486,7 +6498,8 @@ impl cosmic::Application for AppModel {
                                     == crate::fritz::normalize_ain_for_selection(&device.ain)
                             })
                         });
-                        self.settings_status = Some(format!(                            "Found {} compatible power-meter device(s)",
+                        self.settings_status = Some(format!(
+                            "Found {} compatible power-meter device(s)",
                             self.devices.len()
                         ));
                         record_diagnostic_event(
@@ -6985,7 +6998,8 @@ mod history_tests {
     fn solar_named_devices_are_default_inputs_case_insensitively() {
         let devices = vec![
             FritzDevice {
-                name: "Solar inverter".into(),                ain: "12:34-56".into(),
+                name: "Solar inverter".into(),
+                ain: "12:34-56".into(),
             },
             FritzDevice {
                 name: "ROOF SOLAR METER".into(),
