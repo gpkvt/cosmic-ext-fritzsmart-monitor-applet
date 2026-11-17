@@ -4060,14 +4060,33 @@ impl cosmic::Application for AppModel {
                         "graph_power_values_retrievable": sample_count > 0
                     })
                 }).collect();
+                let stored_device_histories: Vec<serde_json::Value> = self.device_history.iter().map(|(ain, samples)| {
+                    let current_reading = self.readings.iter().find(|reading|
+                        crate::fritz::normalize_ain_for_selection(&reading.ain) == *ain
+                    );
+                    serde_json::json!({
+                        "normalized_ain": ain,
+                        "live_device_found": current_reading.is_some(),
+                        "live_device_name": current_reading.map(|reading| reading.name.as_str()),
+                        "sample_count": samples.len(),
+                        "first_sample_age_seconds": samples.front().map(|(timestamp, _, _)| now.saturating_duration_since(*timestamp).as_secs()),
+                        "last_sample_age_seconds": samples.back().map(|(timestamp, _, _)| now.saturating_duration_since(*timestamp).as_secs()),
+                        "graph_power_values_retrievable": !samples.is_empty(),
+                        "graph_power_values_count": samples.iter().map(|(_, power, _)| *power as f64).count(),
+                        "power_min_w": samples.iter().map(|(_, power, _)| *power).min(),
+                        "power_max_w": samples.iter().map(|(_, power, _)| *power).max()
+                    })
+                }).collect();
                 let graph_diagnostics = serde_json::json!({
                     "history_storage": self.history_storage_diagnostics,
                     "runtime": {
                         "configured_timespan_minutes": self.settings.graph_timespan_minutes,
                         "current_readings": self.readings.len(),
                         "device_history_entries": self.device_history.len(),
-                        "device_histories": device_history_json,
-                        "overall_power_history_samples": self.history.len()
+                        "live_device_histories": device_history_json,
+                        "stored_device_histories": stored_device_histories,
+                        "overall_power_history_samples": self.history.len(),
+                        "overall_power_graph_values_retrievable": !self.history.is_empty()
                     }
                 });
                 let graph_diagnostics_text = serde_json::to_string_pretty(&graph_diagnostics)
