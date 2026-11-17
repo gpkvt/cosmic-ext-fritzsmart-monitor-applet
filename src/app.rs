@@ -5805,18 +5805,28 @@ impl cosmic::Application for AppModel {
             Message::ShowDeviceHistoryGraph(ain) => {
                 let mut ordered: Vec<_> = self.readings.iter().collect();
                 ordered.sort_by_key(|reading| {
-                    self.settings.device_order.iter().position(|configured| {
-                        crate::fritz::normalize_ain_for_selection(configured)
-                            == crate::fritz::normalize_ain_for_selection(&reading.ain)
-                    }).unwrap_or(usize::MAX)
+                    self.settings
+                        .device_order
+                        .iter()
+                        .position(|configured| {
+                            crate::fritz::normalize_ain_for_selection(configured)
+                                == crate::fritz::normalize_ain_for_selection(&reading.ain)
+                        })
+                        .unwrap_or(usize::MAX)
                 });
-                self.history_graph_devices = ordered.into_iter().filter_map(|reading| {
-                    let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                    self.device_history.get(&key)
-                        .filter(|samples| !samples.is_empty())
-                        .map(|_| (key, reading.name.clone()))
-                }).collect();
-                self.history_graph_index = self.history_graph_devices.iter()
+                self.history_graph_devices = ordered
+                    .into_iter()
+                    .filter_map(|reading| {
+                        let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
+                        self.device_history
+                            .get(&key)
+                            .filter(|samples| !samples.is_empty())
+                            .map(|_| (key, reading.name.clone()))
+                    })
+                    .collect();
+                self.history_graph_index = self
+                    .history_graph_devices
+                    .iter()
                     .position(|(key, _)| *key == crate::fritz::normalize_ain_for_selection(&ain));
                 if let Some(index) = self.history_graph_index {
                     let (key, name) = self.history_graph_devices[index].clone();
@@ -5825,12 +5835,21 @@ impl cosmic::Application for AppModel {
                         let axis_start = format_graph_axis_start(
                             self.settings.graph_timespan_minutes,
                             samples.front().map(|(timestamp, _, _)| {
-                                Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)
+                                Instant::now()
+                                    .duration_since(*timestamp)
+                                    .as_secs()
+                                    .div_ceil(60)
                             }),
                         );
                         self.expanded_graph = Some((
-                            format!("{} · {}", name, crate::i18n::tr(&self.settings.language, "POWER (W)")),
-                            values, "W".into(), Some(axis_start),
+                            format!(
+                                "{} · {}",
+                                name,
+                                crate::i18n::tr(&self.settings.language, "POWER (W)")
+                            ),
+                            values,
+                            "W".into(),
+                            Some(axis_start),
                         ));
                     }
                 }
@@ -5844,11 +5863,17 @@ impl cosmic::Application for AppModel {
                     let id = Id::unique();
                     self.graph_window = Some(id);
                     let mut settings = self.core.applet.get_popup_settings(
-                        main_window_id, id, Some((800, 600)), None, None,
+                        main_window_id,
+                        id,
+                        Some((800, 600)),
+                        None,
+                        None,
                     );
                     settings.positioner.size_limits = Limits::NONE
-                        .min_width(640.0).min_height(480.0)
-                        .max_width(800.0).max_height(600.0);
+                        .min_width(640.0)
+                        .min_height(480.0)
+                        .max_width(800.0)
+                        .max_height(600.0);
                     return get_popup(settings);
                 }
             }
@@ -5860,16 +5885,26 @@ impl cosmic::Application for AppModel {
                         self.history_graph_index = Some(next);
                         let (key, name) = self.history_graph_devices[next].clone();
                         if let Some(samples) = self.device_history.get(&key) {
-                            let values = samples.iter().map(|(_, power, _)| *power as f64).collect();
+                            let values =
+                                samples.iter().map(|(_, power, _)| *power as f64).collect();
                             let axis_start = format_graph_axis_start(
                                 self.settings.graph_timespan_minutes,
                                 samples.front().map(|(timestamp, _, _)| {
-                                    Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)
+                                    Instant::now()
+                                        .duration_since(*timestamp)
+                                        .as_secs()
+                                        .div_ceil(60)
                                 }),
                             );
                             self.expanded_graph = Some((
-                                format!("{} · {}", name, crate::i18n::tr(&self.settings.language, "POWER (W)")),
-                                values, "W".into(), Some(axis_start),
+                                format!(
+                                    "{} · {}",
+                                    name,
+                                    crate::i18n::tr(&self.settings.language, "POWER (W)")
+                                ),
+                                values,
+                                "W".into(),
+                                Some(axis_start),
                             ));
                         }
                     }
