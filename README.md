@@ -164,6 +164,8 @@ Weather is optional and requires an [OpenWeatherMap API key](https://openweather
 3. Enter a location as a city name or `latitude,longitude`.
 4. Set the independent weather refresh interval.
 
+To replace OpenWeatherMap's outdoor temperature, open **Devices** settings and enable **Outdoor temperature source** on the desired device. Only one device can be selected; the first device whose name contains “solar” is selected by default. Selecting a source automatically includes that device in monitored readings. Disable the option on that device to return to OpenWeatherMap.
+
 The weather card can show current conditions, feels-like temperature, humidity, wind, pressure, cloud cover, visibility, sunrise and sunset, and the forecast. Its illustrative background image is selected to match the reported weather condition and is sourced from Wikimedia Commons; it is not a live camera view of the configured location. If image lookup is unavailable, the card falls back to its normal appearance.
 
 Weather is optional. Weather service failures are independent of FRITZ!Box monitoring.
