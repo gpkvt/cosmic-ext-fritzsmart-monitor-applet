@@ -1902,7 +1902,9 @@ fn diagnostics_clock_ticks() -> impl futures::Stream<Item = Message> {
 }
 
 fn animation_ticks() -> impl futures::Stream<Item = Message> {
-    clock_ticks(Duration::from_millis(16))
+    // A 10 fps spinner is visually smooth enough at this small size and avoids
+    // forcing a full applet redraw at display refresh rate while requests run.
+    clock_ticks(Duration::from_millis(100))
 }
 
 fn flow_animation_ticks() -> impl futures::Stream<Item = Message> {
@@ -2028,7 +2030,9 @@ impl cosmic::Application for AppModel {
 
         let mut subscriptions = vec![clock];
         if self.popup.is_some() {
-            subscriptions.push(Subscription::run(flow_animation_ticks));
+            if energy_flow_values(&self.readings, &self.settings.input_ains).is_some() {
+                subscriptions.push(Subscription::run(flow_animation_ticks));
+            }
             if self.weather.as_ref().is_some_and(|weather| {
                 weather.slideshow_frames.len() > 1 && weather.slideshow_sequence.len() > 1
             }) {
@@ -3876,9 +3880,8 @@ impl cosmic::Application for AppModel {
                     .and_then(|frame| weather.slideshow_frames.get(*frame))
                     .or(weather.background_image.as_ref())
                 {
-                    let photo_bytes = semi_transparent_weather_photo(image_bytes);
                     let photo =
-                        widget::image::Image::new(widget::image::Handle::from_bytes(photo_bytes))
+                        widget::image::Image::new(widget::image::Handle::from_bytes(image_bytes.clone()))
                             .width(cosmic::iced::Length::Fill)
                             .height(cosmic::iced::Length::Fixed(260.0))
                             .content_fit(cosmic::iced::ContentFit::Fill);
@@ -5733,7 +5736,16 @@ impl cosmic::Application for AppModel {
                             &weather.background_images,
                             self.settings.weather_slideshow_interval_seconds,
                         );
-                        weather.slideshow_frames = frames;
+                        // Decode, lower opacity and encode each photo once when weather data arrives.
+                        // Doing this in view() repeated the full image conversion on every slideshow
+                        // frame (four times per second) and caused excessive CPU usage.
+                        weather.slideshow_frames = frames
+                            .iter()
+                            .map(|frame| semi_transparent_weather_photo(frame))
+                            .collect();
+                        if let Some(background) = weather.background_image.as_mut() {
+                            *background = semi_transparent_weather_photo(background);
+                        }
                         weather.slideshow_sequence = sequence;
                         weather.slideshow_frame_sources = frame_sources;
                         let slideshow_len = weather.slideshow_sequence.len();
