@@ -2245,6 +2245,10 @@ impl cosmic::Application for AppModel {
             let line_height = (panel_text_size * 0.65).max(1.0);
             let item_height = if icon_at_top {
                 (line_height * 2.0).max(24.0)
+            } else if self.settings.panel_multiline {
+                // Paired readings are stacked as separate panel_item rows.
+                // Do not give each compact line the full single-line height.
+                (panel_text_size * 1.15).clamp(16.0, 22.0)
             } else {
                 24.0
             };
