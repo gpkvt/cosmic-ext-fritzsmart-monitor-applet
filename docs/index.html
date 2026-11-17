@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#10131a">
-  <meta name="description" content="FRITZ!Power Monitor — a native-feeling COSMIC panel applet for live FRITZ!Box power, temperature, device and weather monitoring.">
+  <meta name="description" content="A focused COSMIC desktop applet for live FRITZ!Box power, device temperatures, history and optional weather — private, local-first and open source.">
   <meta property="og:title" content="FRITZ!Power Monitor — Your home, in real time">
   <meta property="og:description" content="Live power, device temperatures and optional local weather in your COSMIC desktop panel.">
   <title>FRITZ!Power Monitor — Your home, in real time</title>
@@ -106,6 +106,123 @@
       .hero-card-description{font-size:8.5px;line-height:1.3;-webkit-line-clamp:4}
       .hero-shot:hover,.hero-shot:focus-visible{transform:rotate(0deg) translateY(-5px) scale(1.06)!important}
     }
+  
+    /* 2026 visual refresh: a calmer, COSMIC-inspired editorial layout. */
+    :root{color-scheme:light dark;--bg:#f4f5f8;--surface:#fff;--surface2:#f8f9fc;--surface3:#eceef4;--text:#20212b;--muted:#5e6271;--soft:#7d8190;--line:#dfe2ea;--mint:#6857d9;--blue:#5278c9;--amber:#a66b19;--violet:#8064c8;--max:1200px;--radius:22px}
+    html{scroll-padding-top:84px}
+    body{background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;line-height:1.65}
+    body:before{z-index:0;opacity:.75;background:radial-gradient(ellipse at 76% 4%,#dcd8ff99,transparent 36rem),radial-gradient(ellipse at 4% 34%,#dce9f799,transparent 38rem)}
+    body>*{position:relative}
+    a:hover{color:var(--mint)}
+    .wrap{width:min(var(--max),calc(100% - 56px))}
+    .topbar{background:#f4f5f8eF;border-bottom:1px solid #dfe2eacc;backdrop-filter:blur(20px)}
+    .nav{height:72px}.brand{color:#242432;font-size:15px;letter-spacing:-.035em}.brand img{width:34px;height:34px}
+    .navlinks{gap:22px;color:#626577;font-size:12px}.navlinks a:hover{color:#29243e}
+    .nav-cta{border-color:#6857d955;color:#5948c8;background:#6857d90b}
+    .hero{min-height:650px;grid-template-columns:.94fr 1.06fr;gap:44px;padding:78px 0 82px}
+    .hero h1{max-width:600px;font-size:clamp(54px,6.5vw,82px);line-height:.99;letter-spacing:-.078em;margin:20px 0 22px}
+    .hero h1 span{color:#6857d9}
+    .eyebrow{color:#6555ce;font-size:11px;letter-spacing:.13em}
+    .eyebrow:before{width:20px}
+    .hero-copy{max-width:530px;color:#626678;font-size:18px;line-height:1.65}
+    .actions{gap:11px;margin-top:28px}
+    .btn{padding:13px 19px;border-radius:12px;background:#6857d9;color:#fff;font-size:13px;box-shadow:0 5px 16px #6857d925}
+    .btn:hover{color:#fff;background:#5848c5;box-shadow:0 9px 24px #6857d933}
+    .btn.secondary{background:#fff;border:1px solid #d9dbe5;color:#343548;box-shadow:none}
+    .btn.secondary:hover{color:#5948c8;border-color:#aaa0e7;background:#faf9ff}
+    .hero-meta{gap:17px;margin-top:30px;color:#777b8c;font-size:10px}
+    .dot{background:#27a47a;box-shadow:0 0 0 4px #27a47a20}
+    .hero-gallery{min-height:390px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:center;gap:12px;padding:18px 0 34px}
+    .hero-shot{position:relative;left:auto!important;bottom:auto!important;z-index:auto!important;display:flex;width:100%;height:auto;min-height:270px;padding:10px;border:1px solid #dfe1e9;border-radius:17px;background:#fff;box-shadow:0 14px 34px #25243b12;text-align:left;transform:none!important;overflow:hidden;animation:card-deal .65s both}
+    .hero-shot:nth-child(2){margin-top:34px;animation-delay:.09s}
+    .hero-shot:nth-child(3){margin-top:68px;animation-delay:.18s}
+    .hero-gallery .hero-shot:nth-child(n+4){display:none}
+    .hero-shot:before{display:none}
+    .hero-shot img{display:block;width:100%;height:172px!important;min-height:0;object-fit:contain;border-radius:9px;background:#f2f3f7;border:0}
+    .hero-card-title{padding:12px 2px 1px;color:#272738;font-size:12px;font-weight:750;white-space:normal}
+    .hero-card-type{padding:3px 2px;color:#777b8c;font-size:9px}
+    .hero-card-description{margin:5px 2px 2px;color:#65697a;font-size:10px;line-height:1.45;-webkit-line-clamp:3}
+    .hero-shot:hover{border-color:#8be0c4aa;box-shadow:0 18px 40px #25243b20;filter:none}
+    .hero-shot:focus-visible{outline:3px solid #8b7bea;outline-offset:4px}
+    .cards-dealt .hero-shot{animation:card-deal .65s both}
+    @keyframes card-deal{from{opacity:0;translate:0 18px}to{opacity:1;translate:0 0}}
+    .hero-gallery .hero-shot:nth-child(n+4){animation:none}
+    .trustline{padding:18px 0;border-color:#dfe2ea;background:#ffffff80}
+    .trust-inner{justify-content:center;gap:16px 34px;color:#74788a;font-size:10px;letter-spacing:.06em}
+    .trust-inner span{gap:8px}
+    section{padding:88px 0;border-color:#e0e2e9}
+    .section-head{max-width:740px;margin-bottom:36px}
+    .section-head h2{font-size:clamp(34px,4.8vw,54px);letter-spacing:-.065em;margin:14px 0;color:#252536}
+    .section-head p{font-size:16px;color:#666a7b;line-height:1.7}
+    .section-kicker{color:#777b8c}
+    .feature-grid{grid-template-columns:repeat(3,1fr);gap:16px}
+    .feature{min-height:205px;padding:25px;border:1px solid #e0e2eb;border-radius:18px;background:#fff;box-shadow:0 5px 20px #27243b08;transition:transform .2s,border-color .2s,box-shadow .2s}
+    .feature:hover{transform:translateY(-3px);border-color:#c9c2f0;box-shadow:0 12px 30px #27243b10}
+    .feature-icon{width:42px;height:42px;border-radius:12px;background:#efedff;color:#6857d9;font-size:19px}
+    .feature h3{margin:17px 0 7px;color:#28283a;font-size:16px}
+    .feature p{color:#696d7d;font-size:13px;line-height:1.65}
+    .showcase{gap:56px;margin:66px 0}
+    .showcase h3{color:#28283a;font-size:29px}
+    .showcase p,.checklist li{color:#626678}
+    .checklist li:before{color:#6857d9}
+    .shot{border-radius:22px;background:linear-gradient(145deg,#e8eaf2,#fff);border:1px solid #dfe2eb;box-shadow:0 22px 55px #29263b14}
+    .shot:after{display:none}
+    .install-band{gap:42px;padding:42px;border-radius:24px;background:linear-gradient(125deg,#eeecff,#f5f7fc 60%,#e8f1f4);border:1px solid #d9d5f4}
+    .install-band h2{color:#29283d;font-size:clamp(34px,4vw,48px)}
+    .install-band .muted{color:#626678}
+    .terminal{background:#1d2030;border:1px solid #34364b;border-radius:16px;box-shadow:0 14px 32px #25243b18}
+    .terminal-head{color:#aeb2c5}.terminal pre{color:#e1e4ef}
+    .steps{gap:14px}.step{padding:24px;border:1px solid #e0e2eb;border-radius:18px;background:#fff}.step:before{color:#6857d9}.step h3{color:#29293a}.step p{color:#686c7c}
+    .details-grid{gap:14px}
+    .detail{padding:24px;border:1px solid #e0e2eb;border-radius:18px;background:#fff;box-shadow:0 5px 20px #27243b07}
+    .detail-icon{width:46px;height:46px;margin-bottom:16px;border:1px solid #e0dcff;border-radius:13px;background:#f0eeff;color:#6857d9}
+    .detail-icon img{width:25px!important;height:25px!important}
+    .detail h3{color:#29293a;font-size:16px}.detail p{color:#65697a;font-size:13px;line-height:1.7}.detail code{color:#5c4cc2}
+    .package-command{border-color:#e1e3eb;background:#f5f6f9}.package-command code{color:#34364a}
+    .package-command-label{color:#777b8c!important}
+    .faq{max-width:900px}.faq details{border-color:#e0e2eb;padding:17px 0}.faq summary{color:#303044;font-size:15px}.faq summary:after{color:#6857d9}.faq p{color:#666a7a;font-size:14px;line-height:1.7}
+    .gallery-invite{display:flex;justify-content:flex-start}
+    .screenshot-dialog{width:min(94vw,1160px);max-width:94vw;padding:24px!important;border:1px solid #ffffff24!important;border-radius:22px!important;background:#171a28!important;box-shadow:0 30px 100px #0008!important}
+    .screenshot-dialog::backdrop{background:#111321c9;backdrop-filter:blur(8px)}
+    .gallery-dialog-head{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:12px}
+    .gallery-dialog-head h2{margin:0;color:#f4f4fa;font-size:18px;letter-spacing:-.02em}
+    .gallery-close{width:38px;height:38px;border:1px solid #ffffff24;border-radius:11px;background:#ffffff0a;color:#fff;font-size:24px;cursor:pointer}
+    .gallery-viewer{grid-template-columns:48px minmax(0,1fr) 48px;gap:14px}
+    .gallery-stage img{height:min(67vh,680px);border-radius:10px}
+    .gallery-stage figcaption{color:#b9bdcd}.gallery-stage figcaption strong{color:#fff}
+    .gallery-control{width:44px;height:44px;border:1px solid #ffffff24;border-radius:12px;background:#ffffff0a;color:#fff}
+    .gallery-control:hover{color:#fff;background:#6857d9}
+    .gallery-dialog-foot{color:#aeb2c5}.gallery-dialog-foot kbd{color:#fff}
+    .final-cta{padding:90px 0}.final-cta h2{color:#272739}.final-cta p{color:#666a7b}
+    footer{padding:32px 0 42px;background:#eceef4;color:#74788a}
+    .footer-brand{color:#29293a}.footer-links{gap:17px}.footer-links a:hover{color:#5c4cc2}
+    .legal-notice{color:#7c8090}.legal-notice a{color:#5f6373}
+    .reveal{opacity:0;transform:translateY(12px);transition:opacity .55s ease,transform .55s ease}
+    .reveal.visible{opacity:1;transform:translateY(0)}
+    .detail.reveal{opacity:0!important;transform:translateY(12px)!important;visibility:visible!important}
+    .detail.reveal.visible{opacity:1!important;transform:translateY(0)!important}
+    @media(max-width:900px){.navlinks{gap:13px}.hero{grid-template-columns:1fr;gap:22px;padding-top:58px}.hero-copy{max-width:680px}.hero-gallery{max-width:760px;width:100%;margin:0 auto;min-height:310px}.hero-shot{min-height:245px}.hero-shot img{height:145px!important}.showcase,.showcase:nth-of-type(even){grid-template-columns:1fr;gap:28px}.showcase:nth-of-type(even) .showcase-copy{order:0}.install-band{grid-template-columns:1fr;gap:28px}}
+    @media(max-width:650px){.wrap{width:min(var(--max),calc(100% - 34px))}.nav{height:auto;min-height:66px;align-items:flex-start;padding:13px 0;flex-direction:column;gap:9px}.navlinks{width:100%;gap:8px 16px;flex-wrap:wrap;font-size:11px}.nav-cta{padding:5px 10px}.hero{padding:48px 0 52px;min-height:0}.hero h1{font-size:clamp(48px,14vw,66px)}.hero-copy{font-size:16px}.hero-gallery{gap:7px;min-height:0;padding:8px 0 22px}.hero-shot{min-height:190px;padding:6px;border-radius:12px}.hero-shot:nth-child(2){margin-top:20px}.hero-shot:nth-child(3){margin-top:40px}.hero-shot img{height:105px!important}.hero-card-title{font-size:10px;padding-top:8px}.hero-card-type{font-size:7px}.hero-card-description{font-size:8px;-webkit-line-clamp:2}.hero-meta{gap:10px;font-size:9px}section{padding:64px 0}.section-head{margin-bottom:28px}.section-head h2{font-size:36px}.section-head p{font-size:14px}.feature-grid{grid-template-columns:1fr 1fr;gap:10px}.feature{min-height:0;padding:17px}.feature h3{font-size:14px;margin-top:13px}.feature p{font-size:12px}.feature-icon{width:36px;height:36px}.details-grid,.steps{grid-template-columns:1fr}.detail{padding:20px}.install-band{padding:24px;border-radius:18px}.install-band h2{font-size:35px}.terminal pre{font-size:10px;padding:13px}.screenshot-dialog{width:96vw;max-width:96vw;padding:14px!important;border-radius:16px!important}.gallery-viewer{grid-template-columns:32px minmax(0,1fr) 32px;gap:5px}.gallery-control{width:30px;height:36px;font-size:20px}.gallery-stage img{height:58vh}.gallery-dialog-foot{font-size:10px}.footer-inner{align-items:flex-start}.footer-links{gap:10px 14px}}
+    @media(prefers-color-scheme:dark){
+      :root{color-scheme:dark;--bg:#11131b;--surface:#191c27;--surface2:#202432;--surface3:#292e3e;--text:#f0f1f7;--muted:#b3b7c6;--soft:#8b90a2;--line:#303546;--mint:#a99afc;--blue:#9bb8fa;--amber:#edc17d;--violet:#c4adff}
+      body{background:#11131b;color:#f0f1f7}body:before{opacity:.7;background:radial-gradient(ellipse at 76% 4%,#51458a55,transparent 36rem),radial-gradient(ellipse at 4% 34%,#294d6655,transparent 38rem)}
+      .topbar{background:#11131beF;border-color:#ffffff18}.brand,.footer-brand{color:#f0f1f7}.navlinks{color:#b0b4c3}.nav-cta{color:#b6aaff;border-color:#a99afc66}
+      .hero h1 span,.eyebrow{color:#b2a5ff}.hero-copy,.section-head p,.feature p,.showcase p,.checklist li,.detail p,.faq p,.final-cta p{color:#b1b5c4}
+      .btn{background:#7867df;color:#fff}.btn:hover{background:#8979ee;color:#fff}.btn.secondary{background:#ffffff09;border-color:#41465a;color:#f0f1f7}
+      .hero-shot,.feature,.step,.detail{background:#1b1f2b;border-color:#34394b;box-shadow:0 8px 25px #0003}
+      .hero-shot img{background:#111520}.hero-card-title,.feature h3,.step h3,.detail h3,.faq summary,.section-head h2,.showcase h3,.install-band h2,.final-cta h2{color:#f0f1f7}
+      .hero-card-type,.hero-card-description{color:#aeb3c4}.feature-icon,.detail-icon{background:#2b2745;border-color:#49416f;color:#b4a7ff}
+      .trustline{background:#171a24;border-color:#303546}.trust-inner{color:#9da2b4}
+      section{border-color:#303546}.install-band{background:linear-gradient(125deg,#292442,#202432 60%,#1c3039);border-color:#4a426b}
+      .terminal{background:#0b0d14}.terminal-head{color:#aeb3c4}.terminal pre{color:#e1e4ef}
+      .shot{background:linear-gradient(145deg,#292f40,#181b27);border-color:#3b4154}
+      .package-command{background:#10131c;border-color:#34394b}.package-command code{color:#e0e3ed}
+      .faq details{border-color:#303546}.faq summary:after{color:#b4a7ff}
+      footer{background:#0d0f16;color:#969bad}.legal-notice{color:#9297a9}.legal-notice a{color:#b4b8c8}
+      .dot{background:#55cda5;box-shadow:0 0 0 4px #55cda520}
+    }
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.reveal,.hero-shot,.feature,.btn{transition:none!important;animation:none!important}.reveal{opacity:1;transform:none}}
+
   </style>
 </head>
 <body>
@@ -118,8 +235,8 @@
     <div class="wrap hero">
       <div class="reveal">
         <div class="eyebrow">A COSMIC desktop applet</div>
-        <h1>Your home.<br>Your power.<br><span>In real time.</span></h1>
-        <p class="hero-copy">Keep an eye on household power, device temperatures and optional local weather — right where you work, in the COSMIC panel.</p>
+        <h1>Energy insight.<br>Right on your<br><span>COSMIC desktop.</span></h1>
+        <p class="hero-copy">See live household power, device temperatures and optional weather in your desktop panel. Clear readings, useful history and no cloud account for core monitoring.</p>
         <div class="actions"><a class="btn" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases">Get the applet <span>↗</span></a><a class="btn secondary" href="#tour">Explore the interface ↓</a></div>
         <div class="hero-meta"><span><i class="dot"></i> Open source · MIT</span><span>Built for COSMIC</span><span>FRITZ!Box Smart Home</span></div>
       </div>
@@ -151,8 +268,8 @@
     </div></section>
 
     <section id="tour"><div class="wrap">
-      <div class="section-head reveal"><div class="eyebrow">A closer look</div><h2>The applet, as it really looks.</h2><p>Browse ten screenshots captured from FRITZ!Power Monitor on the COSMIC desktop. The gallery displays one image at a time; use the previous and next controls or your keyboard arrow keys to move through the views.</p></div>
-      <div class="gallery-invite"><button class="btn secondary" type="button" data-open-gallery>View all ten screenshots <span>↗</span></button></div>
+      <div class="section-head reveal"><div class="eyebrow">A closer look</div><h2>The applet, as it really looks.</h2><p>A real look at the applet — captured directly from the COSMIC desktop, not mockups. Open the gallery to explore all ten screens.</p></div>
+      <div class="gallery-invite"><button class="btn secondary" type="button" data-open-gallery>Explore the full screenshot gallery <span>↗</span></button></div>
     </div></section>
 
     <section id="install"><div class="wrap">
@@ -191,7 +308,7 @@
         <article class="detail reveal"><div class="detail-icon" aria-hidden="true"><img src="icons/shield-check.svg" alt="" width="28" height="28"></div><h3>Secure router connection</h3><p>Uses FRITZ!Box challenge-response login and validates HTTPS certificates by default. Add a router-specific PEM CA certificate when using a self-signed certificate without disabling hostname verification.</p></article>
         <article class="detail reveal"><div class="detail-icon" aria-hidden="true"><img src="icons/lock.svg" alt="" width="28" height="28"></div><h3>Private local configuration</h3><p>Router credentials and the optional weather API key are stored in <code>~/.config/fritz_solar.cfg</code> with owner-only permissions.</p></article>
         <article class="detail reveal"><div class="detail-icon" aria-hidden="true"><img src="icons/refresh-cw.svg" alt="" width="28" height="28"></div><h3>Independent refresh cycles</h3><p>Power readings refresh every 30 seconds to one hour (60 seconds by default). Weather refreshes independently every 5–60 minutes (10 minutes by default).</p></article>
-        <article class="detail reveal"><div class="detail-icon" aria-hidden="true"><img src="icons/check-circle.svg" alt="" width="28" height="28"></div><h3>Graceful failures</h3><p>The last successful reading remains visible if a later refresh fails. A device with bad measurements is skipped without discarding healthy device readings.</p></article>
+        <article class="detail reveal"><div class="detail-icon" aria-hidden="true"><img src="icons/check-circle.svg" alt="" width="28" height="28"></div><h3>Graceful failures</h3><p>Connection failures are reported separately from weather errors. Invalid or unavailable readings are not presented as current, while healthy device data remains independent.</p></article>
         <article class="detail reveal"><div class="detail-icon" aria-hidden="true"><img src="icons/thermometer.svg" alt="" width="28" height="28"></div><h3>Alerts when they matter</h3><p>Temperature alerts are optional and disabled by default. Notifications fire when a device crosses a configured limit and re-arm after the temperature returns to range.</p></article>
         <article class="detail reveal"><div class="detail-icon" aria-hidden="true"><img src="icons/chart-line.svg" alt="" width="28" height="28"></div><h3>Persistent graph history</h3><p>Power and temperature samples are stored locally and restored after restarting the applet. Both saved samples and the selected retention period survive applet restarts. On startup, saved samples are reloaded and the same 5-minute to 4-year retention window continues to apply. History uses adaptive sampling capped at about 50,000 samples per series; the graphs do not provide daily yield or forecasts.</p></article>
       </div>
@@ -314,6 +431,6 @@
 
 
   </script>
-  <!-- GitHub Pages republish trigger: 2026-11-16 -->
+  <!-- Website redesign: 2026-11-17 -->
 </body>
 </html>
