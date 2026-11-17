@@ -621,7 +621,7 @@ fn graph_visual_with_dimensions(
     .height(widget_height);
 
     let y_axis_label = if unit == "°C" {
-        format!("TEMPERATURE ({unit})")
+        unit.to_string()
     } else if unit.contains("/s") {
         format!("BANDWIDTH ({unit})")
     } else {
