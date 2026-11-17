@@ -895,7 +895,10 @@ pub fn build_weather_slideshow_frames(
     let mut frames = Vec::new();
     let mut sequence = Vec::new();
     let mut frame_sources = Vec::new();
-    let hold_ticks = usize::from(display_seconds.clamp(5, 300));
+    // The slideshow only needs a timer while the displayed photo is held
+    // or a transition is running. Hold ticks run every five seconds; transition
+    // frames retain their one-second cadence.
+    let hold_ticks = usize::from(display_seconds.clamp(5, 300)).div_ceil(5);
     for (index, current) in decoded.iter().enumerate() {
         let mut output = std::io::Cursor::new(Vec::new());
         let mut still = current.clone();
@@ -1191,7 +1194,8 @@ mod tests {
         let (frames, sequence, frame_sources) =
             build_weather_slideshow_frames(&[encode(first), encode(second)], 5);
         assert_eq!(frames.len(), 8);
-        assert_eq!(sequence.len(), 46);
+        // Two five-second photo holds plus six one-second crossfade frames.
+        assert_eq!(sequence.len(), 8);
         assert_eq!(frame_sources.len(), frames.len());
         assert_eq!(frame_sources[0], vec![0]);
         assert_eq!(frame_sources[1], vec![0, 1]);
