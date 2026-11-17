@@ -1606,14 +1606,14 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                     Ok(response_body) => {
                         system_info = parse_device_info(&response_body);
                         endpoints.push(json!({
-                        "name": "device_information",
-                        "method": "POST",
-                        "endpoint": endpoint_path,
-                        "soap_action": format!("{SERVICE}#GetInfo"),
-                        "status": status,
-                        "body_json": redact_device_info_json(xml_response_as_json(&response_body)),
-                    }));
-                    },
+                            "name": "device_information",
+                            "method": "POST",
+                            "endpoint": endpoint_path,
+                            "soap_action": format!("{SERVICE}#GetInfo"),
+                            "status": status,
+                            "body_json": redact_device_info_json(xml_response_as_json(&response_body)),
+                        }));
+                    }
                     Err(error) => endpoints.push(json!({
                         "name": "device_information",
                         "method": "POST",
@@ -1679,15 +1679,15 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                                 .wan = Some(wan_info);
                         }
                         endpoints.push(json!({
-                        "name": "wan_common_interface_link_properties",
-                        "method": "POST",
-                        "endpoint": endpoint_path,
-                        "soap_action": format!("{SERVICE}#GetCommonLinkProperties"),
-                        "status": status,
-                        "body_json": xml_response_as_json(&response_body),
-                        "body_raw": response_body,
-                    }));
-                    },
+                            "name": "wan_common_interface_link_properties",
+                            "method": "POST",
+                            "endpoint": endpoint_path,
+                            "soap_action": format!("{SERVICE}#GetCommonLinkProperties"),
+                            "status": status,
+                            "body_json": xml_response_as_json(&response_body),
+                            "body_raw": response_body,
+                        }));
+                    }
                     Err(error) => endpoints.push(json!({
                         "name": "wan_common_interface_link_properties",
                         "method": "POST",
