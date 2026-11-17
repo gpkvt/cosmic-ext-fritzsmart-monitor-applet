@@ -67,6 +67,7 @@ pub struct AppModel {
     pending_power_targets: HashMap<String, bool>,
     latest_version: Option<Result<String, String>>,
     latest_version_loading: bool,
+    flow_animation_frame: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +77,7 @@ pub enum Message {
     TooltipSurfaceAction(cosmic::surface::Action<Message>),
     Refresh,
     ClockTick,
+    FlowAnimationTick,
     Updated(Box<Result<FritzFetchResult, String>>),
     SetDevicePower(String, bool),
     PowerCommandFinished(String, bool, Result<(), String>),
@@ -943,9 +945,191 @@ fn displayed_power_w(readings: &[FritzReading], selected_ains: &[String]) -> Opt
         .map(|reading| reading.power_w)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct EnergyFlow {
+    consumption_w: i64,
+    solar_generation_w: i64,
+    solar_to_home_w: i64,
+    grid_import_w: i64,
+    grid_export_w: i64,
+}
+
+fn energy_flow_values(
+    readings: &[FritzReading],
+    input_ains: &HashSet<String>,
+) -> Option<EnergyFlow> {
+    let has_solar_reading = readings.iter().any(|reading| {
+        input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+    });
+    if !has_solar_reading {
+        return None;
+    }
+
+    let consumption_w = output_power_w(readings, input_ains).max(0);
+    // Input devices are stored as negative power readings; present generation
+    // as a positive flow and subtract it from household consumption.
+    let solar_generation_w = input_power_w(readings, input_ains).saturating_neg().max(0);
+    let grid_balance_w = consumption_w.saturating_sub(solar_generation_w);
+    Some(EnergyFlow {
+        consumption_w,
+        solar_generation_w,
+        solar_to_home_w: consumption_w.min(solar_generation_w),
+        grid_import_w: grid_balance_w.max(0),
+        grid_export_w: grid_balance_w.saturating_neg().max(0),
+    })
+}
+
+fn energy_flow_label(language: &str, label: &'static str) -> &'static str {
+    if crate::i18n::language(language) != "de" {
+        return label;
+    }
+    match label {
+        "ENERGY FLOW" => "ENERGIEFLUSS",
+        "Solar" => "Solar",
+        "Home" => "Haus",
+        "Grid" => "Netz",
+        "Home consumption" => "Hausverbrauch",
+        "Self-consumed" => "Selbst genutzt",
+        "Grid import" => "Netzbezug",
+        "Grid export" => "Netzeinspeisung",
+        "After solar" => "Nach Solar",
+        "No grid exchange" => "Kein Netzaustausch",
+        "Solar to home" => "Solar zum Haus",
+        _ => label,
+    }
+}
+
+fn energy_flow_animation_glyph(frame: u8, reverse: bool) -> &'static str {
+    const FORWARD: [&str; 4] = ["● · · →", "· ● · →", "· · ● →", "· ● · →"];
+    const REVERSE: [&str; 4] = ["← · · ●", "← · ● ·", "← ● · ·", "← · ● ·"];
+    let index = usize::from(frame % 4);
+    if reverse {
+        REVERSE[index]
+    } else {
+        FORWARD[index]
+    }
+}
+
+fn energy_flow_overview(
+    readings: &[FritzReading],
+    input_ains: &HashSet<String>,
+    animation_frame: u8,
+    language: &str,
+) -> Option<cosmic::Element<'static, Message>> {
+    let flow = energy_flow_values(readings, input_ains)?;
+    let import_active = flow.grid_import_w > 0;
+    let export_active = flow.grid_export_w > 0;
+    let grid_label = if import_active {
+        energy_flow_label(language, "Grid import")
+    } else if export_active {
+        energy_flow_label(language, "Grid export")
+    } else {
+        energy_flow_label(language, "No grid exchange")
+    };
+    let grid_value = if import_active {
+        flow.grid_import_w
+    } else {
+        flow.grid_export_w
+    };
+
+    let node = |icon: &'static str, label: &'static str, value: i64| {
+        widget::Column::new()
+            .spacing(3)
+            .width(cosmic::iced::Length::Fill)
+            .align_x(cosmic::iced::Alignment::Center)
+            .push(widget::icon::from_name(icon).size(20))
+            .push(widget::text::caption(energy_flow_label(language, label)))
+            .push(widget::text::body(keep_value_unit_together(format!("{value} W"))))
+    };
+    let flow_path = |glyph: &'static str, label: &'static str, value: i64| {
+        widget::Column::new()
+            .spacing(2)
+            .width(cosmic::iced::Length::Fixed(76.0))
+            .align_x(cosmic::iced::Alignment::Center)
+            .push(widget::text::body(glyph).size(13))
+            .push(widget::text::caption(energy_flow_label(language, label)))
+            .push(widget::text::caption(format!("{value} W")))
+    };
+
+    let solar_glyph = if flow.solar_to_home_w > 0 {
+        energy_flow_animation_glyph(animation_frame, false)
+    } else {
+        "—"
+    };
+    let grid_glyph = if import_active {
+        energy_flow_animation_glyph(animation_frame, true)
+    } else if export_active {
+        energy_flow_animation_glyph(animation_frame, false)
+    } else {
+        "—"
+    };
+    let balance_label = if import_active {
+        format!(
+            "{}: {} W",
+            energy_flow_label(language, "After solar"),
+            flow.grid_import_w
+        )
+    } else if export_active {
+        format!(
+            "{}: {} W",
+            energy_flow_label(language, "Grid export"),
+            flow.grid_export_w
+        )
+    } else {
+        format!(
+            "{}: 0 W",
+            energy_flow_label(language, "After solar")
+        )
+    };
+
+    let content = widget::Column::new()
+        .spacing(8)
+        .width(cosmic::iced::Length::Fill)
+        .push(widget::text::caption(energy_flow_label(language, "ENERGY FLOW")))
+        .push(
+            widget::Row::new()
+                .spacing(2)
+                .width(cosmic::iced::Length::Fill)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(node("weather-clear-symbolic", "Solar", flow.solar_generation_w))
+                .push(flow_path(
+                    solar_glyph,
+                    "Self-consumed",
+                    flow.solar_to_home_w,
+                ))
+                .push(node("go-home-symbolic", "Home", flow.consumption_w))
+                .push(flow_path(
+                    grid_glyph,
+                    grid_label,
+                    grid_value,
+                ))
+                .push(node("network-server-symbolic", "Grid", grid_value)),
+        )
+        .push(
+            widget::container(widget::text::body(balance_label))
+                .width(cosmic::iced::Length::Fill)
+                .padding([6, 8])
+                .style(|theme| {
+                    let cosmic = theme.cosmic();
+                    cosmic::iced::widget::container::Style {
+                        background: Some(
+                            cosmic::iced::Color::from(cosmic.background(false).base).into(),
+                        ),
+                        border: cosmic::iced::Border {
+                            radius: 6.0.into(),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    }
+                }),
+        );
+    Some(surface_card(content.into(), 12))
+}
+
 fn live_power_summary(
     power: String,
     temperature: Option<String>,
+    energy_flow: Option<cosmic::Element<'static, Message>>,
     history: Vec<f64>,
     temperature_history: Vec<f64>,
     graph_style: &str,
@@ -975,10 +1159,14 @@ fn live_power_summary(
         .width(cosmic::iced::Length::Fill)
         .push(values);
 
-    let content = widget::Column::new()
+    let mut content = widget::Column::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
-        .push(metrics)
+        .push(metrics);
+    if let Some(energy_flow) = energy_flow {
+        content = content.push(energy_flow);
+    }
+    content = content
         .push(widget::text::caption(crate::i18n::tr(
             language,
             "CURRENT POWER HISTORY",
@@ -1606,6 +1794,22 @@ fn animation_ticks() -> impl futures::Stream<Item = Message> {
     clock_ticks(Duration::from_millis(16))
 }
 
+fn flow_animation_ticks() -> impl futures::Stream<Item = Message> {
+    cosmic::iced::stream::channel(
+        2,
+        |mut output: futures::channel::mpsc::Sender<Message>| async move {
+            let mut interval = tokio::time::interval(Duration::from_millis(220));
+            interval.tick().await;
+            loop {
+                interval.tick().await;
+                if output.send(Message::FlowAnimationTick).await.is_err() {
+                    break;
+                }
+            }
+        },
+    )
+}
+
 fn weather_slideshow_ticks() -> impl futures::Stream<Item = Message> {
     cosmic::iced::stream::channel(
         2,
@@ -1711,15 +1915,16 @@ impl cosmic::Application for AppModel {
             Subscription::run(regular_clock_ticks)
         };
 
-        if self.popup.is_some()
-            && self.weather.as_ref().is_some_and(|weather| {
+        let mut subscriptions = vec![clock];
+        if self.popup.is_some() {
+            subscriptions.push(Subscription::run(flow_animation_ticks));
+            if self.weather.as_ref().is_some_and(|weather| {
                 weather.slideshow_frames.len() > 1 && weather.slideshow_sequence.len() > 1
-            })
-        {
-            Subscription::batch(vec![clock, Subscription::run(weather_slideshow_ticks)])
-        } else {
-            clock
+            }) {
+                subscriptions.push(Subscription::run(weather_slideshow_ticks));
+            }
         }
+        Subscription::batch(subscriptions)
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
@@ -3751,9 +3956,16 @@ impl cosmic::Application for AppModel {
                 } else {
                     primary.map(|reading| format!("{:.1} °C", reading.temperature_c))
                 };
+                let energy_flow = energy_flow_overview(
+                    &self.readings,
+                    &self.settings.input_ains,
+                    self.flow_animation_frame,
+                    &self.settings.language,
+                );
                 let summary_card = live_power_summary(
                     summary_power,
                     summary_temperature,
+                    energy_flow,
                     self.history
                         .iter()
                         .map(|(_, value)| *value as f64)
@@ -4754,6 +4966,9 @@ impl cosmic::Application for AppModel {
                 }
                 return Task::batch(tasks);
             }
+            Message::FlowAnimationTick => {
+                self.flow_animation_frame = (self.flow_animation_frame + 1) % 4;
+            }
             Message::ClockTick => {
                 if self
                     .settings_save_at
@@ -5752,6 +5967,90 @@ mod history_tests {
         assert_eq!(input_power_w(&readings, &HashSet::new()), 0);
         assert_eq!(net_power_w(&readings, &inputs), 50);
         assert_eq!(net_power_w(&readings, &HashSet::new()), 750);
+    }
+
+    #[test]
+    fn energy_flow_subtracts_solar_generation_from_household_consumption() {
+        let readings = vec![
+            FritzReading {
+                ain: "111111".into(),
+                name: "House load".into(),
+                power_w: 900,
+                temperature_c: 20.0,
+                power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
+            },
+            FritzReading {
+                ain: "222222".into(),
+                name: "Solar inverter".into(),
+                power_w: 350,
+                temperature_c: 21.0,
+                power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
+            },
+        ];
+        let inputs = HashSet::from(["222222".to_string()]);
+        assert_eq!(
+            energy_flow_values(&readings, &inputs),
+            Some(EnergyFlow {
+                consumption_w: 900,
+                solar_generation_w: 350,
+                solar_to_home_w: 350,
+                grid_import_w: 550,
+                grid_export_w: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn energy_flow_reports_solar_surplus_as_grid_export() {
+        let readings = vec![
+            FritzReading {
+                ain: "111111".into(),
+                name: "House load".into(),
+                power_w: 250,
+                temperature_c: 20.0,
+                power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
+            },
+            FritzReading {
+                ain: "222222".into(),
+                name: "Solar inverter".into(),
+                power_w: 800,
+                temperature_c: 21.0,
+                power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
+            },
+        ];
+        let inputs = HashSet::from(["222222".to_string()]);
+        assert_eq!(
+            energy_flow_values(&readings, &inputs),
+            Some(EnergyFlow {
+                consumption_w: 250,
+                solar_generation_w: 800,
+                solar_to_home_w: 250,
+                grid_import_w: 0,
+                grid_export_w: 550,
+            })
+        );
+    }
+
+    #[test]
+    fn energy_flow_is_not_shown_without_a_configured_solar_reading() {
+        let readings = vec![FritzReading {
+            ain: "111111".into(),
+            name: "House load".into(),
+            power_w: 250,
+            temperature_c: 20.0,
+            power_state: None,
+            power_controllable: false,
+            power_toggle_allowed: false,
+        }];
+        assert_eq!(energy_flow_values(&readings, &HashSet::new()), None);
     }
 
     #[test]
