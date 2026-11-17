@@ -2224,20 +2224,22 @@ fn regular_clock_ticks() -> impl futures::Stream<Item = Message> {
 }
 
 fn diagnostics_clock_ticks() -> impl futures::Stream<Item = Message> {
-    clock_ticks(Duration::from_secs(1))
+    // Diagnostics values change only with network refreshes or hardware polling;
+    // polling once every five seconds is sufficient and avoids needless redraws.
+    clock_ticks(Duration::from_secs(5))
 }
 
 fn animation_ticks() -> impl futures::Stream<Item = Message> {
-    // Four updates per second keep the refresh indicator responsive without
-    // repeatedly rebuilding the full applet while a request is in flight.
-    clock_ticks(Duration::from_millis(250))
+    // One update per second keeps the refresh indicator visibly animated
+    // without forcing four complete applet redraws per second.
+    clock_ticks(Duration::from_secs(1))
 }
 
 fn flow_animation_ticks() -> impl futures::Stream<Item = Message> {
     cosmic::iced::stream::channel(
         2,
         |mut output: futures::channel::mpsc::Sender<Message>| async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(1));
+            let mut interval = tokio::time::interval(Duration::from_secs(5));
             interval.tick().await;
             loop {
                 interval.tick().await;
@@ -2249,7 +2251,23 @@ fn flow_animation_ticks() -> impl futures::Stream<Item = Message> {
     )
 }
 
-fn weather_slideshow_ticks() -> impl futures::Stream<Item = Message> {
+fn weather_slideshow_hold_ticks() -> impl futures::Stream<Item = Message> {
+    cosmic::iced::stream::channel(
+        2,
+        |mut output: futures::channel::mpsc::Sender<Message>| async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(5));
+            interval.tick().await;
+            loop {
+                interval.tick().await;
+                if output.send(Message::WeatherSlideshowTick).await.is_err() {
+                    break;
+                }
+            }
+        },
+    )
+}
+
+fn weather_slideshow_transition_ticks() -> impl futures::Stream<Item = Message> {
     cosmic::iced::stream::channel(
         2,
         |mut output: futures::channel::mpsc::Sender<Message>| async move {
@@ -2263,6 +2281,14 @@ fn weather_slideshow_ticks() -> impl futures::Stream<Item = Message> {
             }
         },
     )
+}
+
+fn weather_slideshow_transition_active(weather: &crate::weather::WeatherData, index: usize) -> bool {
+    weather
+        .slideshow_sequence
+        .get(index)
+        .and_then(|frame| weather.slideshow_frame_sources.get(*frame))
+        .is_some_and(|sources| sources.len() > 1)
 }
 
 impl cosmic::Application for AppModel {
@@ -2395,10 +2421,16 @@ impl cosmic::Application for AppModel {
                     .as_ref()
                     .is_some_and(|weather| !weather.slideshow_sequence.is_empty())
             {
-                // Keep the timer active both when a slideshow exists and when
-                // the initial weather response had no usable image. The latter
-                // still needs its deadline to trigger a background-image retry.
-                subscriptions.push(Subscription::run(weather_slideshow_ticks));
+                // Hold each photo with a low-frequency tick. Only run the
+                // one-second timer for the three actual crossfade frames.
+                let transition_active = self.weather.as_ref().is_some_and(|weather| {
+                    weather_slideshow_transition_active(weather, self.weather_slideshow_index)
+                });
+                if transition_active {
+                    subscriptions.push(Subscription::run(weather_slideshow_transition_ticks));
+                } else {
+                    subscriptions.push(Subscription::run(weather_slideshow_hold_ticks));
+                }
             }
         }
         Subscription::batch(subscriptions)
