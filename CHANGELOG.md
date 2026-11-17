@@ -8,6 +8,10 @@ Changes are tracked in date-based entries. See the [GitHub Releases](https://git
 
 ### Fixed
 
+- Right-align split panel values through their fixed-width containers, keeping naturally sized text flush to the same right edge.
+
+### Fixed
+
 - Matched the spacing between split number/unit lines to the configured panel text line height, removing the oversized gap in odd multiline panel items.
 
 ### Fixed
