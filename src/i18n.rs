@@ -31,10 +31,7 @@ pub fn language(setting: &str) -> &'static str {
     fn from_locale(value: &str) -> Option<&'static str> {
         let value = value.to_ascii_lowercase();
         let value = value.split(':').next().unwrap_or(&value);
-        let value = value
-            .split(['_', '-', '.'])
-            .next()
-            .unwrap_or(value);
+        let value = value.split(['_', '-', '.']).next().unwrap_or(value);
         match value {
             "de" => Some("de"),
             "en" => Some("en"),
@@ -53,7 +50,9 @@ pub fn language(setting: &str) -> &'static str {
         }
     }
 
-    if setting != "system" && let Some(language) = from_locale(setting) {
+    if setting != "system"
+        && let Some(language) = from_locale(setting)
+    {
         return language;
     }
     for key in ["LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"] {

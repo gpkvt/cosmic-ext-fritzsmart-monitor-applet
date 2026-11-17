@@ -332,7 +332,6 @@ fn quick_slider_anchor_labels(labels: [&'static str; 5]) -> cosmic::Element<'sta
     row.into()
 }
 
-
 /// Reduce weather-photo opacity so the COSMIC surface behind the card shows through.
 fn semi_transparent_weather_photo(bytes: &[u8]) -> Vec<u8> {
     let Ok(decoded) = image::load_from_memory(bytes) else {
@@ -635,13 +634,17 @@ fn graph_visual_with_dimensions(
         .push(widget::Space::new().width(cosmic::iced::Length::Fixed(8.0)))
         .push(widget::text::caption(format!("MAX {maximum:.1} {unit}")))
         .push(widget::Space::new().width(cosmic::iced::Length::Fixed(8.0)))
-        .push(widget::text::caption(format!("CURRENT {current_value:.1} {unit}")));
+        .push(widget::text::caption(format!(
+            "CURRENT {current_value:.1} {unit}"
+        )));
     let x_axis = widget::Row::new()
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
         .push(widget::text::caption("TIME"))
         .push(widget::Space::new().width(cosmic::iced::Length::Fixed(8.0)))
-        .push(widget::text::caption(axis_start.unwrap_or_else(|| "Start".to_string())))
+        .push(widget::text::caption(
+            axis_start.unwrap_or_else(|| "Start".to_string()),
+        ))
         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
         .push(widget::text::caption("Now"));
     let content = widget::Column::new()
@@ -1065,7 +1068,9 @@ fn energy_flow_overview(
             .align_x(cosmic::iced::Alignment::Center)
             .push(widget::icon::from_name(icon).size(20))
             .push(widget::text::caption(energy_flow_label(language, label)))
-            .push(widget::text::body(keep_value_unit_together(format!("{value} W"))))
+            .push(widget::text::body(keep_value_unit_together(format!(
+                "{value} W"
+            ))))
     };
     let flow_path = |glyph: &'static str, label: &'static str, value: i64| {
         widget::Column::new()
@@ -1102,33 +1107,33 @@ fn energy_flow_overview(
             flow.grid_export_w
         )
     } else {
-        format!(
-            "{}: 0 W",
-            energy_flow_label(language, "After solar")
-        )
+        format!("{}: 0 W", energy_flow_label(language, "After solar"))
     };
 
     let content = widget::Column::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
-        .push(widget::text::caption(energy_flow_label(language, "ENERGY FLOW")))
+        .push(widget::text::caption(energy_flow_label(
+            language,
+            "ENERGY FLOW",
+        )))
         .push(
             widget::Row::new()
                 .spacing(2)
                 .width(cosmic::iced::Length::Fill)
                 .align_y(cosmic::iced::Alignment::Center)
-                .push(node("weather-clear-symbolic", "Solar", flow.solar_generation_w))
+                .push(node(
+                    "weather-clear-symbolic",
+                    "Solar",
+                    flow.solar_generation_w,
+                ))
                 .push(flow_path(
                     solar_glyph,
                     "Self-consumed",
                     flow.solar_to_home_w,
                 ))
                 .push(node("go-home-symbolic", "Home", flow.consumption_w))
-                .push(flow_path(
-                    grid_glyph,
-                    grid_label,
-                    grid_value,
-                ))
+                .push(flow_path(grid_glyph, grid_label, grid_value))
                 .push(node("network-server-symbolic", "Grid", grid_value)),
         )
         .push(
@@ -1757,7 +1762,11 @@ fn clock_ticks(interval_duration: Duration) -> impl futures::Stream<Item = Messa
 
 async fn fetch_latest_release_version() -> Result<String, String> {
     let client = reqwest::Client::builder()
-        .user_agent(concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!(
+            env!("CARGO_PKG_NAME"),
+            "/",
+            env!("CARGO_PKG_VERSION")
+        ))
         .timeout(Duration::from_secs(10))
         .build()
         .map_err(|error| error.to_string())?;
@@ -2333,19 +2342,13 @@ impl cosmic::Application for AppModel {
                     widget::Row::new()
                         .spacing(10)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(
-                            widget::text::body(title.clone())
-                                .width(cosmic::iced::Length::Fill),
-                        )
+                        .push(widget::text::body(title.clone()).width(cosmic::iced::Length::Fill))
                         .push(
                             widget::button::custom(
                                 widget::Row::new()
                                     .spacing(6)
                                     .align_y(cosmic::iced::Alignment::Center)
-                                    .push(
-                                        widget::icon::from_name("window-close-symbolic")
-                                            .size(16),
-                                    )
+                                    .push(widget::icon::from_name("window-close-symbolic").size(16))
                                     .push(widget::text::caption(crate::i18n::tr(
                                         &self.settings.language,
                                         "Close",
@@ -3027,9 +3030,7 @@ impl cosmic::Application for AppModel {
                             crate::i18n::tr(&self.settings.language, "Not checked yet").to_string()
                         },
                         self.latest_version.as_ref().map(|result| match result {
-                            Ok(version) => {
-                                !is_newer_version(version, env!("APP_VERSION"))
-                            }
+                            Ok(version) => !is_newer_version(version, env!("APP_VERSION")),
                             Err(_) => false,
                         }),
                     ))
@@ -3742,12 +3743,11 @@ impl cosmic::Application for AppModel {
                     .or(weather.background_image.as_ref())
                 {
                     let photo_bytes = semi_transparent_weather_photo(image_bytes);
-                    let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
-                        photo_bytes,
-                    ))
-                    .width(cosmic::iced::Length::Fill)
-                    .height(cosmic::iced::Length::Fixed(260.0))
-                    .content_fit(cosmic::iced::ContentFit::Fill);
+                    let photo =
+                        widget::image::Image::new(widget::image::Handle::from_bytes(photo_bytes))
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .content_fit(cosmic::iced::ContentFit::Fill);
                     let details = widget::container(weather_content)
                         .width(cosmic::iced::Length::Fill)
                         .height(cosmic::iced::Length::Fixed(260.0))
@@ -5247,10 +5247,9 @@ impl cosmic::Application for AppModel {
                 self.update_installing = true;
                 self.update_status = None;
                 let version = version.clone();
-                return Task::perform(
-                    crate::updater::install_update(version),
-                    |result| cosmic::Action::App(Message::LatestUpdateInstalled(result)),
-                );
+                return Task::perform(crate::updater::install_update(version), |result| {
+                    cosmic::Action::App(Message::LatestUpdateInstalled(result))
+                });
             }
             Message::LatestUpdateInstalled(result) => {
                 self.update_installing = false;
@@ -5492,8 +5491,8 @@ impl cosmic::Application for AppModel {
                     && let Some(weather) = &self.weather
                     && !weather.slideshow_sequence.is_empty()
                 {
-                    self.weather_slideshow_index = (self.weather_slideshow_index + 1)
-                        % weather.slideshow_sequence.len();
+                    self.weather_slideshow_index =
+                        (self.weather_slideshow_index + 1) % weather.slideshow_sequence.len();
                 }
             }
             Message::WeatherUpdated(result) => {
