@@ -3,6 +3,7 @@
 ## [17.11.2026]
 
 ### Fixed
+- Remove the gap between the weather background image and its refresh progress indicator while preserving spacing around the weather section.
 
 - Use libcosmic's `progress_bar::linear::Linear` widget API for the 2 px weather refresh indicator.
 
