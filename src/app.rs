@@ -307,7 +307,7 @@ fn format_uptime(seconds: u64) -> String {
 }
 
 fn format_link_rate(bits_per_second: u64) -> String {
-    let megabits = bits_per_second as f64 / 1_000_000.0;
+    let megabits = (bits_per_second as f64 / 1_000_000.0 * 10.0).round() / 10.0;
     if megabits.fract().abs() < f64::EPSILON {
         format!("{megabits:.0} Mb/s")
     } else {
@@ -7831,7 +7831,7 @@ mod history_tests {
 
     #[test]
     fn wan_link_rates_are_shown_in_megabits_per_second() {
-        assert_eq!(format_link_rate(531_968_000), "532.0 Mb/s");
+        assert_eq!(format_link_rate(531_968_000), "532 Mb/s");
         assert_eq!(format_link_rate(55_000_000), "55 Mb/s");
     }
 
