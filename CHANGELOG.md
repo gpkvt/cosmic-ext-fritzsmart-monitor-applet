@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Right-aligned the rows inside paired panel columns so their readings share a common right edge.
+
 - Reduced the fixed row height of paired multiline panel readings; their vertical spacing now follows the configured text size instead of reserving 24 px per line.
 
 - Tightened the line spacing of paired two-line panel readings.
