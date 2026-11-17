@@ -2012,8 +2012,11 @@ impl cosmic::Application for AppModel {
         core: cosmic::Core,
         _flags: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
-        let settings = FritzSettings::load().unwrap_or_default();
+        let mut settings = FritzSettings::load().unwrap_or_default();
         let setup_assistant = !settings.setup_completed;
+        if setup_assistant && settings.url.trim().is_empty() {
+            settings.url = "http://fritz.box".into();
+        }
         let (history, device_history) =
             crate::history::load(graph_history_window(settings.graph_timespan_minutes));
         let collapsed_menu_sections = settings.collapsed_menu_sections.iter().cloned().collect();
