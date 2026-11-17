@@ -2282,6 +2282,7 @@ impl cosmic::Application for AppModel {
                                     .any(|hidden| hidden == "temperature"),
                         ))
                         .size(panel_text_size)
+                        .align_x(cosmic::iced::Alignment::End)
                         .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
                         .into(),
                     self.settings.panel_multiline
@@ -2330,6 +2331,7 @@ impl cosmic::Application for AppModel {
                                         || input_power.is_none()),
                             ))
                             .size(panel_text_size)
+                        .align_x(cosmic::iced::Alignment::End)
                         .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
                             .into(),
                         self.settings.panel_multiline
@@ -2373,6 +2375,7 @@ impl cosmic::Application for AppModel {
                                     && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption"),
                             ))
                             .size(panel_text_size)
+                        .align_x(cosmic::iced::Alignment::End)
                         .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
                             .into(),
                         self.settings.panel_multiline
@@ -2421,6 +2424,7 @@ impl cosmic::Application for AppModel {
                             widget::container(
                                 widget::text::body(keep_value_unit_together(value))
                                     .size(panel_text_size)
+                        .align_x(cosmic::iced::Alignment::End)
                                     .line_height(cosmic::iced::widget::text::LineHeight::Relative(
                                         0.85,
                                     )),
@@ -2491,6 +2495,7 @@ impl cosmic::Application for AppModel {
                                         || self.weather.is_none()),
                             ))
                             .size(panel_text_size)
+                        .align_x(cosmic::iced::Alignment::End)
                         .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
                             .into(),
                         self.settings.panel_multiline
