@@ -2460,6 +2460,7 @@ impl cosmic::Application for AppModel {
                     if self.settings.panel_multiline {
                         widget::Column::new()
                             .spacing(0)
+                            .align_x(cosmic::iced::Alignment::End)
                             .push(bandwidth_row("Download", "go-down-symbolic", download))
                             .push(bandwidth_row("Upload", "go-up-symbolic", upload))
                             .into()
@@ -2563,7 +2564,11 @@ impl cosmic::Application for AppModel {
                 if members.len() == 1 {
                     content = content.push(members.remove(0));
                 } else {
-                    let mut rows = widget::Column::new().spacing(0);
+                    // Align each row to the shared right edge of the
+                    // widest row so the value text forms a consistent column.
+                    let mut rows = widget::Column::new()
+                        .spacing(0)
+                        .align_x(cosmic::iced::Alignment::End);
                     for member in members {
                         rows = rows.push(member);
                     }
