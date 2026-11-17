@@ -528,7 +528,7 @@ fn graph_visual_with_dimensions(
     .width(cosmic::iced::Length::Fill)
     .height(widget_height);
 
-    let content = widget::Column::new()
+    let mut content = widget::Column::new()
         .spacing(8)
         .push(
             widget::Row::new()
