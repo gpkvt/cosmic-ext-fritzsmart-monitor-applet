@@ -41,8 +41,8 @@ def render(source: Path, destination: Path, title: str) -> None:
     nav = (
         '<a class="brand" href="index.html"><img src="logo.svg" alt="">'
         'FRITZ!Power Monitor</a><nav class="nav-links" aria-label="Hauptnavigation">'
-        '<a href="index.html">Overview</a><a href="guide.html">User guide</a>'
-        '<a href="readme.html">README</a><a href="security.html">Security</a>'
+        '<a href="index.html">Übersicht</a><a href="guide.html">Benutzerhandbuch</a>'
+        '<a href="readme.html">README</a><a href="security.html">Sicherheit</a>'
         '</nav>'
     )
     page = f"""<!doctype html>
