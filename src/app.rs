@@ -1247,17 +1247,26 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
     .class(cosmic::theme::Button::Text);
     content = content.push(history_heading);
     if !history_collapsed {
-        content = content
-            .push(collapsible_graph(
-                "CURRENT POWER (W)", "graph-current-power",
-                collapsed_sections.contains("graph-current-power"),
-                interactive_graph_with_axis(&language, crate::i18n::tr(&language, "CURRENT POWER"), history.into_iter(), &graph_style, "W", axis_start.clone()),
-            ))
-            .push(collapsible_graph(
-                "AVERAGE TEMPERATURE HISTORY (°C)", "graph-current-temperature",
-                collapsed_sections.contains("graph-current-temperature"),
-                interactive_graph_with_axis(&language, crate::i18n::tr(&language, "AVERAGE TEMPERATURE"), temperature_history.into_iter(), &graph_style, "°C", axis_start),
-            ));
+        content = content.push(
+            widget::Column::new()
+                .spacing(8)
+                .push(interactive_graph_with_axis(
+                    &language,
+                    crate::i18n::tr(&language, "CURRENT POWER"),
+                    history.into_iter(),
+                    &graph_style,
+                    "W",
+                    axis_start.clone(),
+                ))
+                .push(interactive_graph_with_axis(
+                    &language,
+                    crate::i18n::tr(&language, "AVERAGE TEMPERATURE"),
+                    temperature_history.into_iter(),
+                    &graph_style,
+                    "°C",
+                    axis_start,
+                )),
+        );
     }
     surface_card(content.into(), 14)
 }
@@ -1356,16 +1365,30 @@ fn total_power_overview(
             .map(|(timestamp, _)| Instant::now().duration_since(*timestamp).as_secs() / 60),
     );
 
-    let output_graph = widget::Column::new()
-        .spacing(8)
-        .push(collapsible_graph(
-            "TOTAL POWER OUTPUT (W)", "graph-total-power-output", collapsed_sections.contains("graph-total-power-output"),
-            interactive_graph_with_axis(&settings.language, crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"), history.iter().map(|(_, value)| *value as f64), &settings.graph_style, "W", axis_start.clone()),
-        ))
-        .push(collapsible_graph(
-            "AVERAGE TEMPERATURE (°C)", "graph-total-output-temperature", collapsed_sections.contains("graph-total-output-temperature"),
-            interactive_graph_with_axis(&settings.language, crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"), output_temperature_history.iter().map(|(_, value)| *value), &settings.graph_style, "°C", axis_start.clone()),
-        ));
+    let output_graph = collapsible_graph(
+        "POWER OUTPUT & TEMPERATURE",
+        "graph-total-output-pair",
+        collapsed_sections.contains("graph-total-output-pair"),
+        widget::Column::new()
+            .spacing(8)
+            .push(interactive_graph_with_axis(
+                &settings.language,
+                crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
+                history.iter().map(|(_, value)| *value as f64),
+                &settings.graph_style,
+                "W",
+                axis_start.clone(),
+            ))
+            .push(interactive_graph_with_axis(
+                &settings.language,
+                crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
+                output_temperature_history.iter().map(|(_, value)| *value),
+                &settings.graph_style,
+                "°C",
+                axis_start.clone(),
+            ))
+            .into(),
+    );
     let output_content = widget::Column::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
@@ -1420,16 +1443,33 @@ fn total_power_overview(
         let mut input_graph = widget::Column::new()
             .spacing(8)
             .push(collapsible_graph(
-                "TOTAL POWER INPUT (W)", "graph-total-power-input", collapsed_sections.contains("graph-total-power-input"),
-                interactive_graph_with_axis(&settings.language, crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"), input_history.iter().map(|(_, value)| *value as f64), &settings.graph_style, "W", axis_start.clone()),
+                "POWER INPUT & TEMPERATURE",
+                "graph-total-input-pair",
+                collapsed_sections.contains("graph-total-input-pair"),
+                widget::Column::new()
+                    .spacing(8)
+                    .push(interactive_graph_with_axis(
+                        &settings.language,
+                        crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
+                        input_history.iter().map(|(_, value)| *value as f64),
+                        &settings.graph_style,
+                        "W",
+                        axis_start.clone(),
+                    ))
+                    .push(interactive_graph_with_axis(
+                        &settings.language,
+                        crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
+                        input_temperature_history.iter().map(|(_, value)| *value),
+                        &settings.graph_style,
+                        "°C",
+                        axis_start.clone(),
+                    ))
+                    .into(),
             ));
         if let Some(summary) = input_energy_summary {
             input_graph = input_graph.push(summary);
         }
-        input_graph = input_graph.push(collapsible_graph(
-            "AVERAGE TEMPERATURE (°C)", "graph-total-input-temperature", collapsed_sections.contains("graph-total-input-temperature"),
-            interactive_graph_with_axis(&settings.language, crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"), input_temperature_history.iter().map(|(_, value)| *value), &settings.graph_style, "°C", axis_start),
-        ));
+
         let input_content = widget::Column::new()
             .spacing(8)
             .width(cosmic::iced::Length::Fill)
@@ -4211,32 +4251,30 @@ impl cosmic::Application for AppModel {
                         )
                         .push(widget::divider::horizontal::default())
                         .push(collapsible_graph(
-                            "DOWNLOAD HISTORY",
-                            "graph-bandwidth-download",
-                            self.collapsed_menu_sections.contains("graph-bandwidth-download"),
-                            interactive_graph(
-                                &self.settings.language,
-                                crate::i18n::tr(&self.settings.language, "DOWNLOAD HISTORY"),
-                                self.bandwidth_history
-                                    .iter()
-                                    .map(|(_, download, _)| *download as f64 / 1_000_000.0),
-                                &self.settings.graph_style,
-                                "Mb/s",
-                            ),
-                        ))
-                        .push(collapsible_graph(
-                            "UPLOAD HISTORY",
-                            "graph-bandwidth-upload",
-                            self.collapsed_menu_sections.contains("graph-bandwidth-upload"),
-                            interactive_graph(
-                                &self.settings.language,
-                                crate::i18n::tr(&self.settings.language, "UPLOAD HISTORY"),
-                                self.bandwidth_history
-                                    .iter()
-                                    .map(|(_, _, upload)| *upload as f64 / 1_000_000.0),
-                                &self.settings.graph_style,
-                                "Mb/s",
-                            ),
+                            "DOWNLOAD & UPLOAD HISTORY",
+                            "graph-bandwidth-pair",
+                            self.collapsed_menu_sections.contains("graph-bandwidth-pair"),
+                            widget::Column::new()
+                                .spacing(8)
+                                .push(interactive_graph(
+                                    &self.settings.language,
+                                    crate::i18n::tr(&self.settings.language, "DOWNLOAD HISTORY"),
+                                    self.bandwidth_history
+                                        .iter()
+                                        .map(|(_, download, _)| *download as f64 / 1_000_000.0),
+                                    &self.settings.graph_style,
+                                    "Mb/s",
+                                ))
+                                .push(interactive_graph(
+                                    &self.settings.language,
+                                    crate::i18n::tr(&self.settings.language, "UPLOAD HISTORY"),
+                                    self.bandwidth_history
+                                        .iter()
+                                        .map(|(_, _, upload)| *upload as f64 / 1_000_000.0),
+                                    &self.settings.graph_style,
+                                    "Mb/s",
+                                ))
+                                .into(),
                         ))
                 } else {
                     widget::Column::new()
