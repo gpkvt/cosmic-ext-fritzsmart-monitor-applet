@@ -75,7 +75,7 @@ jobs:
           [[ "$(dpkg-deb --field "$deb" Package)" == "fritz-power-monitor" ]]
           [[ "$(dpkg-deb --field "$deb" Version)" == "$VERSION" ]]
           [[ "$(dpkg-deb --field "$deb" Architecture)" == "amd64" ]]
-          dpkg-deb --contents "$deb" | grep -Fq './usr/bin/fritz-power-monitor'
+          dpkg-deb --contents "$deb" | grep -F './usr/bin/fritz-power-monitor' >/dev/null
           file "$appimage"
           (cd dist && sha256sum --check SHA256SUMS)
 
