@@ -357,7 +357,7 @@ fn parse_settings_section(value: &str) -> String {
 }
 
 fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
-    const SECTION_IDS: [&str; 5] = [
+    const SECTION_IDS: [&str; 6] = [
         "summary",
         "weather",
         "internet-bandwidth",
