@@ -61,7 +61,7 @@ pub struct AppModel {
     collapsed_menu_sections: HashSet<String>,
     quick_refresh_interval: u32,
     quick_graph_timespan: u32,
-    expanded_graph: Option<(String, Vec<f64>, String)>,
+    expanded_graph: Option<(String, Vec<f64>, String, Option<String>)>,
     next_weather_refresh_at: Option<Instant>,
     pending_power_changes: HashSet<String>,
     pending_power_targets: HashMap<String, bool>,
@@ -100,7 +100,7 @@ pub enum Message {
     PanelNetPowerChanged(bool),
     GraphTimespanChanged(u32),
     GraphStyleChanged(String),
-    ShowGraph(String, Vec<f64>, String),
+    ShowGraph(String, Vec<f64>, String, Option<String>),
     CloseGraph,
     RefreshIntervalChanged(u32),
     DiscoverDevices,
@@ -520,6 +520,7 @@ fn graph_visual_large(
     values: impl Iterator<Item = f64>,
     style: &str,
     unit: &str,
+    axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     // The enlarged graph should use a genuinely large canvas, not just a slightly taller compact card.
     graph_visual_with_dimensions(
@@ -528,7 +529,7 @@ fn graph_visual_large(
         unit,
         480.0,
         cosmic::iced::Length::Fill,
-        Some("Start".to_string()),
+        axis_start,
     )
 }
 
@@ -615,10 +616,15 @@ fn graph_visual_with_dimensions(
     .width(cosmic::iced::Length::Fill)
     .height(widget_height);
 
+    let y_axis_label = if unit == "°C" {
+        format!("TEMPERATURE ({unit})")
+    } else {
+        format!("POWER ({unit})")
+    };
     let axis_values = widget::Row::new()
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::text::caption(format!("POWER ({unit})")).width(cosmic::iced::Length::Fill))
+        .push(widget::text::caption(y_axis_label).width(cosmic::iced::Length::Fill))
         .push(widget::text::caption(format!("MAX {maximum:.1} {unit}")))
         .push(widget::Space::new().width(cosmic::iced::Length::Fixed(12.0)))
         .push(widget::text::caption(format!("CURRENT {current_value:.1} {unit}")));
@@ -672,7 +678,6 @@ fn interactive_graph_inner(
     axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
-    let current_value = values.last().copied().unwrap_or(0.0);
     let mut graph = widget::Column::new()
         .spacing(6)
         .push(
@@ -689,13 +694,14 @@ fn interactive_graph_inner(
             values.iter().copied(),
             style,
             unit,
-            axis_start,
+            axis_start.clone(),
         ));
     widget::button::custom(graph)
         .on_press(Message::ShowGraph(
             title.to_string(),
             values,
             unit.to_string(),
+            axis_start,
         ))
         .padding(0)
         .width(cosmic::iced::Length::Fill)
@@ -2305,7 +2311,7 @@ impl cosmic::Application for AppModel {
         // accidentally receive the applet's interactive view.
         // The expanded graph is a regular, independently managed desktop window.
         if self.graph_window == Some(id)
-            && let Some((title, values, unit)) = &self.expanded_graph
+            && let Some((title, values, unit, axis_start)) = &self.expanded_graph
         {
             let graph_page = widget::Column::new()
                 .spacing(4)
@@ -2316,6 +2322,7 @@ impl cosmic::Application for AppModel {
                     values.iter().copied(),
                     &self.settings.graph_style,
                     unit,
+                    axis_start.clone(),
                 ))
                 .push(
                     widget::Row::new()
@@ -4905,8 +4912,8 @@ impl cosmic::Application for AppModel {
             Message::TooltipSurfaceAction(action) => {
                 return Task::done(cosmic::Action::Surface(action));
             }
-            Message::ShowGraph(title, values, unit) => {
-                self.expanded_graph = Some((title, values, unit));
+            Message::ShowGraph(title, values, unit, axis_start) => {
+                self.expanded_graph = Some((title, values, unit, axis_start));
                 if self.graph_window.is_none() {
                     // Applets must create secondary surfaces through the
                     // applet popup API. window::open() creates a local window
