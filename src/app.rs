@@ -2391,7 +2391,7 @@ impl cosmic::Application for AppModel {
                 panel_items.push((
                     "power-consumption",
                     panel_item(
-                        if self.settings.panel_net_power {
+                        if self.settings.panel_net_power && input_power.is_some() {
                             "Net power"
                         } else {
                             "Power consumption"
@@ -3045,8 +3045,7 @@ impl cosmic::Application for AppModel {
                                 )
                                 .padding([8, 10]),
                             ),
-                    )
-                    ;
+                    );
                 if has_input_device {
                     content = content.push(
                         widget::Row::new()
@@ -3070,14 +3069,14 @@ impl cosmic::Application for AppModel {
                             ),
                     );
                 }
-                    content = content.push(
-                        widget::Row::new()
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(
-                                widget::Column::new()
-                                    .spacing(3)
-                                    .width(cosmic::iced::Length::Fill)
-                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Average temperature")))
+                content = content.push(
+                    widget::Row::new()
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(
+                            widget::Column::new()
+                                .spacing(3)
+                                .width(cosmic::iced::Length::Fill)
+                                .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Average temperature")))
                                     .push(widget::text::caption(
                                         "When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.",
                                     )),
@@ -3328,10 +3327,12 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption(
                         "Reorder readings and choose which ones appear in the panel. Changes are saved automatically.",
                     ));
-                for (index, item) in self.settings.panel_order.iter().enumerate() {
-                    if item == "solar-power" && !has_input_device {
-                        continue;
-                    }
+                let visible_panel_order = self
+                    .settings
+                    .panel_order
+                    .iter()
+                    .filter(|item| item.as_str() != "solar-power" || has_input_device);
+                for (index, item) in visible_panel_order.enumerate() {
                     let id = match item.as_str() {
                         "weather" => "weather",
                         "power-consumption" => "power-consumption",
