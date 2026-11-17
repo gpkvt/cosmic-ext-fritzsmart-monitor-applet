@@ -2544,9 +2544,10 @@ impl cosmic::Application for AppModel {
                     (
                         "Interface",
                         "Language and visual presentation",
-                        vec![
-                            (crate::i18n::tr(&self.settings.language, "Language"), "language"),
-                        ],
+                        vec![(
+                            crate::i18n::tr(&self.settings.language, "Language"),
+                            "language",
+                        )],
                     ),
                     (
                         "Display & updates",
@@ -2569,10 +2570,7 @@ impl cosmic::Application for AppModel {
                     (
                         "Layout",
                         "Choose what appears and in which order",
-                        vec![
-                            ("Menu order", "menu-order"),
-                            ("Panel order", "panel-order"),
-                        ],
+                        vec![("Menu order", "menu-order"), ("Panel order", "panel-order")],
                     ),
                     (
                         "Support",
