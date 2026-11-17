@@ -2526,13 +2526,53 @@ impl cosmic::Application for AppModel {
         }
         ordered_panel_items.extend(panel_items.drain(..));
 
-        // Keep every icon/value pair as its own horizontal panel item.
-        // In multiline mode, only the odd item uses two text lines; do not
-        // stack related readings into vertical columns. This produces a
-        // consistent sequence of left-aligned icon slots and right-aligned
-        // value slots across the entire panel.
-        for (_, item) in ordered_panel_items {
-            content = content.push(item);
+        if self.settings.panel_multiline {
+            // Keep related readings together as two-line groups while each
+            // member remains its own horizontal icon/value pair. Starting
+            // each row at the same left edge aligns the icon slots; the
+            // value renderer keeps each value right-aligned in its own slot.
+            let mut panel_groups: Vec<(
+                Option<&'static str>,
+                Vec<cosmic::Element<'static, Message>>,
+            )> = Vec::new();
+            for (id, item) in ordered_panel_items {
+                let group_key = match id {
+                    "weather" | "temperature" => Some("weather-temperature"),
+                    "power-consumption" | "solar-power" => Some("power-solar"),
+                    _ => None,
+                };
+                if let Some(key) = group_key {
+                    if let Some((_, members)) = panel_groups
+                        .iter_mut()
+                        .find(|(existing, _)| *existing == Some(key))
+                    {
+                        members.push(item);
+                    } else {
+                        panel_groups.push((Some(key), vec![item]));
+                    }
+                } else {
+                    panel_groups.push((None, vec![item]));
+                }
+            }
+
+            for (_, mut members) in panel_groups {
+                if members.len() == 1 {
+                    content = content.push(members.remove(0));
+                } else {
+                    let mut rows = widget::Column::new()
+                        .spacing(0)
+                        .align_x(cosmic::iced::Alignment::Start);
+                    for member in members {
+                        rows = rows.push(member);
+                    }
+                    content = content.push(rows);
+                }
+            }
+        } else {
+            // Single-line mode keeps every reading independently positionable.
+            for (_, item) in ordered_panel_items {
+                content = content.push(item);
+            }
         }
         // Keep connection health visible even when the popup is closed.
         if self.error.is_some() {

@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Restored two-line grouping for weather/temperature and consumption/solar in multiline panel mode while retaining horizontal icon/value pairs within each line.
+
 - Flattened multiline panel items into one horizontal sequence of icon/value pairs; icons align left and values align right independently.
 
 - Left-aligned icon columns in paired panel readings and stacked download/upload rows while retaining right-aligned values.
