@@ -738,7 +738,7 @@ pub fn chessboard_background_overlay() -> Option<Vec<u8>> {
     static OVERLAY: LazyLock<Option<Vec<u8>>> = LazyLock::new(|| {
         let width = 1200u32;
         let height = 520u32;
-        let square_size = 4u32;
+        let square_size = 8u32;
         let image = image::RgbaImage::from_fn(width, height, |x, y| {
             if ((x / square_size) + (y / square_size)) % 2 == 0 {
                 image::Rgba([0, 0, 0, 224])
@@ -1074,9 +1074,9 @@ mod tests {
         let decoded = image::load_from_memory(&bytes).unwrap().to_rgba8();
         assert_eq!(decoded.dimensions(), (1200, 520));
         assert_eq!(decoded.get_pixel(0, 0).0, [0, 0, 0, 224]);
-        assert_eq!(decoded.get_pixel(4, 0).0, [0, 0, 0, 224]);
-        assert_eq!(decoded.get_pixel(0, 4).0, [0, 0, 0, 224]);
-        assert_eq!(decoded.get_pixel(4, 4).0, [0, 0, 0, 224]);
+        assert_eq!(decoded.get_pixel(8, 0).0, [0, 0, 0, 224]);
+        assert_eq!(decoded.get_pixel(0, 8).0, [0, 0, 0, 224]);
+        assert_eq!(decoded.get_pixel(8, 8).0, [0, 0, 0, 224]);
     }
 
     #[test]
