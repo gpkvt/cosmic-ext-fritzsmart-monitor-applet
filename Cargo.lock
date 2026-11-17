@@ -1766,7 +1766,9 @@ dependencies = [
  "reqwest",
  "roxmltree 0.20.0",
  "serde_json",
+ "sha2",
  "tokio",
+ "zbus",
 ]
 
 [[package]]
