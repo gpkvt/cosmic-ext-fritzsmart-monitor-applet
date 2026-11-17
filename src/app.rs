@@ -3327,12 +3327,13 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption(
                         "Reorder readings and choose which ones appear in the panel. Changes are saved automatically.",
                     ));
-                let visible_panel_order = self
+                let visible_panel_order: Vec<_> = self
                     .settings
                     .panel_order
                     .iter()
-                    .filter(|item| item.as_str() != "solar-power" || has_input_device);
-                for (index, item) in visible_panel_order.enumerate() {
+                    .filter(|item| item.as_str() != "solar-power" || has_input_device)
+                    .collect();
+                for (index, item) in visible_panel_order.iter().enumerate() {
                     let id = match item.as_str() {
                         "weather" => "weather",
                         "power-consumption" => "power-consumption",
@@ -3371,7 +3372,7 @@ impl cosmic::Application for AppModel {
                         Message::MovePanelItem(id, false),
                     ));
                     content = content.push(row);
-                    if index + 1 < self.settings.panel_order.len() {
+                    if index + 1 < visible_panel_order.len() {
                         content = content.push(widget::divider::horizontal::default());
                     }
                 }
