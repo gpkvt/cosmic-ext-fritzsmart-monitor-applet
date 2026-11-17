@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Tightened the line spacing of paired two-line panel readings.
+
 - Increased the line spacing of the enlarged unpaired two-line panel value.
 
 - Increased the font and icon sizes for the unpaired item in two-line panel mode.
