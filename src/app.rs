@@ -2017,7 +2017,11 @@ fn weather_image_countdown_ticks() -> impl futures::Stream<Item = Message> {
             interval.tick().await;
             loop {
                 interval.tick().await;
-                if output.send(Message::WeatherImageCountdownTick).await.is_err() {
+                if output
+                    .send(Message::WeatherImageCountdownTick)
+                    .await
+                    .is_err()
+                {
                     break;
                 }
             }
@@ -6272,7 +6276,9 @@ impl cosmic::Application for AppModel {
                 self.next_weather_image_fetch_at = Some(
                     Instant::now()
                         + Duration::from_secs(u64::from(
-                            self.settings.weather_slideshow_interval_seconds.clamp(5, 300),
+                            self.settings
+                                .weather_slideshow_interval_seconds
+                                .clamp(5, 300),
                         )),
                 );
                 match result {
