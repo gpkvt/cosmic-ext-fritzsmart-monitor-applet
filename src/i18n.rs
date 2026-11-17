@@ -2108,6 +2108,18 @@ mod tests {
     }
 
     #[test]
+    fn japanese_and_korean_locales_are_detected_and_translated() {
+        for locale in ["ja", "ko"] {
+            assert_eq!(super::language(locale), locale);
+            for key in ["Settings", "Weather", "Connection", "Japanese", "Korean", "Panel item order", "FRITZ!Box URL", "Send test notification"] {
+                assert_ne!(tr(locale, key), key, "{locale}: {key}");
+            }
+        }
+        assert_eq!(super::language("ja_JP.UTF-8"), "ja");
+        assert_eq!(super::language("ko-KR"), "ko");
+    }
+
+    #[test]
     fn core_labels_are_translated_for_every_added_locale() {
         for language in ["es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no"] {
             assert_ne!(tr(language, "Settings"), "Settings", "{language}");
