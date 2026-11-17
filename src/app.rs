@@ -194,7 +194,11 @@ fn build_debug_report(app: &AppModel) -> String {
             contents
                 .lines()
                 .find(|line| line.starts_with("PRETTY_NAME="))
-                .map(|line| line.trim_start_matches("PRETTY_NAME=").trim_matches('"').to_string())
+                .map(|line| {
+                    line.trim_start_matches("PRETTY_NAME=")
+                        .trim_matches('"')
+                        .to_string()
+                })
         })
         .unwrap_or_else(|| "Unknown".into());
     let readings = if app.readings.is_empty() {
@@ -203,7 +207,15 @@ fn build_debug_report(app: &AppModel) -> String {
         app.readings
             .iter()
             .map(|reading| {
-                let suffix: String = reading.ain.chars().rev().take(4).collect::<String>().chars().rev().collect();
+                let suffix: String = reading
+                    .ain
+                    .chars()
+                    .rev()
+                    .take(4)
+                    .collect::<String>()
+                    .chars()
+                    .rev()
+                    .collect();
                 let masked_ain = if reading.ain.chars().count() > 4 {
                     format!("…{suffix}")
                 } else {
@@ -239,7 +251,11 @@ fn build_debug_report(app: &AppModel) -> String {
     let activity = if app.diagnostic_events.is_empty() {
         "None".to_string()
     } else {
-        app.diagnostic_events.iter().cloned().collect::<Vec<_>>().join("\n")
+        app.diagnostic_events
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
     };
     let history_diagnostics = serde_json::to_string_pretty(&app.history_storage_diagnostics)
         .unwrap_or_else(|error| format!("Could not serialize history diagnostics: {error}"));
