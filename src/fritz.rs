@@ -90,6 +90,14 @@ pub struct FritzDevice {
     pub ain: String,
 }
 
+pub fn default_external_temperature_ain(devices: &[FritzDevice]) -> Option<String> {
+    devices
+        .iter()
+        .find(|device| device.name.to_lowercase().contains("solar"))
+        .map(|device| normalize_ain_for_selection(&device.ain))
+        .filter(|ain| !ain.is_empty())
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TemperatureAlertThresholds {
     pub high_c: i16,
@@ -133,6 +141,7 @@ pub struct FritzSettings {
     pub openweathermap_api_key: String,
     pub weather_location: String,
     pub weather_temperature_ain: String,
+    pub weather_temperature_source_initialized: bool,
     pub weather_refresh_interval_minutes: u16,
     pub weather_slideshow_interval_seconds: u16,
     pub menu_order: Vec<String>,
@@ -178,6 +187,7 @@ impl Default for FritzSettings {
             openweathermap_api_key: String::new(),
             weather_location: String::new(),
             weather_temperature_ain: String::new(),
+            weather_temperature_source_initialized: false,
             weather_refresh_interval_minutes: 10,
             weather_slideshow_interval_seconds: 10,
             menu_order: default_menu_order(),
@@ -516,6 +526,8 @@ impl FritzSettings {
             openweathermap_api_key: get("OPENWEATHERMAP_API_KEY"),
             weather_location: get("WEATHER_LOCATION"),
             weather_temperature_ain: get("WEATHER_TEMPERATURE_AIN"),
+            weather_temperature_source_initialized: get("WEATHER_TEMPERATURE_SOURCE_INITIALIZED").eq_ignore_ascii_case("true")
+                || !get("WEATHER_TEMPERATURE_AIN").trim().is_empty(),
             weather_refresh_interval_minutes: get("WEATHER_REFRESH_INTERVAL_MINUTES")
                 .parse::<u16>()
                 .unwrap_or(10)
@@ -607,7 +619,7 @@ impl FritzSettings {
             parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
         let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
-            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\n",
             match self.language.as_str() {
                 "de" => "de",
                 "en" => "en",
@@ -672,6 +684,7 @@ impl FritzSettings {
             self.openweathermap_api_key,
             self.weather_location,
             self.weather_temperature_ain,
+            if self.weather_temperature_source_initialized { "true" } else { "false" },
             self.weather_refresh_interval_minutes.clamp(5, 60),
             self.weather_slideshow_interval_seconds.clamp(5, 300),
             input_ains,
@@ -1363,6 +1376,17 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn defaults_external_temperature_to_first_solar_device_case_insensitively() {
+        let devices = vec![
+            FritzDevice { name: "Smart Plug".into(), ain: "11:11".into() },
+            FritzDevice { name: "Roof SOLAR meter".into(), ain: "22:22".into() },
+            FritzDevice { name: "Solar battery".into(), ain: "33:33".into() },
+        ];
+        assert_eq!(default_external_temperature_ain(&devices), Some("2222".into()));
+        assert_eq!(default_external_temperature_ain(&devices[..1]), None);
+    }
 
     #[test]
     fn parses_persisted_settings_section_safely() {
