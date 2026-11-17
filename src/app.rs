@@ -6295,10 +6295,7 @@ impl cosmic::Application for AppModel {
                                 weather.image_attributions = attributions;
                                 weather.image_attribution =
                                     weather.image_attributions.first().cloned();
-                                weather.slideshow_frames = frames
-                                    .iter()
-                                    .to_vec()
-                                    .collect();
+                                weather.slideshow_frames = frames;
                                 weather.slideshow_sequence = sequence;
                                 weather.slideshow_frame_sources = frame_sources;
                                 weather.background_image = weather
@@ -6359,10 +6356,7 @@ impl cosmic::Application for AppModel {
                         // Decode, lower opacity and encode each photo once when weather data arrives.
                         // Doing this in view() repeated the full image conversion on every slideshow
                         // frame (four times per second) and caused excessive CPU usage.
-                        weather.slideshow_frames = frames
-                            .iter()
-                            .to_vec()
-                            .collect();
+                        weather.slideshow_frames = frames;
                         weather.background_image = weather
                             .background_image
                             .take()
@@ -6479,10 +6473,7 @@ impl cosmic::Application for AppModel {
                         &weather.background_images,
                         self.settings.weather_slideshow_interval_seconds,
                     );
-                    weather.slideshow_frames = frames
-                        .iter()
-                        .to_vec()
-                        .collect();
+                    weather.slideshow_frames = frames;
                     weather.slideshow_sequence = sequence;
                     weather.slideshow_frame_sources = frame_sources;
                     self.weather_slideshow_handles = weather
