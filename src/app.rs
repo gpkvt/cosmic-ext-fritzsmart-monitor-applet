@@ -2190,7 +2190,11 @@ impl cosmic::Application for AppModel {
 
         // Use half-size text in two-line panel mode to keep stacked readings compact.
         let panel_text_size = f32::from(self.settings.panel_text_size)
-            / if self.settings.panel_multiline { 2.0 } else { 1.0 };
+            / if self.settings.panel_multiline {
+                2.0
+            } else {
+                1.0
+            };
 
         // Keep every reading at its intrinsic width. Expanding each child to
         // Fill inside the horizontal panel row pushes later readings off-screen.
