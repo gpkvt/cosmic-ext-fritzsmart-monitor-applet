@@ -5611,16 +5611,6 @@ impl cosmic::Application for AppModel {
                     "FRITZ!Box refresh started: requesting live readings and device inventory.",
                 );
 
-                // Advance the existing slideshow immediately so every manual
-                // reload visibly changes the weather background without waiting
-                // for the network request to complete.
-                if let Some(weather) = &self.weather
-                    && !weather.slideshow_sequence.is_empty()
-                {
-                    self.weather_slideshow_index =
-                        (self.weather_slideshow_index + 1) % weather.slideshow_sequence.len();
-                }
-
                 // A manual reload refreshes the weather photo/slideshow as well
                 // as the FRITZ!Box readings. Keep the weather request independent
                 // so a weather-provider failure cannot block the main refresh.
@@ -6275,11 +6265,16 @@ impl cosmic::Application for AppModel {
                             None
                         };
                         let slideshow_len = weather.slideshow_sequence.len();
+                        let had_weather_background = self.weather.is_some();
                         self.weather = Some(weather);
                         self.weather_slideshow_index = if slideshow_len == 0 {
                             0
+                        } else if had_weather_background {
+                            // Every successful weather reload advances the background,
+                            // including scheduled reloads; manual reloads use this same path.
+                            (self.weather_slideshow_index + 1) % slideshow_len
                         } else {
-                            self.weather_slideshow_index % slideshow_len
+                            0
                         };
                         self.weather_error = None;
                     }
