@@ -2380,7 +2380,7 @@ mod tests {
 
     #[test]
     fn supported_languages_and_locale_variants_are_resolved() {
-        for language in ["en", "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no"] {
+        for language in ["en", "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko"] {
             assert_eq!(super::language(language), language);
         }
         assert_eq!(super::language("fr_FR.UTF-8"), "fr");
@@ -2431,8 +2431,8 @@ mod tests {
 
     #[test]
     fn language_picker_names_are_localized_for_every_supported_locale() {
-        let languages = ["English", "German", "Spanish", "Dutch", "French", "Italian", "Swedish", "Portuguese", "Polish", "Danish", "Norwegian"];
-        for locale in ["en", "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no"] {
+        let languages = ["English", "German", "Spanish", "Dutch", "French", "Italian", "Swedish", "Portuguese", "Polish", "Danish", "Norwegian", "Japanese", "Korean"];
+        for locale in ["en", "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko"] {
             for name in languages {
                 assert_ne!(tr(locale, name), name, "{locale}: {name}");
             }
