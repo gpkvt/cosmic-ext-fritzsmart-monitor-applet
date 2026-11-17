@@ -2454,7 +2454,7 @@ impl cosmic::Application for AppModel {
                     if self.settings.panel_multiline {
                         widget::Column::new()
                             .spacing(0)
-                            .align_x(cosmic::iced::Alignment::End)
+                            .align_x(cosmic::iced::Alignment::Start)
                             .push(bandwidth_row("Download", "go-down-symbolic", download))
                             .push(bandwidth_row("Upload", "go-up-symbolic", upload))
                             .into()
@@ -2558,11 +2558,12 @@ impl cosmic::Application for AppModel {
                 if members.len() == 1 {
                     content = content.push(members.remove(0));
                 } else {
-                    // Align each row to the shared right edge of the
-                    // widest row so the value text forms a consistent column.
+                    // Start every row at the same left edge so icon slots
+                    // line up vertically within the group. Values remain
+                    // right-aligned inside their own fixed-width slots.
                     let mut rows = widget::Column::new()
                         .spacing(0)
-                        .align_x(cosmic::iced::Alignment::End);
+                        .align_x(cosmic::iced::Alignment::Start);
                     for member in members {
                         rows = rows.push(member);
                     }
