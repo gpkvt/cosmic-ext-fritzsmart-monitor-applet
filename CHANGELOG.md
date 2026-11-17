@@ -6,6 +6,10 @@ Changes are tracked in date-based entries. See the [GitHub Releases](https://git
 
 ## [17.11.2026]
 
+### Fixed
+
+- Right-aligned panel values within content-sized columns, including matching right edges for both lines of multiline readings.
+
 ### Changed
 
 - Unified all panel text rendering through one shared renderer so temperature, power, bandwidth and status values use identical typography, alignment and line spacing.
