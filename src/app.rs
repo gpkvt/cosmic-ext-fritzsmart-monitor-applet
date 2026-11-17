@@ -3289,7 +3289,7 @@ impl cosmic::Application for AppModel {
                                         0.06,
                                         0.07,
                                         0.09,
-                                        if weather.icon_code.ends_with('n') { 0.62 } else { 0.58 },
+                                        if weather.icon_code.ends_with('n') { 0.30 } else { 0.26 },
                                     ).into(),
                                 ),
                                 text_color: Some(cosmic::iced::Color::WHITE),
