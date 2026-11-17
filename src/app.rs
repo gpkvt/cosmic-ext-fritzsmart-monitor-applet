@@ -3105,7 +3105,7 @@ impl cosmic::Application for AppModel {
                                 "Certificate validation disabled",
                             )
                             .to_string(),
-                            Some(false),
+                            None,
                         )
                     } else if !self.settings.ca_cert_path.trim().is_empty() {
                         (
