@@ -504,8 +504,16 @@ fn graph_visual(
     values: impl Iterator<Item = f64>,
     style: &str,
     unit: &str,
+    axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
-    graph_visual_with_dimensions(values, style, unit, 48.0, cosmic::iced::Length::Fixed(56.0))
+    graph_visual_with_dimensions(
+        values,
+        style,
+        unit,
+        48.0,
+        cosmic::iced::Length::Fixed(56.0),
+        axis_start,
+    )
 }
 
 fn graph_visual_large(
@@ -514,7 +522,14 @@ fn graph_visual_large(
     unit: &str,
 ) -> cosmic::Element<'static, Message> {
     // The enlarged graph should use a genuinely large canvas, not just a slightly taller compact card.
-    graph_visual_with_dimensions(values, style, unit, 480.0, cosmic::iced::Length::Fill)
+    graph_visual_with_dimensions(
+        values,
+        style,
+        unit,
+        480.0,
+        cosmic::iced::Length::Fill,
+        Some("Start".to_string()),
+    )
 }
 
 fn graph_visual_with_dimensions(
@@ -523,6 +538,7 @@ fn graph_visual_with_dimensions(
     unit: &str,
     graph_height: f64,
     widget_height: cosmic::iced::Length,
+    axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
     let current_value = values.last().copied().unwrap_or(0.0);
@@ -548,7 +564,10 @@ fn graph_visual_with_dimensions(
             })
             .collect()
     };
-    let y = |v: f64| height - 4.0 - ((v - minimum) / range) * (height - 8.0);
+    let plot_top = 4.0;
+    let plot_bottom = height - 4.0;
+    let plot_height = plot_bottom - plot_top;
+    let y = |v: f64| plot_bottom - ((v - minimum) / range) * plot_height;
     let drawing = if style == "bar" {
         let slot = WIDTH / COUNT as f64;
         samples.iter().enumerate().map(|(i,v)| {
@@ -572,14 +591,14 @@ fn graph_visual_with_dimensions(
     const GRID_COLUMNS: usize = 6;
     let horizontal_grid = (1..GRID_ROWS)
         .map(|row| {
-            let y = row as f64 * height / GRID_ROWS as f64;
+            let y = plot_top + row as f64 * plot_height / GRID_ROWS as f64;
             format!("M0 {y:.2}H{WIDTH}")
         })
         .collect::<Vec<_>>();
     let vertical_grid = (1..GRID_COLUMNS)
         .map(|column| {
             let x = column as f64 * WIDTH / GRID_COLUMNS as f64;
-            format!("M{x:.2} 0V{height}")
+            format!("M{x:.2} {plot_top:.2}V{plot_bottom:.2}")
         })
         .collect::<Vec<_>>();
     let grid = horizontal_grid
@@ -587,9 +606,8 @@ fn graph_visual_with_dimensions(
         .chain(vertical_grid)
         .collect::<Vec<_>>()
         .join(" ");
-    let baseline = height - 2.0;
     let svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {height}\" preserveAspectRatio=\"none\"><title>{current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.18\" stroke-width=\"0.6\"/><path d=\"M0 {baseline}H{WIDTH}\" stroke=\"#808080\" stroke-opacity=\"0.35\"/>{drawing}</svg>"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {height}\" preserveAspectRatio=\"none\"><title>Power over time. Maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.18\" stroke-width=\"0.6\"/><path d=\"M0 {plot_top:.2}V{plot_bottom:.2}H{WIDTH}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.45\" stroke-width=\"1\"/>{drawing}</svg>"
     );
     let graph = widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
         svg.into_bytes(),
@@ -597,23 +615,27 @@ fn graph_visual_with_dimensions(
     .width(cosmic::iced::Length::Fill)
     .height(widget_height);
 
-    let mut content = widget::Column::new()
-        .spacing(8)
-        .push(
-            widget::Row::new()
-                .width(cosmic::iced::Length::Fill)
-                .push(widget::text::caption(format!("MIN {minimum:.1} {unit}")))
-                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
-        )
-        .push(graph);
+    let axis_values = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(widget::text::caption(format!("POWER ({unit})")).width(cosmic::iced::Length::Fill))
+        .push(widget::text::caption(format!("MAX {maximum:.1} {unit}")))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(12.0)))
+        .push(widget::text::caption(format!("CURRENT {current_value:.1} {unit}")));
+    let x_axis = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(widget::text::caption("TIME"))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(8.0)))
+        .push(widget::text::caption(axis_start.unwrap_or_else(|| "Start".to_string())))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+        .push(widget::text::caption("Now"));
+    let content = widget::Column::new()
+        .spacing(6)
+        .push(axis_values)
+        .push(graph)
+        .push(x_axis);
     if matches!(widget_height, cosmic::iced::Length::Fill) {
-        content = content.push(
-            widget::Column::new()
-                .spacing(2)
-                .push(widget::text::caption("CURRENT"))
-                .push(widget::text(format!("{current_value:.1} {unit}"))),
-        );
         content.height(cosmic::iced::Length::Fill).into()
     } else {
         content.into()
@@ -663,22 +685,12 @@ fn interactive_graph_inner(
                     "Open graph",
                 ))),
         )
-        .push(graph_visual(values.iter().copied(), style, unit));
-    if let Some(axis_start) = axis_start {
-        graph = graph.push(
-            widget::Row::new()
-                .width(cosmic::iced::Length::Fill)
-                .push(widget::text::caption(axis_start))
-                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                .push(widget::text::caption("Now")),
-        );
-    }
-    graph = graph.push(
-        widget::Column::new()
-            .spacing(2)
-            .push(widget::text::caption("CURRENT"))
-            .push(widget::text(format!("{current_value:.1} {unit}"))),
-    );
+        .push(graph_visual(
+            values.iter().copied(),
+            style,
+            unit,
+            axis_start,
+        ));
     widget::button::custom(graph)
         .on_press(Message::ShowGraph(
             title.to_string(),
