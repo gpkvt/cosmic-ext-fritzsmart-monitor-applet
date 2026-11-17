@@ -88,7 +88,7 @@ for page in pages:
         if parser.gallery_images != 1:
             fail(f"index.html: expected one gallery image element, found {parser.gallery_images}")
         safeguard_icons = re.findall(
-            r'<div class="detail-icon"[^>]*>\s*<img src="icons/([a-z-]+\\.svg)" alt="" width="28" height="28"></div>',
+            r'<div class="detail-icon"[^>]*>\s*<img src="icons/([a-z-]+\.svg)" alt="" width="28" height="28"></div>',
             content,
         )
         expected_icons = {
