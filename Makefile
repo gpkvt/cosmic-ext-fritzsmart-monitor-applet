@@ -9,7 +9,7 @@ ICON_FILE := $(DATADIR)/icons/hicolor/scalable/apps/$(APP_ID).svg
 
 UPDATE ?= 1
 
-.PHONY: build update install reload uninstall
+.PHONY: build update install reload uninstall repo-help publish-pages publish-release build-release workflows workflow-runs workflow-watch
 
 build:
 	cargo build --release
@@ -39,3 +39,25 @@ reload:
 
 uninstall:
 	rm -f "$(BINDIR)/$(APP_NAME)" "$(DESKTOP_FILE)" "$(ICON_FILE)"
+
+repo-help:
+	@bash scripts/repo.sh help
+
+publish-pages:
+	@bash scripts/repo.sh publish-pages
+
+publish-release:
+	@bash scripts/repo.sh publish-release "$(or $(BUMP),patch)"
+
+build-release:
+	@bash scripts/repo.sh build-release "$(or $(REF),main)"
+
+workflows:
+	@bash scripts/repo.sh workflows
+
+workflow-runs:
+	@bash scripts/repo.sh runs $(if $(WORKFLOW),$(WORKFLOW),)
+
+workflow-watch:
+	@test -n "$(RUN_ID)" || { echo "Usage: make workflow-watch RUN_ID=<id>" >&2; exit 2; }
+	@bash scripts/repo.sh watch "$(RUN_ID)"
