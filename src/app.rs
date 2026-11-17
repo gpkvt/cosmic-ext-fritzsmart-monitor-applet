@@ -295,7 +295,9 @@ fn cpu_temperature_c() -> Option<f64> {
     let hwmon = std::fs::read_dir("/sys/class/hwmon").ok()?;
     for device in hwmon.flatten() {
         let name = std::fs::read_to_string(device.path().join("name"))
-            .unwrap_or_default().trim().to_ascii_lowercase();
+            .unwrap_or_default()
+            .trim()
+            .to_ascii_lowercase();
         if !["coretemp", "k10temp", "zenpower", "cpu_thermal"].contains(&name.as_str()) {
             continue;
         }
@@ -304,18 +306,28 @@ fn cpu_temperature_c() -> Option<f64> {
         };
         for entry in entries.flatten() {
             let file_name = entry.file_name().to_string_lossy().to_string();
-            if !file_name.starts_with("temp") || !file_name.ends_with("_input") { continue; }
-            let label_path = entry.path().with_file_name(
-                format!("{}_label", file_name.trim_end_matches("_input")),
-            );
+            if !file_name.starts_with("temp") || !file_name.ends_with("_input") {
+                continue;
+            }
+            let label_path = entry
+                .path()
+                .with_file_name(format!("{}_label", file_name.trim_end_matches("_input")));
             let label = std::fs::read_to_string(label_path)
-                .unwrap_or_default().trim().to_ascii_lowercase();
-            let preferred = ["package", "tctl", "tdie", "cpu"].iter().any(|part| label.contains(part));
-            if !preferred && !(label.is_empty() && file_name == "temp1_input") { continue; }
+                .unwrap_or_default()
+                .trim()
+                .to_ascii_lowercase();
+            let preferred = ["package", "tctl", "tdie", "cpu"]
+                .iter()
+                .any(|part| label.contains(part));
+            if !preferred && !(label.is_empty() && file_name == "temp1_input") {
+                continue;
+            }
             if let Ok(raw) = std::fs::read_to_string(entry.path()) {
                 if let Ok(value) = raw.trim().parse::<f64>() {
                     let temperature = value / 1000.0;
-                    if (-20.0..=150.0).contains(&temperature) { return Some(temperature); }
+                    if (-20.0..=150.0).contains(&temperature) {
+                        return Some(temperature);
+                    }
                 }
             }
         }
@@ -4258,14 +4270,21 @@ impl cosmic::Application for AppModel {
                 let cpu_temperature = cpu_temperature_c();
                 let cpu_temperature_label = cpu_temperature
                     .map(|temperature| format!("{temperature:.1} °C"))
-                    .unwrap_or_else(|| crate::i18n::tr(&self.settings.language, "Not available").to_string());
+                    .unwrap_or_else(|| {
+                        crate::i18n::tr(&self.settings.language, "Not available").to_string()
+                    });
                 content = content
                     .push(widget::divider::horizontal::default())
-                    .push(widget::text::title3(crate::i18n::tr(&self.settings.language, "System")))
+                    .push(widget::text::title3(crate::i18n::tr(
+                        &self.settings.language,
+                        "System",
+                    )))
                     .push(diagnostic_status_row(
                         crate::i18n::tr(&self.settings.language, "CPU temperature"),
                         &cpu_temperature_label,
-                        cpu_temperature.map(|temperature| Some(temperature < 90.0)).unwrap_or(None),
+                        cpu_temperature
+                            .map(|temperature| Some(temperature < 90.0))
+                            .unwrap_or(None),
                     ))
                     .push(widget::divider::horizontal::default());
                 content = content
@@ -4374,13 +4393,18 @@ impl cosmic::Application for AppModel {
                             widget::Row::new()
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::text::body(reading.name.clone()).width(cosmic::iced::Length::Fill))
+                                .push(
+                                    widget::text::body(reading.name.clone())
+                                        .width(cosmic::iced::Length::Fill),
+                                )
                                 .push(widget::text::body(format!("{:.0} W", reading.power_w)))
-                                .push(widget::text::caption(format!("{:.1} °C · {state}", reading.temperature_c))),
+                                .push(widget::text::caption(format!(
+                                    "{:.1} °C · {state}",
+                                    reading.temperature_c
+                                ))),
                         );
                     }
                 }
-
 
                 content = content.push(widget::divider::horizontal::default()).push(
                     widget::text::title3(crate::i18n::tr(
