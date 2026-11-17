@@ -92,10 +92,10 @@ fn weather_code_description(code: u8) -> &'static str {
         45 | 48 => "Fog",
         51 => "Light drizzle",
         53 => "Drizzle",
-        55 | 56 | 57 => "Dense drizzle",
+        55..=57 => "Dense drizzle",
         61 => "Light rain",
         63 => "Rain",
-        65 | 66 | 67 => "Heavy rain",
+        65..=67 => "Heavy rain",
         71 => "Light snow",
         73 => "Snow",
         75 | 77 => "Heavy snow",
@@ -300,10 +300,11 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
     let image_attribution = image_attributions.first().cloned();
     // At night, never substitute an unrelated image when Commons cannot
     // provide a credible match. Use a locally generated star field instead.
-    if icon_code.ends_with('n') && background_images.is_empty() {
-        if let Some(stars) = generate_starry_night_background() {
-            background_images.push(stars);
-        }
+    if icon_code.ends_with('n')
+        && background_images.is_empty()
+        && let Some(stars) = generate_starry_night_background()
+    {
+        background_images.push(stars);
     }
     let background_image = background_images.first().cloned();
     // The applet builds its slideshow with the user's configured display duration.
@@ -757,7 +758,7 @@ pub fn build_weather_slideshow_frames(
         {
             frames.push(output.into_inner());
             let frame_index = frames.len() - 1;
-            sequence.extend(std::iter::repeat(frame_index).take(hold_ticks));
+            sequence.extend(std::iter::repeat_n(frame_index, hold_ticks));
             frame_sources.push(vec![index]);
         }
         if decoded.len() < 2 {
