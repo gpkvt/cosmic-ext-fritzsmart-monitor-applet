@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: rustfmt-main
@@ -49,3 +50,9 @@ jobs:
           git add -- '*.rs'
           git commit -m "style(rustfmt): format Rust sources"
           git push origin HEAD:main
+
+          # GITHUB_TOKEN pushes do not trigger push workflows. Explicitly run
+          # the quality suite against the newly formatted main commit.
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/quality.yml/dispatches" \
+            -f ref=main
