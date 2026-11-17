@@ -2052,6 +2052,7 @@ impl cosmic::Application for AppModel {
         (
             Self {
                 core,
+                selected_ains: settings.ains.clone(),
                 settings,
                 settings_open: setup_assistant,
                 setup_assistant,
@@ -2605,9 +2606,9 @@ impl cosmic::Application for AppModel {
                 }
                 actions = actions.push(widget::Space::new().width(cosmic::iced::Length::Fill));
                 if self.setup_step >= 4 {
-                    actions = actions.push(widget::button::suggested("Finish").on_press(Message::SetupFinish));
+                    actions = actions.push(widget::button::text("Finish").on_press(Message::SetupFinish));
                 } else {
-                    actions = actions.push(widget::button::suggested(if self.setup_step == 3 { "Finish setup" } else { "Continue" }).on_press(if self.setup_step == 3 { Message::SetupFinish } else { Message::SetupNext }));
+                    actions = actions.push(widget::button::text(if self.setup_step == 3 { "Finish setup" } else { "Continue" }).on_press(if self.setup_step == 3 { Message::SetupFinish } else { Message::SetupNext }));
                 }
                 content = content.push(actions);
             } else if self.active_settings_section.is_some() {
