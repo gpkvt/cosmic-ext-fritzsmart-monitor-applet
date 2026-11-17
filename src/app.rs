@@ -5084,11 +5084,8 @@ impl cosmic::Application for AppModel {
                 self.persist_settings();
             }
             Message::LanguageChanged(language) => {
-                self.settings.language = match language.as_str() {
-                    "de" => "de".into(),
-                    "en" => "en".into(),
-                    _ => "system".into(),
-                };
+                self.settings.language =
+                    crate::i18n::language_setting(&language).to_string();
                 self.persist_settings();
             }
             Message::ToggleSettings => {
