@@ -2247,7 +2247,7 @@ impl cosmic::Application for AppModel {
                 .max()
                 .unwrap_or_default() as f32
                 * font_size
-                * 0.62;
+                * 0.72;
             let width = width.max(font_size);
 
             let text = self
@@ -2517,7 +2517,7 @@ impl cosmic::Application for AppModel {
                     if self.settings.panel_multiline {
                         widget::Column::new()
                             .spacing(0)
-                            .align_x(cosmic::iced::Alignment::Start)
+                            .align_x(cosmic::iced::Alignment::End)
                             .push(bandwidth_row("Download", "go-down-symbolic", download))
                             .push(bandwidth_row("Upload", "go-up-symbolic", upload))
                             .into()
