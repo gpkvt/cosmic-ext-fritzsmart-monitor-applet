@@ -2244,8 +2244,17 @@ impl cosmic::Application for AppModel {
             } else {
                 24.0
             };
+            // Paired multiline rows share their group's available width so
+            // their value columns end at the same right edge. Standalone
+            // readings retain their natural width to avoid pushing later items
+            // out of the panel.
+            let align_value_column = self.settings.panel_multiline && !icon_at_top;
             let mut item = widget::Row::new()
-                .width(cosmic::iced::Length::Shrink)
+                .width(if align_value_column {
+                    cosmic::iced::Length::Fill
+                } else {
+                    cosmic::iced::Length::Shrink
+                })
                 .spacing(5)
                 .align_y(if icon_at_top {
                     cosmic::iced::Alignment::Start
@@ -2267,10 +2276,15 @@ impl cosmic::Application for AppModel {
                     .center_y(icon_height as u16);
                 item = item.push(icon_column);
             }
-            // Keep the value shrink-wrapped so it cannot consume the space
-            // needed by subsequent readings. Multiline values start at the
-            // same top edge as their icon; single-line values are centered.
-            let mut value = widget::container(value).width(cosmic::iced::Length::Shrink);
+            // Paired rows put flexible space between the left-aligned icon
+            // and the right-aligned value. This makes the numeric values share
+            // a common right edge without widening standalone panel items.
+            if align_value_column {
+                item = item.push(widget::Space::new().width(cosmic::iced::Length::Fill));
+            }
+            let mut value = widget::container(value)
+                .width(cosmic::iced::Length::Shrink)
+                .align_x(cosmic::iced::Alignment::End);
             if !icon_at_top {
                 value = value.center_y(item_height as u16);
             }
