@@ -16,7 +16,7 @@ FRITZ!Power Monitor verbindet sich direkt mit deiner FRITZ!Box. Es zeigt Haushal
 - Optionale Wetterbedingungen und Vorhersagen von OpenWeatherMap sowie passende Bildmotive von Wikimedia Commons.
 - Konfigurierbare Aktualisierungsintervalle, Diagramm-Aufbewahrung, Panelanzeige und Menüanordnung.
 - Temperaturwarnungen und Steuerung unterstützter Smart-Home-Schalter.
-- Übersetzungen für Englisch, Deutsch, Spanisch, Niederländisch, Französisch, Italienisch, Schwedisch, Portugiesisch, Polnisch, Dänisch und Norwegisch. Noch nicht übersetzte Texte werden auf Englisch angezeigt.
+- Vollständige Übersetzungen der Benutzeroberfläche für Englisch, Deutsch, Spanisch, Niederländisch, Französisch, Italienisch, Schwedisch, Portugiesisch, Polnisch, Dänisch, Norwegisch, Japanisch und Koreanisch.
 
 ## Bildschirmfotos
 
