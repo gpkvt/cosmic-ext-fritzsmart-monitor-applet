@@ -686,7 +686,7 @@ fn interactive_graph_inner(
     axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
-    let mut graph = widget::Column::new()
+    let graph = widget::Column::new()
         .spacing(6)
         .push(
             widget::Row::new()
