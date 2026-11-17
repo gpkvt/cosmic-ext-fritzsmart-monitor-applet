@@ -3,6 +3,7 @@
 
 from html import escape
 from pathlib import Path
+import os
 import re
 import shutil
 
@@ -76,7 +77,7 @@ def sync_package_download_version() -> None:
         raise RuntimeError("Could not read [package].version from Cargo.toml")
     index = DOCS / "index.html"
     content = index.read_text(encoding="utf-8")
-    version = match.group(1)
+    version = os.environ.get("APP_RELEASE_VERSION", match.group(1))
     if "@APP_VERSION@" in content:
         content = content.replace("@APP_VERSION@", version)
         index.write_text(content, encoding="utf-8")
