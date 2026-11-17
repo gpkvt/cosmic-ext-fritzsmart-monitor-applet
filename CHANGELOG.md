@@ -2,6 +2,10 @@
 
 ## [17.11.2026]
 
+### Fixed
+
+- Replaced a full-vector `extend(drain(..))` with `append` in panel-item ordering to satisfy Clippy's `extend_with_drain` lint.
+
 ### Added
 
 - Added a 2 px progress line beneath the weather background image to show the time remaining until the next weather and image refresh.
