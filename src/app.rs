@@ -2157,13 +2157,15 @@ impl cosmic::Application for AppModel {
             if energy_flow_values(&self.readings, &self.settings.input_ains).is_some() {
                 subscriptions.push(Subscription::run(flow_animation_ticks));
             }
-            if self
-                .weather
-                .as_ref()
-                .is_some_and(|weather| !weather.slideshow_sequence.is_empty())
+            if self.next_weather_image_fetch_at.is_some()
+                || self
+                    .weather
+                    .as_ref()
+                    .is_some_and(|weather| !weather.slideshow_sequence.is_empty())
             {
-                // Keep the deadline timer active even with a single background
-                // image: that image still needs to be replaced when its hold ends.
+                // Keep the timer active both when a slideshow exists and when
+                // the initial weather response had no usable image. The latter
+                // still needs its deadline to trigger a background-image retry.
                 subscriptions.push(Subscription::run(weather_slideshow_ticks));
             }
         }

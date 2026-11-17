@@ -1,6 +1,9 @@
 use reqwest::Client;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::LazyLock;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
+
+static COMMONS_SEARCH_OFFSET: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CommonsAttribution {
@@ -638,8 +641,10 @@ async fn fetch_commons_background(
     let mut images = Vec::new();
     let mut seen_titles = std::collections::HashSet::new();
     let mut attributions = Vec::new();
-    // Search every condition-specific phrase. Avoid rotating through arbitrary
-    // result offsets, which admitted unrelated files into the slideshow.
+    // Advance by a full result page for every fetch. A wall-clock bucket made
+    // repeated short slideshow intervals reuse the same search results.
+    let search_offset = COMMONS_SEARCH_OFFSET.fetch_add(20, Ordering::Relaxed) % 480;
+    // Search every condition-specific phrase and keep the title relevance filter.
     for variant in 0..commons_search_terms(icon_code).len() {
         let search = commons_search_term(icon_code, variant);
         let response = client
@@ -653,17 +658,7 @@ async fn fetch_commons_background(
                 // Wikimedia's search ranking is stable. Advance through
                 // result windows so successive slideshow refreshes can show
                 // different relevant photographs instead of the same first hits.
-                (
-                    "gsroffset",
-                    &((SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs()
-                        / 30
-                        * 5)
-                        % 1000)
-                        .to_string(),
-                ),
+                ("gsroffset", &search_offset.to_string()),
                 ("prop", "imageinfo|categories"),
                 ("iiprop", "url|extmetadata"),
                 ("cllimit", "20"),
