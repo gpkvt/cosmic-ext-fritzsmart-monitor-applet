@@ -6246,20 +6246,25 @@ impl cosmic::Application for AppModel {
             }
             Message::WeatherImageCountdownTick => {}
             Message::WeatherSlideshowTick => {
-                if self.popup.is_some()
-                    && let Some(weather) = &self.weather
-                    && !weather.slideshow_sequence.is_empty()
-                {
-                    let current = self.weather_slideshow_index % weather.slideshow_sequence.len();
-                    let next = (current + 1) % weather.slideshow_sequence.len();
-                    let current_frame = weather.slideshow_sequence[current];
-                    let next_frame = weather.slideshow_sequence[next];
-                    let current_sources = weather.slideshow_frame_sources.get(current_frame);
-                    let next_sources = weather.slideshow_frame_sources.get(next_frame);
-                    let image_timeout = current_sources.is_some_and(|sources| sources.len() == 1)
-                        && next_sources.is_some_and(|sources| sources.len() == 2);
-                    self.weather_slideshow_index = next;
-                    if image_timeout && !self.weather_images_loading {
+                if self.popup.is_some() {
+                    // Advance the visual slideshow independently of image fetching.
+                    // Fetching must be driven by the configured deadline, not by
+                    // detecting a crossfade frame: a single image or mismatched
+                    // image dimensions may have no crossfade frames at all.
+                    if let Some(weather) = &self.weather
+                        && !weather.slideshow_sequence.is_empty()
+                    {
+                        self.weather_slideshow_index = (self.weather_slideshow_index + 1)
+                            % weather.slideshow_sequence.len();
+                    }
+
+                    let image_fetch_due = self
+                        .next_weather_image_fetch_at
+                        .is_some_and(|deadline| Instant::now() >= deadline);
+                    if image_fetch_due
+                        && !self.weather_images_loading
+                        && let Some(weather) = &self.weather
+                    {
                         self.weather_images_loading = true;
                         // Keep the line at zero during the network request.
                         self.next_weather_image_fetch_at = None;

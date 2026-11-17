@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- Trigger weather background image reloads directly from the configured slideshow deadline instead of relying on crossfade-frame detection, so refresh also works with a single image or images with differing dimensions.
+
+### Fixed
+
 - Animate the weather background countdown as a low-overhead 10 fps sweep over the full image duration; hold it at zero during image fetching and restart after the request completes.
 
 ### Fixed
