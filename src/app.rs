@@ -4112,10 +4112,14 @@ impl cosmic::Application for AppModel {
                                     widget::Column::new()
                                         .width(cosmic::iced::Length::Fixed(82.0))
                                         .align_x(cosmic::iced::Alignment::End)
-                                        .push(widget::text::body(format!(
-                                            "{:.0} °C\n{:.0} °C",
-                                            day.max_temperature_c, day.min_temperature_c
-                                        ))),
+                                        .push(
+                                            widget::text::body(format!(
+                                                "{:.0} °C\n{:.0} °C",
+                                                day.max_temperature_c, day.min_temperature_c
+                                            ))
+                                            .width(cosmic::iced::Length::Fill)
+                                            .align_x(cosmic::iced::Alignment::End),
+                                        ),
                                 )
                                 .push(
                                     widget::Column::new()
