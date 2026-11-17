@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- Removed the residual vertical gap between the two lines of multiline panel values while preserving the configured font size.
+
+## [17.11.2026]
+
+### Fixed
+
 - Aligned the unit line of split panel values directly beneath the number, without adding a second indentation on top of the icon column.
 
 ## [17.11.2026]
