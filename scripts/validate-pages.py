@@ -87,9 +87,20 @@ for page in pages:
             fail(f"index.html: missing gallery elements: {', '.join(sorted(missing))}")
         if parser.gallery_images != 1:
             fail(f"index.html: expected one gallery image element, found {parser.gallery_images}")
-        safeguard_icons = re.findall(r'<div class="detail-icon"[^>]*>\s*<span>.+?</span>\s*</div>', content)
-        if len(safeguard_icons) != 6:
-            fail(f"index.html: expected six visible safeguard icons, found {len(safeguard_icons)}")
+        safeguard_icons = re.findall(
+            r'<div class="detail-icon"[^>]*>\s*<img src="icons/([a-z-]+\\.svg)" alt="" width="28" height="28"></div>',
+            content,
+        )
+        expected_icons = {
+            "shield-check.svg",
+            "lock.svg",
+            "refresh-cw.svg",
+            "check-circle.svg",
+            "thermometer.svg",
+            "chart-line.svg",
+        }
+        if set(safeguard_icons) != expected_icons or len(safeguard_icons) != 6:
+            fail("index.html: safeguard icons must use all six dedicated SVG image assets")
         if not re.search(r"event\.key\s*===\s*['\"]ArrowLeft['\"]", content):
             fail("index.html: left-arrow keyboard navigation is missing")
         if not re.search(r"event\.key\s*===\s*['\"]ArrowRight['\"]", content):
