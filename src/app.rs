@@ -141,6 +141,7 @@ pub enum Message {
     TestNotification,
     CopyDiagnosticUrl(String),
     ClearDiagnosticEvents,
+    WriteDebugFile,
     FetchForecastFromDiagnostics,
     CheckLatestVersion,
     LatestVersionChecked(Result<String, String>),
@@ -174,6 +175,97 @@ fn record_diagnostic_event(events: &mut VecDeque<String>, message: impl Into<Str
     while events.len() > 60 {
         events.pop_front();
     }
+}
+
+fn build_debug_report(app: &AppModel) -> String {
+    let settings = &app.settings;
+    let connection_url = reqwest::Url::parse(&settings.url)
+        .map(|mut url| {
+            let _ = url.set_username("");
+            let _ = url.set_password(None);
+            url.set_query(None);
+            url.set_fragment(None);
+            url.to_string()
+        })
+        .unwrap_or_else(|_| "<invalid or unset>".into());
+    let os_release = std::fs::read_to_string("/etc/os-release")
+        .ok()
+        .and_then(|contents| {
+            contents
+                .lines()
+                .find(|line| line.starts_with("PRETTY_NAME="))
+                .map(|line| line.trim_start_matches("PRETTY_NAME=").trim_matches('"').to_string())
+        })
+        .unwrap_or_else(|| "Unknown".into());
+    let readings = if app.readings.is_empty() {
+        "None".to_string()
+    } else {
+        app.readings
+            .iter()
+            .map(|reading| {
+                let masked_ain = if reading.ain.len() > 4 {
+                    format!("…{}", &reading.ain[reading.ain.len() - 4..])
+                } else {
+                    "redacted".into()
+                };
+                format!(
+                    "- {} (AIN {masked_ain}): {} W, {:.1} °C, power state {:?}",
+                    reading.name, reading.power_w, reading.temperature_c, reading.power_state
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let requests = crate::fritz::http_request_diagnostics();
+    let request_log = if requests.is_empty() {
+        "None".to_string()
+    } else {
+        requests
+            .iter()
+            .map(|request| {
+                format!(
+                    "{} · {} · {} {} · {}",
+                    request.timestamp,
+                    request.method,
+                    if request.https { "HTTPS" } else { "HTTP" },
+                    request.status,
+                    request.path
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let activity = if app.diagnostic_events.is_empty() {
+        "None".to_string()
+    } else {
+        app.diagnostic_events.iter().cloned().collect::<Vec<_>>().join("\n")
+    };
+    let history_diagnostics = serde_json::to_string_pretty(&app.history_storage_diagnostics)
+        .unwrap_or_else(|error| format!("Could not serialize history diagnostics: {error}"));
+    format!(
+        "FRITZ!Power Monitor debug report\nGenerated: {}\nApplication version: {}\nOperating system: {}\n\n[Connection]\nFRITZ!Box URL: {}\nUsername configured: {}\nPassword configured: {}\nInvalid certificates allowed: {}\nCustom CA configured: {}\nLast FRITZ!Box error: {}\n\n[Weather]\nEnabled: {}\nLast weather error: {}\nForecast error: {}\n\n[Settings]\nRefresh interval: {} seconds\nGraph range: {} minutes\nGraph style: {}\nSelected devices: {}\nDiscovered devices: {}\n\n[Current readings]\n{}\n\n[HTTP requests]\n{}\n\n[Diagnostic activity]\n{}\n\n[History storage diagnostics]\n{}\n",
+        chrono::Local::now().format("%Y-%m-%d %H:%M:%S %:z"),
+        env!("APP_VERSION"),
+        os_release,
+        connection_url,
+        !settings.username.is_empty(),
+        !settings.password.is_empty(),
+        settings.allow_invalid_certs,
+        !settings.ca_cert_path.is_empty(),
+        app.error.as_deref().unwrap_or("None"),
+        settings.weather_enabled,
+        app.weather_error.as_deref().unwrap_or("None"),
+        app.weather_forecast_error.as_deref().unwrap_or("None"),
+        settings.refresh_interval_seconds,
+        settings.graph_timespan_minutes,
+        settings.graph_style,
+        settings.ains.len(),
+        app.devices.len(),
+        readings,
+        request_log,
+        activity,
+        history_diagnostics
+    )
 }
 
 fn device_matches_search(device: &FritzDevice, query: &str) -> bool {
@@ -4413,6 +4505,15 @@ impl cosmic::Application for AppModel {
                     }
                 }
                 content = content.push(action_button(
+                    "document-save-symbolic",
+                    crate::i18n::tr(&self.settings.language, "Write debug.txt"),
+                    Message::WriteDebugFile,
+                ));
+                content = content.push(widget::text::caption(crate::i18n::tr(
+                    &self.settings.language,
+                    "Writes a diagnostic report to ~/debug.txt. Passwords and API keys are excluded.",
+                )));
+                content = content.push(action_button(
                     "edit-clear-all-symbolic",
                     crate::i18n::tr(&self.settings.language, "Clear activity"),
                     Message::ClearDiagnosticEvents,
@@ -6382,6 +6483,27 @@ impl cosmic::Application for AppModel {
                     &mut self.diagnostic_events,
                     "Diagnostic activity log cleared.",
                 );
+            }
+            Message::WriteDebugFile => {
+                record_diagnostic_event(
+                    &mut self.diagnostic_events,
+                    "Debug report export requested.",
+                );
+                let report = build_debug_report(self);
+                let path = std::env::var_os("HOME")
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
+                    .join("debug.txt");
+                match std::fs::write(&path, report) {
+                    Ok(()) => record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        format!("Debug report written to {}.", path.display()),
+                    ),
+                    Err(error) => record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        format!("Could not write debug report to {}: {error}", path.display()),
+                    ),
+                }
             }
             Message::TestNotification => {
                 record_diagnostic_event(
