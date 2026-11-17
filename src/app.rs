@@ -2115,36 +2115,38 @@ impl cosmic::Application for AppModel {
             }
 
             if self.active_settings_section == Some("language") {
-                let language_button = |label: &'static str, code: &'static str| {
-                    widget::button::custom(widget::text::body(label))
-                        .on_press(Message::LanguageChanged(code.into()))
-                        .class(cosmic::theme::Button::Standard)
-                };
+                let language_options = [
+                    ("System default", "system"),
+                    ("English", "en"),
+                    ("German", "de"),
+                    ("Spanish", "es"),
+                    ("Dutch", "nl"),
+                    ("French", "fr"),
+                    ("Italian", "it"),
+                    ("Swedish", "sv"),
+                    ("Portuguese", "pt"),
+                    ("Polish", "pl"),
+                    ("Danish", "da"),
+                    ("Norwegian", "no"),
+                    ("Japanese", "ja"),
+                    ("Korean", "ko"),
+                ];
+                let language_labels: Vec<String> = language_options
+                    .iter()
+                    .map(|(label, _)| crate::i18n::tr(&self.settings.language, label).to_string())
+                    .collect();
+                let selected_language = language_options
+                    .iter()
+                    .position(|(_, code)| *code == self.settings.language)
+                    .or_else(|| (self.settings.language == "system").then_some(0));
                 content = content
                     .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Interface language")))
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.")))
-                    .push(widget::Column::new().spacing(8)
-                        .push(widget::Row::new().spacing(8)
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "System default"), "system"))
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "English"), "en")))
-                        .push(widget::Row::new().spacing(8)
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "German"), "de"))
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "Spanish"), "es")))
-                        .push(widget::Row::new().spacing(8)
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "Dutch"), "nl"))
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "French"), "fr")))
-                        .push(widget::Row::new().spacing(8)
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "Italian"), "it"))
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "Swedish"), "sv")))
-                        .push(widget::Row::new().spacing(8)
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "Portuguese"), "pt"))
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "Polish"), "pl")))
-                        .push(widget::Row::new().spacing(8)
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "Danish"), "da"))
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "Norwegian"), "no")))
-                        .push(widget::Row::new().spacing(8)
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "Japanese"), "ja"))
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "Korean"), "ko"))))
+                    .push(widget::dropdown::dropdown(
+                        language_labels,
+                        selected_language,
+                        |index| Message::LanguageChanged(language_options[index].1.to_string()),
+                    ).width(Length::Fill))
                     .push(widget::divider::horizontal::default());
             }
             if self.active_settings_section == Some("panel") {
