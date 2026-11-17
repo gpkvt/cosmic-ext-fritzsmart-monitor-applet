@@ -357,10 +357,9 @@ fn parse_settings_section(value: &str) -> String {
 }
 
 fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
-    const SECTION_IDS: [&str; 14] = [
+    const SECTION_IDS: [&str; 9] = [
         "summary", "weather", "internet-bandwidth", "total-power-output", "total-power-input", "current-power-history",
-        "graph-current-power", "graph-current-temperature", "graph-total-power-output", "graph-total-output-temperature", "graph-total-power-input", "graph-total-input-temperature",
-        "graph-bandwidth-download", "graph-bandwidth-upload",
+        "graph-total-output-pair", "graph-total-input-pair", "graph-bandwidth-pair",
     ];
     value
         .split(',')
@@ -1353,7 +1352,7 @@ mod tests {
     #[test]
     fn parses_persisted_collapsed_menu_sections_safely() {
         assert_eq!(
-            parse_collapsed_menu_sections("weather,unknown,summary,weather,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature"),
+            parse_collapsed_menu_sections("weather,unknown,summary,weather,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature,graph-total-output-pair,graph-total-input-pair,graph-bandwidth-pair"),
             vec![
                 "weather".to_string(),
                 "summary".to_string(),
@@ -1361,12 +1360,9 @@ mod tests {
                 "total-power-output".to_string(),
                 "total-power-input".to_string(),
                 "current-power-history".to_string(),
-                "graph-current-power".to_string(),
-                "graph-current-temperature".to_string(),
-                "graph-total-power-output".to_string(),
-                "graph-total-output-temperature".to_string(),
-                "graph-total-power-input".to_string(),
-                "graph-total-input-temperature".to_string(),
+                "graph-total-output-pair".to_string(),
+                "graph-total-input-pair".to_string(),
+                "graph-bandwidth-pair".to_string(),
             ]
         );
         assert!(parse_collapsed_menu_sections("").is_empty());
