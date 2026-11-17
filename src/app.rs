@@ -976,7 +976,7 @@ fn total_power_overview(
     let axis_start = format_graph_axis_start(
         settings.graph_timespan_minutes,
         history.front().map(|(timestamp, _)| {
-            Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)
+            Instant::now().duration_since(*timestamp).as_secs() / 60
         }),
     );
 
@@ -3510,7 +3510,7 @@ impl cosmic::Application for AppModel {
                     format_graph_axis_start(
                         self.settings.graph_timespan_minutes,
                         self.history.front().map(|(timestamp, _)| {
-                            Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)
+                            Instant::now().duration_since(*timestamp).as_secs() / 60
                         }),
                     ),
                 );
@@ -5640,6 +5640,7 @@ mod history_tests {
         assert_eq!(format_graph_axis_start(1440, Some(180)), "3h ago");
         assert_eq!(format_graph_axis_start(1440, Some(1500)), "1d ago");
         assert_eq!(format_graph_axis_start(2880, Some(1590)), "1d 2h 30m ago");
+        assert_eq!(format_graph_axis_start(4320, Some(3032)), "2d 2h 32m ago");
         assert_eq!(format_graph_axis_start(90, Some(35)), "35m ago");
         assert_eq!(format_graph_axis_start(60, None), "1h ago");
         assert_eq!(format_graph_axis_start(2_102_400, Some(60)), "1h ago");
