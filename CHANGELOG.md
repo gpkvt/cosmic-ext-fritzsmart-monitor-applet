@@ -8,6 +8,8 @@ Changes are tracked in date-based entries. See the [GitHub Releases](https://git
 
 ### Added
 
+- Added an optional outdoor-temperature source that uses a selected FRITZ!Box device sensor instead of OpenWeatherMap's reported temperature.
+
 - Added a first-run setup assistant for FRITZ!Box credentials, device discovery and optional weather configuration ([#498](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/498)).
 - Added an animated solar/grid energy-flow view showing household consumption, solar generation, self-consumption and grid import/export ([#461](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/461)).
 - Added one-click application updates in Diagnostics for Flatpak, Debian packages, AppImages and source checkouts, with checksum verification where applicable ([#464](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/464)).
