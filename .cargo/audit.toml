@@ -1,0 +1,21 @@
+# Explicit exceptions for transitive dependencies pinned by the current
+# libcosmic/desktop stack. Keep these IDs specific: new advisories must still
+# fail the security workflow and every exception should be reviewed on updates.
+[advisories]
+ignore = [
+    # Unmaintained upstream crates with no fixed release in the RustSec database.
+    "RUSTSEC-2026-0374", # basic-toml, via i18n-config
+    "RUSTSEC-2026-0543", # chrono, current RustSec unmaintained advisory
+    "RUSTSEC-2024-0436", # paste, via target-specific metal dependency
+    "RUSTSEC-2026-0206", # rustybuzz, via usvg
+    "RUSTSEC-2026-0192", # ttf-parser, via fontdb/rustybuzz
+    "RUSTSEC-2026-0371", # zbus_names, via the desktop accessibility stack
+    "RUSTSEC-2026-0370", # zvariant, via the desktop accessibility stack
+    "RUSTSEC-2026-0372", # zvariant_derive, via zvariant
+
+    # Unsoundness advisories in transitive desktop dependencies. The versions
+    # with fixes cannot currently be selected within the locked upstream
+    # dependency constraints; revisit when libcosmic/winit/xkbcommon update.
+    "RUSTSEC-2026-0253", # lru 0.16.x, pulled by cryoglyph/quinn-proto
+    "RUSTSEC-2026-0186", # memmap2 0.8.x, pulled by xkbcommon 0.7.x
+]
