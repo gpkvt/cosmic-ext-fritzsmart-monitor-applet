@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- Advance the weather background after every successful weather reload, including scheduled reloads, using the configured weather refresh interval.
+
+### Fixed
+
 - Align values in paired multiline panel rows to a shared right edge while keeping icons left-aligned and standalone items naturally sized.
 
 ### Fixed
