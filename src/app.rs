@@ -2229,6 +2229,10 @@ fn diagnostics_clock_ticks() -> impl futures::Stream<Item = Message> {
     clock_ticks(Duration::from_secs(5))
 }
 
+fn countdown_clock_ticks() -> impl futures::Stream<Item = Message> {
+    clock_ticks(Duration::from_secs(1))
+}
+
 fn animation_ticks() -> impl futures::Stream<Item = Message> {
     // One update per second keeps the refresh indicator visibly animated
     // without forcing four complete applet redraws per second.
@@ -2283,7 +2287,10 @@ fn weather_slideshow_transition_ticks() -> impl futures::Stream<Item = Message> 
     )
 }
 
-fn weather_slideshow_transition_active(weather: &crate::weather::WeatherData, index: usize) -> bool {
+fn weather_slideshow_transition_active(
+    weather: &crate::weather::WeatherData,
+    index: usize,
+) -> bool {
     weather
         .slideshow_sequence
         .get(index)
@@ -2388,7 +2395,7 @@ impl cosmic::Application for AppModel {
     fn subscription(&self) -> Subscription<Self::Message> {
         // Use non-capturing function pointers: this libcosmic iced version's
         // Subscription::run accepts a fn pointer rather than a closure.
-        // Refreshing gets frame-rate ticks for the spinner; otherwise a one-second tick updates countdowns and deadlines.
+        // Keep fast ticks only for visible animation and imminent deadlines.
         let now = Instant::now();
         let needs_second_precision = self.settings_save_at.is_some()
             || self.settings_saved_until.is_some()
@@ -2400,11 +2407,11 @@ impl cosmic::Application for AppModel {
             });
         let clock = if self.refresh_started_at.is_some() {
             Subscription::run(animation_ticks)
-        } else if self.active_settings_section == Some("diagnostics") {
-            // Keep live diagnostics responsive only while that page is open.
-            Subscription::run(diagnostics_clock_ticks)
         } else if needs_second_precision {
             // Preserve the final-second refresh countdown and short save status.
+            Subscription::run(countdown_clock_ticks)
+        } else if self.active_settings_section == Some("diagnostics") {
+            // Hardware and connection diagnostics do not need per-second redraws.
             Subscription::run(diagnostics_clock_ticks)
         } else {
             Subscription::run(regular_clock_ticks)
