@@ -2146,7 +2146,7 @@ impl cosmic::Application for AppModel {
                         language_labels,
                         selected_language,
                         move |index| Message::LanguageChanged(language_options[index].1.to_string()),
-                    ).width(Length::Fill))
+                    ).width(cosmic::iced::Length::Fill))
                     .push(widget::divider::horizontal::default());
             }
             if self.active_settings_section == Some("panel") {
