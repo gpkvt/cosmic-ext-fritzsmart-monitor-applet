@@ -633,7 +633,7 @@ fn generate_starry_night_background() -> Option<Vec<u8>> {
 fn pixelate_background_image(bytes: Vec<u8>, block_size: u32) -> Option<Vec<u8>> {
     use image::imageops::FilterType;
 
-    let decoded = image::load_from_memory(&bytes)?.to_rgb8();
+    let decoded = image::load_from_memory(&bytes).ok()?.to_rgb8();
     let (width, height) = decoded.dimensions();
     if width == 0 || height == 0 {
         return None;
