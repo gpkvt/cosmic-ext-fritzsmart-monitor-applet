@@ -337,68 +337,20 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
 fn commons_search_terms(icon_code: &str) -> &'static [&'static str] {
     let is_night = icon_code.ends_with('n');
     match (icon_code.get(..2).unwrap_or(""), is_night) {
-        ("01", true) => &[
-            "clear starry night sky landscape",
-            "clear night sky over city skyline",
-            "moon stars night mountain landscape",
-        ],
-        ("01", false) => &[
-            "sunny blue sky landscape",
-            "bright sunshine over mountain landscape",
-            "sunlit blue sky countryside",
-        ],
-        ("02" | "03" | "04", true) => &[
-            "cloudy night sky moon city",
-            "dramatic clouds over city at night",
-            "moon behind clouds night landscape",
-        ],
-        ("02" | "03" | "04", false) => &[
-            "cloudy sky landscape daytime",
-            "dramatic overcast clouds mountain",
-            "cloud formations over countryside",
-        ],
-        ("09" | "10", true) => &[
-            "rainy night city street reflections",
-            "rain falling at night urban street",
-            "night rain illuminated street",
-        ],
-        ("09" | "10", false) => &[
-            "rain shower daytime landscape",
-            "rain falling over city daytime",
-            "rain clouds over green countryside",
-        ],
-        ("11", true) => &[
-            "lightning thunderstorm night city",
-            "lightning storm over landscape at night",
-            "dramatic thunderstorm night sky",
-        ],
-        ("11", false) => &[
-            "thunderstorm lightning dark clouds daytime",
-            "storm clouds over landscape",
-            "approaching thunderstorm countryside",
-        ],
-        ("13", true) => &[
-            "snowfall at night village lights",
-            "snowy night forest landscape",
-            "winter night snow covered street",
-        ],
-        ("13", false) => &[
-            "snowfall daytime forest",
-            "snow covered mountain winter landscape",
-            "snowy village in daylight",
-        ],
-        ("50", true) => &[
-            "foggy night street lights",
-            "misty night city landscape",
-            "fog over forest at night",
-        ],
-        ("50", false) => &[
-            "morning fog forest landscape",
-            "misty countryside morning",
-            "foggy city street daylight",
-        ],
-        (_, true) => &["night weather landscape", "night sky city lights"],
-        _ => &["weather sky landscape daytime", "dramatic sky landscape"],
+        ("01", true) => &["clear starry night sky landscape", "stars moon night sky mountains", "milky way stars over natural landscape"],
+        ("01", false) => &["sunny blue sky mountain landscape", "sunshine over green countryside", "sunlit forest meadow landscape"],
+        ("02" | "03" | "04", true) => &["moon behind clouds over mountain landscape night", "cloudy night sky over forest", "stars behind clouds mountain night"],
+        ("02" | "03" | "04", false) => &["cloudy sky over mountain landscape", "dramatic clouds over forest", "cloud formations over countryside"],
+        ("09" | "10", true) => &["rain falling over forest at night", "rain clouds over mountain night landscape", "night rain over lake landscape"],
+        ("09" | "10", false) => &["rain shower over green countryside", "rain falling over forest landscape", "rain clouds over mountain valley"],
+        ("11", true) => &["lightning thunderstorm over mountain landscape night", "lightning storm over forest at night", "dramatic thunderstorm night sky stars"],
+        ("11", false) => &["thunderstorm lightning over mountain landscape", "storm clouds over forest", "approaching thunderstorm over countryside"],
+        ("13", true) => &["snowy forest under starry night sky", "snow covered mountain night landscape", "snowfall over mountain forest at night"],
+        ("13", false) => &["snowfall daytime forest", "snow covered mountain winter landscape", "snowy alpine meadow in daylight"],
+        ("50", true) => &["fog over forest at night", "misty mountain landscape night", "foggy lake under stars"],
+        ("50", false) => &["morning fog forest landscape", "misty mountain countryside morning", "fog over meadow and trees"],
+        (_, true) => &["stars over natural night landscape", "night sky over mountains"],
+        _ => &["weather sky over natural landscape", "dramatic clouds over mountains"],
     }
 }
 
@@ -413,92 +365,57 @@ fn commons_title_matches_condition(icon_code: &str, title: &str) -> bool {
         .split(|character: char| !character.is_ascii_alphanumeric())
         .filter(|word| !word.is_empty())
         .collect();
-    // Exact tokens only: prefixes and generic landscape/night words are not
-    // evidence that a file actually depicts the requested weather.
     let has = |terms: &[&str]| words.iter().any(|word| terms.contains(word));
 
-    // Commons search can return editorial assets whose titles only mention
-    // weather. Reject these before considering condition keywords.
-    let non_photo_terms = [
-        "book",
-        "novel",
-        "film",
-        "movie",
-        "cover",
-        "poster",
-        "illustration",
-        "drawing",
-        "painting",
-        "cartoon",
-        "comic",
-        "manga",
-        "album",
-        "song",
-        "soundtrack",
-        "game",
-        "logo",
-        "advertisement",
-        "advert",
-        "theatre",
-        "theater",
-        "fiction",
-        "character",
-        "sculpture",
-        "statue",
-        "map",
-        "diagram",
-        "chart",
-        "screenshot",
+    // Only natural scenery and astronomy are suitable as weather backgrounds.
+    // Explicitly reject editorial artwork and human-made/urban subjects.
+    let excluded_terms = [
+        "book", "novel", "film", "movie", "cover", "poster", "illustration",
+        "drawing", "painting", "cartoon", "comic", "manga", "album", "song",
+        "soundtrack", "game", "logo", "advertisement", "advert", "theatre",
+        "theater", "fiction", "character", "sculpture", "statue", "map",
+        "diagram", "chart", "screenshot", "city", "cities", "urban", "street",
+        "road", "highway", "building", "buildings", "architecture", "bridge",
+        "village", "town", "suburb", "industrial", "factory", "vehicle", "portrait", "person", "people", "crowd", "fashion", "product", "stilllife",
+        "car", "train", "ship", "harbor", "harbour", "port",
     ];
-    if has(&non_photo_terms) {
+    if has(&excluded_terms) {
         return false;
     }
 
-    let rain = [
-        "rain",
-        "rains",
-        "raining",
-        "rainy",
-        "shower",
-        "showers",
-        "drizzle",
-        "drizzling",
-        "precipitation",
+    let nature_terms = [
+        "sky", "skies", "cloud", "clouds", "cloudy", "overcast", "cumulus",
+        "stratus", "mountain", "mountains", "mountainous", "hill", "hills",
+        "forest", "forests", "wood", "woods", "woodland", "tree", "trees",
+        "landscape", "countryside", "field", "fields", "meadow", "meadows",
+        "lake", "lakes", "river", "rivers", "ocean", "sea", "coast", "coastal",
+        "beach", "shore", "desert", "glacier", "glaciers", "ice", "alpine",
+        "valley", "valleys", "nature", "natural", "waterfall", "waterfalls",
+        "grassland", "prairie", "wetland", "swamp",
     ];
-    let storm = [
-        "storm",
-        "storms",
-        "stormy",
-        "thunder",
-        "thunderstorm",
-        "lightning",
-    ];
+    let astronomy_terms = ["star", "stars", "starry", "starlight", "milky", "moon", "moonlight"];
+    if !has(&nature_terms) && !has(&astronomy_terms) {
+        return false;
+    }
+
+    let rain = ["rain", "rains", "raining", "rainy", "shower", "showers", "drizzle", "drizzling", "precipitation"];
+    let storm = ["storm", "storms", "stormy", "thunder", "thunderstorm", "lightning"];
     let snow = ["snow", "snowfall", "snowy", "blizzard"];
     let fog = ["fog", "foggy", "mist", "misty", "haze", "hazy"];
-    let clouds = [
-        "cloud", "clouds", "cloudy", "overcast", "cumulus", "stratus",
-    ];
+    let clouds = ["cloud", "clouds", "cloudy", "overcast", "cumulus", "stratus"];
 
     match icon_code.get(..2).unwrap_or("") {
         "01" if icon_code.ends_with('n') => {
-            has(&["clear", "star", "stars", "starry", "moon", "moonlight"])
-                && !has(&rain)
-                && !has(&storm)
-                && !has(&snow)
-                && !has(&fog)
+            has(&["clear", "star", "stars", "starry", "moon", "moonlight", "milky"])
+                && !has(&rain) && !has(&storm) && !has(&snow) && !has(&fog)
         }
         "01" => {
             (has(&["sun", "sunny", "sunshine", "sunlight", "cloudless"])
                 || has(&["blue", "sky"]) && normalized.contains("blue sky")
                 || has(&["clear"]) && normalized.contains("clear sky"))
-                && !has(&rain)
-                && !has(&storm)
-                && !has(&snow)
-                && !has(&fog)
+                && !has(&rain) && !has(&storm) && !has(&snow) && !has(&fog)
         }
-        "02" | "03" | "04" => {
-            has(&clouds) && !has(&rain) && !has(&storm) && !has(&snow) && !has(&fog)
-        }
+        "02" | "03" | "04" => has(&clouds) && !has(&rain) && !has(&storm) && !has(&snow) && !has(&fog),
         "09" | "10" => has(&rain) && !has(&storm) && !has(&snow),
         "11" => has(&storm),
         "13" => has(&snow),
@@ -927,22 +844,22 @@ mod tests {
         for (icon, expected) in [
             ("01d", "sunny blue sky landscape"),
             ("01n", "clear starry night sky landscape"),
-            ("10n", "rainy night city street reflections"),
-            ("10d", "rain shower daytime landscape"),
-            ("11n", "lightning thunderstorm night city"),
-            ("11d", "thunderstorm lightning dark clouds daytime"),
-            ("13n", "snowfall at night village lights"),
+            ("10n", "rain falling over forest at night"),
+            ("10d", "rain shower over green countryside"),
+            ("11n", "lightning thunderstorm over mountain landscape night"),
+            ("11d", "thunderstorm lightning over mountain landscape"),
+            ("13n", "snowy forest under starry night sky"),
             ("50d", "morning fog forest landscape"),
         ] {
             assert_eq!(commons_search_term(icon, 0), expected);
         }
         assert_eq!(
             commons_search_term("01n", 1),
-            "clear night sky over city skyline"
+            "stars moon night sky mountains"
         );
         assert_eq!(
             commons_search_term("01n", 2),
-            "moon stars night mountain landscape"
+            "milky way stars over natural landscape"
         );
     }
 
@@ -965,11 +882,14 @@ mod tests {
             ("10d", "Cloudy sky over the coast", false),
             ("10d", "Thunderstorm with heavy rain", false),
             ("10n", "Rainbow over the city", false),
-            ("11d", "Lightning during a thunderstorm", true),
+            ("10n", "Rain falling over a city street", false),
+            ("11d", "Lightning over the mountains during a thunderstorm", true),
             ("11n", "Snowy mountain at night", false),
             ("13d", "Snowfall in a winter forest", true),
             ("50d", "Misty morning landscape", true),
             ("50n", "Sunny city skyline", false),
+            ("01d", "Sunny city skyline", false),
+            ("01d", "Sunny book cover with blue sky", false),
         ] {
             assert_eq!(
                 commons_title_matches_condition(icon, title),
