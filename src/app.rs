@@ -537,14 +537,14 @@ fn graph_visual_with_dimensions(
                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                 .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
         )
-        .push(graph)
-        .push(
+        .push(graph);
+    if matches!(widget_height, cosmic::iced::Length::Fill) {
+        content = content.push(
             widget::Column::new()
                 .spacing(2)
                 .push(widget::text::caption("CURRENT"))
                 .push(widget::text(format!("{current_value:.1} {unit}"))),
         );
-    if matches!(widget_height, cosmic::iced::Length::Fill) {
         content.height(cosmic::iced::Length::Fill).into()
     } else {
         content.into()
@@ -581,6 +581,7 @@ fn interactive_graph_inner(
     axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
+    let current_value = values.last().copied().unwrap_or(0.0);
     let mut graph = widget::Column::new()
         .spacing(6)
         .push(
@@ -603,6 +604,13 @@ fn interactive_graph_inner(
                 .push(widget::text::caption("Now")),
         );
     }
+    graph = graph.push(
+        widget::Row::new()
+            .align_y(cosmic::iced::Alignment::Center)
+            .spacing(6)
+            .push(widget::text::caption("CURRENT"))
+            .push(widget::text(format!("{current_value:.1} {unit}"))),
+    );
     widget::button::custom(graph)
         .on_press(Message::ShowGraph(
             title.to_string(),
