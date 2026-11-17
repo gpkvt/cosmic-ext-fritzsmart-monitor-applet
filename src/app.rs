@@ -2717,27 +2717,71 @@ impl cosmic::Application for AppModel {
                 // Keep the expanded graph's information hierarchy consistent
                 // with compact graphs: title first, then MIN/MAX/CURRENT,
                 // the plot, and finally the time axis. Only the plot size differs.
-                .push(
-                    widget::Row::new()
-                        .spacing(10)
+                .push({
+                    let mut header = widget::Row::new()
+                        .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::body(title.clone()).width(cosmic::iced::Length::Fill))
-                        .push(
-                            widget::button::custom(
-                                widget::Row::new()
-                                    .spacing(6)
-                                    .align_y(cosmic::iced::Alignment::Center)
-                                    .push(widget::icon::from_name("window-close-symbolic").size(16))
-                                    .push(widget::text::caption(crate::i18n::tr(
-                                        &self.settings.language,
-                                        "Close",
-                                    ))),
-                            )
-                            .on_press(Message::CloseGraph)
-                            .padding(6)
-                            .class(cosmic::theme::Button::Text),
-                        ),
-                )
+                        .push(widget::text::body(title.clone()).width(cosmic::iced::Length::Fill));
+                    if let Some(index) = self.history_graph_index {
+                        let previous = widget::button::custom(
+                            widget::Row::new()
+                                .spacing(4)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::icon::from_name("go-previous-symbolic").size(16))
+                                .push(widget::text::caption(crate::i18n::tr(
+                                    &self.settings.language,
+                                    "Previous",
+                                ))),
+                        )
+                        .on_press(Message::NavigateDeviceHistory(-1))
+                        .padding(6)
+                        .class(cosmic::theme::Button::Text);
+                        let next = widget::button::custom(
+                            widget::Row::new()
+                                .spacing(4)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::text::caption(crate::i18n::tr(
+                                    &self.settings.language,
+                                    "Next",
+                                )))
+                                .push(widget::icon::from_name("go-next-symbolic").size(16)),
+                        )
+                        .on_press(Message::NavigateDeviceHistory(1))
+                        .padding(6)
+                        .class(cosmic::theme::Button::Text);
+                        let previous: cosmic::Element<'_, Message> = if index > 0 {
+                            previous.into()
+                        } else {
+                            widget::Space::new()
+                                .width(cosmic::iced::Length::Fixed(82.0))
+                                .into()
+                        };
+                        let next: cosmic::Element<'_, Message> =
+                            if index + 1 < self.history_graph_devices.len() {
+                                next.into()
+                            } else {
+                                widget::Space::new()
+                                    .width(cosmic::iced::Length::Fixed(58.0))
+                                    .into()
+                            };
+                        header = header.push(previous).push(next);
+                    }
+                    header.push(
+                        widget::button::custom(
+                            widget::Row::new()
+                                .spacing(6)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::icon::from_name("window-close-symbolic").size(16))
+                                .push(widget::text::caption(crate::i18n::tr(
+                                    &self.settings.language,
+                                    "Close",
+                                ))),
+                        )
+                        .on_press(Message::CloseGraph)
+                        .padding(6)
+                        .class(cosmic::theme::Button::Text),
+                    )
+                })
                 .push(graph_visual_large(
                     values.iter().copied(),
                     &self.settings.graph_style,
@@ -4992,22 +5036,9 @@ impl cosmic::Application for AppModel {
                     .width(cosmic::iced::Length::Fill)
                     .padding([8, 12])
                     .class(cosmic::theme::Button::ListItem(heading_radius));
-                    let history_button: cosmic::Element<'_, Message> = if let Some(samples) =
-                        device_history.filter(|samples| !samples.is_empty())
+                    let history_button: cosmic::Element<'_, Message> = if device_history
+                        .is_some_and(|samples| !samples.is_empty())
                     {
-                        let values = samples
-                            .iter()
-                            .map(|(_, power, _)| *power as f64)
-                            .collect::<Vec<_>>();
-                        let axis_start = format_graph_axis_start(
-                            self.settings.graph_timespan_minutes,
-                            samples.front().map(|(timestamp, _, _)| {
-                                Instant::now()
-                                    .duration_since(*timestamp)
-                                    .as_secs()
-                                    .div_ceil(60)
-                            }),
-                        );
                         widget::button::custom(
                             widget::Row::new()
                                 .spacing(5)
@@ -5021,16 +5052,7 @@ impl cosmic::Application for AppModel {
                                     "History",
                                 ))),
                         )
-                        .on_press(Message::ShowGraph(
-                            format!(
-                                "{} · {}",
-                                reading.name,
-                                crate::i18n::tr(&self.settings.language, "POWER (W)")
-                            ),
-                            values,
-                            "W".into(),
-                            Some(axis_start),
-                        ))
+                        .on_press(Message::ShowDeviceHistoryGraph(reading.ain.clone()))
                         .padding([8, 8])
                         .class(cosmic::theme::Button::Text)
                         .into()
@@ -5751,6 +5773,8 @@ impl cosmic::Application for AppModel {
                 return Task::done(cosmic::Action::Surface(action));
             }
             Message::ShowGraph(title, values, unit, axis_start) => {
+                self.history_graph_devices.clear();
+                self.history_graph_index = None;
                 self.expanded_graph = Some((title, values, unit, axis_start));
                 if self.graph_window.is_none() {
                     // Applets must create secondary surfaces through the
@@ -5778,8 +5802,83 @@ impl cosmic::Application for AppModel {
                     return get_popup(settings);
                 }
             }
+            Message::ShowDeviceHistoryGraph(ain) => {
+                let mut ordered: Vec<_> = self.readings.iter().collect();
+                ordered.sort_by_key(|reading| {
+                    self.settings.device_order.iter().position(|configured| {
+                        crate::fritz::normalize_ain_for_selection(configured)
+                            == crate::fritz::normalize_ain_for_selection(&reading.ain)
+                    }).unwrap_or(usize::MAX)
+                });
+                self.history_graph_devices = ordered.into_iter().filter_map(|reading| {
+                    let key = crate::fritz::normalize_ain_for_selection(&reading.ain);
+                    self.device_history.get(&key)
+                        .filter(|samples| !samples.is_empty())
+                        .map(|_| (key, reading.name.clone()))
+                }).collect();
+                self.history_graph_index = self.history_graph_devices.iter()
+                    .position(|(key, _)| *key == crate::fritz::normalize_ain_for_selection(&ain));
+                if let Some(index) = self.history_graph_index {
+                    let (key, name) = self.history_graph_devices[index].clone();
+                    if let Some(samples) = self.device_history.get(&key) {
+                        let values = samples.iter().map(|(_, power, _)| *power as f64).collect();
+                        let axis_start = format_graph_axis_start(
+                            self.settings.graph_timespan_minutes,
+                            samples.front().map(|(timestamp, _, _)| {
+                                Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)
+                            }),
+                        );
+                        self.expanded_graph = Some((
+                            format!("{} · {}", name, crate::i18n::tr(&self.settings.language, "POWER (W)")),
+                            values, "W".into(), Some(axis_start),
+                        ));
+                    }
+                }
+                if self.graph_window.is_none() {
+                    let Some(main_window_id) = self.core.main_window_id() else {
+                        self.expanded_graph = None;
+                        self.history_graph_index = None;
+                        self.history_graph_devices.clear();
+                        return Task::none();
+                    };
+                    let id = Id::unique();
+                    self.graph_window = Some(id);
+                    let mut settings = self.core.applet.get_popup_settings(
+                        main_window_id, id, Some((800, 600)), None, None,
+                    );
+                    settings.positioner.size_limits = Limits::NONE
+                        .min_width(640.0).min_height(480.0)
+                        .max_width(800.0).max_height(600.0);
+                    return get_popup(settings);
+                }
+            }
+            Message::NavigateDeviceHistory(delta) => {
+                if let Some(current) = self.history_graph_index {
+                    let next = current as isize + delta;
+                    if next >= 0 && (next as usize) < self.history_graph_devices.len() {
+                        let next = next as usize;
+                        self.history_graph_index = Some(next);
+                        let (key, name) = self.history_graph_devices[next].clone();
+                        if let Some(samples) = self.device_history.get(&key) {
+                            let values = samples.iter().map(|(_, power, _)| *power as f64).collect();
+                            let axis_start = format_graph_axis_start(
+                                self.settings.graph_timespan_minutes,
+                                samples.front().map(|(timestamp, _, _)| {
+                                    Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)
+                                }),
+                            );
+                            self.expanded_graph = Some((
+                                format!("{} · {}", name, crate::i18n::tr(&self.settings.language, "POWER (W)")),
+                                values, "W".into(), Some(axis_start),
+                            ));
+                        }
+                    }
+                }
+            }
             Message::CloseGraph => {
                 self.expanded_graph = None;
+                self.history_graph_devices.clear();
+                self.history_graph_index = None;
                 if let Some(id) = self.graph_window.take() {
                     return destroy_popup(id);
                 }
@@ -7028,6 +7127,8 @@ impl cosmic::Application for AppModel {
                 if self.graph_window == Some(id) {
                     self.graph_window = None;
                     self.expanded_graph = None;
+                    self.history_graph_devices.clear();
+                    self.history_graph_index = None;
                 }
             }
         }
