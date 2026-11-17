@@ -203,8 +203,9 @@ fn build_debug_report(app: &AppModel) -> String {
         app.readings
             .iter()
             .map(|reading| {
-                let masked_ain = if reading.ain.len() > 4 {
-                    format!("…{}", &reading.ain[reading.ain.len() - 4..])
+                let suffix: String = reading.ain.chars().rev().take(4).collect::<String>().chars().rev().collect();
+                let masked_ain = if reading.ain.chars().count() > 4 {
+                    format!("…{suffix}")
                 } else {
                     "redacted".into()
                 };
