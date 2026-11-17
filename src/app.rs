@@ -3077,11 +3077,11 @@ impl cosmic::Application for AppModel {
                                 .spacing(3)
                                 .width(cosmic::iced::Length::Fill)
                                 .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Average temperature")))
-                                    .push(widget::text::caption(
-                                        "When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.",
-                                    )),
-                            )
-                            .push(
+                                .push(widget::text::caption(
+                                    "When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.",
+                                )),
+                        )
+                        .push(
                                 widget::container(
                                     widget::toggler(self.settings.panel_average_temperature)
                                         .on_toggle(Message::PanelAverageTemperatureChanged),
