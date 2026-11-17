@@ -1753,13 +1753,13 @@ impl cosmic::Application for AppModel {
         let mut panel_items: Vec<(&str, cosmic::Element<'static, Message>)> = Vec::new();
 
         if self.settings.weather_enabled
-        && !self
-            .settings
-            .hidden_panel_items
-            .iter()
-            .any(|hidden| hidden == "weather")
-        && let Some(weather) = &self.weather
-    {
+            && !self
+                .settings
+                .hidden_panel_items
+                .iter()
+                .any(|hidden| hidden == "weather")
+            && let Some(weather) = &self.weather
+        {
             panel_items.push((
                 "weather",
                 panel_item(
@@ -1773,7 +1773,7 @@ impl cosmic::Application for AppModel {
                 )
                 .into(),
             ));
-    }
+        }
         if self.error.is_none() {
             if !self
                 .settings
@@ -1810,13 +1810,13 @@ impl cosmic::Application for AppModel {
                 ));
             }
             if !self.settings.panel_net_power
-            && !self
-                .settings
-                .hidden_panel_items
-                .iter()
-                .any(|hidden| hidden == "solar-power")
-            && let Some(input_power) = input_power
-        {
+                && !self
+                    .settings
+                    .hidden_panel_items
+                    .iter()
+                    .any(|hidden| hidden == "solar-power")
+                && let Some(input_power) = input_power
+            {
                 panel_items.push((
                     "solar-power",
                     panel_item(
@@ -1842,7 +1842,7 @@ impl cosmic::Application for AppModel {
                     )
                     .into(),
                 ));
-        }
+            }
 
             if self.settings.panel_internet_bandwidth
                 && !self
@@ -2031,8 +2031,8 @@ impl cosmic::Application for AppModel {
         // accidentally receive the applet's interactive view.
         // The expanded graph is a regular, independently managed desktop window.
         if self.graph_window == Some(id)
-        && let Some((title, values, unit)) = &self.expanded_graph
-    {
+            && let Some((title, values, unit)) = &self.expanded_graph
+        {
             let graph_page = widget::Column::new()
                 .spacing(4)
                 .padding(8)
@@ -2080,6 +2080,7 @@ impl cosmic::Application for AppModel {
                 .height(cosmic::iced::Length::Fill)
                 .class(cosmic::theme::Container::WindowBackground)
                 .into();
+        }
         // Only render applet content for the popup we created. Other
         // secondary surfaces (including native text context menus) must not
         // accidentally receive the applet's interactive view.
@@ -3426,8 +3427,8 @@ impl cosmic::Application for AppModel {
                     // weather scenes without replacing the condition-matched
                     // photograph or obscuring its Commons attribution.
                     if weather.icon_code.ends_with('n')
-                    && let Some(stars) = starry_night_overlay()
-                {
+                        && let Some(stars) = starry_night_overlay()
+                    {
                         let star_layer = widget::container(
                             widget::image::Image::new(widget::image::Handle::from_bytes(stars))
                                 .width(cosmic::iced::Length::Fill)
@@ -3438,7 +3439,7 @@ impl cosmic::Application for AppModel {
                         .height(cosmic::iced::Length::Fixed(260.0))
                         .clip(true);
                         weather_layers = weather_layers.push(star_layer);
-                }
+                    }
                     widget::container(weather_layers.push(details))
                         .width(cosmic::iced::Length::Fill)
                         .height(cosmic::iced::Length::Fixed(260.0))
