@@ -6,6 +6,10 @@
 
 - Vertically aligned panel icons with their corresponding values; in two-line mode, icons now align with the first text line while single-line values remain vertically centered.
 
+### Changed
+
+- Unified internet bandwidth readings with the shared panel-item renderer, removing their separate icon, spacing and alignment layout.
+
 All notable changes to FRITZ!Power Monitor are documented here.
 
 Changes are tracked in date-based entries. See the [GitHub Releases](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases) for published versions.
