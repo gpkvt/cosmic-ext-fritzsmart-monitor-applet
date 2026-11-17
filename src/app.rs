@@ -3371,9 +3371,9 @@ impl cosmic::Application for AppModel {
                                 weather_layers = weather_layers.push(star_layer);
                             }
                         }
-                        // Apply an 80%-transparent dark wash across the
-                        // complete photograph, above the image/stars and below
-                        // the weather text and controls.
+                        // Apply a 50%-opaque dark wash across the complete
+                        // photograph, above the image/stars and below the weather
+                        // text and controls.
                         let background_overlay = widget::container(
                             cosmic::iced::widget::Space::new()
                                 .width(cosmic::iced::Length::Fill)
@@ -3383,7 +3383,7 @@ impl cosmic::Application for AppModel {
                         .height(cosmic::iced::Length::Fixed(260.0))
                         .style(|_| cosmic::iced::widget::container::Style {
                             background: Some(
-                                cosmic::iced::Color::from_rgba(0.06, 0.07, 0.09, 0.20).into(),
+                                cosmic::iced::Color::from_rgba(0.06, 0.07, 0.09, 0.50).into(),
                             ),
                             ..Default::default()
                         });
