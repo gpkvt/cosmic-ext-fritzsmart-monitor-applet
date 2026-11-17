@@ -900,7 +900,14 @@ fn live_power_summary(
             temperature_history.into_iter(),
             graph_style,
             "°C",
-        ));
+        ))
+        .push(
+            widget::Row::new()
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::caption(axis_start))
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(widget::text::caption("Now")),
+        );
     surface_card(content.into(), 14)
 }
 
@@ -1005,6 +1012,13 @@ fn total_power_overview(
             &settings.graph_style,
             "°C",
         ))
+        .push(
+            widget::Row::new()
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::caption(axis_start.clone()))
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(widget::text::caption("Now")),
+        )
         ;
     let output_content = widget::Column::new()
         .spacing(8)
@@ -1070,7 +1084,14 @@ fn total_power_overview(
                 input_temperature_history.iter().map(|(_, value)| *value),
                 &settings.graph_style,
                 "°C",
-            ));
+            ))
+            .push(
+                widget::Row::new()
+                    .width(cosmic::iced::Length::Fill)
+                    .push(widget::text::caption(axis_start))
+                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                    .push(widget::text::caption("Now")),
+            );
         let input_content = widget::Column::new()
             .spacing(8)
             .width(cosmic::iced::Length::Fill)
