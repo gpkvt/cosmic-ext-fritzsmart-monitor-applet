@@ -2,7 +2,10 @@ use crate::fritz::{
     FritzDevice, FritzFetchResult, FritzInternetBandwidth, FritzReading, FritzSettings,
     TemperatureAlertThresholds, discover_devices, fetch_fritz_data,
 };
-use crate::weather::{WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather, fetch_weather_forecast, starry_night_overlay, chessboard_background_overlay};
+use crate::weather::{
+    WeatherData, WeatherForecast, build_weather_slideshow_frames, chessboard_background_overlay,
+    fetch_weather, fetch_weather_forecast, starry_night_overlay,
+};
 use cosmic::iced::{
     Limits, Subscription, futures,
     platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
@@ -559,11 +562,13 @@ fn graph_visual_with_dimensions(
             widget::Row::new()
                 .width(cosmic::iced::Length::Fill)
                 .push(widget::text::caption(format!("MIN {minimum:.1} {unit}")))
-                .push(widget::text::caption(format!(
+                .push(
+                    widget::text::caption(format!(
                         "FRITZ!Power Monitor · v{}",
                         env!("APP_VERSION")
                     ))
-                    .width(cosmic::iced::Length::Fill))
+                    .width(cosmic::iced::Length::Fill),
+                )
                 .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
         )
         .push(graph);
@@ -1043,9 +1048,9 @@ fn total_power_overview(
     let input_power = input_power_w(readings, &settings.input_ains);
     let axis_start = format_graph_axis_start(
         settings.graph_timespan_minutes,
-        history.front().map(|(timestamp, _)| {
-            Instant::now().duration_since(*timestamp).as_secs() / 60
-        }),
+        history
+            .front()
+            .map(|(timestamp, _)| Instant::now().duration_since(*timestamp).as_secs() / 60),
     );
 
     let output_graph = widget::Column::new()
@@ -1067,8 +1072,7 @@ fn total_power_overview(
             &settings.graph_style,
             "°C",
             axis_start.clone(),
-        ))
-        ;
+        ));
     let output_content = widget::Column::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
@@ -1112,8 +1116,8 @@ fn total_power_overview(
             .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
     });
     if has_input_readings {
-        let input_energy_summary = input_energy_and_timespan(&input_history)
-            .map(|(energy_wh, timespan)| {
+        let input_energy_summary =
+            input_energy_and_timespan(&input_history).map(|(energy_wh, timespan)| {
                 widget::text::caption(format!(
                     "{}: {energy_wh:.1} Wh · {}",
                     crate::i18n::tr(&settings.language, "TOTAL ENERGY"),
@@ -1134,7 +1138,8 @@ fn total_power_overview(
         if let Some(summary) = input_energy_summary {
             input_graph = input_graph.push(summary);
         }
-        input_graph = input_graph.push(widget::text::caption("AVERAGE TEMPERATURE (°C)"))
+        input_graph = input_graph
+            .push(widget::text::caption("AVERAGE TEMPERATURE (°C)"))
             .push(interactive_graph_with_axis(
                 &settings.language,
                 crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
@@ -1373,7 +1378,10 @@ fn error_notice<'a>(title: &'static str, message: &'a str) -> cosmic::Element<'a
 fn diagnostic_url_button(url: String) -> cosmic::Element<'static, Message> {
     const MAX_VISIBLE_CHARS: usize = 24;
     let visible = if url.chars().count() > MAX_VISIBLE_CHARS {
-        format!("{}…", url.chars().take(MAX_VISIBLE_CHARS - 1).collect::<String>())
+        format!(
+            "{}…",
+            url.chars().take(MAX_VISIBLE_CHARS - 1).collect::<String>()
+        )
     } else {
         url.clone()
     };
@@ -1522,14 +1530,19 @@ fn animation_ticks() -> impl futures::Stream<Item = Message> {
 }
 
 fn weather_slideshow_ticks() -> impl futures::Stream<Item = Message> {
-    cosmic::iced::stream::channel(2, |mut output: futures::channel::mpsc::Sender<Message>| async move {
-        let mut interval = tokio::time::interval(Duration::from_millis(250));
-        interval.tick().await;
-        loop {
+    cosmic::iced::stream::channel(
+        2,
+        |mut output: futures::channel::mpsc::Sender<Message>| async move {
+            let mut interval = tokio::time::interval(Duration::from_millis(250));
             interval.tick().await;
-            if output.send(Message::WeatherSlideshowTick).await.is_err() { break; }
-        }
-    })
+            loop {
+                interval.tick().await;
+                if output.send(Message::WeatherSlideshowTick).await.is_err() {
+                    break;
+                }
+            }
+        },
+    )
 }
 
 impl cosmic::Application for AppModel {
@@ -1621,7 +1634,11 @@ impl cosmic::Application for AppModel {
             Subscription::run(regular_clock_ticks)
         };
 
-        if self.popup.is_some() && self.weather.as_ref().is_some_and(|weather| weather.slideshow_frames.len() > 1 && weather.slideshow_sequence.len() > 1) {
+        if self.popup.is_some()
+            && self.weather.as_ref().is_some_and(|weather| {
+                weather.slideshow_frames.len() > 1 && weather.slideshow_sequence.len() > 1
+            })
+        {
             Subscription::batch(vec![clock, Subscription::run(weather_slideshow_ticks)])
         } else {
             clock
@@ -2022,7 +2039,8 @@ impl cosmic::Application for AppModel {
                                         .align_y(cosmic::iced::Alignment::Center)
                                         .push(
                                             widget::icon::from_name("window-close-symbolic")
-                                                .size(18),                                        )
+                                                .size(18),
+                                        )
                                         .push(widget::text::caption(crate::i18n::tr(
                                             &self.settings.language,
                                             "Close",
@@ -2064,12 +2082,9 @@ impl cosmic::Application for AppModel {
                 // The section title and back button are rendered in the sticky
                 // header below; keep only the selected section's controls here.
             } else {
-                content = content
-                    .push(widget::divider::horizontal::default())
-                    .push(widget::text::caption(crate::i18n::tr(
-                        &self.settings.language,
-                        "GENERAL",
-                    )));
+                content = content.push(widget::divider::horizontal::default()).push(
+                    widget::text::caption(crate::i18n::tr(&self.settings.language, "GENERAL")),
+                );
                 for (title, section) in [
                     (
                         crate::i18n::tr(&self.settings.language, "Language"),
@@ -2429,12 +2444,18 @@ impl cosmic::Application for AppModel {
                         _ => continue,
                     };
                     let label = crate::i18n::tr(&self.settings.language, menu_element_label(id));
-                    let visible = !self.settings.hidden_menu_elements.iter().any(|hidden| hidden == id);
+                    let visible = !self
+                        .settings
+                        .hidden_menu_elements
+                        .iter()
+                        .any(|hidden| hidden == id);
                     let mut row = widget::Row::new()
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::text::body(label).width(cosmic::iced::Length::Fill))
-                        .push(widget::toggler(visible).on_toggle(move |value| Message::ToggleMenuElementVisibility(id, value)));
+                        .push(widget::toggler(visible).on_toggle(move |value| {
+                            Message::ToggleMenuElementVisibility(id, value)
+                        }));
                     row = row.push(icon_action_button(
                         "+",
                         crate::i18n::tr(&self.settings.language, "Move up"),
@@ -2475,20 +2496,20 @@ impl cosmic::Application for AppModel {
                         .hidden_panel_items
                         .iter()
                         .any(|hidden| hidden == id);
-                    let mut row = widget::Row::new()
-                        .spacing(8)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(
-                            widget::text::body(crate::i18n::tr(
-                                &self.settings.language,
-                                panel_item_label(id),
-                            ))
-                            .width(cosmic::iced::Length::Fill),
-                        )
-                        .push(
-                            widget::toggler(visible)
-                                .on_toggle(move |value| Message::TogglePanelItemVisibility(id, value)),
-                        );
+                    let mut row =
+                        widget::Row::new()
+                            .spacing(8)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::text::body(crate::i18n::tr(
+                                    &self.settings.language,
+                                    panel_item_label(id),
+                                ))
+                                .width(cosmic::iced::Length::Fill),
+                            )
+                            .push(widget::toggler(visible).on_toggle(move |value| {
+                                Message::TogglePanelItemVisibility(id, value)
+                            }));
                     row = row.push(icon_action_button(
                         "+",
                         crate::i18n::tr(&self.settings.language, "Move up"),
@@ -2755,11 +2776,16 @@ impl cosmic::Application for AppModel {
                 };
                 content = content
                     .push(diagnostic_status_row(
-                        crate::i18n::tr(&self.settings.language, "OpenWeatherMap · current weather"),
+                        crate::i18n::tr(
+                            &self.settings.language,
+                            "OpenWeatherMap · current weather",
+                        ),
                         weather_provider_status.0,
                         weather_provider_status.1,
                     ))
-                    .push(diagnostic_url_button("https://api.openweathermap.org/data/2.5/weather".into()));
+                    .push(diagnostic_url_button(
+                        "https://api.openweathermap.org/data/2.5/weather".into(),
+                    ));
 
                 let commons_status = if !self.settings.weather_enabled {
                     (
@@ -2791,12 +2817,19 @@ impl cosmic::Application for AppModel {
                 };
                 content = content
                     .push(diagnostic_status_row(
-                        crate::i18n::tr(&self.settings.language, "Wikimedia Commons · image search and download"),
+                        crate::i18n::tr(
+                            &self.settings.language,
+                            "Wikimedia Commons · image search and download",
+                        ),
                         commons_status.0,
                         commons_status.1,
                     ))
-                    .push(diagnostic_url_button("https://commons.wikimedia.org/w/api.php".into()))
-                    .push(widget::text::caption("Thumbnail URL is returned by the API."));
+                    .push(diagnostic_url_button(
+                        "https://commons.wikimedia.org/w/api.php".into(),
+                    ))
+                    .push(widget::text::caption(
+                        "Thumbnail URL is returned by the API.",
+                    ));
 
                 let forecast_status = if self.settings.weather_location.trim().is_empty() {
                     (
@@ -2833,13 +2866,17 @@ impl cosmic::Application for AppModel {
                         forecast_status.0,
                         forecast_status.1,
                     ))
-                    .push(diagnostic_url_button("https://geocoding-api.open-meteo.com/v1/search".into()))
+                    .push(diagnostic_url_button(
+                        "https://geocoding-api.open-meteo.com/v1/search".into(),
+                    ))
                     .push(diagnostic_status_row(
                         crate::i18n::tr(&self.settings.language, "Open-Meteo · forecast"),
                         forecast_status.0,
                         forecast_status.1,
                     ))
-                    .push(diagnostic_url_button("https://api.open-meteo.com/v1/forecast".into()))
+                    .push(diagnostic_url_button(
+                        "https://api.open-meteo.com/v1/forecast".into(),
+                    ))
                     .push(action_button(
                         "view-refresh-symbolic",
                         crate::i18n::tr(&self.settings.language, "Get 7-day forecast"),
@@ -2858,10 +2895,13 @@ impl cosmic::Application for AppModel {
                                     .spacing(8)
                                     .align_y(cosmic::iced::Alignment::Center)
                                     .push(widget::icon::from_name(day.icon_name()).size(18))
-                                    .push(widget::text::body(format!(
-                                        "{} · {}",
-                                        day.date, day.description
-                                    )).width(cosmic::iced::Length::Fill))
+                                    .push(
+                                        widget::text::body(format!(
+                                            "{} · {}",
+                                            day.date, day.description
+                                        ))
+                                        .width(cosmic::iced::Length::Fill),
+                                    )
                                     .push(widget::text::body(format!(
                                         "{:.0}° / {:.0}°",
                                         day.max_temperature_c, day.min_temperature_c
@@ -2873,12 +2913,14 @@ impl cosmic::Application for AppModel {
                         widget::text::caption(crate::i18n::tr(
                             &self.settings.language,
                             "Loading forecast…",
-                        )).into()
+                        ))
+                        .into()
                     } else {
                         widget::text::caption(crate::i18n::tr(
                             &self.settings.language,
                             "Request a forecast to verify the Open-Meteo endpoints.",
-                        )).into()
+                        ))
+                        .into()
                     });
 
                 let requests = crate::fritz::http_request_diagnostics();
@@ -2955,7 +2997,11 @@ impl cosmic::Application for AppModel {
                         fritz_base_status.1,
                     ))
                     .push(if endpoint.is_empty() {
-                        widget::text::caption(crate::i18n::tr(&self.settings.language, "Base URL not configured")).into()
+                        widget::text::caption(crate::i18n::tr(
+                            &self.settings.language,
+                            "Base URL not configured",
+                        ))
+                        .into()
                     } else {
                         diagnostic_url_button(endpoint.to_string())
                     });
@@ -3049,7 +3095,8 @@ impl cosmic::Application for AppModel {
                             "SETTINGS NOT SAVED"
                         } else {
                             "CONNECTION FAILED"
-                        };                        let message = status
+                        };
+                        let message = status
                             .split_once(':')
                             .map(|(_, message)| message.trim())
                             .unwrap_or(status);
@@ -3127,15 +3174,18 @@ impl cosmic::Application for AppModel {
                     .align_y(cosmic::iced::Alignment::Center)
                     .push(widget::text::caption(current_date))
                     .push(widget::Space::new().width(cosmic::iced::Length::Fill));
-                let current_frame = weather.slideshow_sequence
+                let current_frame = weather
+                    .slideshow_sequence
                     .get(self.weather_slideshow_index)
                     .copied()
                     .unwrap_or(0);
-                let current_sources = weather.slideshow_frame_sources
+                let current_sources = weather
+                    .slideshow_frame_sources
                     .get(current_frame)
                     .cloned()
                     .unwrap_or_else(|| vec![0]);
-                let current_attributions: Vec<_> = current_sources.iter()
+                let current_attributions: Vec<_> = current_sources
+                    .iter()
                     .filter_map(|index| weather.image_attributions.get(*index))
                     .collect();
                 if !current_attributions.is_empty() {
@@ -3153,9 +3203,7 @@ impl cosmic::Application for AppModel {
                         .class(cosmic::theme::Button::Standard),
                     );
                 }
-                let mut weather_details = widget::Column::new()
-                    .spacing(6)
-                    .push(date_row);
+                let mut weather_details = widget::Column::new().spacing(6).push(date_row);
                 if self.weather_attribution_expanded {
                     for credit in current_attributions {
                         weather_details = weather_details.push(widget::text::caption(format!(
@@ -3166,10 +3214,12 @@ impl cosmic::Application for AppModel {
                             credit.license
                         )));
                         weather_details = weather_details.push(
-                            widget::button::custom(widget::text::caption("Wikimedia Commons file page ↗"))
-                                .on_press(Message::OpenCommonsPage(credit.page_url.clone()))
-                                .padding([2, 6])
-                                .class(cosmic::theme::Button::Text),
+                            widget::button::custom(widget::text::caption(
+                                "Wikimedia Commons file page ↗",
+                            ))
+                            .on_press(Message::OpenCommonsPage(credit.page_url.clone()))
+                            .padding([2, 6])
+                            .class(cosmic::theme::Button::Text),
                         );
                         if let Some(license_url) = &credit.license_url {
                             weather_details = weather_details.push(
@@ -3304,62 +3354,49 @@ impl cosmic::Application for AppModel {
                     .spacing(8)
                     .push(weather_heading)
                     .push(weather_details);
-                let weather_card: cosmic::Element<'_, Message> =
-                    if let Some(image_bytes) = weather.slideshow_sequence.get(self.weather_slideshow_index)
-                        .and_then(|frame| weather.slideshow_frames.get(*frame))
-                        .or(weather.background_image.as_ref()) {
-                        let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
-                            image_bytes.clone(),
-                        ))
+                let weather_card: cosmic::Element<'_, Message> = if let Some(image_bytes) = weather
+                    .slideshow_sequence
+                    .get(self.weather_slideshow_index)
+                    .and_then(|frame| weather.slideshow_frames.get(*frame))
+                    .or(weather.background_image.as_ref())
+                {
+                    let photo = widget::image::Image::new(widget::image::Handle::from_bytes(
+                        image_bytes.clone(),
+                    ))
+                    .width(cosmic::iced::Length::Fill)
+                    .height(cosmic::iced::Length::Fixed(260.0))
+                    .content_fit(cosmic::iced::ContentFit::Fill);
+                    let details = widget::container(weather_content)
                         .width(cosmic::iced::Length::Fill)
                         .height(cosmic::iced::Length::Fixed(260.0))
-                        .content_fit(cosmic::iced::ContentFit::Fill);
-                        let details = widget::container(weather_content)
-                            .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(260.0))
-                            .padding(10)
-                            .clip(true)
-                            .style(|_| cosmic::iced::widget::container::Style {
-                                // Keep the text layer transparent; the separate
-                                // background wash below it handles photo contrast.
-                                background: None,
-                                text_color: Some(cosmic::iced::Color::WHITE),
-                                ..Default::default()
-                            });
-                        // Keep the photograph and its readable details inside
-                        // one explicitly bounded, clipped weather surface. This
-                        // prevents the image layer from painting into adjacent
-                        // forecast or menu content when the popup is resized.
-                        let image_layer = widget::container(photo)
-                            .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(260.0))
-                            .clip(true);
-                        let mut weather_layers = cosmic::iced::widget::Stack::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(260.0))
-                            .push(image_layer);
-                        // Add a subtle transparent star field to nighttime
-                        // weather scenes without replacing the condition-matched
-                        // photograph or obscuring its Commons attribution.
-                        if weather.icon_code.ends_with('n') {
-                            if let Some(stars) = starry_night_overlay() {
-                                let star_layer = widget::container(
-                                    widget::image::Image::new(widget::image::Handle::from_bytes(stars))
-                                        .width(cosmic::iced::Length::Fill)
-                                        .height(cosmic::iced::Length::Fixed(260.0))
-                                        .content_fit(cosmic::iced::ContentFit::Fill),
-                                )
-                                .width(cosmic::iced::Length::Fill)
-                                .height(cosmic::iced::Length::Fixed(260.0))
-                                .clip(true);
-                                weather_layers = weather_layers.push(star_layer);
-                            }
-                        }
-                        // A black chessboard texture replaces image pixelation:
-                        // alternating squares are 50% opaque and fully transparent.
-                        if let Some(pattern) = chessboard_background_overlay() {
-                            let pattern_layer = widget::container(
-                                widget::image::Image::new(widget::image::Handle::from_bytes(pattern))
+                        .padding(10)
+                        .clip(true)
+                        .style(|_| cosmic::iced::widget::container::Style {
+                            // Keep the text layer transparent; the separate
+                            // background wash below it handles photo contrast.
+                            background: None,
+                            text_color: Some(cosmic::iced::Color::WHITE),
+                            ..Default::default()
+                        });
+                    // Keep the photograph and its readable details inside
+                    // one explicitly bounded, clipped weather surface. This
+                    // prevents the image layer from painting into adjacent
+                    // forecast or menu content when the popup is resized.
+                    let image_layer = widget::container(photo)
+                        .width(cosmic::iced::Length::Fill)
+                        .height(cosmic::iced::Length::Fixed(260.0))
+                        .clip(true);
+                    let mut weather_layers = cosmic::iced::widget::Stack::new()
+                        .width(cosmic::iced::Length::Fill)
+                        .height(cosmic::iced::Length::Fixed(260.0))
+                        .push(image_layer);
+                    // Add a subtle transparent star field to nighttime
+                    // weather scenes without replacing the condition-matched
+                    // photograph or obscuring its Commons attribution.
+                    if weather.icon_code.ends_with('n') {
+                        if let Some(stars) = starry_night_overlay() {
+                            let star_layer = widget::container(
+                                widget::image::Image::new(widget::image::Handle::from_bytes(stars))
                                     .width(cosmic::iced::Length::Fill)
                                     .height(cosmic::iced::Length::Fixed(260.0))
                                     .content_fit(cosmic::iced::ContentFit::Fill),
@@ -3367,32 +3404,45 @@ impl cosmic::Application for AppModel {
                             .width(cosmic::iced::Length::Fill)
                             .height(cosmic::iced::Length::Fixed(260.0))
                             .clip(true);
-                            weather_layers = weather_layers.push(pattern_layer);
+                            weather_layers = weather_layers.push(star_layer);
                         }
-                        widget::container(
-                            weather_layers.push(details),
+                    }
+                    // A black chessboard texture replaces image pixelation:
+                    // alternating squares are 50% opaque and fully transparent.
+                    if let Some(pattern) = chessboard_background_overlay() {
+                        let pattern_layer = widget::container(
+                            widget::image::Image::new(widget::image::Handle::from_bytes(pattern))
+                                .width(cosmic::iced::Length::Fill)
+                                .height(cosmic::iced::Length::Fixed(260.0))
+                                .content_fit(cosmic::iced::ContentFit::Fill),
                         )
+                        .width(cosmic::iced::Length::Fill)
+                        .height(cosmic::iced::Length::Fixed(260.0))
+                        .clip(true);
+                        weather_layers = weather_layers.push(pattern_layer);
+                    }
+                    widget::container(weather_layers.push(details))
                         .width(cosmic::iced::Length::Fill)
                         .height(cosmic::iced::Length::Fixed(260.0))
                         .clip(true)
                         .into()
-                    } else {
-                        widget::container(weather_content)
-                            .padding(10)
-                            .style(|theme| {
-                                let cosmic = theme.cosmic();
-                                cosmic::iced::widget::container::Style {
-                                    background: Some(
-                                        cosmic::iced::Color::from(
-                                            cosmic.background(false).small_widget,
-                                        )
-                                        .into(),
-                                    ),
-                                    ..Default::default()
-                                }
-                            })
-                            .into()
-                    };
+                } else {
+                    widget::container(weather_content)
+                        .padding(10)
+                        .style(|theme| {
+                            let cosmic = theme.cosmic();
+                            cosmic::iced::widget::container::Style {
+                                background: Some(
+                                    cosmic::iced::Color::from(
+                                        cosmic.background(false).small_widget,
+                                    )
+                                    .into(),
+                                ),
+                                ..Default::default()
+                            }
+                        })
+                        .into()
+                };
                 weather_section = weather_section.push(weather_card);
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
@@ -3583,10 +3633,14 @@ impl cosmic::Application for AppModel {
                         .iter()
                         .map(|(_, value)| *value as f64)
                         .collect(),
-                    rebuild_temperature_history(&self.device_history, &self.settings.input_ains, false)
-                        .iter()
-                        .map(|(_, value)| *value)
-                        .collect(),
+                    rebuild_temperature_history(
+                        &self.device_history,
+                        &self.settings.input_ains,
+                        false,
+                    )
+                    .iter()
+                    .map(|(_, value)| *value)
+                    .collect(),
                     &self.settings.graph_style,
                     &self.settings.language,
                     format_graph_axis_start(
@@ -3847,15 +3901,22 @@ impl cosmic::Application for AppModel {
                                                         .width(cosmic::iced::Length::Fill)
                                                         .push(widget::text::caption(
                                                             format_graph_axis_start(
-                                                                self.settings.graph_timespan_minutes,
-                                                                device_history.and_then(|samples| {
-                                                                    samples.front().map(|(timestamp, _, _)| {
-                                                                        Instant::now()
-                                                                            .duration_since(*timestamp)
-                                                                            .as_secs()
-                                                                            .div_ceil(60)
-                                                                    })
-                                                                }),
+                                                                self.settings
+                                                                    .graph_timespan_minutes,
+                                                                device_history.and_then(
+                                                                    |samples| {
+                                                                        samples.front().map(
+                                                                            |(timestamp, _, _)| {
+                                                                                Instant::now()
+                                                                                    .duration_since(
+                                                                                        *timestamp,
+                                                                                    )
+                                                                                    .as_secs()
+                                                                                    .div_ceil(60)
+                                                                            },
+                                                                        )
+                                                                    },
+                                                                ),
                                                             ),
                                                         ))
                                                         .push(
@@ -3945,15 +4006,22 @@ impl cosmic::Application for AppModel {
                                                         .width(cosmic::iced::Length::Fill)
                                                         .push(widget::text::caption(
                                                             format_graph_axis_start(
-                                                                self.settings.graph_timespan_minutes,
-                                                                device_history.and_then(|samples| {
-                                                                    samples.front().map(|(timestamp, _, _)| {
-                                                                        Instant::now()
-                                                                            .duration_since(*timestamp)
-                                                                            .as_secs()
-                                                                            .div_ceil(60)
-                                                                    })
-                                                                }),
+                                                                self.settings
+                                                                    .graph_timespan_minutes,
+                                                                device_history.and_then(
+                                                                    |samples| {
+                                                                        samples.front().map(
+                                                                            |(timestamp, _, _)| {
+                                                                                Instant::now()
+                                                                                    .duration_since(
+                                                                                        *timestamp,
+                                                                                    )
+                                                                                    .as_secs()
+                                                                                    .div_ceil(60)
+                                                                            },
+                                                                        )
+                                                                    },
+                                                                ),
                                                             ),
                                                         ))
                                                         .push(
@@ -4052,13 +4120,26 @@ impl cosmic::Application for AppModel {
                     menu_cards.extend(power_sections);
                 }
                 menu_cards.retain(|(key, _)| {
-                    let element = if key == "0-summary" { "summary" }
-                    else if key == "1-weather" { "weather" }
-                    else if key == "bandwidth" { "internet-bandwidth" }
-                    else if key.starts_with("2-") { "devices" }
-                    else if key.starts_with("3-") { "total-power-output" }
-                    else if key.starts_with("4-") { "total-power-input" }                    else { "devices" };
-                    !self.settings.hidden_menu_elements.iter().any(|hidden| hidden == element)
+                    let element = if key == "0-summary" {
+                        "summary"
+                    } else if key == "1-weather" {
+                        "weather"
+                    } else if key == "bandwidth" {
+                        "internet-bandwidth"
+                    } else if key.starts_with("2-") {
+                        "devices"
+                    } else if key.starts_with("3-") {
+                        "total-power-output"
+                    } else if key.starts_with("4-") {
+                        "total-power-input"
+                    } else {
+                        "devices"
+                    };
+                    !self
+                        .settings
+                        .hidden_menu_elements
+                        .iter()
+                        .any(|hidden| hidden == element)
                 });
                 // Sort popup sections by the user's saved order while preserving device order.
                 menu_cards.sort_by_key(|(key, _)| {
@@ -4120,8 +4201,11 @@ impl cosmic::Application for AppModel {
                                         .first()
                                         .and_then(|selected| {
                                             self.readings.iter().find(|reading| {
-                                                crate::fritz::normalize_ain_for_selection(&reading.ain)
-                                                    == crate::fritz::normalize_ain_for_selection(selected)
+                                                crate::fritz::normalize_ain_for_selection(
+                                                    &reading.ain,
+                                                ) == crate::fritz::normalize_ain_for_selection(
+                                                    selected,
+                                                )
                                             })
                                         })
                                         .or_else(|| self.readings.first());
@@ -4334,9 +4418,7 @@ impl cosmic::Application for AppModel {
                     "FRITZ!Power Monitor · v{}",
                     env!("APP_VERSION")
                 )))
-                .push(
-                    widget::Space::new().width(cosmic::iced::Length::Fill),
-                )
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                 .push(
                     widget::button::custom(widget::text::caption("Source code ↗"))
                         .on_press(Message::OpenCommonsPage(
@@ -4751,8 +4833,14 @@ impl cosmic::Application for AppModel {
             }
             Message::TestNotification => {
                 let _ = notify_rust::Notification::new()
-                    .summary(&crate::i18n::tr(&self.settings.language, "Fritz Power Monitor notification test"))
-                    .body(&crate::i18n::tr(&self.settings.language, "Notifications are working correctly."))
+                    .summary(&crate::i18n::tr(
+                        &self.settings.language,
+                        "Fritz Power Monitor notification test",
+                    ))
+                    .body(&crate::i18n::tr(
+                        &self.settings.language,
+                        "Notifications are working correctly.",
+                    ))
                     .show();
             }
             Message::FetchForecastFromDiagnostics => {
@@ -4838,8 +4926,12 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::ToggleMenuElementVisibility(element, visible) => {
-                self.settings.hidden_menu_elements.retain(|hidden| hidden != element);
-                if !visible { self.settings.hidden_menu_elements.push(element.to_string()); }
+                self.settings
+                    .hidden_menu_elements
+                    .retain(|hidden| hidden != element);
+                if !visible {
+                    self.settings.hidden_menu_elements.push(element.to_string());
+                }
                 self.persist_settings();
             }
             Message::TogglePanelItemVisibility(item, visible) => {
@@ -4980,7 +5072,8 @@ impl cosmic::Application for AppModel {
                 if self.popup.is_some() {
                     if let Some(weather) = &self.weather {
                         if !weather.slideshow_sequence.is_empty() {
-                            self.weather_slideshow_index = (self.weather_slideshow_index + 1) % weather.slideshow_sequence.len();
+                            self.weather_slideshow_index = (self.weather_slideshow_index + 1)
+                                % weather.slideshow_sequence.len();
                         }
                     }
                 }
@@ -5062,8 +5155,7 @@ impl cosmic::Application for AppModel {
                 self.persist_settings();
             }
             Message::LanguageChanged(language) => {
-                self.settings.language =
-                    crate::i18n::language_setting(&language).to_string();
+                self.settings.language = crate::i18n::language_setting(&language).to_string();
                 self.persist_settings();
             }
             Message::ToggleSettings => {
@@ -5102,7 +5194,8 @@ impl cosmic::Application for AppModel {
                 self.settings.allow_invalid_certs = value;
                 self.persist_settings();
             }
-            Message::CaCertPathChanged(value) => {                self.settings.ca_cert_path = value;
+            Message::CaCertPathChanged(value) => {
+                self.settings.ca_cert_path = value;
                 self.persist_settings();
             }
             Message::PanelTextSizeChanged(value) => {

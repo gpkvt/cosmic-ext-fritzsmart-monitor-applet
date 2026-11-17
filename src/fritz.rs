@@ -282,10 +282,17 @@ fn default_panel_order() -> Vec<String> {
 }
 
 fn parse_hidden_menu_elements(value: &str) -> Vec<String> {
-    value.split(',').map(str::trim)
+    value
+        .split(',')
+        .map(str::trim)
         .filter(|id| MENU_ELEMENT_IDS.contains(id))
         .map(str::to_string)
-        .fold(Vec::new(), |mut hidden, id| { if !hidden.contains(&id) { hidden.push(id); } hidden })
+        .fold(Vec::new(), |mut hidden, id| {
+            if !hidden.contains(&id) {
+                hidden.push(id);
+            }
+            hidden
+        })
 }
 
 fn parse_hidden_panel_items(value: &str) -> Vec<String> {
@@ -1756,11 +1763,8 @@ mod tests {
     #[test]
     fn fetch_result_reports_all_selected_devices_as_missing() {
         let xml = r#"<devicelist></devicelist>"#;
-        let result = parse_fetch_result_xml(
-            xml,
-            &["111111111111".into(), "222222222222".into()],
-        )
-        .unwrap();
+        let result =
+            parse_fetch_result_xml(xml, &["111111111111".into(), "222222222222".into()]).unwrap();
 
         assert!(result.readings.is_empty());
         assert_eq!(

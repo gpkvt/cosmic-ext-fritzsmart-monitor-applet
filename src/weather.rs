@@ -295,7 +295,8 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
     let location_name = payload["name"].as_str().unwrap_or(location).to_string();
     // Select photos using both the observed condition and OpenWeatherMap's
     // local day/night indicator. Image failures remain non-fatal.
-    let (mut background_images, image_attributions) = fetch_commons_background(&client, icon_code).await;
+    let (mut background_images, image_attributions) =
+        fetch_commons_background(&client, icon_code).await;
     let image_attribution = image_attributions.first().cloned();
     // At night, never substitute an unrelated image when Commons cannot
     // provide a credible match. Use a locally generated star field instead.
@@ -418,30 +419,81 @@ fn commons_title_matches_condition(icon_code: &str, title: &str) -> bool {
     // Commons search can return editorial assets whose titles only mention
     // weather. Reject these before considering condition keywords.
     let non_photo_terms = [
-        "book", "novel", "film", "movie", "cover", "poster", "illustration",
-        "drawing", "painting", "cartoon", "comic", "manga", "album", "song",
-        "soundtrack", "game", "logo", "advertisement", "advert", "theatre",
-        "theater", "fiction", "character", "sculpture", "statue", "map",
-        "diagram", "chart", "screenshot",
+        "book",
+        "novel",
+        "film",
+        "movie",
+        "cover",
+        "poster",
+        "illustration",
+        "drawing",
+        "painting",
+        "cartoon",
+        "comic",
+        "manga",
+        "album",
+        "song",
+        "soundtrack",
+        "game",
+        "logo",
+        "advertisement",
+        "advert",
+        "theatre",
+        "theater",
+        "fiction",
+        "character",
+        "sculpture",
+        "statue",
+        "map",
+        "diagram",
+        "chart",
+        "screenshot",
     ];
     if has(&non_photo_terms) {
         return false;
     }
 
-    let rain = ["rain", "rains", "raining", "rainy", "shower", "showers", "drizzle", "drizzling", "precipitation"];
-    let storm = ["storm", "storms", "stormy", "thunder", "thunderstorm", "lightning"];
+    let rain = [
+        "rain",
+        "rains",
+        "raining",
+        "rainy",
+        "shower",
+        "showers",
+        "drizzle",
+        "drizzling",
+        "precipitation",
+    ];
+    let storm = [
+        "storm",
+        "storms",
+        "stormy",
+        "thunder",
+        "thunderstorm",
+        "lightning",
+    ];
     let snow = ["snow", "snowfall", "snowy", "blizzard"];
     let fog = ["fog", "foggy", "mist", "misty", "haze", "hazy"];
-    let clouds = ["cloud", "clouds", "cloudy", "overcast", "cumulus", "stratus"];
+    let clouds = [
+        "cloud", "clouds", "cloudy", "overcast", "cumulus", "stratus",
+    ];
 
     match icon_code.get(..2).unwrap_or("") {
         "01" if icon_code.ends_with('n') => {
             has(&["clear", "star", "stars", "starry", "moon", "moonlight"])
-                && !has(&rain) && !has(&storm) && !has(&snow) && !has(&fog)
+                && !has(&rain)
+                && !has(&storm)
+                && !has(&snow)
+                && !has(&fog)
         }
         "01" => {
-            (has(&["sun", "sunny", "sunshine", "sunlight", "cloudless"]) || has(&["blue", "sky"]) && normalized.contains("blue sky") || has(&["clear"]) && normalized.contains("clear sky"))
-                && !has(&rain) && !has(&storm) && !has(&snow) && !has(&fog)
+            (has(&["sun", "sunny", "sunshine", "sunlight", "cloudless"])
+                || has(&["blue", "sky"]) && normalized.contains("blue sky")
+                || has(&["clear"]) && normalized.contains("clear sky"))
+                && !has(&rain)
+                && !has(&storm)
+                && !has(&snow)
+                && !has(&fog)
         }
         "02" | "03" | "04" => {
             has(&clouds) && !has(&rain) && !has(&storm) && !has(&snow) && !has(&fog)
@@ -465,21 +517,37 @@ async fn fetch_commons_background(
     // result offsets, which admitted unrelated files into the slideshow.
     for variant in 0..commons_search_terms(icon_code).len() {
         let search = commons_search_term(icon_code, variant);
-        let response = client.get("https://commons.wikimedia.org/w/api.php")
+        let response = client
+            .get("https://commons.wikimedia.org/w/api.php")
             .query(&[
-                ("action", "query"), ("generator", "search"),
-                ("gsrsearch", search), ("gsrnamespace", "6"),
+                ("action", "query"),
+                ("generator", "search"),
+                ("gsrsearch", search),
+                ("gsrnamespace", "6"),
                 ("gsrlimit", "20"),
-                ("prop", "imageinfo|categories"), ("iiprop", "url|extmetadata"),
-                ("cllimit", "20"), ("clshow", "!hidden"),
-                ("iiurlwidth", "1200"), ("format", "json"),
-            ]).send().await;
+                ("prop", "imageinfo|categories"),
+                ("iiprop", "url|extmetadata"),
+                ("cllimit", "20"),
+                ("clshow", "!hidden"),
+                ("iiurlwidth", "1200"),
+                ("format", "json"),
+            ])
+            .send()
+            .await;
         let Ok(response) = response else { continue };
-        if !response.status().is_success() { continue; }
-        let Ok(response) = response.json::<serde_json::Value>().await else { continue };
-        let Some(pages) = response["query"]["pages"].as_object() else { continue };
+        if !response.status().is_success() {
+            continue;
+        }
+        let Ok(response) = response.json::<serde_json::Value>().await else {
+            continue;
+        };
+        let Some(pages) = response["query"]["pages"].as_object() else {
+            continue;
+        };
         for page in pages.values() {
-            if images.len() >= 5 { break; }
+            if images.len() >= 5 {
+                break;
+            }
             let title = page["title"].as_str().unwrap_or("");
             // Use the file title itself as the relevance signal. Categories
             // are often broad or inherited and can incorrectly admit unrelated
@@ -487,38 +555,60 @@ async fn fetch_commons_background(
             if !commons_title_matches_condition(icon_code, title) {
                 continue;
             }
-            if !seen_titles.insert(title.to_string()) { continue; }
+            if !seen_titles.insert(title.to_string()) {
+                continue;
+            }
             let info = &page["imageinfo"][0];
-            let Some(image_url) = info["thumburl"].as_str().or_else(|| info["url"].as_str()) else { continue };
-            let Ok(response) = client.get(image_url).send().await else { continue };
-            if !response.status().is_success() { continue; }
-            let Ok(bytes) = response.bytes().await else { continue };
+            let Some(image_url) = info["thumburl"].as_str().or_else(|| info["url"].as_str()) else {
+                continue;
+            };
+            let Ok(response) = client.get(image_url).send().await else {
+                continue;
+            };
+            if !response.status().is_success() {
+                continue;
+            }
+            let Ok(bytes) = response.bytes().await else {
+                continue;
+            };
             // Keep the original photograph intact. The weather card adds a
             // transparent black chessboard overlay at display time.
             let image = bytes.to_vec();
             let metadata = &info["extmetadata"];
-            let artist = metadata["Artist"]["value"].as_str()
+            let artist = metadata["Artist"]["value"]
+                .as_str()
                 .or_else(|| metadata["Credit"]["value"].as_str())
                 .filter(|value| !strip_html(value).is_empty())
                 .map(strip_html)
                 .unwrap_or_else(|| "Author not provided by Wikimedia Commons".to_string());
-            let license = metadata["LicenseShortName"]["value"].as_str()
+            let license = metadata["LicenseShortName"]["value"]
+                .as_str()
                 .or_else(|| metadata["UsageTerms"]["value"].as_str())
                 .map(strip_html)
                 .filter(|value| !value.is_empty())
                 .unwrap_or_else(|| "License details on Wikimedia Commons file page".to_string());
-            let license_url = metadata["LicenseUrl"]["value"].as_str()
+            let license_url = metadata["LicenseUrl"]["value"]
+                .as_str()
                 .filter(|url| url.starts_with("https://") && !url.chars().any(char::is_control))
                 .map(str::to_string);
-            let title = page["title"].as_str().unwrap_or("Wikimedia Commons photograph");
-            let page_url = info["descriptionurl"].as_str().unwrap_or("https://commons.wikimedia.org/");
+            let title = page["title"]
+                .as_str()
+                .unwrap_or("Wikimedia Commons photograph");
+            let page_url = info["descriptionurl"]
+                .as_str()
+                .unwrap_or("https://commons.wikimedia.org/");
             attributions.push(CommonsAttribution {
-                title: title.to_string(), artist, license, license_url,
+                title: title.to_string(),
+                artist,
+                license,
+                license_url,
                 page_url: commons_file_page_url(page_url),
             });
             images.push(image);
         }
-        if images.len() >= 5 { break; }
+        if images.len() >= 5 {
+            break;
+        }
     }
     (images, attributions)
 }
@@ -532,7 +622,6 @@ fn commons_file_page_url(value: &str) -> String {
         "https://commons.wikimedia.org/".to_string()
     }
 }
-
 
 /// Creates a deterministic, locally generated starry-night backdrop. This is
 /// deliberately independent of network services and external image metadata.
@@ -554,7 +643,11 @@ pub fn starry_night_overlay() -> Option<Vec<u8>> {
             let y = random() % (height * 3 / 4);
             let brightness = 175u8.saturating_add((random() % 81) as u8);
             let alpha = 105u8.saturating_add((random() % 125) as u8);
-            let radius = if brightness > 230 && random() % 7 == 0 { 1i32 } else { 0i32 };
+            let radius = if brightness > 230 && random() % 7 == 0 {
+                1i32
+            } else {
+                0i32
+            };
             for dy in -radius..=radius {
                 for dx in -radius..=radius {
                     if dx * dx + dy * dy > radius * radius {
@@ -605,18 +698,28 @@ fn generate_starry_night_background() -> Option<Vec<u8>> {
         let x = random() % width;
         let y = random() % (height * 3 / 4);
         let brightness = 150u8.saturating_add((random() % 106) as u8);
-        let radius = if brightness > 225 && random() % 5 == 0 { 2i32 } else { 1i32 };
+        let radius = if brightness > 225 && random() % 5 == 0 {
+            2i32
+        } else {
+            1i32
+        };
         for dy in -radius..=radius {
             for dx in -radius..=radius {
-                if dx * dx + dy * dy > radius * radius { continue; }
+                if dx * dx + dy * dy > radius * radius {
+                    continue;
+                }
                 let px = x as i32 + dx;
                 let py = y as i32 + dy;
                 if px >= 0 && py >= 0 && px < width as i32 && py < height as i32 {
-                    image.put_pixel(px as u32, py as u32, image::Rgb([
-                        brightness.saturating_sub(12),
-                        brightness.saturating_sub(5),
-                        brightness,
-                    ]));
+                    image.put_pixel(
+                        px as u32,
+                        py as u32,
+                        image::Rgb([
+                            brightness.saturating_sub(12),
+                            brightness.saturating_sub(5),
+                            brightness,
+                        ]),
+                    );
                 }
             }
         }
@@ -657,11 +760,14 @@ pub fn build_weather_slideshow_frames(
     display_seconds: u16,
 ) -> (Vec<Vec<u8>>, Vec<usize>, Vec<Vec<usize>>) {
     use image::{DynamicImage, ImageBuffer, Rgba};
-    let decoded: Vec<_> = images.iter()
+    let decoded: Vec<_> = images
+        .iter()
         .filter_map(|bytes| image::load_from_memory(bytes).ok())
         .map(|image| image.to_rgba8())
         .collect();
-    if decoded.is_empty() { return (Vec::new(), Vec::new(), Vec::new()); }
+    if decoded.is_empty() {
+        return (Vec::new(), Vec::new(), Vec::new());
+    }
 
     let mut frames = Vec::new();
     let mut sequence = Vec::new();
@@ -670,29 +776,37 @@ pub fn build_weather_slideshow_frames(
     for (index, current) in decoded.iter().enumerate() {
         let mut output = std::io::Cursor::new(Vec::new());
         if DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(current.clone()).to_rgb8())
-            .write_to(&mut output, image::ImageFormat::Jpeg).is_ok()
+            .write_to(&mut output, image::ImageFormat::Jpeg)
+            .is_ok()
         {
             frames.push(output.into_inner());
             let frame_index = frames.len() - 1;
             sequence.extend(std::iter::repeat(frame_index).take(hold_ticks));
             frame_sources.push(vec![index]);
         }
-        if decoded.len() < 2 { continue; }
+        if decoded.len() < 2 {
+            continue;
+        }
         let next = &decoded[(index + 1) % decoded.len()];
-        if current.dimensions() != next.dimensions() { continue; }
+        if current.dimensions() != next.dimensions() {
+            continue;
+        }
         for step in 1..=3 {
             let amount = step as f32 / 4.0;
-            let mut blended: ImageBuffer<Rgba<u8>, Vec<u8>> = ImageBuffer::new(current.width(), current.height());
+            let mut blended: ImageBuffer<Rgba<u8>, Vec<u8>> =
+                ImageBuffer::new(current.width(), current.height());
             for (x, y, pixel) in blended.enumerate_pixels_mut() {
                 let a = current.get_pixel(x, y).0;
                 let b = next.get_pixel(x, y).0;
                 *pixel = Rgba(std::array::from_fn(|channel| {
-                    (f32::from(a[channel]) * (1.0 - amount) + f32::from(b[channel]) * amount).round() as u8
+                    (f32::from(a[channel]) * (1.0 - amount) + f32::from(b[channel]) * amount)
+                        .round() as u8
                 }));
             }
             let mut output = std::io::Cursor::new(Vec::new());
             if DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(blended).to_rgb8())
-                .write_to(&mut output, image::ImageFormat::Jpeg).is_ok()
+                .write_to(&mut output, image::ImageFormat::Jpeg)
+                .is_ok()
             {
                 frames.push(output.into_inner());
                 sequence.push(frames.len() - 1);
@@ -715,7 +829,8 @@ fn strip_html(value: &str) -> String {
         }
     }
     let output = output.split_whitespace().collect::<Vec<_>>().join(" ");
-    output.replace("&amp;", "&")
+    output
+        .replace("&amp;", "&")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
@@ -842,8 +957,14 @@ mod tests {
         ] {
             assert_eq!(commons_search_term(icon, 0), expected);
         }
-        assert_eq!(commons_search_term("01n", 1), "clear night sky over city skyline");
-        assert_eq!(commons_search_term("01n", 2), "moon stars night mountain landscape");
+        assert_eq!(
+            commons_search_term("01n", 1),
+            "clear night sky over city skyline"
+        );
+        assert_eq!(
+            commons_search_term("01n", 2),
+            "moon stars night mountain landscape"
+        );
     }
 
     #[test]
@@ -856,7 +977,11 @@ mod tests {
             ("04d", "Overcast sky", true),
             ("04d", "Beautiful landscape at night", false),
             ("04d", "Rain clouds over the city", false),
-            ("02d", "Cloudy with a Chance of Meatballs movie poster", false),
+            (
+                "02d",
+                "Cloudy with a Chance of Meatballs movie poster",
+                false,
+            ),
             ("10d", "Heavy rain over a field", true),
             ("10d", "Cloudy sky over the coast", false),
             ("10d", "Thunderstorm with heavy rain", false),
@@ -867,7 +992,11 @@ mod tests {
             ("50d", "Misty morning landscape", true),
             ("50n", "Sunny city skyline", false),
         ] {
-            assert_eq!(commons_title_matches_condition(icon, title), expected, "{icon}: {title}");
+            assert_eq!(
+                commons_title_matches_condition(icon, title),
+                expected,
+                "{icon}: {title}"
+            );
         }
     }
 
@@ -880,30 +1009,48 @@ mod tests {
             "Rainy Day cartoon character",
             "Snowstorm album cover",
         ] {
-            let icon = if title.to_ascii_lowercase().contains("thunderstorm") { "11d" }
-                else if title.to_ascii_lowercase().contains("rainy") { "10d" }
-                else if title.to_ascii_lowercase().contains("snowstorm") { "13d" }
-                else { "04d" };
+            let icon = if title.to_ascii_lowercase().contains("thunderstorm") {
+                "11d"
+            } else if title.to_ascii_lowercase().contains("rainy") {
+                "10d"
+            } else if title.to_ascii_lowercase().contains("snowstorm") {
+                "13d"
+            } else {
+                "04d"
+            };
             assert!(!commons_title_matches_condition(icon, title), "{title}");
         }
-        assert!(commons_title_matches_condition("04d", "Cumulus clouds over the coast"));
-        assert!(commons_title_matches_condition("11d", "Lightning over the mountains"));
+        assert!(commons_title_matches_condition(
+            "04d",
+            "Cumulus clouds over the coast"
+        ));
+        assert!(commons_title_matches_condition(
+            "11d",
+            "Lightning over the mountains"
+        ));
     }
 
     #[test]
     fn weather_slideshow_contains_hold_and_crossfade_frames() {
         let first = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
-            8, 8, image::Rgb([0, 0, 0]),
+            8,
+            8,
+            image::Rgb([0, 0, 0]),
         ));
         let second = image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
-            8, 8, image::Rgb([255, 255, 255]),
+            8,
+            8,
+            image::Rgb([255, 255, 255]),
         ));
         let encode = |image: image::DynamicImage| {
             let mut output = std::io::Cursor::new(Vec::new());
-            image.write_to(&mut output, image::ImageFormat::Jpeg).unwrap();
+            image
+                .write_to(&mut output, image::ImageFormat::Jpeg)
+                .unwrap();
             output.into_inner()
         };
-        let (frames, sequence, frame_sources) = build_weather_slideshow_frames(&[encode(first), encode(second)], 5);
+        let (frames, sequence, frame_sources) =
+            build_weather_slideshow_frames(&[encode(first), encode(second)], 5);
         assert_eq!(frames.len(), 8);
         assert_eq!(sequence.len(), 46);
         assert_eq!(frame_sources.len(), frames.len());
