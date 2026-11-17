@@ -317,6 +317,43 @@ fn graph_history_storage_window(minutes: u32) -> Duration {
     graph_history_window(minutes).max(Duration::from_secs(30 * 24 * 60 * 60))
 }
 
+fn rebuild_device_history_graph(
+    device_history: &crate::history::DeviceHistory,
+    ain: &str,
+    name: &str,
+    language: &str,
+    minutes: u32,
+) -> (String, Vec<f64>, String, Option<String>) {
+    let now = Instant::now();
+    let window = graph_history_window(minutes);
+    let visible: Vec<_> = device_history
+        .get(ain)
+        .into_iter()
+        .flat_map(|samples| samples.iter())
+        .filter(|(timestamp, _, _)| now.duration_since(*timestamp) <= window)
+        .collect();
+    let values = visible
+        .iter()
+        .map(|(_, power, _)| *power as f64)
+        .collect();
+    let axis_start = format_graph_axis_start(
+        minutes,
+        visible.first().map(|(timestamp, _, _)| {
+            now.duration_since(*timestamp).as_secs().div_ceil(60)
+        }),
+    );
+    (
+        format!(
+            "{} · {}",
+            name,
+            crate::i18n::tr(language, "POWER (W)")
+        ),
+        values,
+        "W".into(),
+        Some(axis_start),
+    )
+}
+
 const MAX_HISTORY_SAMPLES: u64 = 50_000;
 const MIN_HISTORY_SAMPLE_INTERVAL: Duration = Duration::from_secs(60);
 
@@ -5956,6 +5993,7 @@ impl cosmic::Application for AppModel {
                     let minutes = minutes.clamp(5, 2_102_400);
                     if self.settings.graph_timespan_minutes != minutes {
                         self.settings.graph_timespan_minutes = minutes;
+                        self.quick_graph_timespan = minutes;
                         let now = Instant::now();
                         let window = graph_history_window(minutes);
                         let storage_window = graph_history_storage_window(minutes);
@@ -5963,38 +6001,16 @@ impl cosmic::Application for AppModel {
                         history.retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
                         self.history = history;
                         self.device_history = device_history;
-
-                        if let Some(index) = self.history_graph_index {
-                            if let Some((key, name)) =
-                                self.history_graph_devices.get(index).cloned()
-                            {
-                                if let Some(samples) = self.device_history.get(&key) {
-                                    let visible: Vec<_> = samples
-                                        .iter()
-                                        .filter(|(timestamp, _, _)| {
-                                            now.duration_since(*timestamp) <= window
-                                        })
-                                        .collect();
-                                    let values =
-                                        visible.iter().map(|(_, power, _)| *power as f64).collect();
-                                    let axis_start = format_graph_axis_start(
-                                        minutes,
-                                        visible.first().map(|(timestamp, _, _)| {
-                                            now.duration_since(*timestamp).as_secs().div_ceil(60)
-                                        }),
-                                    );
-                                    self.expanded_graph = Some((
-                                        format!(
-                                            "{} · {}",
-                                            name,
-                                            crate::i18n::tr(&self.settings.language, "POWER (W)")
-                                        ),
-                                        values,
-                                        "W".into(),
-                                        Some(axis_start),
-                                    ));
-                                }
-                            }
+                        if let Some(index) = self.history_graph_index
+                            && let Some((key, name)) = self.history_graph_devices.get(index).cloned()
+                        {
+                            self.expanded_graph = Some(rebuild_device_history_graph(
+                                &self.device_history,
+                                &key,
+                                &name,
+                                &self.settings.language,
+                                minutes,
+                            ));
                         }
                         self.history_storage_diagnostics =
                             crate::history::diagnostics(storage_window);
@@ -6662,9 +6678,19 @@ impl cosmic::Application for AppModel {
                     (self.history, self.device_history) = crate::history::load(storage_window);
                     let window = graph_history_window(self.settings.graph_timespan_minutes);
                     let now = Instant::now();
-                    self.history
-                        .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
+                    self.history.retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
                     self.history_storage_diagnostics = crate::history::diagnostics(storage_window);
+                    if let Some(index) = self.history_graph_index
+                        && let Some((key, name)) = self.history_graph_devices.get(index).cloned()
+                    {
+                        self.expanded_graph = Some(rebuild_device_history_graph(
+                            &self.device_history,
+                            &key,
+                            &name,
+                            &self.settings.language,
+                            self.settings.graph_timespan_minutes,
+                        ));
+                    }
                     self.persist_settings();
                 }
             }
@@ -7050,14 +7076,25 @@ impl cosmic::Application for AppModel {
             }
             Message::GraphTimespanChanged(value) => {
                 self.settings.graph_timespan_minutes = value.clamp(5, 2_102_400);
+                self.quick_graph_timespan = self.settings.graph_timespan_minutes;
                 let storage_window =
                     graph_history_storage_window(self.settings.graph_timespan_minutes);
                 (self.history, self.device_history) = crate::history::load(storage_window);
                 let window = graph_history_window(self.settings.graph_timespan_minutes);
                 let now = Instant::now();
-                self.history
-                    .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
+                self.history.retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
                 self.history_storage_diagnostics = crate::history::diagnostics(storage_window);
+                if let Some(index) = self.history_graph_index
+                    && let Some((key, name)) = self.history_graph_devices.get(index).cloned()
+                {
+                    self.expanded_graph = Some(rebuild_device_history_graph(
+                        &self.device_history,
+                        &key,
+                        &name,
+                        &self.settings.language,
+                        self.settings.graph_timespan_minutes,
+                    ));
+                }
                 self.persist_settings();
             }
             Message::GraphStyleChanged(value) => {
