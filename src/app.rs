@@ -3887,6 +3887,7 @@ impl cosmic::Application for AppModel {
                         .into()
                     });
 
+                let requests = crate::fritz::http_request_diagnostics();
                 let fritz_base = endpoint.trim_end_matches('/');
                 let fritz_endpoint_status = |path: &str| {
                     requests
