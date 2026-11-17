@@ -5,14 +5,23 @@ use std::env;
 /// Keep an explicitly selected supported language instead of silently resetting it to system.
 pub fn language_setting(value: &str) -> &'static str {
     match value {
-        "en" | "de" | "es" | "nl" | "fr" | "it" | "sv" | "pt" | "pl" | "da" | "no" | "ja" | "ko" | "system" => {
-            match value {
-                "en" => "en", "de" => "de", "es" => "es", "nl" => "nl",
-                "fr" => "fr", "it" => "it", "sv" => "sv", "pt" => "pt",
-                "pl" => "pl", "da" => "da", "no" => "no", "ja" => "ja",
-                "ko" => "ko", _ => "system",
-            }
-        }
+        "en" | "de" | "es" | "nl" | "fr" | "it" | "sv" | "pt" | "pl" | "da" | "no" | "ja"
+        | "ko" | "system" => match value {
+            "en" => "en",
+            "de" => "de",
+            "es" => "es",
+            "nl" => "nl",
+            "fr" => "fr",
+            "it" => "it",
+            "sv" => "sv",
+            "pt" => "pt",
+            "pl" => "pl",
+            "da" => "da",
+            "no" => "no",
+            "ja" => "ja",
+            "ko" => "ko",
+            _ => "system",
+        },
         _ => "system",
     }
 }
@@ -22,7 +31,10 @@ pub fn language(setting: &str) -> &'static str {
     fn from_locale(value: &str) -> Option<&'static str> {
         let value = value.to_ascii_lowercase();
         let value = value.split(':').next().unwrap_or(&value);
-        let value = value.split(|c| c == '_' || c == '-' || c == '.').next().unwrap_or(&value);
+        let value = value
+            .split(|c| c == '_' || c == '-' || c == '.')
+            .next()
+            .unwrap_or(&value);
         match value {
             "de" => Some("de"),
             "en" => Some("en"),
@@ -62,15 +74,60 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
     if lang != "de" {
         return match (lang, key) {
             // Spanish
-            ("es", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "El sistema sigue el idioma del escritorio. Idiomas disponibles: inglés, alemán, español, neerlandés, francés, italiano, sueco, portugués, polaco, danés y noruego.",
-            ("nl", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "Het systeem volgt de taal van je bureaublad. Beschikbare talen: Engels, Duits, Spaans, Nederlands, Frans, Italiaans, Zweeds, Portugees, Pools, Deens en Noors.",
-            ("fr", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "Le système suit la langue de votre bureau. Langues disponibles : anglais, allemand, espagnol, néerlandais, français, italien, suédois, portugais, polonais, danois et norvégien.",
-            ("it", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "Il sistema segue la lingua del desktop. Lingue disponibili: inglese, tedesco, spagnolo, olandese, francese, italiano, svedese, portoghese, polacco, danese e norvegese.",
-            ("sv", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "Systemet följer skrivbordets språk. Tillgängliga språk: engelska, tyska, spanska, nederländska, franska, italienska, svenska, portugisiska, polska, danska och norska.",
-            ("pt", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "O sistema segue o idioma do ambiente de trabalho. Idiomas disponíveis: inglês, alemão, espanhol, neerlandês, francês, italiano, sueco, português, polaco, dinamarquês e norueguês.",
-            ("pl", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "System używa języka pulpitu. Dostępne języki: angielski, niemiecki, hiszpański, niderlandzki, francuski, włoski, szwedzki, portugalski, polski, duński i norweski.",
-            ("da", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "Systemet følger sproget på skrivebordet. Tilgængelige sprog: engelsk, tysk, spansk, nederlandsk, fransk, italiensk, svensk, portugisisk, polsk, dansk og norsk.",
-            ("no", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "Systemet følger språket på skrivebordet. Tilgjengelige språk: engelsk, tysk, spansk, nederlandsk, fransk, italiensk, svensk, portugisisk, polsk, dansk og norsk.",
+            (
+                "es",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.",
+            ) => {
+                "El sistema sigue el idioma del escritorio. Idiomas disponibles: inglés, alemán, español, neerlandés, francés, italiano, sueco, portugués, polaco, danés y noruego."
+            }
+            (
+                "nl",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.",
+            ) => {
+                "Het systeem volgt de taal van je bureaublad. Beschikbare talen: Engels, Duits, Spaans, Nederlands, Frans, Italiaans, Zweeds, Portugees, Pools, Deens en Noors."
+            }
+            (
+                "fr",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.",
+            ) => {
+                "Le système suit la langue de votre bureau. Langues disponibles : anglais, allemand, espagnol, néerlandais, français, italien, suédois, portugais, polonais, danois et norvégien."
+            }
+            (
+                "it",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.",
+            ) => {
+                "Il sistema segue la lingua del desktop. Lingue disponibili: inglese, tedesco, spagnolo, olandese, francese, italiano, svedese, portoghese, polacco, danese e norvegese."
+            }
+            (
+                "sv",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.",
+            ) => {
+                "Systemet följer skrivbordets språk. Tillgängliga språk: engelska, tyska, spanska, nederländska, franska, italienska, svenska, portugisiska, polska, danska och norska."
+            }
+            (
+                "pt",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.",
+            ) => {
+                "O sistema segue o idioma do ambiente de trabalho. Idiomas disponíveis: inglês, alemão, espanhol, neerlandês, francês, italiano, sueco, português, polaco, dinamarquês e norueguês."
+            }
+            (
+                "pl",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.",
+            ) => {
+                "System używa języka pulpitu. Dostępne języki: angielski, niemiecki, hiszpański, niderlandzki, francuski, włoski, szwedzki, portugalski, polski, duński i norweski."
+            }
+            (
+                "da",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.",
+            ) => {
+                "Systemet følger sproget på skrivebordet. Tilgængelige sprog: engelsk, tysk, spansk, nederlandsk, fransk, italiensk, svensk, portugisisk, polsk, dansk og norsk."
+            }
+            (
+                "no",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.",
+            ) => {
+                "Systemet følger språket på skrivebordet. Tilgjengelige språk: engelsk, tysk, spansk, nederlandsk, fransk, italiensk, svensk, portugisisk, polsk, dansk og norsk."
+            }
             ("es", "Settings") => "Ajustes",
             ("es", "Configure your power monitor") => "Configura tu monitor de energía",
             ("es", "GENERAL") => "GENERAL",
@@ -595,23 +652,40 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             // Expanded es interface and diagnostics coverage
             ("es", "Close") => "Cerrar",
             ("es", "Panel item order") => "Orden de los elementos del panel",
-            ("es", "Adjusts the power and temperature text in the panel") => "Ajusta el texto de potencia y temperatura del panel",
-            ("es", "Controls the gap between panel items") => "Controla el espacio entre los elementos del panel",
+            ("es", "Adjusts the power and temperature text in the panel") => {
+                "Ajusta el texto de potencia y temperatura del panel"
+            }
+            ("es", "Controls the gap between panel items") => {
+                "Controla el espacio entre los elementos del panel"
+            }
             ("es", "Multiline panel values") => "Valores del panel en varias líneas",
-            ("es", "Stack related readings vertically instead of placing them on one line.") => "Muestra las lecturas relacionadas en vertical en lugar de en una sola línea.",
+            ("es", "Stack related readings vertically instead of placing them on one line.") => {
+                "Muestra las lecturas relacionadas en vertical en lugar de en una sola línea."
+            }
             ("es", "Show panel refresh button") => "Mostrar botón de actualización en el panel",
-            ("es", "Display a separate refresh button beside the applet in the panel.") => "Muestra un botón de actualización independiente junto al applet en el panel.",
+            ("es", "Display a separate refresh button beside the applet in the panel.") => {
+                "Muestra un botón de actualización independiente junto al applet en el panel."
+            }
             ("es", "Show internet bandwidth") => "Mostrar el ancho de banda de Internet",
             ("es", "Combine consumption and solar power") => "Combinar consumo y energía solar",
-            ("es", "Show one net power value: total consumption minus solar generation.") => "Muestra una única potencia neta: consumo total menos generación solar.",
+            ("es", "Show one net power value: total consumption minus solar generation.") => {
+                "Muestra una única potencia neta: consumo total menos generación solar."
+            }
             ("es", "Exclude solar devices") => "Excluir dispositivos solares",
-            ("es", "Ignore temperatures from devices whose name contains “solar” when calculating the average.") => "Ignora las temperaturas de los dispositivos cuyo nombre contiene «solar» al calcular la media.",
+            (
+                "es",
+                "Ignore temperatures from devices whose name contains “solar” when calculating the average.",
+            ) => {
+                "Ignora las temperaturas de los dispositivos cuyo nombre contiene «solar» al calcular la media."
+            }
             ("es", "GRAPH STYLE") => "ESTILO DE GRÁFICA",
             ("es", "30 seconds to 1 hour") => "De 30 segundos a 1 hora",
             ("es", "Use current weather icon") => "Usar el icono del tiempo actual",
             ("es", "OpenWeatherMap API key") => "Clave de API de OpenWeatherMap",
             ("es", "API key") => "Clave de API",
-            ("es", "Location (city or latitude,longitude)") => "Ubicación (ciudad o latitud,longitud)",
+            ("es", "Location (city or latitude,longitude)") => {
+                "Ubicación (ciudad o latitud,longitud)"
+            }
             ("es", "Weather refresh") => "Actualización del tiempo",
             ("es", "Slideshow image duration") => "Duración de las imágenes",
             ("es", "FRITZ!Box URL") => "URL de FRITZ!Box",
@@ -621,8 +695,12 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("es", "Popup element order") => "Orden de los elementos de la ventana",
             ("es", "Move up") => "Mover arriba",
             ("es", "Move down") => "Mover abajo",
-            ("es", "Select power-meter devices") => "Selecciona los dispositivos medidores de energía",
-            ("es", "Input device (separate total)") => "Dispositivo de entrada (total independiente)",
+            ("es", "Select power-meter devices") => {
+                "Selecciona los dispositivos medidores de energía"
+            }
+            ("es", "Input device (separate total)") => {
+                "Dispositivo de entrada (total independiente)"
+            }
             ("es", "Connection security") => "Seguridad de la conexión",
             ("es", "External resources") => "Servicios externos",
             ("es", "System notifications") => "Notificaciones del sistema",
@@ -633,37 +711,60 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("es", "Get 7-day forecast") => "Obtener pronóstico de 7 días",
             ("es", "HTTP successful") => "HTTP correcto",
             ("es", "HTTP failed") => "Error HTTP",
-            ("es", "Connected · device data loaded") => "Conectado · datos de dispositivos cargados",
+            ("es", "Connected · device data loaded") => {
+                "Conectado · datos de dispositivos cargados"
+            }
             ("es", "Request in progress") => "Solicitud en curso",
             ("es", "No additional status messages") => "No hay más mensajes de estado",
             ("es", "Photo") => "Foto",
             ("es", "Forecast data by Open-Meteo") => "Pronóstico de Open-Meteo",
             ("es", "DOWNLOAD HISTORY") => "HISTORIAL DE DESCARGA",
             ("es", "UPLOAD HISTORY") => "HISTORIAL DE SUBIDA",
-            ("es", "Select one or more devices in Settings") => "Selecciona uno o más dispositivos en Ajustes",
-            ("es", "Fritz Power Monitor notification test") => "Prueba de notificaciones de Fritz Power Monitor",
-            ("es", "Notifications are working correctly.") => "Las notificaciones funcionan correctamente.",
+            ("es", "Select one or more devices in Settings") => {
+                "Selecciona uno o más dispositivos en Ajustes"
+            }
+            ("es", "Fritz Power Monitor notification test") => {
+                "Prueba de notificaciones de Fritz Power Monitor"
+            }
+            ("es", "Notifications are working correctly.") => {
+                "Las notificaciones funcionan correctamente."
+            }
 
             // Expanded nl interface and diagnostics coverage
             ("nl", "Close") => "Sluiten",
             ("nl", "Panel item order") => "Volgorde van paneelitems",
-            ("nl", "Adjusts the power and temperature text in the panel") => "Past de tekstgrootte van vermogen en temperatuur in het paneel aan",
+            ("nl", "Adjusts the power and temperature text in the panel") => {
+                "Past de tekstgrootte van vermogen en temperatuur in het paneel aan"
+            }
             ("nl", "Controls the gap between panel items") => "Regelt de ruimte tussen paneelitems",
             ("nl", "Multiline panel values") => "Paneelwaarden op meerdere regels",
-            ("nl", "Stack related readings vertically instead of placing them on one line.") => "Toont bij elkaar horende metingen onder elkaar in plaats van op één regel.",
+            ("nl", "Stack related readings vertically instead of placing them on one line.") => {
+                "Toont bij elkaar horende metingen onder elkaar in plaats van op één regel."
+            }
             ("nl", "Show panel refresh button") => "Vernieuwknop in paneel tonen",
-            ("nl", "Display a separate refresh button beside the applet in the panel.") => "Toont een aparte vernieuwknop naast de applet in het paneel.",
+            ("nl", "Display a separate refresh button beside the applet in the panel.") => {
+                "Toont een aparte vernieuwknop naast de applet in het paneel."
+            }
             ("nl", "Show internet bandwidth") => "Internetbandbreedte tonen",
             ("nl", "Combine consumption and solar power") => "Verbruik en zonne-energie combineren",
-            ("nl", "Show one net power value: total consumption minus solar generation.") => "Toont één nettovermogenswaarde: totaal verbruik min zonne-opwekking.",
+            ("nl", "Show one net power value: total consumption minus solar generation.") => {
+                "Toont één nettovermogenswaarde: totaal verbruik min zonne-opwekking."
+            }
             ("nl", "Exclude solar devices") => "Zonnepanelen uitsluiten",
-            ("nl", "Ignore temperatures from devices whose name contains “solar” when calculating the average.") => "Negeert temperaturen van apparaten met ‘solar’ in de naam bij het berekenen van het gemiddelde.",
+            (
+                "nl",
+                "Ignore temperatures from devices whose name contains “solar” when calculating the average.",
+            ) => {
+                "Negeert temperaturen van apparaten met ‘solar’ in de naam bij het berekenen van het gemiddelde."
+            }
             ("nl", "GRAPH STYLE") => "GRAFIEKSTIJL",
             ("nl", "30 seconds to 1 hour") => "30 seconden tot 1 uur",
             ("nl", "Use current weather icon") => "Huidig weerpictogram gebruiken",
             ("nl", "OpenWeatherMap API key") => "OpenWeatherMap API-sleutel",
             ("nl", "API key") => "API-sleutel",
-            ("nl", "Location (city or latitude,longitude)") => "Locatie (plaats of breedtegraad,lengtegraad)",
+            ("nl", "Location (city or latitude,longitude)") => {
+                "Locatie (plaats of breedtegraad,lengtegraad)"
+            }
             ("nl", "Weather refresh") => "Weer vernieuwen",
             ("nl", "Slideshow image duration") => "Duur van diavoorstelling",
             ("nl", "FRITZ!Box URL") => "FRITZ!Box-URL",
@@ -692,24 +793,45 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("nl", "Forecast data by Open-Meteo") => "Verwachting door Open-Meteo",
             ("nl", "DOWNLOAD HISTORY") => "DOWNLOADGESCHIEDENIS",
             ("nl", "UPLOAD HISTORY") => "UPLOADGESCHIEDENIS",
-            ("nl", "Select one or more devices in Settings") => "Selecteer een of meer apparaten in Instellingen",
-            ("nl", "Fritz Power Monitor notification test") => "Meldingstest van Fritz Power Monitor",
+            ("nl", "Select one or more devices in Settings") => {
+                "Selecteer een of meer apparaten in Instellingen"
+            }
+            ("nl", "Fritz Power Monitor notification test") => {
+                "Meldingstest van Fritz Power Monitor"
+            }
             ("nl", "Notifications are working correctly.") => "Meldingen werken correct.",
 
             // Expanded fr interface and diagnostics coverage
             ("fr", "Close") => "Fermer",
             ("fr", "Panel item order") => "Ordre des éléments du panneau",
-            ("fr", "Adjusts the power and temperature text in the panel") => "Règle la taille du texte de puissance et de température dans le panneau",
-            ("fr", "Controls the gap between panel items") => "Règle l’espacement entre les éléments du panneau",
+            ("fr", "Adjusts the power and temperature text in the panel") => {
+                "Règle la taille du texte de puissance et de température dans le panneau"
+            }
+            ("fr", "Controls the gap between panel items") => {
+                "Règle l’espacement entre les éléments du panneau"
+            }
             ("fr", "Multiline panel values") => "Valeurs du panneau sur plusieurs lignes",
-            ("fr", "Stack related readings vertically instead of placing them on one line.") => "Affiche les mesures associées verticalement plutôt que sur une seule ligne.",
+            ("fr", "Stack related readings vertically instead of placing them on one line.") => {
+                "Affiche les mesures associées verticalement plutôt que sur une seule ligne."
+            }
             ("fr", "Show panel refresh button") => "Afficher le bouton d’actualisation du panneau",
-            ("fr", "Display a separate refresh button beside the applet in the panel.") => "Affiche un bouton d’actualisation distinct à côté de l’applet dans le panneau.",
+            ("fr", "Display a separate refresh button beside the applet in the panel.") => {
+                "Affiche un bouton d’actualisation distinct à côté de l’applet dans le panneau."
+            }
             ("fr", "Show internet bandwidth") => "Afficher le débit Internet",
-            ("fr", "Combine consumption and solar power") => "Combiner consommation et énergie solaire",
-            ("fr", "Show one net power value: total consumption minus solar generation.") => "Affiche une puissance nette : consommation totale moins production solaire.",
+            ("fr", "Combine consumption and solar power") => {
+                "Combiner consommation et énergie solaire"
+            }
+            ("fr", "Show one net power value: total consumption minus solar generation.") => {
+                "Affiche une puissance nette : consommation totale moins production solaire."
+            }
             ("fr", "Exclude solar devices") => "Exclure les appareils solaires",
-            ("fr", "Ignore temperatures from devices whose name contains “solar” when calculating the average.") => "Ignore les températures des appareils dont le nom contient « solar » lors du calcul de la moyenne.",
+            (
+                "fr",
+                "Ignore temperatures from devices whose name contains “solar” when calculating the average.",
+            ) => {
+                "Ignore les températures des appareils dont le nom contient « solar » lors du calcul de la moyenne."
+            }
             ("fr", "GRAPH STYLE") => "STYLE DU GRAPHIQUE",
             ("fr", "30 seconds to 1 hour") => "De 30 secondes à 1 heure",
             ("fr", "Use current weather icon") => "Utiliser l’icône météo actuelle",
@@ -725,7 +847,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("fr", "Popup element order") => "Ordre des éléments de la fenêtre",
             ("fr", "Move up") => "Monter",
             ("fr", "Move down") => "Descendre",
-            ("fr", "Select power-meter devices") => "Sélectionner les appareils de mesure électrique",
+            ("fr", "Select power-meter devices") => {
+                "Sélectionner les appareils de mesure électrique"
+            }
             ("fr", "Input device (separate total)") => "Appareil d’entrée (total séparé)",
             ("fr", "Connection security") => "Sécurité de la connexion",
             ("fr", "External resources") => "Services externes",
@@ -737,37 +861,64 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("fr", "Get 7-day forecast") => "Obtenir les prévisions sur 7 jours",
             ("fr", "HTTP successful") => "HTTP réussi",
             ("fr", "HTTP failed") => "Échec HTTP",
-            ("fr", "Connected · device data loaded") => "Connecté · données des appareils chargées",
+            ("fr", "Connected · device data loaded") => {
+                "Connecté · données des appareils chargées"
+            }
             ("fr", "Request in progress") => "Requête en cours",
             ("fr", "No additional status messages") => "Aucun autre message d’état",
             ("fr", "Photo") => "Photo",
             ("fr", "Forecast data by Open-Meteo") => "Prévisions par Open-Meteo",
             ("fr", "DOWNLOAD HISTORY") => "HISTORIQUE DES TÉLÉCHARGEMENTS",
             ("fr", "UPLOAD HISTORY") => "HISTORIQUE DES ENVOIS",
-            ("fr", "Select one or more devices in Settings") => "Sélectionnez un ou plusieurs appareils dans les paramètres",
-            ("fr", "Fritz Power Monitor notification test") => "Test de notification Fritz Power Monitor",
-            ("fr", "Notifications are working correctly.") => "Les notifications fonctionnent correctement.",
+            ("fr", "Select one or more devices in Settings") => {
+                "Sélectionnez un ou plusieurs appareils dans les paramètres"
+            }
+            ("fr", "Fritz Power Monitor notification test") => {
+                "Test de notification Fritz Power Monitor"
+            }
+            ("fr", "Notifications are working correctly.") => {
+                "Les notifications fonctionnent correctement."
+            }
 
             // Expanded it interface and diagnostics coverage
             ("it", "Close") => "Chiudi",
             ("it", "Panel item order") => "Ordine degli elementi del pannello",
-            ("it", "Adjusts the power and temperature text in the panel") => "Regola la dimensione del testo di potenza e temperatura nel pannello",
-            ("it", "Controls the gap between panel items") => "Regola la distanza tra gli elementi del pannello",
+            ("it", "Adjusts the power and temperature text in the panel") => {
+                "Regola la dimensione del testo di potenza e temperatura nel pannello"
+            }
+            ("it", "Controls the gap between panel items") => {
+                "Regola la distanza tra gli elementi del pannello"
+            }
             ("it", "Multiline panel values") => "Valori del pannello su più righe",
-            ("it", "Stack related readings vertically instead of placing them on one line.") => "Dispone le letture correlate in verticale anziché su un'unica riga.",
-            ("it", "Show panel refresh button") => "Mostra il pulsante di aggiornamento nel pannello",
-            ("it", "Display a separate refresh button beside the applet in the panel.") => "Mostra un pulsante di aggiornamento separato accanto all'applet nel pannello.",
+            ("it", "Stack related readings vertically instead of placing them on one line.") => {
+                "Dispone le letture correlate in verticale anziché su un'unica riga."
+            }
+            ("it", "Show panel refresh button") => {
+                "Mostra il pulsante di aggiornamento nel pannello"
+            }
+            ("it", "Display a separate refresh button beside the applet in the panel.") => {
+                "Mostra un pulsante di aggiornamento separato accanto all'applet nel pannello."
+            }
             ("it", "Show internet bandwidth") => "Mostra la larghezza di banda Internet",
             ("it", "Combine consumption and solar power") => "Combina consumo ed energia solare",
-            ("it", "Show one net power value: total consumption minus solar generation.") => "Mostra un unico valore netto: consumo totale meno produzione solare.",
+            ("it", "Show one net power value: total consumption minus solar generation.") => {
+                "Mostra un unico valore netto: consumo totale meno produzione solare."
+            }
             ("it", "Exclude solar devices") => "Escludi i dispositivi solari",
-            ("it", "Ignore temperatures from devices whose name contains “solar” when calculating the average.") => "Ignora le temperature dei dispositivi il cui nome contiene «solar» nel calcolo della media.",
+            (
+                "it",
+                "Ignore temperatures from devices whose name contains “solar” when calculating the average.",
+            ) => {
+                "Ignora le temperature dei dispositivi il cui nome contiene «solar» nel calcolo della media."
+            }
             ("it", "GRAPH STYLE") => "STILE DEL GRAFICO",
             ("it", "30 seconds to 1 hour") => "Da 30 secondi a 1 ora",
             ("it", "Use current weather icon") => "Usa l'icona meteo attuale",
             ("it", "OpenWeatherMap API key") => "Chiave API OpenWeatherMap",
             ("it", "API key") => "Chiave API",
-            ("it", "Location (city or latitude,longitude)") => "Posizione (città o latitudine,longitudine)",
+            ("it", "Location (city or latitude,longitude)") => {
+                "Posizione (città o latitudine,longitudine)"
+            }
             ("it", "Weather refresh") => "Aggiornamento meteo",
             ("it", "Slideshow image duration") => "Durata delle immagini",
             ("it", "FRITZ!Box URL") => "URL FRITZ!Box",
@@ -796,24 +947,41 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("it", "Forecast data by Open-Meteo") => "Previsioni fornite da Open-Meteo",
             ("it", "DOWNLOAD HISTORY") => "CRONOLOGIA DOWNLOAD",
             ("it", "UPLOAD HISTORY") => "CRONOLOGIA UPLOAD",
-            ("it", "Select one or more devices in Settings") => "Seleziona uno o più dispositivi nelle impostazioni",
+            ("it", "Select one or more devices in Settings") => {
+                "Seleziona uno o più dispositivi nelle impostazioni"
+            }
             ("it", "Fritz Power Monitor notification test") => "Test notifiche Fritz Power Monitor",
-            ("it", "Notifications are working correctly.") => "Le notifiche funzionano correttamente.",
+            ("it", "Notifications are working correctly.") => {
+                "Le notifiche funzionano correttamente."
+            }
 
             // Expanded sv interface and diagnostics coverage
             ("sv", "Close") => "Stäng",
             ("sv", "Panel item order") => "Ordning för panelobjekt",
-            ("sv", "Adjusts the power and temperature text in the panel") => "Justerar textstorleken för effekt och temperatur i panelen",
+            ("sv", "Adjusts the power and temperature text in the panel") => {
+                "Justerar textstorleken för effekt och temperatur i panelen"
+            }
             ("sv", "Controls the gap between panel items") => "Styr avståndet mellan panelobjekten",
             ("sv", "Multiline panel values") => "Panelvärden på flera rader",
-            ("sv", "Stack related readings vertically instead of placing them on one line.") => "Visa relaterade mätvärden vertikalt i stället för på en rad.",
+            ("sv", "Stack related readings vertically instead of placing them on one line.") => {
+                "Visa relaterade mätvärden vertikalt i stället för på en rad."
+            }
             ("sv", "Show panel refresh button") => "Visa uppdateringsknapp i panelen",
-            ("sv", "Display a separate refresh button beside the applet in the panel.") => "Visar en separat uppdateringsknapp bredvid panelappen.",
+            ("sv", "Display a separate refresh button beside the applet in the panel.") => {
+                "Visar en separat uppdateringsknapp bredvid panelappen."
+            }
             ("sv", "Show internet bandwidth") => "Visa internethastighet",
             ("sv", "Combine consumption and solar power") => "Kombinera förbrukning och solel",
-            ("sv", "Show one net power value: total consumption minus solar generation.") => "Visa ett nettovärde: total förbrukning minus solelproduktion.",
+            ("sv", "Show one net power value: total consumption minus solar generation.") => {
+                "Visa ett nettovärde: total förbrukning minus solelproduktion."
+            }
             ("sv", "Exclude solar devices") => "Uteslut solenergienheter",
-            ("sv", "Ignore temperatures from devices whose name contains “solar” when calculating the average.") => "Ignorera temperaturer från enheter vars namn innehåller ”solar” när medelvärdet beräknas.",
+            (
+                "sv",
+                "Ignore temperatures from devices whose name contains “solar” when calculating the average.",
+            ) => {
+                "Ignorera temperaturer från enheter vars namn innehåller ”solar” när medelvärdet beräknas."
+            }
             ("sv", "GRAPH STYLE") => "GRAFSTIL",
             ("sv", "30 seconds to 1 hour") => "30 sekunder till 1 timme",
             ("sv", "Use current weather icon") => "Använd aktuell väderikon",
@@ -848,30 +1016,51 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("sv", "Forecast data by Open-Meteo") => "Prognosdata från Open-Meteo",
             ("sv", "DOWNLOAD HISTORY") => "NEDLADDNINGSHISTORIK",
             ("sv", "UPLOAD HISTORY") => "UPPLADDNINGSHISTORIK",
-            ("sv", "Select one or more devices in Settings") => "Välj en eller flera enheter i Inställningar",
-            ("sv", "Fritz Power Monitor notification test") => "Aviseringstest för Fritz Power Monitor",
+            ("sv", "Select one or more devices in Settings") => {
+                "Välj en eller flera enheter i Inställningar"
+            }
+            ("sv", "Fritz Power Monitor notification test") => {
+                "Aviseringstest för Fritz Power Monitor"
+            }
             ("sv", "Notifications are working correctly.") => "Aviseringarna fungerar.",
 
             // Expanded pt interface and diagnostics coverage
             ("pt", "Close") => "Fechar",
             ("pt", "Panel item order") => "Ordem dos elementos do painel",
-            ("pt", "Adjusts the power and temperature text in the panel") => "Ajusta o tamanho do texto da potência e temperatura no painel",
-            ("pt", "Controls the gap between panel items") => "Controla o espaço entre os elementos do painel",
+            ("pt", "Adjusts the power and temperature text in the panel") => {
+                "Ajusta o tamanho do texto da potência e temperatura no painel"
+            }
+            ("pt", "Controls the gap between panel items") => {
+                "Controla o espaço entre os elementos do painel"
+            }
             ("pt", "Multiline panel values") => "Valores do painel em várias linhas",
-            ("pt", "Stack related readings vertically instead of placing them on one line.") => "Apresenta as leituras relacionadas na vertical em vez de numa só linha.",
+            ("pt", "Stack related readings vertically instead of placing them on one line.") => {
+                "Apresenta as leituras relacionadas na vertical em vez de numa só linha."
+            }
             ("pt", "Show panel refresh button") => "Mostrar botão de atualização no painel",
-            ("pt", "Display a separate refresh button beside the applet in the panel.") => "Mostra um botão de atualização separado junto à aplicação no painel.",
+            ("pt", "Display a separate refresh button beside the applet in the panel.") => {
+                "Mostra um botão de atualização separado junto à aplicação no painel."
+            }
             ("pt", "Show internet bandwidth") => "Mostrar largura de banda da Internet",
             ("pt", "Combine consumption and solar power") => "Combinar consumo e energia solar",
-            ("pt", "Show one net power value: total consumption minus solar generation.") => "Mostra um valor líquido: consumo total menos produção solar.",
+            ("pt", "Show one net power value: total consumption minus solar generation.") => {
+                "Mostra um valor líquido: consumo total menos produção solar."
+            }
             ("pt", "Exclude solar devices") => "Excluir dispositivos solares",
-            ("pt", "Ignore temperatures from devices whose name contains “solar” when calculating the average.") => "Ignora as temperaturas de dispositivos cujo nome contém «solar» ao calcular a média.",
+            (
+                "pt",
+                "Ignore temperatures from devices whose name contains “solar” when calculating the average.",
+            ) => {
+                "Ignora as temperaturas de dispositivos cujo nome contém «solar» ao calcular a média."
+            }
             ("pt", "GRAPH STYLE") => "ESTILO DO GRÁFICO",
             ("pt", "30 seconds to 1 hour") => "30 segundos a 1 hora",
             ("pt", "Use current weather icon") => "Usar o ícone meteorológico atual",
             ("pt", "OpenWeatherMap API key") => "Chave de API OpenWeatherMap",
             ("pt", "API key") => "Chave de API",
-            ("pt", "Location (city or latitude,longitude)") => "Localização (cidade ou latitude,longitude)",
+            ("pt", "Location (city or latitude,longitude)") => {
+                "Localização (cidade ou latitude,longitude)"
+            }
             ("pt", "Weather refresh") => "Atualização meteorológica",
             ("pt", "Slideshow image duration") => "Duração das imagens",
             ("pt", "FRITZ!Box URL") => "URL da FRITZ!Box",
@@ -893,37 +1082,62 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("pt", "Get 7-day forecast") => "Obter previsão de 7 dias",
             ("pt", "HTTP successful") => "HTTP bem-sucedido",
             ("pt", "HTTP failed") => "Falha HTTP",
-            ("pt", "Connected · device data loaded") => "Ligado · dados dos dispositivos carregados",
+            ("pt", "Connected · device data loaded") => {
+                "Ligado · dados dos dispositivos carregados"
+            }
             ("pt", "Request in progress") => "Pedido em curso",
             ("pt", "No additional status messages") => "Sem mensagens de estado adicionais",
             ("pt", "Photo") => "Fotografia",
             ("pt", "Forecast data by Open-Meteo") => "Previsão fornecida por Open-Meteo",
             ("pt", "DOWNLOAD HISTORY") => "HISTÓRICO DE TRANSFERÊNCIAS",
             ("pt", "UPLOAD HISTORY") => "HISTÓRICO DE ENVIOS",
-            ("pt", "Select one or more devices in Settings") => "Selecione um ou mais dispositivos nas definições",
-            ("pt", "Fritz Power Monitor notification test") => "Teste de notificações do Fritz Power Monitor",
-            ("pt", "Notifications are working correctly.") => "As notificações estão a funcionar corretamente.",
+            ("pt", "Select one or more devices in Settings") => {
+                "Selecione um ou mais dispositivos nas definições"
+            }
+            ("pt", "Fritz Power Monitor notification test") => {
+                "Teste de notificações do Fritz Power Monitor"
+            }
+            ("pt", "Notifications are working correctly.") => {
+                "As notificações estão a funcionar corretamente."
+            }
 
             // Expanded pl interface and diagnostics coverage
             ("pl", "Close") => "Zamknij",
             ("pl", "Panel item order") => "Kolejność elementów panelu",
-            ("pl", "Adjusts the power and temperature text in the panel") => "Zmienia rozmiar tekstu mocy i temperatury w panelu",
-            ("pl", "Controls the gap between panel items") => "Ustawia odstęp między elementami panelu",
+            ("pl", "Adjusts the power and temperature text in the panel") => {
+                "Zmienia rozmiar tekstu mocy i temperatury w panelu"
+            }
+            ("pl", "Controls the gap between panel items") => {
+                "Ustawia odstęp między elementami panelu"
+            }
             ("pl", "Multiline panel values") => "Wartości panelu w wielu wierszach",
-            ("pl", "Stack related readings vertically instead of placing them on one line.") => "Wyświetla powiązane odczyty pionowo zamiast w jednym wierszu.",
+            ("pl", "Stack related readings vertically instead of placing them on one line.") => {
+                "Wyświetla powiązane odczyty pionowo zamiast w jednym wierszu."
+            }
             ("pl", "Show panel refresh button") => "Pokaż przycisk odświeżania w panelu",
-            ("pl", "Display a separate refresh button beside the applet in the panel.") => "Wyświetla osobny przycisk odświeżania obok apletu w panelu.",
+            ("pl", "Display a separate refresh button beside the applet in the panel.") => {
+                "Wyświetla osobny przycisk odświeżania obok apletu w panelu."
+            }
             ("pl", "Show internet bandwidth") => "Pokaż przepustowość Internetu",
             ("pl", "Combine consumption and solar power") => "Połącz zużycie i energię słoneczną",
-            ("pl", "Show one net power value: total consumption minus solar generation.") => "Pokazuje jedną wartość netto: całkowite zużycie minus produkcja energii słonecznej.",
+            ("pl", "Show one net power value: total consumption minus solar generation.") => {
+                "Pokazuje jedną wartość netto: całkowite zużycie minus produkcja energii słonecznej."
+            }
             ("pl", "Exclude solar devices") => "Wyklucz urządzenia solarne",
-            ("pl", "Ignore temperatures from devices whose name contains “solar” when calculating the average.") => "Pomija temperatury urządzeń, których nazwa zawiera „solar”, podczas obliczania średniej.",
+            (
+                "pl",
+                "Ignore temperatures from devices whose name contains “solar” when calculating the average.",
+            ) => {
+                "Pomija temperatury urządzeń, których nazwa zawiera „solar”, podczas obliczania średniej."
+            }
             ("pl", "GRAPH STYLE") => "STYL WYKRESU",
             ("pl", "30 seconds to 1 hour") => "Od 30 sekund do 1 godziny",
             ("pl", "Use current weather icon") => "Użyj ikony bieżącej pogody",
             ("pl", "OpenWeatherMap API key") => "Klucz API OpenWeatherMap",
             ("pl", "API key") => "Klucz API",
-            ("pl", "Location (city or latitude,longitude)") => "Lokalizacja (miasto lub szerokość,długość geograficzna)",
+            ("pl", "Location (city or latitude,longitude)") => {
+                "Lokalizacja (miasto lub szerokość,długość geograficzna)"
+            }
             ("pl", "Weather refresh") => "Odświeżanie pogody",
             ("pl", "Slideshow image duration") => "Czas wyświetlania zdjęcia",
             ("pl", "FRITZ!Box URL") => "Adres URL FRITZ!Box",
@@ -952,30 +1166,51 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("pl", "Forecast data by Open-Meteo") => "Prognoza z Open-Meteo",
             ("pl", "DOWNLOAD HISTORY") => "HISTORIA POBIERANIA",
             ("pl", "UPLOAD HISTORY") => "HISTORIA WYSYŁANIA",
-            ("pl", "Select one or more devices in Settings") => "Wybierz co najmniej jedno urządzenie w ustawieniach",
-            ("pl", "Fritz Power Monitor notification test") => "Test powiadomień Fritz Power Monitor",
+            ("pl", "Select one or more devices in Settings") => {
+                "Wybierz co najmniej jedno urządzenie w ustawieniach"
+            }
+            ("pl", "Fritz Power Monitor notification test") => {
+                "Test powiadomień Fritz Power Monitor"
+            }
             ("pl", "Notifications are working correctly.") => "Powiadomienia działają prawidłowo.",
 
             // Expanded da interface and diagnostics coverage
             ("da", "Close") => "Luk",
             ("da", "Panel item order") => "Rækkefølge for panelelementer",
-            ("da", "Adjusts the power and temperature text in the panel") => "Justerer tekststørrelsen for effekt og temperatur i panelet",
-            ("da", "Controls the gap between panel items") => "Styrer afstanden mellem panelelementer",
+            ("da", "Adjusts the power and temperature text in the panel") => {
+                "Justerer tekststørrelsen for effekt og temperatur i panelet"
+            }
+            ("da", "Controls the gap between panel items") => {
+                "Styrer afstanden mellem panelelementer"
+            }
             ("da", "Multiline panel values") => "Panelværdier på flere linjer",
-            ("da", "Stack related readings vertically instead of placing them on one line.") => "Viser relaterede målinger lodret i stedet for på én linje.",
+            ("da", "Stack related readings vertically instead of placing them on one line.") => {
+                "Viser relaterede målinger lodret i stedet for på én linje."
+            }
             ("da", "Show panel refresh button") => "Vis opdateringsknap i panelet",
-            ("da", "Display a separate refresh button beside the applet in the panel.") => "Viser en separat opdateringsknap ved siden af appletten i panelet.",
+            ("da", "Display a separate refresh button beside the applet in the panel.") => {
+                "Viser en separat opdateringsknap ved siden af appletten i panelet."
+            }
             ("da", "Show internet bandwidth") => "Vis internetbåndbredde",
             ("da", "Combine consumption and solar power") => "Kombinér forbrug og solenergi",
-            ("da", "Show one net power value: total consumption minus solar generation.") => "Vis én nettoværdi: samlet forbrug minus solproduktion.",
+            ("da", "Show one net power value: total consumption minus solar generation.") => {
+                "Vis én nettoværdi: samlet forbrug minus solproduktion."
+            }
             ("da", "Exclude solar devices") => "Udeluk solenergienheder",
-            ("da", "Ignore temperatures from devices whose name contains “solar” when calculating the average.") => "Ignorer temperaturer fra enheder med ”solar” i navnet ved beregning af gennemsnittet.",
+            (
+                "da",
+                "Ignore temperatures from devices whose name contains “solar” when calculating the average.",
+            ) => {
+                "Ignorer temperaturer fra enheder med ”solar” i navnet ved beregning af gennemsnittet."
+            }
             ("da", "GRAPH STYLE") => "GRAFSTIL",
             ("da", "30 seconds to 1 hour") => "30 sekunder til 1 time",
             ("da", "Use current weather icon") => "Brug aktuelt vejrikon",
             ("da", "OpenWeatherMap API key") => "OpenWeatherMap API-nøgle",
             ("da", "API key") => "API-nøgle",
-            ("da", "Location (city or latitude,longitude)") => "Placering (by eller breddegrad,længdegrad)",
+            ("da", "Location (city or latitude,longitude)") => {
+                "Placering (by eller breddegrad,længdegrad)"
+            }
             ("da", "Weather refresh") => "Vejropdatering",
             ("da", "Slideshow image duration") => "Varighed af billeder",
             ("da", "FRITZ!Box URL") => "FRITZ!Box-URL",
@@ -1004,30 +1239,51 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("da", "Forecast data by Open-Meteo") => "Prognose fra Open-Meteo",
             ("da", "DOWNLOAD HISTORY") => "DOWNLOADHISTORIK",
             ("da", "UPLOAD HISTORY") => "UPLOADHISTORIK",
-            ("da", "Select one or more devices in Settings") => "Vælg en eller flere enheder i Indstillinger",
-            ("da", "Fritz Power Monitor notification test") => "Fritz Power Monitor-meddelelsestest",
+            ("da", "Select one or more devices in Settings") => {
+                "Vælg en eller flere enheder i Indstillinger"
+            }
+            ("da", "Fritz Power Monitor notification test") => {
+                "Fritz Power Monitor-meddelelsestest"
+            }
             ("da", "Notifications are working correctly.") => "Meddelelser fungerer korrekt.",
 
             // Expanded no interface and diagnostics coverage
             ("no", "Close") => "Lukk",
             ("no", "Panel item order") => "Rekkefølge for panelelementer",
-            ("no", "Adjusts the power and temperature text in the panel") => "Justerer tekststørrelsen for effekt og temperatur i panelet",
-            ("no", "Controls the gap between panel items") => "Styrer avstanden mellom panelelementene",
+            ("no", "Adjusts the power and temperature text in the panel") => {
+                "Justerer tekststørrelsen for effekt og temperatur i panelet"
+            }
+            ("no", "Controls the gap between panel items") => {
+                "Styrer avstanden mellom panelelementene"
+            }
             ("no", "Multiline panel values") => "Panelverdier over flere linjer",
-            ("no", "Stack related readings vertically instead of placing them on one line.") => "Viser relaterte målinger vertikalt i stedet for på én linje.",
+            ("no", "Stack related readings vertically instead of placing them on one line.") => {
+                "Viser relaterte målinger vertikalt i stedet for på én linje."
+            }
             ("no", "Show panel refresh button") => "Vis oppdateringsknapp i panelet",
-            ("no", "Display a separate refresh button beside the applet in the panel.") => "Viser en egen oppdateringsknapp ved siden av appleten i panelet.",
+            ("no", "Display a separate refresh button beside the applet in the panel.") => {
+                "Viser en egen oppdateringsknapp ved siden av appleten i panelet."
+            }
             ("no", "Show internet bandwidth") => "Vis internetthastighet",
             ("no", "Combine consumption and solar power") => "Kombiner forbruk og solenergi",
-            ("no", "Show one net power value: total consumption minus solar generation.") => "Vis én nettoverdi: totalt forbruk minus solproduksjon.",
+            ("no", "Show one net power value: total consumption minus solar generation.") => {
+                "Vis én nettoverdi: totalt forbruk minus solproduksjon."
+            }
             ("no", "Exclude solar devices") => "Utelat solenergienheter",
-            ("no", "Ignore temperatures from devices whose name contains “solar” when calculating the average.") => "Ignorer temperaturer fra enheter med «solar» i navnet når gjennomsnittet beregnes.",
+            (
+                "no",
+                "Ignore temperatures from devices whose name contains “solar” when calculating the average.",
+            ) => {
+                "Ignorer temperaturer fra enheter med «solar» i navnet når gjennomsnittet beregnes."
+            }
             ("no", "GRAPH STYLE") => "GRAFSTIL",
             ("no", "30 seconds to 1 hour") => "30 sekunder til 1 time",
             ("no", "Use current weather icon") => "Bruk gjeldende værikon",
             ("no", "OpenWeatherMap API key") => "OpenWeatherMap API-nøkkel",
             ("no", "API key") => "API-nøkkel",
-            ("no", "Location (city or latitude,longitude)") => "Sted (by eller breddegrad, lengdegrad)",
+            ("no", "Location (city or latitude,longitude)") => {
+                "Sted (by eller breddegrad, lengdegrad)"
+            }
             ("no", "Weather refresh") => "Væroppdatering",
             ("no", "Slideshow image duration") => "Varighet for lysbildefremvisning",
             ("no", "FRITZ!Box URL") => "FRITZ!Box-URL",
@@ -1056,10 +1312,13 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("no", "Forecast data by Open-Meteo") => "Værvarsel fra Open-Meteo",
             ("no", "DOWNLOAD HISTORY") => "NEDLASTINGSHISTORIKK",
             ("no", "UPLOAD HISTORY") => "OPPLASTINGSHISTORIKK",
-            ("no", "Select one or more devices in Settings") => "Velg én eller flere enheter i Innstillinger",
-            ("no", "Fritz Power Monitor notification test") => "Varslingstest for Fritz Power Monitor",
+            ("no", "Select one or more devices in Settings") => {
+                "Velg én eller flere enheter i Innstillinger"
+            }
+            ("no", "Fritz Power Monitor notification test") => {
+                "Varslingstest for Fritz Power Monitor"
+            }
             ("no", "Notifications are working correctly.") => "Varslingene fungerer som de skal.",
-
 
             // Additional es labels for graphs, TLS and service diagnostics
             ("es", "High temperature") => "Temperatura alta",
@@ -1075,29 +1334,51 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("es", "Move device up") => "Mover dispositivo arriba",
             ("es", "Move device down") => "Mover dispositivo abajo",
             ("es", "Certificate validation disabled") => "Validación de certificados desactivada",
-            ("es", "Custom CA certificate configured") => "Certificado CA personalizado configurado",
+            ("es", "Custom CA certificate configured") => {
+                "Certificado CA personalizado configurado"
+            }
             ("es", "System certificate roots") => "Certificados raíz del sistema",
             ("es", "Plain HTTP · TLS is not enabled") => "HTTP simple · TLS no está habilitado",
-            ("es", "URL is invalid or not configured") => "La URL no es válida o no está configurada",
+            ("es", "URL is invalid or not configured") => {
+                "La URL no es válida o no está configurada"
+            }
             ("es", "HTTPS / TLS") => "HTTPS / TLS",
             ("es", "Not configured") => "No configurado",
-            ("es", "Send a test notification to verify desktop notification delivery.") => "Envía una notificación de prueba para comprobar las notificaciones del escritorio.",
+            ("es", "Send a test notification to verify desktop notification delivery.") => {
+                "Envía una notificación de prueba para comprobar las notificaciones del escritorio."
+            }
             ("es", "Image loaded") => "Imagen cargada",
             ("es", "No usable image loaded") => "No se ha cargado ninguna imagen utilizable",
             ("es", "Weather request failed") => "Error en la solicitud del tiempo",
             ("es", "Weather location not configured") => "Ubicación meteorológica no configurada",
             ("es", "Forecast request in progress") => "Solicitud de pronóstico en curso",
             ("es", "Forecast loaded") => "Pronóstico cargado",
-            ("es", "Not checked · request a forecast to test") => "No comprobado · solicita un pronóstico para probar",
-            ("es", "Request a forecast to verify the Open-Meteo endpoints.") => "Solicita un pronóstico para verificar los servicios de Open-Meteo.",
+            ("es", "Not checked · request a forecast to test") => {
+                "No comprobado · solicita un pronóstico para probar"
+            }
+            ("es", "Request a forecast to verify the Open-Meteo endpoints.") => {
+                "Solicita un pronóstico para verificar los servicios de Open-Meteo."
+            }
             ("es", "Base URL not configured") => "URL base no configurada",
             ("es", "Session authentication") => "Autenticación de sesión",
-            ("es", "Device list and meter readings") => "Lista de dispositivos y lecturas de los medidores",
+            ("es", "Device list and meter readings") => {
+                "Lista de dispositivos y lecturas de los medidores"
+            }
             ("es", "Per-device switch state") => "Estado del interruptor por dispositivo",
             ("es", "Configured devices") => "Dispositivos configurados",
             ("es", "WEATHER UNAVAILABLE") => "TIEMPO NO DISPONIBLE",
-            ("es", "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.") => "Esto es normal cuando no hay errores ni cambios de configuración que comunicar. Los estados de los servicios indican si se han comprobado.",
-            ("es", "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.") => "Usa Recargar ahora para probar la conexión FRITZ!Box, Obtener pronóstico de 7 días para probar Open-Meteo o Enviar notificación de prueba para comprobar las notificaciones.",
+            (
+                "es",
+                "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.",
+            ) => {
+                "Esto es normal cuando no hay errores ni cambios de configuración que comunicar. Los estados de los servicios indican si se han comprobado."
+            }
+            (
+                "es",
+                "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.",
+            ) => {
+                "Usa Recargar ahora para probar la conexión FRITZ!Box, Obtener pronóstico de 7 días para probar Open-Meteo o Enviar notificación de prueba para comprobar las notificaciones."
+            }
             ("es", "FORECAST UNAVAILABLE") => "PRONÓSTICO NO DISPONIBLE",
             ("es", "Weather data is loading…") => "Cargando datos meteorológicos…",
             ("es", "TEMPERATURE (°C)") => "TEMPERATURA (°C)",
@@ -1112,7 +1393,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("nl", "Open graph") => "Grafiek openen",
             ("nl", "CURRENT POWER HISTORY") => "GESCHIEDENIS HUIDIG VERMOGEN",
             ("nl", "CURRENT POWER") => "HUIDIG VERMOGEN",
-            ("nl", "AVERAGE TEMPERATURE HISTORY (°C)") => "GESCHIEDENIS GEMIDDELDE TEMPERATUUR (°C)",
+            ("nl", "AVERAGE TEMPERATURE HISTORY (°C)") => {
+                "GESCHIEDENIS GEMIDDELDE TEMPERATUUR (°C)"
+            }
             ("nl", "AVERAGE TEMPERATURE") => "GEMIDDELDE TEMPERATUUR",
             ("nl", "GRAPH HISTORY") => "GRAFIEKGESCHIEDENIS",
             ("nl", "Move device up") => "Apparaat omhoog verplaatsen",
@@ -1124,23 +1407,39 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("nl", "URL is invalid or not configured") => "URL is ongeldig of niet ingesteld",
             ("nl", "HTTPS / TLS") => "HTTPS / TLS",
             ("nl", "Not configured") => "Niet ingesteld",
-            ("nl", "Send a test notification to verify desktop notification delivery.") => "Verstuur een testmelding om de bureaubladmeldingen te controleren.",
+            ("nl", "Send a test notification to verify desktop notification delivery.") => {
+                "Verstuur een testmelding om de bureaubladmeldingen te controleren."
+            }
             ("nl", "Image loaded") => "Afbeelding geladen",
             ("nl", "No usable image loaded") => "Geen bruikbare afbeelding geladen",
             ("nl", "Weather request failed") => "Weerverzoek mislukt",
             ("nl", "Weather location not configured") => "Weerlocatie niet ingesteld",
             ("nl", "Forecast request in progress") => "Weerverwachting wordt opgevraagd",
             ("nl", "Forecast loaded") => "Verwachting geladen",
-            ("nl", "Not checked · request a forecast to test") => "Nog niet gecontroleerd · vraag een verwachting op om te testen",
-            ("nl", "Request a forecast to verify the Open-Meteo endpoints.") => "Vraag een verwachting op om de Open-Meteo-eindpunten te controleren.",
+            ("nl", "Not checked · request a forecast to test") => {
+                "Nog niet gecontroleerd · vraag een verwachting op om te testen"
+            }
+            ("nl", "Request a forecast to verify the Open-Meteo endpoints.") => {
+                "Vraag een verwachting op om de Open-Meteo-eindpunten te controleren."
+            }
             ("nl", "Base URL not configured") => "Basis-URL niet ingesteld",
             ("nl", "Session authentication") => "Sessieauthenticatie",
             ("nl", "Device list and meter readings") => "Apparatenlijst en meterstanden",
             ("nl", "Per-device switch state") => "Schakelstatus per apparaat",
             ("nl", "Configured devices") => "Ingestelde apparaten",
             ("nl", "WEATHER UNAVAILABLE") => "WEER NIET BESCHIKBAAR",
-            ("nl", "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.") => "Dit is normaal wanneer er geen fouten of configuratiewijzigingen te melden zijn. De status van de eindpunten geeft aan of elke dienst is gecontroleerd.",
-            ("nl", "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.") => "Gebruik Nu vernieuwen om de FRITZ!Box-verbinding te testen, haal de 7-daagse verwachting op om Open-Meteo te testen of verstuur een testmelding.",
+            (
+                "nl",
+                "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.",
+            ) => {
+                "Dit is normaal wanneer er geen fouten of configuratiewijzigingen te melden zijn. De status van de eindpunten geeft aan of elke dienst is gecontroleerd."
+            }
+            (
+                "nl",
+                "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.",
+            ) => {
+                "Gebruik Nu vernieuwen om de FRITZ!Box-verbinding te testen, haal de 7-daagse verwachting op om Open-Meteo te testen of verstuur een testmelding."
+            }
             ("nl", "FORECAST UNAVAILABLE") => "VERWACHTING NIET BESCHIKBAAR",
             ("nl", "Weather data is loading…") => "Weergegevens worden geladen…",
             ("nl", "TEMPERATURE (°C)") => "TEMPERATUUR (°C)",
@@ -1155,7 +1454,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("fr", "Open graph") => "Ouvrir le graphique",
             ("fr", "CURRENT POWER HISTORY") => "HISTORIQUE DE LA PUISSANCE ACTUELLE",
             ("fr", "CURRENT POWER") => "PUISSANCE ACTUELLE",
-            ("fr", "AVERAGE TEMPERATURE HISTORY (°C)") => "HISTORIQUE DE LA TEMPÉRATURE MOYENNE (°C)",
+            ("fr", "AVERAGE TEMPERATURE HISTORY (°C)") => {
+                "HISTORIQUE DE LA TEMPÉRATURE MOYENNE (°C)"
+            }
             ("fr", "AVERAGE TEMPERATURE") => "TEMPÉRATURE MOYENNE",
             ("fr", "GRAPH HISTORY") => "HISTORIQUE DES GRAPHIQUES",
             ("fr", "Move device up") => "Déplacer l’appareil vers le haut",
@@ -1167,23 +1468,41 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("fr", "URL is invalid or not configured") => "URL invalide ou non configurée",
             ("fr", "HTTPS / TLS") => "HTTPS / TLS",
             ("fr", "Not configured") => "Non configuré",
-            ("fr", "Send a test notification to verify desktop notification delivery.") => "Envoyer une notification de test pour vérifier les notifications du bureau.",
+            ("fr", "Send a test notification to verify desktop notification delivery.") => {
+                "Envoyer une notification de test pour vérifier les notifications du bureau."
+            }
             ("fr", "Image loaded") => "Image chargée",
             ("fr", "No usable image loaded") => "Aucune image utilisable chargée",
             ("fr", "Weather request failed") => "Échec de la requête météo",
             ("fr", "Weather location not configured") => "Lieu météo non configuré",
             ("fr", "Forecast request in progress") => "Requête de prévision en cours",
             ("fr", "Forecast loaded") => "Prévisions chargées",
-            ("fr", "Not checked · request a forecast to test") => "Non vérifié · demander des prévisions pour tester",
-            ("fr", "Request a forecast to verify the Open-Meteo endpoints.") => "Demandez des prévisions pour vérifier les services Open-Meteo.",
+            ("fr", "Not checked · request a forecast to test") => {
+                "Non vérifié · demander des prévisions pour tester"
+            }
+            ("fr", "Request a forecast to verify the Open-Meteo endpoints.") => {
+                "Demandez des prévisions pour vérifier les services Open-Meteo."
+            }
             ("fr", "Base URL not configured") => "URL de base non configurée",
             ("fr", "Session authentication") => "Authentification de session",
-            ("fr", "Device list and meter readings") => "Liste des appareils et relevés des compteurs",
+            ("fr", "Device list and meter readings") => {
+                "Liste des appareils et relevés des compteurs"
+            }
             ("fr", "Per-device switch state") => "État de l’interrupteur par appareil",
             ("fr", "Configured devices") => "Appareils configurés",
             ("fr", "WEATHER UNAVAILABLE") => "MÉTÉO INDISPONIBLE",
-            ("fr", "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.") => "Ceci est normal lorsqu’aucune erreur ni modification de configuration ne doit être signalée. Les états des services indiquent si chacun a été vérifié.",
-            ("fr", "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.") => "Utilisez Actualiser pour tester la connexion FRITZ!Box, demandez les prévisions sur 7 jours pour tester Open-Meteo ou envoyez une notification de test.",
+            (
+                "fr",
+                "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.",
+            ) => {
+                "Ceci est normal lorsqu’aucune erreur ni modification de configuration ne doit être signalée. Les états des services indiquent si chacun a été vérifié."
+            }
+            (
+                "fr",
+                "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.",
+            ) => {
+                "Utilisez Actualiser pour tester la connexion FRITZ!Box, demandez les prévisions sur 7 jours pour tester Open-Meteo ou envoyez une notification de test."
+            }
             ("fr", "FORECAST UNAVAILABLE") => "PRÉVISIONS INDISPONIBLES",
             ("fr", "Weather data is loading…") => "Chargement des données météo…",
             ("fr", "TEMPERATURE (°C)") => "TEMPÉRATURE (°C)",
@@ -1204,29 +1523,49 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("it", "Move device up") => "Sposta dispositivo in alto",
             ("it", "Move device down") => "Sposta dispositivo in basso",
             ("it", "Certificate validation disabled") => "Convalida dei certificati disattivata",
-            ("it", "Custom CA certificate configured") => "Certificato CA personalizzato configurato",
+            ("it", "Custom CA certificate configured") => {
+                "Certificato CA personalizzato configurato"
+            }
             ("it", "System certificate roots") => "Certificati radice di sistema",
             ("it", "Plain HTTP · TLS is not enabled") => "HTTP semplice · TLS non è abilitato",
             ("it", "URL is invalid or not configured") => "URL non valido o non configurato",
             ("it", "HTTPS / TLS") => "HTTPS / TLS",
             ("it", "Not configured") => "Non configurato",
-            ("it", "Send a test notification to verify desktop notification delivery.") => "Invia una notifica di prova per verificare le notifiche del desktop.",
+            ("it", "Send a test notification to verify desktop notification delivery.") => {
+                "Invia una notifica di prova per verificare le notifiche del desktop."
+            }
             ("it", "Image loaded") => "Immagine caricata",
             ("it", "No usable image loaded") => "Nessuna immagine utilizzabile caricata",
             ("it", "Weather request failed") => "Richiesta meteo non riuscita",
             ("it", "Weather location not configured") => "Località meteo non configurata",
             ("it", "Forecast request in progress") => "Richiesta previsioni in corso",
             ("it", "Forecast loaded") => "Previsioni caricate",
-            ("it", "Not checked · request a forecast to test") => "Non verificato · richiedi previsioni per provare",
-            ("it", "Request a forecast to verify the Open-Meteo endpoints.") => "Richiedi previsioni per verificare i servizi Open-Meteo.",
+            ("it", "Not checked · request a forecast to test") => {
+                "Non verificato · richiedi previsioni per provare"
+            }
+            ("it", "Request a forecast to verify the Open-Meteo endpoints.") => {
+                "Richiedi previsioni per verificare i servizi Open-Meteo."
+            }
             ("it", "Base URL not configured") => "URL di base non configurato",
             ("it", "Session authentication") => "Autenticazione della sessione",
-            ("it", "Device list and meter readings") => "Elenco dispositivi e letture dei contatori",
+            ("it", "Device list and meter readings") => {
+                "Elenco dispositivi e letture dei contatori"
+            }
             ("it", "Per-device switch state") => "Stato dell’interruttore per dispositivo",
             ("it", "Configured devices") => "Dispositivi configurati",
             ("it", "WEATHER UNAVAILABLE") => "METEO NON DISPONIBILE",
-            ("it", "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.") => "È normale quando non ci sono errori o modifiche alla configurazione da segnalare. Gli stati degli endpoint indicano se ogni servizio è stato verificato.",
-            ("it", "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.") => "Usa Aggiorna ora per verificare la connessione FRITZ!Box, richiedi le previsioni a 7 giorni per provare Open-Meteo oppure invia una notifica di prova.",
+            (
+                "it",
+                "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.",
+            ) => {
+                "È normale quando non ci sono errori o modifiche alla configurazione da segnalare. Gli stati degli endpoint indicano se ogni servizio è stato verificato."
+            }
+            (
+                "it",
+                "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.",
+            ) => {
+                "Usa Aggiorna ora per verificare la connessione FRITZ!Box, richiedi le previsioni a 7 giorni per provare Open-Meteo oppure invia una notifica di prova."
+            }
             ("it", "FORECAST UNAVAILABLE") => "PREVISIONI NON DISPONIBILI",
             ("it", "Weather data is loading…") => "Caricamento dei dati meteo…",
             ("it", "TEMPERATURE (°C)") => "TEMPERATURA (°C)",
@@ -1250,26 +1589,44 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("sv", "Custom CA certificate configured") => "Anpassat CA-certifikat konfigurerat",
             ("sv", "System certificate roots") => "Systemets rotcertifikat",
             ("sv", "Plain HTTP · TLS is not enabled") => "Vanlig HTTP · TLS är inte aktiverat",
-            ("sv", "URL is invalid or not configured") => "URL:en är ogiltig eller inte konfigurerad",
+            ("sv", "URL is invalid or not configured") => {
+                "URL:en är ogiltig eller inte konfigurerad"
+            }
             ("sv", "HTTPS / TLS") => "HTTPS / TLS",
             ("sv", "Not configured") => "Inte konfigurerad",
-            ("sv", "Send a test notification to verify desktop notification delivery.") => "Skicka en testavisering för att kontrollera skrivbordsaviseringar.",
+            ("sv", "Send a test notification to verify desktop notification delivery.") => {
+                "Skicka en testavisering för att kontrollera skrivbordsaviseringar."
+            }
             ("sv", "Image loaded") => "Bild inläst",
             ("sv", "No usable image loaded") => "Ingen användbar bild har lästs in",
             ("sv", "Weather request failed") => "Väderförfrågan misslyckades",
             ("sv", "Weather location not configured") => "Väderplats inte konfigurerad",
             ("sv", "Forecast request in progress") => "Väderprognosförfrågan pågår",
             ("sv", "Forecast loaded") => "Prognos inläst",
-            ("sv", "Not checked · request a forecast to test") => "Inte kontrollerad · hämta en prognos för att testa",
-            ("sv", "Request a forecast to verify the Open-Meteo endpoints.") => "Hämta en prognos för att kontrollera Open-Meteo-tjänsterna.",
+            ("sv", "Not checked · request a forecast to test") => {
+                "Inte kontrollerad · hämta en prognos för att testa"
+            }
+            ("sv", "Request a forecast to verify the Open-Meteo endpoints.") => {
+                "Hämta en prognos för att kontrollera Open-Meteo-tjänsterna."
+            }
             ("sv", "Base URL not configured") => "Bas-URL inte konfigurerad",
             ("sv", "Session authentication") => "Sessionsautentisering",
             ("sv", "Device list and meter readings") => "Enhetslista och mätaravläsningar",
             ("sv", "Per-device switch state") => "Strömbrytarstatus per enhet",
             ("sv", "Configured devices") => "Konfigurerade enheter",
             ("sv", "WEATHER UNAVAILABLE") => "VÄDER EJ TILLGÄNGLIGT",
-            ("sv", "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.") => "Detta är normalt när inga fel eller konfigurationsändringar behöver rapporteras. Tjänststatusen visar om varje tjänst har kontrollerats.",
-            ("sv", "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.") => "Använd Uppdatera nu för att testa FRITZ!Box-anslutningen, hämta 7-dagarsprognosen för att testa Open-Meteo eller skicka en testavisering.",
+            (
+                "sv",
+                "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.",
+            ) => {
+                "Detta är normalt när inga fel eller konfigurationsändringar behöver rapporteras. Tjänststatusen visar om varje tjänst har kontrollerats."
+            }
+            (
+                "sv",
+                "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.",
+            ) => {
+                "Använd Uppdatera nu för att testa FRITZ!Box-anslutningen, hämta 7-dagarsprognosen för att testa Open-Meteo eller skicka en testavisering."
+            }
             ("sv", "FORECAST UNAVAILABLE") => "PROGNOS EJ TILLGÄNGLIG",
             ("sv", "Weather data is loading…") => "Väderdata läses in…",
             ("sv", "TEMPERATURE (°C)") => "TEMPERATUR (°C)",
@@ -1290,29 +1647,51 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("pt", "Move device up") => "Mover dispositivo para cima",
             ("pt", "Move device down") => "Mover dispositivo para baixo",
             ("pt", "Certificate validation disabled") => "Validação de certificados desativada",
-            ("pt", "Custom CA certificate configured") => "Certificado CA personalizado configurado",
+            ("pt", "Custom CA certificate configured") => {
+                "Certificado CA personalizado configurado"
+            }
             ("pt", "System certificate roots") => "Certificados raiz do sistema",
             ("pt", "Plain HTTP · TLS is not enabled") => "HTTP simples · TLS não está ativo",
             ("pt", "URL is invalid or not configured") => "URL inválido ou não configurado",
             ("pt", "HTTPS / TLS") => "HTTPS / TLS",
             ("pt", "Not configured") => "Não configurado",
-            ("pt", "Send a test notification to verify desktop notification delivery.") => "Enviar uma notificação de teste para verificar as notificações do ambiente de trabalho.",
+            ("pt", "Send a test notification to verify desktop notification delivery.") => {
+                "Enviar uma notificação de teste para verificar as notificações do ambiente de trabalho."
+            }
             ("pt", "Image loaded") => "Imagem carregada",
             ("pt", "No usable image loaded") => "Nenhuma imagem utilizável carregada",
             ("pt", "Weather request failed") => "Falha no pedido meteorológico",
-            ("pt", "Weather location not configured") => "Localização meteorológica não configurada",
+            ("pt", "Weather location not configured") => {
+                "Localização meteorológica não configurada"
+            }
             ("pt", "Forecast request in progress") => "Pedido de previsão em curso",
             ("pt", "Forecast loaded") => "Previsão carregada",
-            ("pt", "Not checked · request a forecast to test") => "Não verificado · peça uma previsão para testar",
-            ("pt", "Request a forecast to verify the Open-Meteo endpoints.") => "Peça uma previsão para verificar os serviços Open-Meteo.",
+            ("pt", "Not checked · request a forecast to test") => {
+                "Não verificado · peça uma previsão para testar"
+            }
+            ("pt", "Request a forecast to verify the Open-Meteo endpoints.") => {
+                "Peça uma previsão para verificar os serviços Open-Meteo."
+            }
             ("pt", "Base URL not configured") => "URL base não configurado",
             ("pt", "Session authentication") => "Autenticação de sessão",
-            ("pt", "Device list and meter readings") => "Lista de dispositivos e leituras dos medidores",
+            ("pt", "Device list and meter readings") => {
+                "Lista de dispositivos e leituras dos medidores"
+            }
             ("pt", "Per-device switch state") => "Estado do interruptor por dispositivo",
             ("pt", "Configured devices") => "Dispositivos configurados",
             ("pt", "WEATHER UNAVAILABLE") => "METEOROLOGIA INDISPONÍVEL",
-            ("pt", "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.") => "Isto é normal quando não existem erros ou alterações de configuração a comunicar. Os estados dos serviços indicam se cada um foi verificado.",
-            ("pt", "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.") => "Use Atualizar agora para testar a ligação FRITZ!Box, obtenha a previsão de 7 dias para testar o Open-Meteo ou envie uma notificação de teste.",
+            (
+                "pt",
+                "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.",
+            ) => {
+                "Isto é normal quando não existem erros ou alterações de configuração a comunicar. Os estados dos serviços indicam se cada um foi verificado."
+            }
+            (
+                "pt",
+                "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.",
+            ) => {
+                "Use Atualizar agora para testar a ligação FRITZ!Box, obtenha a previsão de 7 dias para testar o Open-Meteo ou envie uma notificação de teste."
+            }
             ("pt", "FORECAST UNAVAILABLE") => "PREVISÃO INDISPONÍVEL",
             ("pt", "Weather data is loading…") => "A carregar dados meteorológicos…",
             ("pt", "TEMPERATURE (°C)") => "TEMPERATURA (°C)",
@@ -1333,29 +1712,49 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("pl", "Move device up") => "Przenieś urządzenie w górę",
             ("pl", "Move device down") => "Przenieś urządzenie w dół",
             ("pl", "Certificate validation disabled") => "Weryfikacja certyfikatów wyłączona",
-            ("pl", "Custom CA certificate configured") => "Skonfigurowano niestandardowy certyfikat CA",
+            ("pl", "Custom CA certificate configured") => {
+                "Skonfigurowano niestandardowy certyfikat CA"
+            }
             ("pl", "System certificate roots") => "Systemowe główne urzędy certyfikacji",
             ("pl", "Plain HTTP · TLS is not enabled") => "Zwykły HTTP · TLS nie jest włączony",
-            ("pl", "URL is invalid or not configured") => "Nieprawidłowy lub nieskonfigurowany adres URL",
+            ("pl", "URL is invalid or not configured") => {
+                "Nieprawidłowy lub nieskonfigurowany adres URL"
+            }
             ("pl", "HTTPS / TLS") => "HTTPS / TLS",
             ("pl", "Not configured") => "Nie skonfigurowano",
-            ("pl", "Send a test notification to verify desktop notification delivery.") => "Wyślij powiadomienie testowe, aby sprawdzić powiadomienia pulpitu.",
+            ("pl", "Send a test notification to verify desktop notification delivery.") => {
+                "Wyślij powiadomienie testowe, aby sprawdzić powiadomienia pulpitu."
+            }
             ("pl", "Image loaded") => "Obraz wczytany",
             ("pl", "No usable image loaded") => "Nie wczytano użytecznego obrazu",
             ("pl", "Weather request failed") => "Nieudane żądanie pogody",
             ("pl", "Weather location not configured") => "Nie skonfigurowano lokalizacji pogody",
             ("pl", "Forecast request in progress") => "Trwa pobieranie prognozy",
             ("pl", "Forecast loaded") => "Prognoza wczytana",
-            ("pl", "Not checked · request a forecast to test") => "Nie sprawdzono · pobierz prognozę, aby przetestować",
-            ("pl", "Request a forecast to verify the Open-Meteo endpoints.") => "Pobierz prognozę, aby sprawdzić usługi Open-Meteo.",
+            ("pl", "Not checked · request a forecast to test") => {
+                "Nie sprawdzono · pobierz prognozę, aby przetestować"
+            }
+            ("pl", "Request a forecast to verify the Open-Meteo endpoints.") => {
+                "Pobierz prognozę, aby sprawdzić usługi Open-Meteo."
+            }
             ("pl", "Base URL not configured") => "Nie skonfigurowano podstawowego adresu URL",
             ("pl", "Session authentication") => "Uwierzytelnianie sesji",
             ("pl", "Device list and meter readings") => "Lista urządzeń i odczyty liczników",
             ("pl", "Per-device switch state") => "Stan przełącznika urządzenia",
             ("pl", "Configured devices") => "Skonfigurowane urządzenia",
             ("pl", "WEATHER UNAVAILABLE") => "POGODA NIEDOSTĘPNA",
-            ("pl", "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.") => "To normalne, gdy nie ma błędów ani zmian konfiguracji do zgłoszenia. Stany usług pokazują, czy każda z nich została sprawdzona.",
-            ("pl", "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.") => "Użyj opcji Odśwież teraz, aby sprawdzić połączenie FRITZ!Box, pobierz prognozę na 7 dni, aby sprawdzić Open-Meteo, lub wyślij powiadomienie testowe.",
+            (
+                "pl",
+                "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.",
+            ) => {
+                "To normalne, gdy nie ma błędów ani zmian konfiguracji do zgłoszenia. Stany usług pokazują, czy każda z nich została sprawdzona."
+            }
+            (
+                "pl",
+                "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.",
+            ) => {
+                "Użyj opcji Odśwież teraz, aby sprawdzić połączenie FRITZ!Box, pobierz prognozę na 7 dni, aby sprawdzić Open-Meteo, lub wyślij powiadomienie testowe."
+            }
             ("pl", "FORECAST UNAVAILABLE") => "PROGNOZA NIEDOSTĘPNA",
             ("pl", "Weather data is loading…") => "Trwa wczytywanie danych pogodowych…",
             ("pl", "TEMPERATURE (°C)") => "TEMPERATURA (°C)",
@@ -1370,35 +1769,55 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("da", "Open graph") => "Åbn graf",
             ("da", "CURRENT POWER HISTORY") => "HISTORIK FOR AKTUEL EFFEKT",
             ("da", "CURRENT POWER") => "AKTUEL EFFEKT",
-            ("da", "AVERAGE TEMPERATURE HISTORY (°C)") => "HISTORIK FOR GENNEMSNITSTEMPERATUR (°C)",
+            ("da", "AVERAGE TEMPERATURE HISTORY (°C)") => {
+                "HISTORIK FOR GENNEMSNITSTEMPERATUR (°C)"
+            }
             ("da", "AVERAGE TEMPERATURE") => "GENNEMSNITSTEMPERATUR",
             ("da", "GRAPH HISTORY") => "GRAFHISTORIK",
             ("da", "Move device up") => "Flyt enhed op",
             ("da", "Move device down") => "Flyt enhed ned",
             ("da", "Certificate validation disabled") => "Certifikatvalidering deaktiveret",
-            ("da", "Custom CA certificate configured") => "Brugerdefineret CA-certifikat konfigureret",
+            ("da", "Custom CA certificate configured") => {
+                "Brugerdefineret CA-certifikat konfigureret"
+            }
             ("da", "System certificate roots") => "Systemets rodcertifikater",
             ("da", "Plain HTTP · TLS is not enabled") => "Almindelig HTTP · TLS er ikke aktiveret",
             ("da", "URL is invalid or not configured") => "URL er ugyldig eller ikke konfigureret",
             ("da", "HTTPS / TLS") => "HTTPS / TLS",
             ("da", "Not configured") => "Ikke konfigureret",
-            ("da", "Send a test notification to verify desktop notification delivery.") => "Send en testmeddelelse for at kontrollere skrivebordsmeddelelser.",
+            ("da", "Send a test notification to verify desktop notification delivery.") => {
+                "Send en testmeddelelse for at kontrollere skrivebordsmeddelelser."
+            }
             ("da", "Image loaded") => "Billede indlæst",
             ("da", "No usable image loaded") => "Intet brugbart billede indlæst",
             ("da", "Weather request failed") => "Vejranmodning mislykkedes",
             ("da", "Weather location not configured") => "Vejrplacering ikke konfigureret",
             ("da", "Forecast request in progress") => "Vejrudsigt anmodes",
             ("da", "Forecast loaded") => "Vejrudsigt indlæst",
-            ("da", "Not checked · request a forecast to test") => "Ikke kontrolleret · hent en vejrudsigt for at teste",
-            ("da", "Request a forecast to verify the Open-Meteo endpoints.") => "Hent en vejrudsigt for at kontrollere Open-Meteo-tjenesterne.",
+            ("da", "Not checked · request a forecast to test") => {
+                "Ikke kontrolleret · hent en vejrudsigt for at teste"
+            }
+            ("da", "Request a forecast to verify the Open-Meteo endpoints.") => {
+                "Hent en vejrudsigt for at kontrollere Open-Meteo-tjenesterne."
+            }
             ("da", "Base URL not configured") => "Basis-URL ikke konfigureret",
             ("da", "Session authentication") => "Sessionsgodkendelse",
             ("da", "Device list and meter readings") => "Enhedsliste og måleraflæsninger",
             ("da", "Per-device switch state") => "Afbryderstatus pr. enhed",
             ("da", "Configured devices") => "Konfigurerede enheder",
             ("da", "WEATHER UNAVAILABLE") => "VEJR IKKE TILGÆNGELIGT",
-            ("da", "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.") => "Dette er normalt, når der ikke er fejl eller konfigurationsændringer at rapportere. Tjenestestatus viser, om hver tjeneste er kontrolleret.",
-            ("da", "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.") => "Brug Opdater nu til at teste FRITZ!Box-forbindelsen, hent 7-dagesprognosen for at teste Open-Meteo, eller send en testmeddelelse.",
+            (
+                "da",
+                "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.",
+            ) => {
+                "Dette er normalt, når der ikke er fejl eller konfigurationsændringer at rapportere. Tjenestestatus viser, om hver tjeneste er kontrolleret."
+            }
+            (
+                "da",
+                "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.",
+            ) => {
+                "Brug Opdater nu til at teste FRITZ!Box-forbindelsen, hent 7-dagesprognosen for at teste Open-Meteo, eller send en testmeddelelse."
+            }
             ("da", "FORECAST UNAVAILABLE") => "VEJRUDSIGT IKKE TILGÆNGELIG",
             ("da", "Weather data is loading…") => "Vejrdata indlæses…",
             ("da", "TEMPERATURE (°C)") => "TEMPERATUR (°C)",
@@ -1413,7 +1832,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("no", "Open graph") => "Åpne graf",
             ("no", "CURRENT POWER HISTORY") => "HISTORIKK FOR GJELDENDE EFFEKT",
             ("no", "CURRENT POWER") => "GJELDENDE EFFEKT",
-            ("no", "AVERAGE TEMPERATURE HISTORY (°C)") => "HISTORIKK FOR GJENNOMSNITTSTEMPERATUR (°C)",
+            ("no", "AVERAGE TEMPERATURE HISTORY (°C)") => {
+                "HISTORIKK FOR GJENNOMSNITTSTEMPERATUR (°C)"
+            }
             ("no", "AVERAGE TEMPERATURE") => "GJENNOMSNITTSTEMPERATUR",
             ("no", "GRAPH HISTORY") => "GRAFHISTORIKK",
             ("no", "Move device up") => "Flytt enhet opp",
@@ -1425,29 +1846,44 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("no", "URL is invalid or not configured") => "URL er ugyldig eller ikke konfigurert",
             ("no", "HTTPS / TLS") => "HTTPS / TLS",
             ("no", "Not configured") => "Ikke konfigurert",
-            ("no", "Send a test notification to verify desktop notification delivery.") => "Send et testvarsel for å kontrollere skrivebordsvarsler.",
+            ("no", "Send a test notification to verify desktop notification delivery.") => {
+                "Send et testvarsel for å kontrollere skrivebordsvarsler."
+            }
             ("no", "Image loaded") => "Bilde lastet",
             ("no", "No usable image loaded") => "Ingen brukbare bilder lastet",
             ("no", "Weather request failed") => "Værforespørsel mislyktes",
             ("no", "Weather location not configured") => "Værplassering ikke konfigurert",
             ("no", "Forecast request in progress") => "Værvarselforespørsel pågår",
             ("no", "Forecast loaded") => "Værvarsel lastet",
-            ("no", "Not checked · request a forecast to test") => "Ikke kontrollert · hent et værvarsel for å teste",
-            ("no", "Request a forecast to verify the Open-Meteo endpoints.") => "Hent et værvarsel for å kontrollere Open-Meteo-tjenestene.",
+            ("no", "Not checked · request a forecast to test") => {
+                "Ikke kontrollert · hent et værvarsel for å teste"
+            }
+            ("no", "Request a forecast to verify the Open-Meteo endpoints.") => {
+                "Hent et værvarsel for å kontrollere Open-Meteo-tjenestene."
+            }
             ("no", "Base URL not configured") => "Basis-URL ikke konfigurert",
             ("no", "Session authentication") => "Sesjonsautentisering",
             ("no", "Device list and meter readings") => "Enhetsliste og måleravlesninger",
             ("no", "Per-device switch state") => "Bryterstatus per enhet",
             ("no", "Configured devices") => "Konfigurerte enheter",
             ("no", "WEATHER UNAVAILABLE") => "VÆR IKKE TILGJENGELIG",
-            ("no", "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.") => "Dette er normalt når det ikke finnes feil eller konfigurasjonsendringer som må rapporteres. Tjenestestatusen viser om hver tjeneste er kontrollert.",
-            ("no", "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.") => "Bruk Oppdater nå for å teste FRITZ!Box-tilkoblingen, hent 7-dagersvarselet for å teste Open-Meteo, eller send et testvarsel.",
+            (
+                "no",
+                "This is normal when no errors or configuration changes need reporting. The endpoint states above show whether each service has been checked.",
+            ) => {
+                "Dette er normalt når det ikke finnes feil eller konfigurasjonsendringer som må rapporteres. Tjenestestatusen viser om hver tjeneste er kontrollert."
+            }
+            (
+                "no",
+                "Use Reload now to test the FRITZ!Box connection, Get 7-day forecast to test Open-Meteo, or Send test notification to verify desktop notifications.",
+            ) => {
+                "Bruk Oppdater nå for å teste FRITZ!Box-tilkoblingen, hent 7-dagersvarselet for å teste Open-Meteo, eller send et testvarsel."
+            }
             ("no", "FORECAST UNAVAILABLE") => "VÆRVARSEL IKKE TILGJENGELIG",
             ("no", "Weather data is loading…") => "Laster værdata…",
             ("no", "TEMPERATURE (°C)") => "TEMPERATUR (°C)",
             ("no", "INTERNET BANDWIDTH") => "INTERNETTBÅNDBREDDE",
             ("no", "CONNECTION ERROR") => "TILKOBLINGSFEIL",
-
 
             // es device availability states
             ("es", "FRITZ!Box device unavailable") => "Dispositivo FRITZ!Box no disponible",
@@ -1485,51 +1921,130 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("no", "FRITZ!Box device unavailable") => "FRITZ!Box-enhet er utilgjengelig",
             ("no", "FRITZ!Box devices unavailable") => "FRITZ!Box-enheter er utilgjengelige",
 
-
             // es weather setting descriptions
             ("es", "e.g. Amsterdam or 52.37,4.90") => "p. ej., Ámsterdam o 52.37,4.90",
-            ("es", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Independiente de la actualización de FRITZ!Box; 10 minutos por defecto. Requiere una clave API y una ubicación.",
-            ("es", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Cada foto se muestra entre 5 segundos y 5 minutos antes de la transición de fundido.",
+            (
+                "es",
+                "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.",
+            ) => {
+                "Independiente de la actualización de FRITZ!Box; 10 minutos por defecto. Requiere una clave API y una ubicación."
+            }
+            (
+                "es",
+                "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.",
+            ) => {
+                "Cada foto se muestra entre 5 segundos y 5 minutos antes de la transición de fundido."
+            }
 
             // nl weather setting descriptions
             ("nl", "e.g. Amsterdam or 52.37,4.90") => "bijv. Amsterdam of 52.37,4.90",
-            ("nl", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Onafhankelijk van FRITZ!Box-vernieuwing; standaard 10 minuten. Een API-sleutel en locatie zijn vereist.",
-            ("nl", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Elke foto wordt 5 seconden tot 5 minuten getoond voordat de overgang begint.",
+            (
+                "nl",
+                "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.",
+            ) => {
+                "Onafhankelijk van FRITZ!Box-vernieuwing; standaard 10 minuten. Een API-sleutel en locatie zijn vereist."
+            }
+            (
+                "nl",
+                "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.",
+            ) => "Elke foto wordt 5 seconden tot 5 minuten getoond voordat de overgang begint.",
 
             // fr weather setting descriptions
             ("fr", "e.g. Amsterdam or 52.37,4.90") => "p. ex. Amsterdam ou 52.37,4.90",
-            ("fr", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Indépendant de l’actualisation FRITZ!Box ; 10 minutes par défaut. Une clé API et un lieu sont requis.",
-            ("fr", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Chaque photo s’affiche de 5 secondes à 5 minutes avant la transition en fondu.",
+            (
+                "fr",
+                "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.",
+            ) => {
+                "Indépendant de l’actualisation FRITZ!Box ; 10 minutes par défaut. Une clé API et un lieu sont requis."
+            }
+            (
+                "fr",
+                "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.",
+            ) => "Chaque photo s’affiche de 5 secondes à 5 minutes avant la transition en fondu.",
 
             // it weather setting descriptions
             ("it", "e.g. Amsterdam or 52.37,4.90") => "ad es. Amsterdam o 52.37,4.90",
-            ("it", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Indipendente dall'aggiornamento FRITZ!Box; 10 minuti per impostazione predefinita. Richiede una chiave API e una posizione.",
-            ("it", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Ogni foto viene mostrata da 5 secondi a 5 minuti prima della transizione con dissolvenza.",
+            (
+                "it",
+                "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.",
+            ) => {
+                "Indipendente dall'aggiornamento FRITZ!Box; 10 minuti per impostazione predefinita. Richiede una chiave API e una posizione."
+            }
+            (
+                "it",
+                "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.",
+            ) => {
+                "Ogni foto viene mostrata da 5 secondi a 5 minuti prima della transizione con dissolvenza."
+            }
 
             // sv weather setting descriptions
             ("sv", "e.g. Amsterdam or 52.37,4.90") => "t.ex. Amsterdam eller 52.37,4.90",
-            ("sv", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Oberoende av FRITZ!Box-uppdateringen; standard är 10 minuter. Kräver en API-nyckel och en plats.",
-            ("sv", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Varje foto visas i 5 sekunder till 5 minuter före övertoningen.",
+            (
+                "sv",
+                "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.",
+            ) => {
+                "Oberoende av FRITZ!Box-uppdateringen; standard är 10 minuter. Kräver en API-nyckel och en plats."
+            }
+            (
+                "sv",
+                "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.",
+            ) => "Varje foto visas i 5 sekunder till 5 minuter före övertoningen.",
 
             // pt weather setting descriptions
             ("pt", "e.g. Amsterdam or 52.37,4.90") => "por ex., Amesterdão ou 52.37,4.90",
-            ("pt", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Independente da atualização da FRITZ!Box; 10 minutos por predefinição. Requer uma chave de API e uma localização.",
-            ("pt", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Cada fotografia é apresentada durante 5 segundos a 5 minutos antes da transição gradual.",
+            (
+                "pt",
+                "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.",
+            ) => {
+                "Independente da atualização da FRITZ!Box; 10 minutos por predefinição. Requer uma chave de API e uma localização."
+            }
+            (
+                "pt",
+                "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.",
+            ) => {
+                "Cada fotografia é apresentada durante 5 segundos a 5 minutos antes da transição gradual."
+            }
 
             // pl weather setting descriptions
             ("pl", "e.g. Amsterdam or 52.37,4.90") => "np. Amsterdam lub 52.37,4.90",
-            ("pl", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Niezależne od odświeżania FRITZ!Box; domyślnie 10 minut. Wymaga klucza API i lokalizacji.",
-            ("pl", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Każde zdjęcie jest wyświetlane od 5 sekund do 5 minut przed przejściem z przenikaniem.",
+            (
+                "pl",
+                "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.",
+            ) => {
+                "Niezależne od odświeżania FRITZ!Box; domyślnie 10 minut. Wymaga klucza API i lokalizacji."
+            }
+            (
+                "pl",
+                "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.",
+            ) => {
+                "Każde zdjęcie jest wyświetlane od 5 sekund do 5 minut przed przejściem z przenikaniem."
+            }
 
             // da weather setting descriptions
             ("da", "e.g. Amsterdam or 52.37,4.90") => "f.eks. Amsterdam eller 52.37,4.90",
-            ("da", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Uafhængig af FRITZ!Box-opdatering; standard er 10 minutter. Kræver en API-nøgle og en placering.",
-            ("da", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Hvert foto vises i 5 sekunder til 5 minutter før overtoningen.",
+            (
+                "da",
+                "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.",
+            ) => {
+                "Uafhængig af FRITZ!Box-opdatering; standard er 10 minutter. Kræver en API-nøgle og en placering."
+            }
+            (
+                "da",
+                "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.",
+            ) => "Hvert foto vises i 5 sekunder til 5 minutter før overtoningen.",
 
             // no weather setting descriptions
             ("no", "e.g. Amsterdam or 52.37,4.90") => "f.eks. Amsterdam eller 52.37,4.90",
-            ("no", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Uavhengig av FRITZ!Box-oppdateringen; standard er 10 minutter. Krever en API-nøkkel og en plassering.",
-            ("no", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Hvert bilde vises i 5 sekunder til 5 minutter før overgangen med toning.",
+            (
+                "no",
+                "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.",
+            ) => {
+                "Uavhengig av FRITZ!Box-oppdateringen; standard er 10 minutter. Krever en API-nøkkel og en plassering."
+            }
+            (
+                "no",
+                "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.",
+            ) => "Hvert bilde vises i 5 sekunder til 5 minutter før overgangen med toning.",
 
             ("en", "English") => "English",
             ("en", "German") => "German",
@@ -1632,8 +2147,18 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("no", "Polish") => "Polsk",
             ("no", "Danish") => "Dansk",
             ("no", "Norwegian") => "Norsk",
-            ("ja", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "システムはデスクトップの言語に従います。利用可能な言語：英語、ドイツ語、スペイン語、オランダ語、フランス語、イタリア語、スウェーデン語、ポルトガル語、ポーランド語、デンマーク語、ノルウェー語、日本語、韓国語。",
-            ("ja", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.") => "システムはデスクトップの言語に従います。利用可能な言語：英語、ドイツ語、スペイン語、オランダ語、フランス語、イタリア語、スウェーデン語、ポルトガル語、ポーランド語、デンマーク語、ノルウェー語、日本語、韓国語。",
+            (
+                "ja",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.",
+            ) => {
+                "システムはデスクトップの言語に従います。利用可能な言語：英語、ドイツ語、スペイン語、オランダ語、フランス語、イタリア語、スウェーデン語、ポルトガル語、ポーランド語、デンマーク語、ノルウェー語、日本語、韓国語。"
+            }
+            (
+                "ja",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.",
+            ) => {
+                "システムはデスクトップの言語に従います。利用可能な言語：英語、ドイツ語、スペイン語、オランダ語、フランス語、イタリア語、スウェーデン語、ポルトガル語、ポーランド語、デンマーク語、ノルウェー語、日本語、韓国語。"
+            }
             ("ja", "Settings") => "設定",
             ("ja", "Language") => "言語",
             ("ja", "Interface language") => "表示言語",
@@ -1736,8 +2261,18 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("ja", "City") => "都市",
             ("ja", "Show") => "表示",
             ("ja", "Hide") => "非表示",
-            ("ko", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "시스템은 데스크톱 언어를 따릅니다. 사용 가능한 언어: 영어, 독일어, 스페인어, 네덜란드어, 프랑스어, 이탈리아어, 스웨덴어, 포르투갈어, 폴란드어, 덴마크어, 노르웨이어, 일본어, 한국어.",
-            ("ko", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.") => "시스템은 데스크톱 언어를 따릅니다. 사용 가능한 언어: 영어, 독일어, 스페인어, 네덜란드어, 프랑스어, 이탈리아어, 스웨덴어, 포르투갈어, 폴란드어, 덴마크어, 노르웨이어, 일본어, 한국어.",
+            (
+                "ko",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.",
+            ) => {
+                "시스템은 데스크톱 언어를 따릅니다. 사용 가능한 언어: 영어, 독일어, 스페인어, 네덜란드어, 프랑스어, 이탈리아어, 스웨덴어, 포르투갈어, 폴란드어, 덴마크어, 노르웨이어, 일본어, 한국어."
+            }
+            (
+                "ko",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.",
+            ) => {
+                "시스템은 데스크톱 언어를 따릅니다. 사용 가능한 언어: 영어, 독일어, 스페인어, 네덜란드어, 프랑스어, 이탈리아어, 스웨덴어, 포르투갈어, 폴란드어, 덴마크어, 노르웨이어, 일본어, 한국어."
+            }
             ("ko", "Settings") => "설정",
             ("ko", "Language") => "언어",
             ("ko", "Interface language") => "인터페이스 언어",
@@ -1849,7 +2384,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("es", "Open-Meteo · forecast") => "Open-Meteo · pronóstico",
             ("es", "Open-Meteo · geocoding") => "Open-Meteo · geocodificación",
             ("es", "OpenWeatherMap · current weather") => "OpenWeatherMap · tiempo actual",
-            ("es", "Wikimedia Commons · image search and download") => "Wikimedia Commons · búsqueda y descarga de imágenes",
+            ("es", "Wikimedia Commons · image search and download") => {
+                "Wikimedia Commons · búsqueda y descarga de imágenes"
+            }
             ("nl", "Japanese") => "Japans",
             ("nl", "Korean") => "Koreaans",
             ("nl", "Reload now") => "Nu opnieuw laden",
@@ -1859,7 +2396,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("nl", "Open-Meteo · forecast") => "Open-Meteo · verwachting",
             ("nl", "Open-Meteo · geocoding") => "Open-Meteo · geocodering",
             ("nl", "OpenWeatherMap · current weather") => "OpenWeatherMap · huidig weer",
-            ("nl", "Wikimedia Commons · image search and download") => "Wikimedia Commons · afbeeldingen zoeken en downloaden",
+            ("nl", "Wikimedia Commons · image search and download") => {
+                "Wikimedia Commons · afbeeldingen zoeken en downloaden"
+            }
             ("fr", "Japanese") => "Japonais",
             ("fr", "Korean") => "Coréen",
             ("fr", "Reload now") => "Recharger maintenant",
@@ -1869,7 +2408,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("fr", "Open-Meteo · forecast") => "Open-Meteo · prévisions",
             ("fr", "Open-Meteo · geocoding") => "Open-Meteo · géocodage",
             ("fr", "OpenWeatherMap · current weather") => "OpenWeatherMap · météo actuelle",
-            ("fr", "Wikimedia Commons · image search and download") => "Wikimedia Commons · recherche et téléchargement d’images",
+            ("fr", "Wikimedia Commons · image search and download") => {
+                "Wikimedia Commons · recherche et téléchargement d’images"
+            }
             ("it", "Japanese") => "Giapponese",
             ("it", "Korean") => "Coreano",
             ("it", "Reload now") => "Ricarica ora",
@@ -1879,7 +2420,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("it", "Open-Meteo · forecast") => "Open-Meteo · previsioni",
             ("it", "Open-Meteo · geocoding") => "Open-Meteo · geocodifica",
             ("it", "OpenWeatherMap · current weather") => "OpenWeatherMap · meteo attuale",
-            ("it", "Wikimedia Commons · image search and download") => "Wikimedia Commons · ricerca e download di immagini",
+            ("it", "Wikimedia Commons · image search and download") => {
+                "Wikimedia Commons · ricerca e download di immagini"
+            }
             ("sv", "Japanese") => "Japanska",
             ("sv", "Korean") => "Koreanska",
             ("sv", "Reload now") => "Läs in igen",
@@ -1889,7 +2432,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("sv", "Open-Meteo · forecast") => "Open-Meteo · prognos",
             ("sv", "Open-Meteo · geocoding") => "Open-Meteo · geokodning",
             ("sv", "OpenWeatherMap · current weather") => "OpenWeatherMap · aktuellt väder",
-            ("sv", "Wikimedia Commons · image search and download") => "Wikimedia Commons · bildsökning och hämtning",
+            ("sv", "Wikimedia Commons · image search and download") => {
+                "Wikimedia Commons · bildsökning och hämtning"
+            }
             ("pt", "Japanese") => "Japonês",
             ("pt", "Korean") => "Coreano",
             ("pt", "Reload now") => "Recarregar agora",
@@ -1899,7 +2444,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("pt", "Open-Meteo · forecast") => "Open-Meteo · previsão",
             ("pt", "Open-Meteo · geocoding") => "Open-Meteo · geocodificação",
             ("pt", "OpenWeatherMap · current weather") => "OpenWeatherMap · meteorologia atual",
-            ("pt", "Wikimedia Commons · image search and download") => "Wikimedia Commons · pesquisa e transferência de imagens",
+            ("pt", "Wikimedia Commons · image search and download") => {
+                "Wikimedia Commons · pesquisa e transferência de imagens"
+            }
             ("pl", "Japanese") => "Japoński",
             ("pl", "Korean") => "Koreański",
             ("pl", "Reload now") => "Wczytaj ponownie",
@@ -1909,7 +2456,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("pl", "Open-Meteo · forecast") => "Open-Meteo · prognoza",
             ("pl", "Open-Meteo · geocoding") => "Open-Meteo · geokodowanie",
             ("pl", "OpenWeatherMap · current weather") => "OpenWeatherMap · bieżąca pogoda",
-            ("pl", "Wikimedia Commons · image search and download") => "Wikimedia Commons · wyszukiwanie i pobieranie obrazów",
+            ("pl", "Wikimedia Commons · image search and download") => {
+                "Wikimedia Commons · wyszukiwanie i pobieranie obrazów"
+            }
             ("da", "Japanese") => "Japansk",
             ("da", "Korean") => "Koreansk",
             ("da", "Reload now") => "Genindlæs nu",
@@ -1919,7 +2468,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("da", "Open-Meteo · forecast") => "Open-Meteo · vejrudsigt",
             ("da", "Open-Meteo · geocoding") => "Open-Meteo · geokodning",
             ("da", "OpenWeatherMap · current weather") => "OpenWeatherMap · aktuelt vejr",
-            ("da", "Wikimedia Commons · image search and download") => "Wikimedia Commons · billedsøgning og download",
+            ("da", "Wikimedia Commons · image search and download") => {
+                "Wikimedia Commons · billedsøgning og download"
+            }
             ("no", "Japanese") => "Japansk",
             ("no", "Korean") => "Koreansk",
             ("no", "Reload now") => "Last inn på nytt",
@@ -1929,11 +2480,17 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("no", "Open-Meteo · forecast") => "Open-Meteo · værvarsel",
             ("no", "Open-Meteo · geocoding") => "Open-Meteo · geokoding",
             ("no", "OpenWeatherMap · current weather") => "OpenWeatherMap · nåværende vær",
-            ("no", "Wikimedia Commons · image search and download") => "Wikimedia Commons · bildesøk og nedlasting",
+            ("no", "Wikimedia Commons · image search and download") => {
+                "Wikimedia Commons · bildesøk og nedlasting"
+            }
             ("ja", "AVERAGE TEMPERATURE") => "平均気温",
             ("ko", "AVERAGE TEMPERATURE") => "평균 온도",
-            ("ja", "Adjusts the power and temperature text in the panel") => "パネル内の電力・温度テキストのサイズを調整します",
-            ("ko", "Adjusts the power and temperature text in the panel") => "패널의 전력 및 온도 글자 크기를 조정합니다",
+            ("ja", "Adjusts the power and temperature text in the panel") => {
+                "パネル内の電力・温度テキストのサイズを調整します"
+            }
+            ("ko", "Adjusts the power and temperature text in the panel") => {
+                "패널의 전력 및 온도 글자 크기를 조정합니다"
+            }
             ("ja", "Base URL not configured") => "ベース URL が設定されていません",
             ("ko", "Base URL not configured") => "기본 URL이 설정되지 않았습니다",
             ("ja", "CONNECTION ERROR") => "接続エラー",
@@ -1944,7 +2501,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("ko", "Combine consumption and solar power") => "소비 전력과 태양광 발전량 합산",
             ("ja", "Configured devices") => "設定済みデバイス",
             ("ko", "Configured devices") => "구성된 장치",
-            ("ja", "Connected · device data loaded") => "接続済み · デバイスデータを読み込みました",
+            ("ja", "Connected · device data loaded") => {
+                "接続済み · デバイスデータを読み込みました"
+            }
             ("ko", "Connected · device data loaded") => "연결됨 · 장치 데이터를 불러왔습니다",
             ("ja", "Controls the gap between panel items") => "パネル項目間の間隔を調整します",
             ("ko", "Controls the gap between panel items") => "패널 항목 사이 간격을 조정합니다",
@@ -1952,10 +2511,20 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("ko", "DOWNLOAD HISTORY") => "다운로드 기록",
             ("ja", "Device list and meter readings") => "デバイス一覧と計測値",
             ("ko", "Device list and meter readings") => "장치 목록 및 측정값",
-            ("ja", "Display a separate refresh button beside the applet in the panel.") => "パネルのアプレット横に更新ボタンを表示します。",
-            ("ko", "Display a separate refresh button beside the applet in the panel.") => "패널 애플릿 옆에 별도의 새로 고침 버튼을 표시합니다.",
-            ("ja", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "写真はクロスフェードの前に5秒から5分間表示されます。",
-            ("ko", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "사진은 페이드 전환 전에 5초에서 5분 동안 표시됩니다.",
+            ("ja", "Display a separate refresh button beside the applet in the panel.") => {
+                "パネルのアプレット横に更新ボタンを表示します。"
+            }
+            ("ko", "Display a separate refresh button beside the applet in the panel.") => {
+                "패널 애플릿 옆에 별도의 새로 고침 버튼을 표시합니다."
+            }
+            (
+                "ja",
+                "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.",
+            ) => "写真はクロスフェードの前に5秒から5分間表示されます。",
+            (
+                "ko",
+                "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.",
+            ) => "사진은 페이드 전환 전에 5초에서 5분 동안 표시됩니다.",
             ("ja", "Exclude solar devices") => "太陽光発電デバイスを除外",
             ("ko", "Exclude solar devices") => "태양광 장치 제외",
             ("ja", "External resources") => "外部サービス",
@@ -1976,12 +2545,26 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("ko", "GRAPH STYLE") => "그래프 스타일",
             ("ja", "INTERNET BANDWIDTH") => "インターネット帯域幅",
             ("ko", "INTERNET BANDWIDTH") => "인터넷 대역폭",
-            ("ja", "Ignore temperatures from devices whose name contains “solar” when calculating the average.") => "名前に「solar」を含むデバイスの温度を平均値の計算から除外します。",
-            ("ko", "Ignore temperatures from devices whose name contains “solar” when calculating the average.") => "이름에 “solar”가 포함된 장치의 온도는 평균 계산에서 제외합니다.",
+            (
+                "ja",
+                "Ignore temperatures from devices whose name contains “solar” when calculating the average.",
+            ) => "名前に「solar」を含むデバイスの温度を平均値の計算から除外します。",
+            (
+                "ko",
+                "Ignore temperatures from devices whose name contains “solar” when calculating the average.",
+            ) => "이름에 “solar”가 포함된 장치의 온도는 평균 계산에서 제외합니다.",
             ("ja", "Image loaded") => "画像を読み込みました",
             ("ko", "Image loaded") => "이미지를 불러왔습니다",
-            ("ja", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "FRITZ!Box の更新とは独立しています。既定は10分です。APIキーと場所が必要です。",
-            ("ko", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "FRITZ!Box 새로 고침과 별도로 작동하며 기본값은 10분입니다. API 키와 위치가 필요합니다.",
+            (
+                "ja",
+                "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.",
+            ) => "FRITZ!Box の更新とは独立しています。既定は10分です。APIキーと場所が必要です。",
+            (
+                "ko",
+                "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.",
+            ) => {
+                "FRITZ!Box 새로 고침과 별도로 작동하며 기본값은 10분입니다. API 키와 위치가 필요합니다."
+            }
             ("ja", "Latest request failed") => "直近のリクエストに失敗しました",
             ("ko", "Latest request failed") => "최근 요청 실패",
             ("ja", "Latest request succeeded") => "直近のリクエストに成功しました",
@@ -2020,8 +2603,12 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("ko", "Show panel refresh button") => "패널 새로 고침 버튼 표시",
             ("ja", "Slideshow image duration") => "スライドショー画像の表示時間",
             ("ko", "Slideshow image duration") => "슬라이드쇼 이미지 표시 시간",
-            ("ja", "Stack related readings vertically instead of placing them on one line.") => "関連する測定値を横並びではなく縦に表示します。",
-            ("ko", "Stack related readings vertically instead of placing them on one line.") => "관련 측정값을 한 줄에 나란히 표시하지 않고 세로로 쌓습니다.",
+            ("ja", "Stack related readings vertically instead of placing them on one line.") => {
+                "関連する測定値を横並びではなく縦に表示します。"
+            }
+            ("ko", "Stack related readings vertically instead of placing them on one line.") => {
+                "관련 측정값을 한 줄에 나란히 표시하지 않고 세로로 쌓습니다."
+            }
             ("ja", "System certificate roots") => "システムの証明書ストア",
             ("ko", "System certificate roots") => "시스템 인증서 저장소",
             ("ja", "TOTAL POWER INPUT") => "総入力電力",
@@ -2043,31 +2630,76 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("ja", "Weather request failed") => "天気情報の取得に失敗しました",
             ("ko", "Weather request failed") => "날씨 요청 실패",
             ("es", "LAST") => "ÚLTIMOS",
-            ("es", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.") => "El sistema sigue el idioma del escritorio. Idiomas disponibles: inglés, alemán, español, neerlandés, francés, italiano, sueco, portugués, polaco, danés, noruego, japonés y coreano.",
+            (
+                "es",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.",
+            ) => {
+                "El sistema sigue el idioma del escritorio. Idiomas disponibles: inglés, alemán, español, neerlandés, francés, italiano, sueco, portugués, polaco, danés, noruego, japonés y coreano."
+            }
             ("es", "rain") => "lluvia",
             ("nl", "LAST") => "LAATSTE",
-            ("nl", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.") => "Het systeem volgt de taal van je bureaublad. Beschikbare talen: Engels, Duits, Spaans, Nederlands, Frans, Italiaans, Zweeds, Portugees, Pools, Deens, Noors, Japans en Koreaans.",
+            (
+                "nl",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.",
+            ) => {
+                "Het systeem volgt de taal van je bureaublad. Beschikbare talen: Engels, Duits, Spaans, Nederlands, Frans, Italiaans, Zweeds, Portugees, Pools, Deens, Noors, Japans en Koreaans."
+            }
             ("nl", "rain") => "regen",
             ("fr", "LAST") => "DERNIÈRES",
-            ("fr", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.") => "Le système suit la langue de votre bureau. Langues disponibles : anglais, allemand, espagnol, néerlandais, français, italien, suédois, portugais, polonais, danois, norvégien, japonais et coréen.",
+            (
+                "fr",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.",
+            ) => {
+                "Le système suit la langue de votre bureau. Langues disponibles : anglais, allemand, espagnol, néerlandais, français, italien, suédois, portugais, polonais, danois, norvégien, japonais et coréen."
+            }
             ("fr", "rain") => "pluie",
             ("it", "LAST") => "ULTIMI",
-            ("it", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.") => "Il sistema segue la lingua del desktop. Lingue disponibili: inglese, tedesco, spagnolo, olandese, francese, italiano, svedese, portoghese, polacco, danese, norvegese, giapponese e coreano.",
+            (
+                "it",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.",
+            ) => {
+                "Il sistema segue la lingua del desktop. Lingue disponibili: inglese, tedesco, spagnolo, olandese, francese, italiano, svedese, portoghese, polacco, danese, norvegese, giapponese e coreano."
+            }
             ("it", "rain") => "pioggia",
             ("sv", "LAST") => "SENASTE",
-            ("sv", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.") => "Systemet följer skrivbordets språk. Tillgängliga språk: engelska, tyska, spanska, nederländska, franska, italienska, svenska, portugisiska, polska, danska, norska, japanska och koreanska.",
+            (
+                "sv",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.",
+            ) => {
+                "Systemet följer skrivbordets språk. Tillgängliga språk: engelska, tyska, spanska, nederländska, franska, italienska, svenska, portugisiska, polska, danska, norska, japanska och koreanska."
+            }
             ("sv", "rain") => "regn",
             ("pt", "LAST") => "ÚLTIMOS",
-            ("pt", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.") => "O sistema segue o idioma do ambiente de trabalho. Idiomas disponíveis: inglês, alemão, espanhol, neerlandês, francês, italiano, sueco, português, polaco, dinamarquês, norueguês, japonês e coreano.",
+            (
+                "pt",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.",
+            ) => {
+                "O sistema segue o idioma do ambiente de trabalho. Idiomas disponíveis: inglês, alemão, espanhol, neerlandês, francês, italiano, sueco, português, polaco, dinamarquês, norueguês, japonês e coreano."
+            }
             ("pt", "rain") => "chuva",
             ("pl", "LAST") => "OSTATNIE",
-            ("pl", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.") => "System używa języka pulpitu. Dostępne języki: angielski, niemiecki, hiszpański, niderlandzki, francuski, włoski, szwedzki, portugalski, polski, duński, norweski, japoński i koreański.",
+            (
+                "pl",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.",
+            ) => {
+                "System używa języka pulpitu. Dostępne języki: angielski, niemiecki, hiszpański, niderlandzki, francuski, włoski, szwedzki, portugalski, polski, duński, norweski, japoński i koreański."
+            }
             ("pl", "rain") => "deszcz",
             ("da", "LAST") => "SENESTE",
-            ("da", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.") => "Systemet følger sproget på skrivebordet. Tilgængelige sprog: engelsk, tysk, spansk, nederlandsk, fransk, italiensk, svensk, portugisisk, polsk, dansk, norsk, japansk og koreansk.",
+            (
+                "da",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.",
+            ) => {
+                "Systemet følger sproget på skrivebordet. Tilgængelige sprog: engelsk, tysk, spansk, nederlandsk, fransk, italiensk, svensk, portugisisk, polsk, dansk, norsk, japansk og koreansk."
+            }
             ("da", "rain") => "regn",
             ("no", "LAST") => "SISTE",
-            ("no", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.") => "Systemet følger språket på skrivebordet. Tilgjengelige språk: engelsk, tysk, spansk, nederlandsk, fransk, italiensk, svensk, portugisisk, polsk, dansk, norsk, japansk og koreansk.",
+            (
+                "no",
+                "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean.",
+            ) => {
+                "Systemet følger språket på skrivebordet. Tilgjengelige språk: engelsk, tysk, spansk, nederlandsk, fransk, italiensk, svensk, portugisisk, polsk, dansk, norsk, japansk og koreansk."
+            }
             ("no", "rain") => "regn",
             ("ja", "%Y-%m-%d") => "%Y-%m-%d",
             ("ja", "FRITZ!Box") => "FRITZ!Box",
@@ -2077,7 +2709,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("ja", "Open-Meteo · geocoding") => "Open-Meteo · ジオコーディング",
             ("ja", "OpenWeatherMap · current weather") => "OpenWeatherMap · 現在の天気",
             ("ja", "Photo") => "写真",
-            ("ja", "Wikimedia Commons · image search and download") => "Wikimedia Commons · 画像検索とダウンロード",
+            ("ja", "Wikimedia Commons · image search and download") => {
+                "Wikimedia Commons · 画像検索とダウンロード"
+            }
             ("ja", "https://fritz.box") => "https://fritz.box",
             ("ja", "rain") => "雨",
             ("ko", "%Y-%m-%d") => "%Y-%m-%d",
@@ -2088,7 +2722,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("ko", "Open-Meteo · geocoding") => "Open-Meteo · 지오코딩",
             ("ko", "OpenWeatherMap · current weather") => "OpenWeatherMap · 현재 날씨",
             ("ko", "Photo") => "사진",
-            ("ko", "Wikimedia Commons · image search and download") => "Wikimedia Commons · 이미지 검색 및 다운로드",
+            ("ko", "Wikimedia Commons · image search and download") => {
+                "Wikimedia Commons · 이미지 검색 및 다운로드"
+            }
             ("ko", "https://fritz.box") => "https://fritz.box",
             ("ko", "rain") => "비",
             ("ja", "HTTP failed") => "HTTPエラー",
@@ -2101,7 +2737,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("ko", "Load devices") => "장치 불러오기",
             ("ja", "e.g. Amsterdam or 52.37,4.90") => "例：アムステルダム または 52.37,4.90",
             ("ko", "e.g. Amsterdam or 52.37,4.90") => "예: 암스테르담 또는 52.37,4.90",
-        _ => key,
+            _ => key,
         };
     }
     match key {
@@ -2366,12 +3002,16 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Open-Meteo · forecast" => "Open-Meteo · Vorhersage",
         "Open-Meteo · geocoding" => "Open-Meteo · Geokodierung",
         "Send test notification" => "Testbenachrichtigung senden",
-        "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean." => "Das System folgt der Sprache Ihres Desktops. Verfügbare Sprachen: Englisch, Deutsch, Spanisch, Niederländisch, Französisch, Italienisch, Schwedisch, Portugiesisch, Polnisch, Dänisch, Norwegisch, Japanisch und Koreanisch.",
+        "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean." => {
+            "Das System folgt der Sprache Ihres Desktops. Verfügbare Sprachen: Englisch, Deutsch, Spanisch, Niederländisch, Französisch, Italienisch, Schwedisch, Portugiesisch, Polnisch, Dänisch, Norwegisch, Japanisch und Koreanisch."
+        }
         "TOTAL POWER INPUT" => "GESAMTE LEISTUNGSEINSPEISUNG",
         "TOTAL POWER OUTPUT" => "GESAMTE LEISTUNGSABGABE",
-            "TOTAL ENERGY" => "GESAMTENERGIE",
+        "TOTAL ENERGY" => "GESAMTENERGIE",
         "Weather location not configured" => "Wetterstandort nicht konfiguriert",
-        "Wikimedia Commons · image search and download" => "Wikimedia Commons · Bildersuche und Download",
+        "Wikimedia Commons · image search and download" => {
+            "Wikimedia Commons · Bildersuche und Download"
+        }
         _ => key,
     }
 }
@@ -2388,7 +3028,9 @@ mod tests {
 
     #[test]
     fn supported_languages_and_locale_variants_are_resolved() {
-        for language in ["en", "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko"] {
+        for language in [
+            "en", "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko",
+        ] {
             assert_eq!(super::language(language), language);
         }
         assert_eq!(super::language("fr_FR.UTF-8"), "fr");
@@ -2399,7 +3041,16 @@ mod tests {
     fn japanese_and_korean_locales_are_detected_and_translated() {
         for locale in ["ja", "ko"] {
             assert_eq!(super::language(locale), locale);
-            for key in ["Settings", "Weather", "Connection", "Japanese", "Korean", "Panel item order", "FRITZ!Box URL", "Send test notification"] {
+            for key in [
+                "Settings",
+                "Weather",
+                "Connection",
+                "Japanese",
+                "Korean",
+                "Panel item order",
+                "FRITZ!Box URL",
+                "Send test notification",
+            ] {
                 assert_ne!(tr(locale, key), key, "{locale}: {key}");
             }
         }
@@ -2439,18 +3090,35 @@ mod tests {
 
     #[test]
     fn language_picker_names_are_localized_for_every_supported_locale() {
-        let languages = ["English", "German", "Spanish", "Dutch", "French", "Italian", "Swedish", "Portuguese", "Polish", "Danish", "Norwegian", "Japanese", "Korean"];
-        for locale in ["de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko"] {
+        let languages = [
+            "English",
+            "German",
+            "Spanish",
+            "Dutch",
+            "French",
+            "Italian",
+            "Swedish",
+            "Portuguese",
+            "Polish",
+            "Danish",
+            "Norwegian",
+            "Japanese",
+            "Korean",
+        ];
+        for locale in [
+            "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko",
+        ] {
             for name in languages {
                 assert_ne!(tr(locale, name), name, "{locale}: {name}");
             }
         }
     }
 
-
     #[test]
     fn every_language_picker_choice_is_persisted_as_selected() {
-        for language in ["system", "en", "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko"] {
+        for language in [
+            "system", "en", "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko",
+        ] {
             assert_eq!(language_setting(language), language);
         }
         assert_eq!(language_setting("unsupported"), "system");
@@ -2462,7 +3130,9 @@ mod tests {
     }
     #[test]
     fn total_energy_label_is_translated_for_all_supported_languages() {
-        for language in ["de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko"] {
+        for language in [
+            "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko",
+        ] {
             assert_ne!(tr(language, "TOTAL ENERGY"), "TOTAL ENERGY", "{language}");
         }
     }
@@ -2588,11 +3258,12 @@ mod tests {
             "minimum",
             "rain",
         ];
-        for locale in ["de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko"] {
+        for locale in [
+            "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko",
+        ] {
             for key in keys {
                 assert_ne!(tr(locale, key), key, "missing {locale} translation: {key}");
             }
         }
     }
-
 }
