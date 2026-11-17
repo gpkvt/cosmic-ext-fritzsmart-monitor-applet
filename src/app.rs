@@ -1176,6 +1176,7 @@ struct LivePowerSummaryData {
     graph_style: String,
     language: String,
     axis_start: String,
+    history_collapsed: bool,
 }
 
 fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Message> {
@@ -1188,6 +1189,7 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
         graph_style,
         language,
         axis_start,
+        history_collapsed,
     } = data;
     // The section already identifies these readings; avoid repeating a
     // separate "Current power" heading above the values.
@@ -1219,31 +1221,49 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
     if let Some(energy_flow) = energy_flow {
         content = content.push(energy_flow);
     }
-    content = content
-        .push(widget::text::caption(crate::i18n::tr(
-            &language,
-            "CURRENT POWER HISTORY",
-        )))
-        .push(interactive_graph_with_axis(
-            &language,
-            crate::i18n::tr(&language, "CURRENT POWER"),
-            history.into_iter(),
-            &graph_style,
-            "W",
-            axis_start.clone(),
-        ))
-        .push(widget::text::caption(crate::i18n::tr(
-            &language,
-            "AVERAGE TEMPERATURE HISTORY (°C)",
-        )))
-        .push(interactive_graph_with_axis(
-            &language,
-            crate::i18n::tr(&language, "AVERAGE TEMPERATURE"),
-            temperature_history.into_iter(),
-            &graph_style,
-            "°C",
-            axis_start,
-        ));
+    let history_heading = widget::button::custom(
+        widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::text::caption(crate::i18n::tr(
+                &language,
+                "CURRENT POWER HISTORY",
+            )))
+            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+            .push(widget::icon::from_name(if history_collapsed {
+                "go-next-symbolic"
+            } else {
+                "go-down-symbolic"
+            }).size(16)),
+    )
+    .on_press(Message::ToggleMenuSection("current-power-history".into()))
+    .width(cosmic::iced::Length::Fill)
+    .padding([4, 0])
+    .class(cosmic::theme::Button::Text);
+    content = content.push(history_heading);
+    if !history_collapsed {
+        content = content
+            .push(interactive_graph_with_axis(
+                &language,
+                crate::i18n::tr(&language, "CURRENT POWER"),
+                history.into_iter(),
+                &graph_style,
+                "W",
+                axis_start.clone(),
+            ))
+            .push(widget::text::caption(crate::i18n::tr(
+                &language,
+                "AVERAGE TEMPERATURE HISTORY (°C)",
+            )))
+            .push(interactive_graph_with_axis(
+                &language,
+                crate::i18n::tr(&language, "AVERAGE TEMPERATURE"),
+                temperature_history.into_iter(),
+                &graph_style,
+                "°C",
+                axis_start,
+            ));
+    }
     surface_card(content.into(), 14)
 }
 
@@ -4139,6 +4159,9 @@ impl cosmic::Application for AppModel {
                             Instant::now().duration_since(*timestamp).as_secs() / 60
                         }),
                     ),
+                    history_collapsed: self
+                        .collapsed_menu_sections
+                        .contains("current-power-history"),
                 });
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
