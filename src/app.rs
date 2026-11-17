@@ -4196,9 +4196,7 @@ impl cosmic::Application for AppModel {
                                     &self.settings.language,
                                     "SETTINGS",
                                 )))
-                                .push(
-                                    widget::icon::from_name("preferences-system-symbolic").size(20),
-                                ),
+                                .push(widget::text("⚙").size(20)),
                         )
                         .on_press(Message::ToggleSettings)
                         .padding([8, 12])
@@ -4214,7 +4212,9 @@ impl cosmic::Application for AppModel {
                                     &self.settings.language,
                                     "QUICK SETTINGS",
                                 )))
-                                .push(widget::text("⚙").size(20)),
+                                .push(
+                                    widget::icon::from_name("preferences-system-symbolic").size(20),
+                                ),
                         )
                         .on_press(Message::ToggleQuickOptions)
                         .padding([8, 12])
