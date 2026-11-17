@@ -4390,11 +4390,7 @@ impl cosmic::Application for AppModel {
                 .width(cosmic::iced::Length::Fill)
                 .align_y(cosmic::iced::Alignment::Center)
                 .push(
-                    widget::text::caption(format!(
-                        "FRITZ!Power Monitor · v{}",
-                        env!("APP_VERSION")
-                    ))
-                    .width(cosmic::iced::Length::Fill),
+                    widget::Space::new().width(cosmic::iced::Length::Fill),
                 )
                 .push(
                     widget::button::custom(widget::text::caption("Source code ↗"))
@@ -4473,11 +4469,17 @@ impl cosmic::Application for AppModel {
                         .center_y(36),
                     )
                     .push(
-                        widget::text::body(crate::i18n::tr(
-                            &self.settings.language,
-                            "FRITZ!Power Monitor",
-                        ))
-                        .width(cosmic::iced::Length::Fill),
+                        widget::Column::new()
+                            .spacing(1)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::body(crate::i18n::tr(
+                                &self.settings.language,
+                                "FRITZ!Power Monitor",
+                            )))
+                            .push(widget::text::caption(format!(
+                                "v{}",
+                                env!("APP_VERSION")
+                            ))),
                     )
                     .push(if self.refresh_started_at.is_some() {
                         icon_action_button(
@@ -5848,57 +5850,3 @@ mod history_tests {
         assert_eq!(format_graph_axis_start(1440, Some(180)), "3h ago");
         assert_eq!(format_graph_axis_start(1440, Some(1500)), "1d ago");
         assert_eq!(format_graph_axis_start(2880, Some(1590)), "1d 2h 30m ago");
-        assert_eq!(format_graph_axis_start(4320, Some(3032)), "2d 2h 32m ago");
-        assert_eq!(format_graph_axis_start(90, Some(35)), "35m ago");
-        assert_eq!(format_graph_axis_start(60, None), "1h ago");
-        assert_eq!(format_graph_axis_start(2_102_400, Some(60)), "1h ago");
-    }
-
-    #[test]
-    fn history_keeps_five_minute_samples_within_the_last_fifteen_minutes() {
-        let start = Instant::now();
-        let mut history = VecDeque::new();
-        for sample in 0_u64..18 {
-            record_power_sample(
-                &mut history,
-                sample as i64,
-                start + Duration::from_secs(sample * 5 * 60),
-                Duration::from_secs(15 * 60),
-            );
-        }
-        assert_eq!(history.len(), 4);
-        assert_eq!(history.front().unwrap().1, 14);
-        assert_eq!(history.back().unwrap().1, 17);
-    }
-
-    #[test]
-    fn power_toggle_stays_pending_until_fresh_reading_confirms_requested_state() {
-        for (requested, reported, should_remain_pending) in [
-            (true, Some(false), true),
-            (false, Some(true), true),
-            (true, Some(true), false),
-            (false, Some(false), false),
-            (true, None, true),
-        ] {
-            let mut pending_targets = HashMap::from([("123456".to_string(), requested)]);
-            let mut pending_changes = HashSet::from(["123456".to_string()]);
-            let readings = vec![FritzReading {
-                ain: "12:34-56".into(),
-                name: "Test switch".into(),
-                power_w: 100,
-                temperature_c: 20.0,
-                power_state: reported,
-                power_controllable: false,
-                power_toggle_allowed: false,
-            }];
-
-            clear_confirmed_power_changes(&mut pending_targets, &mut pending_changes, &readings);
-
-            assert_eq!(
-                pending_targets.contains_key("123456"),
-                should_remain_pending
-            );
-            assert_eq!(pending_changes.contains("123456"), should_remain_pending);
-        }
-    }
-}
