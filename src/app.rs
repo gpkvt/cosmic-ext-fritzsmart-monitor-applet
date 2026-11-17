@@ -3980,7 +3980,10 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
                     .push(diagnostic_section_heading(
                         crate::i18n::tr(&self.settings.language, "Application & updates"),
-                        crate::i18n::tr(&self.settings.language, "Installed version and release status"),
+                        crate::i18n::tr(
+                            &self.settings.language,
+                            "Installed version and release status",
+                        ),
                     ))
                     .push(diagnostic_info_row(
                         crate::i18n::tr(&self.settings.language, "Version"),
@@ -4367,7 +4370,10 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
                     .push(diagnostic_section_heading(
                         crate::i18n::tr(&self.settings.language, "System & router"),
-                        crate::i18n::tr(&self.settings.language, "Host temperature and FRITZ!Box hardware information"),
+                        crate::i18n::tr(
+                            &self.settings.language,
+                            "Host temperature and FRITZ!Box hardware information",
+                        ),
                     ))
                     .push(diagnostic_status_row(
                         crate::i18n::tr(&self.settings.language, "CPU temperature"),
@@ -4481,7 +4487,10 @@ impl cosmic::Application for AppModel {
                 content = content
                     .push(diagnostic_section_heading(
                         crate::i18n::tr(&self.settings.language, "FRITZ!Box API"),
-                        crate::i18n::tr(&self.settings.language, "Endpoint health and recent router requests"),
+                        crate::i18n::tr(
+                            &self.settings.language,
+                            "Endpoint health and recent router requests",
+                        ),
                     ))
                     .push(diagnostic_status_row(
                         crate::i18n::tr(&self.settings.language, "Connection"),
@@ -4564,9 +4573,12 @@ impl cosmic::Application for AppModel {
                         }
                     )));
                 content = content.push(diagnostic_section_heading(
-                        crate::i18n::tr(&self.settings.language, "Live device data"),
-                        crate::i18n::tr(&self.settings.language, "Current power, temperature and switch state"),
-                    ));
+                    crate::i18n::tr(&self.settings.language, "Live device data"),
+                    crate::i18n::tr(
+                        &self.settings.language,
+                        "Current power, temperature and switch state",
+                    ),
+                ));
                 if self.readings.is_empty() {
                     content = content.push(widget::text::caption(crate::i18n::tr(
                         &self.settings.language,
@@ -4599,7 +4611,10 @@ impl cosmic::Application for AppModel {
                 content = content.push(widget::divider::horizontal::default()).push(
                     diagnostic_section_heading(
                         crate::i18n::tr(&self.settings.language, "History storage"),
-                        crate::i18n::tr(&self.settings.language, "Inspect locally stored samples and graph availability"),
+                        crate::i18n::tr(
+                            &self.settings.language,
+                            "Inspect locally stored samples and graph availability",
+                        ),
                     ),
                 );
                 content = content.push(action_button(

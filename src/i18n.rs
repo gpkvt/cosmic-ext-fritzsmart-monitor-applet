@@ -3780,20 +3780,34 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             "Bei Überschreitung des oberen oder Unterschreitung des unteren Grenzwerts benachrichtigen"
         }
         "Application & updates" => "Anwendung & Aktualisierungen",
-        "Installed version and release status" => "Installierte Version und Veröffentlichungsstatus",
+        "Installed version and release status" => {
+            "Installierte Version und Veröffentlichungsstatus"
+        }
         "FRITZ!Box connection" => "FRITZ!Box-Verbindung",
-        "Address, transport security and authentication" => "Adresse, Transportsicherheit und Authentifizierung",
+        "Address, transport security and authentication" => {
+            "Adresse, Transportsicherheit und Authentifizierung"
+        }
         "Weather services" => "Wetterdienste",
-        "Latest request status for weather, forecasts and background images" => "Status der letzten Anfrage für Wetter, Vorhersagen und Hintergrundbilder",
+        "Latest request status for weather, forecasts and background images" => {
+            "Status der letzten Anfrage für Wetter, Vorhersagen und Hintergrundbilder"
+        }
         "System & router" => "System & Router",
-        "Host temperature and FRITZ!Box hardware information" => "Temperatur des Rechners und FRITZ!Box-Hardwareinformationen",
+        "Host temperature and FRITZ!Box hardware information" => {
+            "Temperatur des Rechners und FRITZ!Box-Hardwareinformationen"
+        }
         "Endpoint health and recent router requests" => "Endpunktstatus und letzte Router-Anfragen",
         "Live device data" => "Live-Gerätedaten",
-        "Current power, temperature and switch state" => "Aktuelle Leistung, Temperatur und Schaltzustand",
+        "Current power, temperature and switch state" => {
+            "Aktuelle Leistung, Temperatur und Schaltzustand"
+        }
         "History storage" => "Verlaufsdaten",
-        "Inspect locally stored samples and graph availability" => "Lokal gespeicherte Messwerte und Diagrammverfügbarkeit prüfen",
+        "Inspect locally stored samples and graph availability" => {
+            "Lokal gespeicherte Messwerte und Diagrammverfügbarkeit prüfen"
+        }
         "Activity & debug report" => "Aktivität & Diagnosebericht",
-        "Recent HTTP responses, events and export tools" => "Letzte HTTP-Antworten, Ereignisse und Exportfunktionen",
+        "Recent HTTP responses, events and export tools" => {
+            "Letzte HTTP-Antworten, Ereignisse und Exportfunktionen"
+        }
         "Application" => "Anwendung",
         "Version" => "Version",
         "Latest version" => "Neueste Version",
