@@ -1707,20 +1707,22 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
         }
     }
 
-    let system_info_json = system_info.as_ref().map(|info| json!({
-        "manufacturer": info.manufacturer,
-        "model": info.model,
-        "product_class": info.product_class,
-        "hardware_version": info.hardware_version,
-        "software_version": info.software_version,
-        "uptime_seconds": info.uptime_seconds,
-        "wan": info.wan.as_ref().map(|wan| json!({
-            "access_type": wan.access_type,
-            "physical_link_status": wan.physical_link_status,
-            "download_bits_per_second": wan.download_bits_per_second,
-            "upload_bits_per_second": wan.upload_bits_per_second,
-        })),
-    }));
+    let system_info_json = system_info.as_ref().map(|info| {
+        json!({
+            "manufacturer": info.manufacturer,
+            "model": info.model,
+            "product_class": info.product_class,
+            "hardware_version": info.hardware_version,
+            "software_version": info.software_version,
+            "uptime_seconds": info.uptime_seconds,
+            "wan": info.wan.as_ref().map(|wan| json!({
+                "access_type": wan.access_type,
+                "physical_link_status": wan.physical_link_status,
+                "download_bits_per_second": wan.download_bits_per_second,
+                "upload_bits_per_second": wan.upload_bits_per_second,
+            })),
+        })
+    });
 
     json!({
         "system_info": system_info_json,
