@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Unified single-line and multiline panel value rendering with the same fixed-width, right-aligned text slot; multiline slots use their longest line to calculate width.
+
 - Right-aligned the rows inside paired panel columns so their readings share a common right edge.
 
 - Reduced the fixed row height of paired multiline panel readings; their vertical spacing now follows the configured text size instead of reserving 24 px per line.
