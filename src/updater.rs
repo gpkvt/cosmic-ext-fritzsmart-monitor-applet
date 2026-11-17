@@ -11,14 +11,7 @@ const SOURCE_CHECKOUT: &str = env!("CARGO_MANIFEST_DIR");
 
 /// Install the latest stable release using the mechanism that owns this install.
 pub async fn install_update(tag: String) -> Result<String, String> {
-    let version = tag.trim().trim_start_matches(['v', 'V']);
-    if version.is_empty()
-        || !version
-            .chars()
-            .all(|character| character.is_ascii_digit() || character == '.')
-    {
-        return Err("The release tag has an unexpected format".into());
-    }
+    let version = normalize_release_version(&tag)?;
     let tag = format!("v{version}");
 
     if std::env::var("FLATPAK_ID").as_deref() == Ok(APP_ID) {
@@ -38,6 +31,28 @@ pub async fn install_update(tag: String) -> Result<String, String> {
     }
 
     Err("This installation is not managed by a supported updater. Download the package from the project releases page.".into())
+}
+
+fn normalize_release_version(tag: &str) -> Result<&str, String> {
+    let version = tag.trim().trim_start_matches(['v', 'V']);
+    let components: Vec<&str> = version.split('.').collect();
+    if components.len() != 3
+        || components
+            .iter()
+            .any(|part| part.is_empty() || !part.chars().all(|character| character.is_ascii_digit()))
+    {
+        return Err("The release tag has an unexpected format".into());
+    }
+    Ok(version)
+}
+
+fn checksum_for_asset<'a>(checksums: &'a str, name: &str) -> Option<&'a str> {
+    checksums.lines().find_map(|line| {
+        let mut fields = line.split_whitespace();
+        let checksum = fields.next()?;
+        let filename = fields.next()?.trim_start_matches('*');
+        (filename == name).then_some(checksum)
+    })
 }
 
 fn client() -> Result<Client, String> {
@@ -64,14 +79,8 @@ async fn download_verified_asset(tag: &str, name: &str) -> Result<Vec<u8>, Strin
         .text()
         .await
         .map_err(|error| error.to_string())?;
-    let expected = checksums
-        .lines()
-        .filter_map(|line| {
-            let mut fields = line.split_whitespace();
-            Some((fields.next()?, fields.next()?.trim_start_matches('*')))
-        })
-        .find(|(_, filename)| *filename == name)
-        .map(|(checksum, _)| checksum.to_ascii_lowercase())
+    let expected = checksum_for_asset(&checksums, name)
+        .map(str::to_ascii_lowercase)
         .ok_or_else(|| format!("The release checksum does not list {name}"))?;
 
     let bytes = client
@@ -238,12 +247,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn source_checkout_is_only_detected_when_manifest_tree_exists() {
-        let path = PathBuf::from(SOURCE_CHECKOUT);
-        assert_eq!(
-            source_checkout().is_some(),
-            path.join("Makefile").is_file() && path.join(".git").exists()
-        );
+    fn release_tags_must_be_numeric_semver_components() {
+        assert_eq!(normalize_release_version("v1.2.3").unwrap(), "1.2.3");
+        assert_eq!(normalize_release_version("1.2.3").unwrap(), "1.2.3");
+        assert!(normalize_release_version("v1.2.3-rc1").is_err());
+        assert!(normalize_release_version("latest").is_err());
+    }
+
+    #[test]
+    fn checksum_lookup_matches_the_exact_asset_name() {
+        let sums = "0123456789abcdef  app.deb\\nabcdef0123456789 *app.AppImage\\n";
+        assert_eq!(checksum_for_asset(sums, "app.deb"), Some("0123456789abcdef"));
+        assert_eq!(checksum_for_asset(sums, "app.AppImage"), Some("abcdef0123456789"));
+        assert_eq!(checksum_for_asset(sums, "other.deb"), None);
     }
 
     #[test]

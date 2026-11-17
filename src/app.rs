@@ -3035,11 +3035,13 @@ impl cosmic::Application for AppModel {
                         crate::i18n::tr(&self.settings.language, "Check for updates"),
                         Message::CheckLatestVersion,
                     ));
-                if self.latest_version.as_ref().is_some_and(|result| {
-                    result
-                        .as_ref()
-                        .is_ok_and(|version| is_newer_version(version, env!("APP_VERSION")))
-                }) {
+                if !self.update_installing
+                    && self.latest_version.as_ref().is_some_and(|result| {
+                        result
+                            .as_ref()
+                            .is_ok_and(|version| is_newer_version(version, env!("APP_VERSION")))
+                    })
+                {
                     content = content.push(action_button(
                         "software-update-available-symbolic",
                         crate::i18n::tr(&self.settings.language, "Install update"),
@@ -5578,6 +5580,15 @@ impl cosmic::Application for AppModel {
             Message::ToggleSettingsSection(section) => {
                 self.active_settings_section = Some(section);
                 self.persist_layout_state();
+                if section == "diagnostics"
+                    && self.latest_version.is_none()
+                    && !self.latest_version_loading
+                {
+                    self.latest_version_loading = true;
+                    return Task::perform(fetch_latest_release_version(), |result| {
+                        cosmic::Action::App(Message::LatestVersionChecked(result))
+                    });
+                }
                 if section == "device" && !self.devices_loaded && !self.devices_loading {
                     self.devices_loading = true;
                     let settings = self.settings.clone();
