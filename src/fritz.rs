@@ -685,7 +685,11 @@ impl FritzSettings {
             self.openweathermap_api_key,
             self.weather_location,
             self.weather_temperature_ain,
-            if self.weather_temperature_source_initialized { "true" } else { "false" },
+            if self.weather_temperature_source_initialized {
+                "true"
+            } else {
+                "false"
+            },
             self.weather_refresh_interval_minutes.clamp(5, 60),
             self.weather_slideshow_interval_seconds.clamp(5, 300),
             input_ains,
@@ -1381,11 +1385,23 @@ mod tests {
     #[test]
     fn defaults_external_temperature_to_first_solar_device_case_insensitively() {
         let devices = vec![
-            FritzDevice { name: "Smart Plug".into(), ain: "11:11".into() },
-            FritzDevice { name: "Roof SOLAR meter".into(), ain: "22:22".into() },
-            FritzDevice { name: "Solar battery".into(), ain: "33:33".into() },
+            FritzDevice {
+                name: "Smart Plug".into(),
+                ain: "11:11".into(),
+            },
+            FritzDevice {
+                name: "Roof SOLAR meter".into(),
+                ain: "22:22".into(),
+            },
+            FritzDevice {
+                name: "Solar battery".into(),
+                ain: "33:33".into(),
+            },
         ];
-        assert_eq!(default_external_temperature_ain(&devices), Some("22:22".into()));
+        assert_eq!(
+            default_external_temperature_ain(&devices),
+            Some("22:22".into())
+        );
         assert_eq!(default_external_temperature_ain(&devices[..1]), None);
     }
 

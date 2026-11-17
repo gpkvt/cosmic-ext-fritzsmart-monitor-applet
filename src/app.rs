@@ -3443,10 +3443,11 @@ impl cosmic::Application for AppModel {
                             .get(&normalized_ain)
                             .copied();
                         let is_input = self.settings.input_ains.contains(&normalized_ain);
-                        let is_external_temperature = !self.settings.weather_temperature_ain.is_empty()
-                            && crate::fritz::normalize_ain_for_selection(
-                                &self.settings.weather_temperature_ain,
-                            ) == normalized_ain;
+                        let is_external_temperature =
+                            !self.settings.weather_temperature_ain.is_empty()
+                                && crate::fritz::normalize_ain_for_selection(
+                                    &self.settings.weather_temperature_ain,
+                                ) == normalized_ain;
                         let mut device_row = widget::Column::new()
                             .spacing(6)
                             .push(row)
@@ -6754,9 +6755,11 @@ impl cosmic::Application for AppModel {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
                 if enabled {
                     self.settings.weather_temperature_ain = ain.clone();
-                    if !self.selected_ains.iter().any(|selected| {
-                        crate::fritz::normalize_ain_for_selection(selected) == key
-                    }) {
+                    if !self
+                        .selected_ains
+                        .iter()
+                        .any(|selected| crate::fritz::normalize_ain_for_selection(selected) == key)
+                    {
                         self.selected_ains.push(ain);
                     }
                     self.settings.ains = self.selected_ains.clone();
