@@ -4113,7 +4113,6 @@ mod tests {
             "Open-Meteo · geocoding",
             "OpenWeatherMap API key",
             "Outdoor temperature source",
-            "OpenWeatherMap",
             "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
             "OpenWeatherMap · current weather",
             "Panel item spacing",
