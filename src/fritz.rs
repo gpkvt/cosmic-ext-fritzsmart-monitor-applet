@@ -143,6 +143,7 @@ pub struct FritzSettings {
     pub expanded_devices: Vec<String>,
     pub quick_options_expanded: bool,
     pub weather_forecast_expanded: bool,
+    pub weather_attribution_expanded: bool,
     pub settings_section: String,
 }
 
@@ -185,6 +186,7 @@ impl Default for FritzSettings {
             expanded_devices: Vec::new(),
             quick_options_expanded: false,
             weather_forecast_expanded: false,
+            weather_attribution_expanded: false,
             settings_section: String::new(),
         }
     }
@@ -361,6 +363,7 @@ fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
         "internet-bandwidth",
         "total-power-output",
         "total-power-input",
+        "current-power-history",
     ];
     value
         .split(',')
@@ -519,6 +522,8 @@ impl FritzSettings {
             quick_options_expanded: get("QUICK_OPTIONS_EXPANDED").eq_ignore_ascii_case("true"),
             weather_forecast_expanded: get("WEATHER_FORECAST_EXPANDED")
                 .eq_ignore_ascii_case("true"),
+            weather_attribution_expanded: get("WEATHER_ATTRIBUTION_EXPANDED")
+                .eq_ignore_ascii_case("true"),
             settings_section: parse_settings_section(&get("SETTINGS_SECTION")),
         };
         Ok(settings)
@@ -581,7 +586,7 @@ impl FritzSettings {
             parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
         let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
-            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nSETTINGS_SECTION={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nSETTINGS_SECTION={}\n",
             match self.language.as_str() {
                 "de" => "de",
                 "en" => "en",
@@ -666,6 +671,11 @@ impl FritzSettings {
                 "false"
             },
             if self.weather_forecast_expanded {
+                "true"
+            } else {
+                "false"
+            },
+            if self.weather_attribution_expanded {
                 "true"
             } else {
                 "false"
