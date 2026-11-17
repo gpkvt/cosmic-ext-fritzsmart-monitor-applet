@@ -2144,7 +2144,7 @@ impl cosmic::Application for AppModel {
                             .push(language_button(crate::i18n::tr(&self.settings.language, "Norwegian"), "no")))
                         .push(widget::Row::new().spacing(8)
                             .push(language_button(crate::i18n::tr(&self.settings.language, "Japanese"), "ja"))
-                            .push(language_button(crate::i18n::tr(&self.settings.language, "Korean"), "ko")))
+                            .push(language_button(crate::i18n::tr(&self.settings.language, "Korean"), "ko"))))
                     .push(widget::divider::horizontal::default());
             }
             if self.active_settings_section == Some("panel") {
