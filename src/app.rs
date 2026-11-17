@@ -2534,7 +2534,7 @@ impl cosmic::Application for AppModel {
                 ordered_panel_items.push(panel_items.remove(index));
             }
         }
-        ordered_panel_items.extend(panel_items.drain(..));
+        ordered_panel_items.append(&mut panel_items);
 
         if self.settings.panel_multiline {
             // Keep related readings together as two-line groups while each
