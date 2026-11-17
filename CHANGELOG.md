@@ -2,6 +2,10 @@
 
 ## [17.11.2026]
 
+### Added
+
+- Added a 2 px progress line beneath the weather background image to show the time remaining until the next weather and image refresh.
+
 ### Fixed
 
 - Restored two-line grouping for weather/temperature and consumption/solar in multiline panel mode while retaining horizontal icon/value pairs within each line.
