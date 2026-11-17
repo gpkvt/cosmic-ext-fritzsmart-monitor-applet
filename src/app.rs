@@ -2678,7 +2678,7 @@ impl cosmic::Application for AppModel {
                             content =
                                 content.push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Searching your FRITZ!Box…")));
                         } else if let Some(error) = &self.error {
-                            content = content.push(error_notice("FRITZ!Box connection", error));
+                            content = content.push(error_notice(crate::i18n::tr(&self.settings.language, "FRITZ!Box connection"), error));
                         }
                         for device in &self.devices {
                             let selected = self.selected_ains.iter().any(|ain| {
