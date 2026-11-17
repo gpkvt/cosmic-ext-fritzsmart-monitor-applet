@@ -32,9 +32,9 @@ pub fn language(setting: &str) -> &'static str {
         let value = value.to_ascii_lowercase();
         let value = value.split(':').next().unwrap_or(&value);
         let value = value
-            .split(|c| c == '_' || c == '-' || c == '.')
+            .split(['_', '-', '.'])
             .next()
-            .unwrap_or(&value);
+            .unwrap_or(value);
         match value {
             "de" => Some("de"),
             "en" => Some("en"),
@@ -53,16 +53,14 @@ pub fn language(setting: &str) -> &'static str {
         }
     }
 
-    if setting != "system" {
-        if let Some(language) = from_locale(setting) {
-            return language;
-        }
+    if setting != "system" && let Some(language) = from_locale(setting) {
+        return language;
     }
     for key in ["LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"] {
-        if let Ok(value) = env::var(key) {
-            if let Some(language) = from_locale(&value) {
-                return language;
-            }
+        if let Ok(value) = env::var(key)
+            && let Some(language) = from_locale(&value)
+        {
+            return language;
         }
     }
     "en"
@@ -1630,7 +1628,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("sv", "FORECAST UNAVAILABLE") => "PROGNOS EJ TILLGÄNGLIG",
             ("sv", "Weather data is loading…") => "Väderdata läses in…",
             ("sv", "TEMPERATURE (°C)") => "TEMPERATUR (°C)",
-            ("sv", "INTERNET BANDWIDTH") => "INTERNETBAND­BREDD",
+            ("sv", "INTERNET BANDWIDTH") => "INTERNETBAND\u{AD}BREDD",
             ("sv", "CONNECTION ERROR") => "ANSLUTNINGSFEL",
 
             // Additional pt labels for graphs, TLS and service diagnostics

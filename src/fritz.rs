@@ -757,6 +757,7 @@ fn decode_xml_response(bytes: &[u8], context: &str) -> Result<String, String> {
         .map_err(|error| format!("{context}: response is not valid UTF-8: {error}"))
 }
 
+#[allow(clippy::too_many_arguments)] // Keep HTTP diagnostic fields explicit at the call site.
 fn format_response_read_error(
     context: &str,
     url_path: &str,
@@ -1000,7 +1001,7 @@ fn parse_devices_xml(xml: &str) -> Result<Vec<FritzDevice>, String> {
             ain: ain.to_string(),
         });
     }
-    devices.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    devices.sort_by_key(|device| device.name.to_lowercase());
     if devices.is_empty() {
         return Err("No devices with usable power-meter readings were found".into());
     }

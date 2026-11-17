@@ -74,7 +74,7 @@ pub enum Message {
     TooltipSurfaceAction(cosmic::surface::Action<Message>),
     Refresh,
     ClockTick,
-    Updated(Result<FritzFetchResult, String>),
+    Updated(Box<Result<FritzFetchResult, String>>),
     SetDevicePower(String, bool),
     PowerCommandFinished(String, bool, Result<(), String>),
     ToggleSettings,
@@ -362,12 +362,12 @@ fn format_countdown(seconds: u64) -> String {
 
 fn format_graph_timespan(minutes: u32) -> String {
     let days = minutes / 1440;
-    if days >= 365 && days % 365 == 0 {
+    if days >= 365 && days.is_multiple_of(365) {
         let years = days / 365;
         format!("{years} {}", if years == 1 { "year" } else { "years" })
-    } else if days > 0 && minutes % 1440 == 0 {
+    } else if days > 0 && minutes.is_multiple_of(1440) {
         format!("{days} {}", if days == 1 { "day" } else { "days" })
-    } else if minutes % 60 == 0 {
+    } else if minutes.is_multiple_of(60) {
         let hours = minutes / 60;
         format!("{hours} {}", if hours == 1 { "hour" } else { "hours" })
     } else if minutes > 60 {
@@ -1610,7 +1610,7 @@ impl cosmic::Application for AppModel {
             && !settings.weather_location.trim().is_empty();
         let forecast_location = settings.weather_location.clone();
         let mut tasks = vec![Task::perform(fetch_fritz_data(), |result| {
-            cosmic::Action::App(Message::Updated(result))
+            cosmic::Action::App(Message::Updated(Box::new(result)))
         })];
         if restore_forecast {
             tasks.push(Task::perform(
@@ -1758,22 +1758,21 @@ impl cosmic::Application for AppModel {
                 .hidden_panel_items
                 .iter()
                 .any(|hidden| hidden == "weather")
+            && let Some(weather) = &self.weather
         {
-            if let Some(weather) = &self.weather {
-                panel_items.push((
-                    "weather",
-                    panel_item(
-                        "Weather",
-                        Some(widget::icon::from_name(weather.icon_name()).size(10).into()),
-                        self.core
-                            .applet
-                            .text(format!("{:.0} °C", weather.temperature_c))
-                            .size(f32::from(self.settings.panel_text_size))
-                            .into(),
-                    )
-                    .into(),
-                ));
-            }
+            panel_items.push((
+                "weather",
+                panel_item(
+                    "Weather",
+                    Some(widget::icon::from_name(weather.icon_name()).size(10).into()),
+                    self.core
+                        .applet
+                        .text(format!("{:.0} °C", weather.temperature_c))
+                        .size(f32::from(self.settings.panel_text_size))
+                        .into(),
+                )
+                .into(),
+            ));
         }
         if self.error.is_none() {
             if !self
@@ -1816,34 +1815,33 @@ impl cosmic::Application for AppModel {
                     .hidden_panel_items
                     .iter()
                     .any(|hidden| hidden == "solar-power")
+                && let Some(input_power) = input_power
             {
-                if let Some(input_power) = input_power {
-                    panel_items.push((
-                        "solar-power",
-                        panel_item(
-                            "Solar power",
-                            Some(
-                                widget::svg(widget::svg::Handle::from_memory(
-                                    br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2-5h14l2 5H3Z"/><path d="M4 9h16l-2 11H6L4 9Z"/><path d="M8 9l1 11M16 9l-1 11M5 13h14M6 17h12"/><path d="M12 1v2M2 5l2 1M22 5l-2 1"/></svg>"#.to_vec(),
-                                ))
-                                .width(10)
-                                .height(10)
-                                .class(cosmic::theme::Svg::custom(|theme| {
-                                    cosmic::iced::widget::svg::Style {
-                                        color: Some(theme.cosmic().on_bg_color().into()),
-                                    }
-                                }))
-                                .into(),
-                            ),
-                            self.core
-                                .applet
-                                .text(input_power)
-                                .size(f32::from(self.settings.panel_text_size))
-                                .into(),
-                        )
-                        .into(),
-                    ));
-                }
+                panel_items.push((
+                    "solar-power",
+                    panel_item(
+                        "Solar power",
+                        Some(
+                            widget::svg(widget::svg::Handle::from_memory(
+                                br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2-5h14l2 5H3Z"/><path d="M4 9h16l-2 11H6L4 9Z"/><path d="M8 9l1 11M16 9l-1 11M5 13h14M6 17h12"/><path d="M12 1v2M2 5l2 1M22 5l-2 1"/></svg>"#.to_vec(),
+                            ))
+                            .width(10)
+                            .height(10)
+                            .class(cosmic::theme::Svg::custom(|theme| {
+                                cosmic::iced::widget::svg::Style {
+                                    color: Some(theme.cosmic().on_bg_color().into()),
+                                }
+                            }))
+                            .into(),
+                        ),
+                        self.core
+                            .applet
+                            .text(input_power)
+                            .size(f32::from(self.settings.panel_text_size))
+                            .into(),
+                    )
+                    .into(),
+                ));
             }
 
             if self.settings.panel_internet_bandwidth
@@ -2032,56 +2030,56 @@ impl cosmic::Application for AppModel {
         // secondary surfaces (including native text context menus) must not
         // accidentally receive the applet's interactive view.
         // The expanded graph is a regular, independently managed desktop window.
-        if self.graph_window == Some(id) {
-            if let Some((title, values, unit)) = &self.expanded_graph {
-                let graph_page = widget::Column::new()
-                    .spacing(4)
-                    .padding(8)
-                    .width(cosmic::iced::Length::Fill)
-                    .height(cosmic::iced::Length::Fill)
-                    .push(graph_visual_large(
-                        values.iter().copied(),
-                        &self.settings.graph_style,
-                        unit,
-                    ))
-                    .push(
-                        widget::Row::new()
-                            .spacing(10)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(
-                                widget::text::title2(title.clone())
-                                    .width(cosmic::iced::Length::Fill),
+        if self.graph_window == Some(id)
+            && let Some((title, values, unit)) = &self.expanded_graph
+        {
+            let graph_page = widget::Column::new()
+                .spacing(4)
+                .padding(8)
+                .width(cosmic::iced::Length::Fill)
+                .height(cosmic::iced::Length::Fill)
+                .push(graph_visual_large(
+                    values.iter().copied(),
+                    &self.settings.graph_style,
+                    unit,
+                ))
+                .push(
+                    widget::Row::new()
+                        .spacing(10)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(
+                            widget::text::title2(title.clone())
+                                .width(cosmic::iced::Length::Fill),
+                        )
+                        .push(
+                            widget::button::custom(
+                                widget::Row::new()
+                                    .spacing(6)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(
+                                        widget::icon::from_name("window-close-symbolic")
+                                            .size(18),
+                                    )
+                                    .push(widget::text::caption(crate::i18n::tr(
+                                        &self.settings.language,
+                                        "Close",
+                                    ))),
                             )
-                            .push(
-                                widget::button::custom(
-                                    widget::Row::new()
-                                        .spacing(6)
-                                        .align_y(cosmic::iced::Alignment::Center)
-                                        .push(
-                                            widget::icon::from_name("window-close-symbolic")
-                                                .size(18),
-                                        )
-                                        .push(widget::text::caption(crate::i18n::tr(
-                                            &self.settings.language,
-                                            "Close",
-                                        ))),
-                                )
-                                .on_press(Message::CloseGraph)
-                                .padding(8)
-                                .class(cosmic::theme::Button::Text),
-                            ),
-                    );
-                // Applet popup surfaces do not receive the normal desktop
-                // window background automatically. Apply COSMIC's window
-                // background style to the entire graph surface so it has a
-                // solid themed backdrop and the same rounded frame as native
-                // COSMIC application windows.
-                return widget::container(graph_page)
-                    .width(cosmic::iced::Length::Fill)
-                    .height(cosmic::iced::Length::Fill)
-                    .class(cosmic::theme::Container::WindowBackground)
-                    .into();
-            }
+                            .on_press(Message::CloseGraph)
+                            .padding(8)
+                            .class(cosmic::theme::Button::Text),
+                        ),
+                );
+            // Applet popup surfaces do not receive the normal desktop
+            // window background automatically. Apply COSMIC's window
+            // background style to the entire graph surface so it has a
+            // solid themed backdrop and the same rounded frame as native
+            // COSMIC application windows.
+            return widget::container(graph_page)
+                .width(cosmic::iced::Length::Fill)
+                .height(cosmic::iced::Length::Fill)
+                .class(cosmic::theme::Container::WindowBackground)
+                .into();
         }
         // Only render applet content for the popup we created. Other
         // secondary surfaces (including native text context menus) must not
@@ -3428,19 +3426,19 @@ impl cosmic::Application for AppModel {
                     // Add a subtle transparent star field to nighttime
                     // weather scenes without replacing the condition-matched
                     // photograph or obscuring its Commons attribution.
-                    if weather.icon_code.ends_with('n') {
-                        if let Some(stars) = starry_night_overlay() {
-                            let star_layer = widget::container(
-                                widget::image::Image::new(widget::image::Handle::from_bytes(stars))
-                                    .width(cosmic::iced::Length::Fill)
-                                    .height(cosmic::iced::Length::Fixed(260.0))
-                                    .content_fit(cosmic::iced::ContentFit::Fill),
-                            )
-                            .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(260.0))
-                            .clip(true);
-                            weather_layers = weather_layers.push(star_layer);
-                        }
+                    if weather.icon_code.ends_with('n')
+                        && let Some(stars) = starry_night_overlay()
+                    {
+                        let star_layer = widget::container(
+                            widget::image::Image::new(widget::image::Handle::from_bytes(stars))
+                                .width(cosmic::iced::Length::Fill)
+                                .height(cosmic::iced::Length::Fixed(260.0))
+                                .content_fit(cosmic::iced::ContentFit::Fill),
+                        )
+                        .width(cosmic::iced::Length::Fill)
+                        .height(cosmic::iced::Length::Fixed(260.0))
+                        .clip(true);
+                        weather_layers = weather_layers.push(star_layer);
                     }
                     widget::container(weather_layers.push(details))
                         .width(cosmic::iced::Length::Fill)
@@ -3985,7 +3983,7 @@ impl cosmic::Application for AppModel {
                                                 .into(),
                                             ),
                                             border: cosmic::iced::Border {
-                                                radius: device_corner_radius.into(),
+                                                radius: device_corner_radius,
                                                 ..Default::default()
                                             },
                                             ..Default::default()
@@ -4070,7 +4068,7 @@ impl cosmic::Application for AppModel {
                                                         .into(),
                                                     ),
                                                     border: cosmic::iced::Border {
-                                                        radius: device_corner_radius.into(),
+                                                        radius: device_corner_radius,
                                                         ..Default::default()
                                                     },
                                                     ..Default::default()
@@ -4090,7 +4088,7 @@ impl cosmic::Application for AppModel {
                                                 .into(),
                                             ),
                                             border: cosmic::iced::Border {
-                                                radius: device_corner_radius.into(),
+                                                radius: device_corner_radius,
                                                 ..Default::default()
                                             },
                                             ..Default::default()
@@ -4123,7 +4121,7 @@ impl cosmic::Application for AppModel {
                                     .into(),
                                 ),
                                 border: cosmic::iced::Border {
-                                    radius: device_corner_radius.into(),
+                                    radius: device_corner_radius,
                                     ..Default::default()
                                 },
                                 ..Default::default()
@@ -4273,11 +4271,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::body(section.1))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
                     let heading_row = if let Some((power, temperature)) = collapsed_value {
-                        let heading_row = if section.0 == "internet-bandwidth" {
-                            heading_row.push(widget::text::body(power))
-                        } else {
-                            heading_row.push(widget::text::body(power))
-                        };
+                        let heading_row = heading_row.push(widget::text::body(power));
                         if let Some(temperature) = temperature {
                             heading_row.push(widget::text::body(temperature))
                         } else {
@@ -4627,7 +4621,7 @@ impl cosmic::Application for AppModel {
                 // as the FRITZ!Box readings. Keep the weather request independent
                 // so a weather-provider failure cannot block the main refresh.
                 let mut tasks = vec![Task::perform(fetch_fritz_data(), |result| {
-                    cosmic::Action::App(Message::Updated(result))
+                    cosmic::Action::App(Message::Updated(Box::new(result)))
                 })];
 
                 // A manual reload must refresh the discovered device inventory
@@ -4693,7 +4687,7 @@ impl cosmic::Application for AppModel {
                     self.refresh_started_at = Some(Instant::now());
                     self.next_refresh_at = None;
                     return Task::perform(fetch_fritz_data(), |result| {
-                        cosmic::Action::App(Message::Updated(result))
+                        cosmic::Action::App(Message::Updated(Box::new(result)))
                     });
                 }
             }
@@ -4727,7 +4721,7 @@ impl cosmic::Application for AppModel {
                         self.refresh_started_at = Some(Instant::now());
                         self.next_refresh_at = None;
                         return Task::perform(fetch_fritz_data(), |result| {
-                            cosmic::Action::App(Message::Updated(result))
+                            cosmic::Action::App(Message::Updated(Box::new(result)))
                         });
                     }
                     Err(error) => {
@@ -4751,7 +4745,7 @@ impl cosmic::Application for AppModel {
             }
             Message::Updated(result) => {
                 self.refresh_started_at = None;
-                match result {
+                match *result {
                     Ok(result) => {
                         let newly_missing = newly_missing_devices(
                             &mut self.missing_device_ains,
@@ -4860,11 +4854,11 @@ impl cosmic::Application for AppModel {
             Message::TestNotification => {
                 let _ = notify_rust::Notification::new()
                     .summary(&crate::i18n::tr(
-                        &self.settings.language,
+                        self.settings.language,
                         "Fritz Power Monitor notification test",
                     ))
                     .body(&crate::i18n::tr(
-                        &self.settings.language,
+                        self.settings.language,
                         "Notifications are working correctly.",
                     ))
                     .show();
@@ -5095,13 +5089,12 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::WeatherSlideshowTick => {
-                if self.popup.is_some() {
-                    if let Some(weather) = &self.weather {
-                        if !weather.slideshow_sequence.is_empty() {
-                            self.weather_slideshow_index = (self.weather_slideshow_index + 1)
-                                % weather.slideshow_sequence.len();
-                        }
-                    }
+                if self.popup.is_some()
+                    && let Some(weather) = &self.weather
+                    && !weather.slideshow_sequence.is_empty()
+                {
+                    self.weather_slideshow_index = (self.weather_slideshow_index + 1)
+                        % weather.slideshow_sequence.len();
                 }
             }
             Message::WeatherUpdated(result) => {
@@ -5259,7 +5252,7 @@ impl cosmic::Application for AppModel {
                     self.refresh_started_at = Some(Instant::now());
                     self.next_refresh_at = None;
                     return Task::perform(fetch_fritz_data(), |result| {
-                        cosmic::Action::App(Message::Updated(result))
+                        cosmic::Action::App(Message::Updated(Box::new(result)))
                     });
                 }
             }
