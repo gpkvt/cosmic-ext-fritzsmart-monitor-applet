@@ -2145,7 +2145,7 @@ impl cosmic::Application for AppModel {
                     .push(widget::dropdown::dropdown(
                         language_labels,
                         selected_language,
-                        |index| Message::LanguageChanged(language_options[index].1.to_string()),
+                        move |index| Message::LanguageChanged(language_options[index].1.to_string()),
                     ).width(Length::Fill))
                     .push(widget::divider::horizontal::default());
             }
