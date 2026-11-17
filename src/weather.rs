@@ -870,10 +870,16 @@ pub fn build_weather_slideshow_frames(
     display_seconds: u16,
 ) -> (Vec<Vec<u8>>, Vec<usize>, Vec<Vec<usize>>) {
     use image::{DynamicImage, ImageBuffer, Rgba};
+
+    // Weather cards never display photos at their original download resolution.
+    // Resize once before generating transitions to avoid repeatedly processing
+    // multi-megapixel images for every slideshow frame.
+    const MAX_WIDTH: u32 = 1280;
+    const MAX_HEIGHT: u32 = 720;
     let decoded: Vec<_> = images
         .iter()
         .filter_map(|bytes| image::load_from_memory(bytes).ok())
-        .map(|image| image.to_rgba8())
+        .map(|image| image.thumbnail(MAX_WIDTH, MAX_HEIGHT).to_rgba8())
         .collect();
     if decoded.is_empty() {
         return (Vec::new(), Vec::new(), Vec::new());
@@ -882,13 +888,15 @@ pub fn build_weather_slideshow_frames(
     let mut frames = Vec::new();
     let mut sequence = Vec::new();
     let mut frame_sources = Vec::new();
-    // Slideshow ticks run once per second; do not enqueue four redraws per second
-    // merely to hold the same still image on screen.
     let hold_ticks = usize::from(display_seconds.clamp(5, 300));
     for (index, current) in decoded.iter().enumerate() {
         let mut output = std::io::Cursor::new(Vec::new());
-        if DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(current.clone()).to_rgb8())
-            .write_to(&mut output, image::ImageFormat::Jpeg)
+        let mut still = current.clone();
+        for pixel in still.pixels_mut() {
+            pixel[3] /= 2;
+        }
+        if DynamicImage::ImageRgba8(still)
+            .write_to(&mut output, image::ImageFormat::Png)
             .is_ok()
         {
             frames.push(output.into_inner());
@@ -911,13 +919,15 @@ pub fn build_weather_slideshow_frames(
                 let a = current.get_pixel(x, y).0;
                 let b = next.get_pixel(x, y).0;
                 *pixel = Rgba(std::array::from_fn(|channel| {
-                    (f32::from(a[channel]) * (1.0 - amount) + f32::from(b[channel]) * amount)
-                        .round() as u8
+                    let value = (f32::from(a[channel]) * (1.0 - amount)
+                        + f32::from(b[channel]) * amount)
+                        .round() as u8;
+                    if channel == 3 { value / 2 } else { value }
                 }));
             }
             let mut output = std::io::Cursor::new(Vec::new());
-            if DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(blended).to_rgb8())
-                .write_to(&mut output, image::ImageFormat::Jpeg)
+            if DynamicImage::ImageRgba8(blended)
+                .write_to(&mut output, image::ImageFormat::Png)
                 .is_ok()
             {
                 frames.push(output.into_inner());
