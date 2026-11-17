@@ -2424,7 +2424,7 @@ impl cosmic::Application for AppModel {
                             widget::container(
                                 widget::text::body(keep_value_unit_together(value))
                                     .size(panel_text_size)
-                        .align_x(cosmic::iced::Alignment::End)
+                                    .align_x(cosmic::iced::Alignment::End)
                                     .line_height(cosmic::iced::widget::text::LineHeight::Relative(
                                         0.85,
                                     )),
