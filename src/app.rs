@@ -114,7 +114,7 @@ pub enum Message {
     ToggleTemperatureAlert(String, bool),
     TemperatureAlertHighChanged(String, i16),
     TemperatureAlertLowChanged(String, i16),
-    WeatherUpdated(Result<WeatherData, String>),
+    WeatherUpdated(Box<Result<WeatherData, String>>),
     WeatherSlideshowTick,
     ToggleWeatherForecast,
     ToggleWeatherAttribution,
@@ -1157,16 +1157,28 @@ fn energy_flow_overview(
     Some(surface_card(content.into(), 12))
 }
 
-fn live_power_summary(
+struct LivePowerSummaryData {
     power: String,
     temperature: Option<String>,
     energy_flow: Option<cosmic::Element<'static, Message>>,
     history: Vec<f64>,
     temperature_history: Vec<f64>,
-    graph_style: &str,
-    language: &str,
+    graph_style: String,
+    language: String,
     axis_start: String,
-) -> cosmic::Element<'static, Message> {
+}
+
+fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Message> {
+    let LivePowerSummaryData {
+        power,
+        temperature,
+        energy_flow,
+        history,
+        temperature_history,
+        graph_style,
+        language,
+        axis_start,
+    } = data;
     // The section already identifies these readings; avoid repeating a
     // separate "Current power" heading above the values.
     let mut values = widget::Row::new()
@@ -3035,7 +3047,7 @@ impl cosmic::Application for AppModel {
                     )))
                     .push(diagnostic_info_row(
                         crate::i18n::tr(&self.settings.language, "Version"),
-                        &format!("v{}", env!("APP_VERSION")),
+                        format!("v{}", env!("APP_VERSION")),
                     ))
                     .push(diagnostic_status_row(
                         crate::i18n::tr(&self.settings.language, "Latest version"),
@@ -3063,7 +3075,9 @@ impl cosmic::Application for AppModel {
                             crate::i18n::tr(&self.settings.language, "Not checked yet").to_string()
                         },
                         self.latest_version.as_ref().map(|result| match result {
-                            Ok(version) => is_current_or_newer_version(env!("APP_VERSION"), version),
+                            Ok(version) => {
+                                is_current_or_newer_version(env!("APP_VERSION"), version)
+                            }
                             Err(_) => false,
                         }),
                     ))
@@ -4033,15 +4047,16 @@ impl cosmic::Application for AppModel {
                     self.flow_animation_frame,
                     &self.settings.language,
                 );
-                let summary_card = live_power_summary(
-                    summary_power,
-                    summary_temperature,
+                let summary_card = live_power_summary(LivePowerSummaryData {
+                    power: summary_power,
+                    temperature: summary_temperature,
                     energy_flow,
-                    self.history
+                    history: self
+                        .history
                         .iter()
                         .map(|(_, value)| *value as f64)
                         .collect(),
-                    rebuild_temperature_history(
+                    temperature_history: rebuild_temperature_history(
                         &self.device_history,
                         &self.settings.input_ains,
                         false,
@@ -4049,15 +4064,15 @@ impl cosmic::Application for AppModel {
                     .iter()
                     .map(|(_, value)| *value)
                     .collect(),
-                    &self.settings.graph_style,
-                    &self.settings.language,
-                    format_graph_axis_start(
+                    graph_style: self.settings.graph_style.clone(),
+                    language: self.settings.language.clone(),
+                    axis_start: format_graph_axis_start(
                         self.settings.graph_timespan_minutes,
                         self.history.front().map(|(timestamp, _)| {
                             Instant::now().duration_since(*timestamp).as_secs() / 60
                         }),
                     ),
-                );
+                });
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
                 menu_cards.push(("0-summary".to_string(), summary_card));
@@ -5042,7 +5057,7 @@ impl cosmic::Application for AppModel {
                     let api_key = self.settings.openweathermap_api_key.clone();
                     let location = self.settings.weather_location.clone();
                     tasks.push(Task::perform(fetch_weather(api_key, location), |result| {
-                        cosmic::Action::App(Message::WeatherUpdated(result))
+                        cosmic::Action::App(Message::WeatherUpdated(Box::new(result)))
                     }));
                 }
                 return Task::batch(tasks);
@@ -5079,7 +5094,7 @@ impl cosmic::Application for AppModel {
                     let api_key = self.settings.openweathermap_api_key.clone();
                     let location = self.settings.weather_location.clone();
                     return Task::perform(fetch_weather(api_key, location), move |result| {
-                        cosmic::Action::App(Message::WeatherUpdated(result))
+                        cosmic::Action::App(Message::WeatherUpdated(Box::new(result)))
                     });
                 }
                 if self
@@ -5255,11 +5270,11 @@ impl cosmic::Application for AppModel {
             }
             Message::TestNotification => {
                 let _ = notify_rust::Notification::new()
-                    .summary(&crate::i18n::tr(
+                    .summary(crate::i18n::tr(
                         &self.settings.language,
                         "Fritz Power Monitor notification test",
                     ))
-                    .body(&crate::i18n::tr(
+                    .body(crate::i18n::tr(
                         &self.settings.language,
                         "Notifications are working correctly.",
                     ))
@@ -5539,7 +5554,7 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::WeatherUpdated(result) => {
-                match result {
+                match *result {
                     Ok(mut weather) => {
                         let (frames, sequence, frame_sources) = build_weather_slideshow_frames(
                             &weather.background_images,
