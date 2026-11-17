@@ -6254,8 +6254,8 @@ impl cosmic::Application for AppModel {
                     if let Some(weather) = &self.weather
                         && !weather.slideshow_sequence.is_empty()
                     {
-                        self.weather_slideshow_index = (self.weather_slideshow_index + 1)
-                            % weather.slideshow_sequence.len();
+                        self.weather_slideshow_index =
+                            (self.weather_slideshow_index + 1) % weather.slideshow_sequence.len();
                     }
 
                     let image_fetch_due = self
