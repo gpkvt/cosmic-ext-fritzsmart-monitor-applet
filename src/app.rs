@@ -942,7 +942,11 @@ fn surface_card<'a>(
 
 fn panel_value_with_unit(value: String, split_unit: bool) -> String {
     if split_unit {
-        value.replacen(' ', "\n", 1)
+        if let Some(number) = value.strip_suffix(" W") {
+            format!("{number}\nWatt")
+        } else {
+            value.replacen(' ', "\n", 1)
+        }
     } else {
         value
     }
@@ -7351,6 +7355,14 @@ mod history_tests {
         assert_eq!(format_panel_temperature(20.0), "20 °C");
         assert_eq!(format_panel_temperature(20.5), "20.5 °C");
         assert_eq!(format_panel_temperature(-3.0), "-3 °C");
+    }
+
+    #[test]
+    fn two_line_panel_expands_watt_unit() {
+        assert_eq!(panel_value_with_unit("2 W".into(), true), "2\nWatt");
+        assert_eq!(panel_value_with_unit("125 W".into(), true), "125\nWatt");
+        assert_eq!(panel_value_with_unit("20 °C".into(), true), "20\n°C");
+        assert_eq!(panel_value_with_unit("2 W".into(), false), "2 W");
     }
 
     #[test]
