@@ -2793,8 +2793,7 @@ impl cosmic::Application for AppModel {
                         },
                         self.latest_version.as_ref().map(|result| match result {
                             Ok(version) => {
-                                version_components(version)
-                                    == version_components(env!("APP_VERSION"))
+                                !is_newer_version(version, env!("APP_VERSION"))
                             }
                             Err(_) => false,
                         }),
