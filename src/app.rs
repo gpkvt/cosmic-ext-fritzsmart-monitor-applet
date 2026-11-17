@@ -6297,7 +6297,7 @@ impl cosmic::Application for AppModel {
                                     weather.image_attributions.first().cloned();
                                 weather.slideshow_frames = frames
                                     .iter()
-                                    .map(|frame| semi_transparent_weather_photo(frame))
+                                    .to_vec()
                                     .collect();
                                 weather.slideshow_sequence = sequence;
                                 weather.slideshow_frame_sources = frame_sources;
@@ -6361,7 +6361,7 @@ impl cosmic::Application for AppModel {
                         // frame (four times per second) and caused excessive CPU usage.
                         weather.slideshow_frames = frames
                             .iter()
-                            .map(|frame| semi_transparent_weather_photo(frame))
+                            .to_vec()
                             .collect();
                         weather.background_image = weather
                             .background_image
@@ -6481,7 +6481,7 @@ impl cosmic::Application for AppModel {
                     );
                     weather.slideshow_frames = frames
                         .iter()
-                        .map(|frame| semi_transparent_weather_photo(frame))
+                        .to_vec()
                         .collect();
                     weather.slideshow_sequence = sequence;
                     weather.slideshow_frame_sources = frame_sources;
