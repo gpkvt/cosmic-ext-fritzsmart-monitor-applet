@@ -3097,6 +3097,17 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("no", "Continue") => "Fortsett",
             ("ja", "Continue") => "続行",
             ("ko", "Continue") => "계속",
+            ("es", "FRITZ!Box connection") => "Conexión de FRITZ!Box",
+            ("nl", "FRITZ!Box connection") => "FRITZ!Box-verbinding",
+            ("fr", "FRITZ!Box connection") => "Connexion FRITZ!Box",
+            ("it", "FRITZ!Box connection") => "Connessione FRITZ!Box",
+            ("sv", "FRITZ!Box connection") => "FRITZ!Box-anslutning",
+            ("pt", "FRITZ!Box connection") => "Ligação FRITZ!Box",
+            ("pl", "FRITZ!Box connection") => "Połączenie FRITZ!Box",
+            ("da", "FRITZ!Box connection") => "FRITZ!Box-forbindelse",
+            ("no", "FRITZ!Box connection") => "FRITZ!Box-tilkobling",
+            ("ja", "FRITZ!Box connection") => "FRITZ!Box 接続",
+            ("ko", "FRITZ!Box connection") => "FRITZ!Box 연결",
             _ => key,
         };
     }
@@ -3416,6 +3427,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "Finish" => "Fertigstellen",
         "Finish setup" => "Einrichtung abschließen",
         "Continue" => "Weiter",
+        "FRITZ!Box connection" => "FRITZ!Box-Verbindung",
         _ => key,
     }
 }
@@ -3544,6 +3556,7 @@ mod tests {
     #[test]
     fn every_app_interface_string_has_a_translation_for_each_supported_language() {
         let keys = [
+            "FRITZ!Box connection",
             "Interface",
             "Language and presentation",
             "Display & updates",
