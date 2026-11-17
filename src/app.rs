@@ -128,6 +128,7 @@ pub enum Message {
     WeatherUpdated(Box<Result<WeatherData, String>>),
     WeatherImagesUpdated(Result<(Vec<Vec<u8>>, Vec<crate::weather::CommonsAttribution>), String>),
     WeatherSlideshowTick,
+    WeatherImageCountdownTick,
     ToggleWeatherForecast,
     ToggleWeatherAttribution,
     TestNotification,
@@ -2006,6 +2007,12 @@ fn flow_animation_ticks() -> impl futures::Stream<Item = Message> {
     )
 }
 
+fn weather_image_countdown_ticks() -> impl futures::Stream<Item = Message> {
+    // Re-render at 30 fps for one continuous sweep instead of one-second steps.
+    // This subscription runs only while the weather popup and countdown are visible.
+    clock_ticks(Duration::from_millis(33)).map(|_| Message::WeatherImageCountdownTick)
+}
+
 fn weather_slideshow_ticks() -> impl futures::Stream<Item = Message> {
     cosmic::iced::stream::channel(
         2,
@@ -2127,6 +2134,9 @@ impl cosmic::Application for AppModel {
 
         let mut subscriptions = vec![clock];
         if self.popup.is_some() {
+            if self.next_weather_image_fetch_at.is_some() {
+                subscriptions.push(Subscription::run(weather_image_countdown_ticks));
+            }
             if energy_flow_values(&self.readings, &self.settings.input_ains).is_some() {
                 subscriptions.push(Subscription::run(flow_animation_ticks));
             }
@@ -6215,6 +6225,7 @@ impl cosmic::Application for AppModel {
                     self.persist_settings();
                 }
             }
+            Message::WeatherImageCountdownTick => {}
             Message::WeatherSlideshowTick => {
                 if self.popup.is_some()
                     && let Some(weather) = &self.weather
@@ -6231,14 +6242,9 @@ impl cosmic::Application for AppModel {
                     self.weather_slideshow_index = next;
                     if image_timeout && !self.weather_images_loading {
                         self.weather_images_loading = true;
-                        self.next_weather_image_fetch_at = Some(
-                            Instant::now()
-                                + Duration::from_secs(u64::from(
-                                    self.settings
-                                        .weather_slideshow_interval_seconds
-                                        .clamp(5, 300),
-                                )),
-                        );
+                        // Keep the line at zero during the network request.
+                        self.next_weather_image_fetch_at = None;
+
                         let icon_code = weather.icon_code.clone();
                         return Task::perform(
                             crate::weather::fetch_weather_background_images(icon_code),
@@ -6249,6 +6255,12 @@ impl cosmic::Application for AppModel {
             }
             Message::WeatherImagesUpdated(result) => {
                 self.weather_images_loading = false;
+                self.next_weather_image_fetch_at = Some(
+                    Instant::now()
+                        + Duration::from_secs(u64::from(
+                            self.settings.weather_slideshow_interval_seconds.clamp(5, 300),
+                        )),
+                );
                 match result {
                     Ok((images, attributions)) => {
                         if let Some(weather) = &mut self.weather {

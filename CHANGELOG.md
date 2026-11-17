@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- Animate the weather background countdown as a smooth 30 fps sweep over the full image duration; hold it at zero during image fetching and restart after the request completes.
+
+### Fixed
+
 - Drive the weather image countdown from the configured slideshow image duration and the next Commons background-image fetch, independently of the OpenWeatherMap data refresh interval.
 
 ### Fixed
