@@ -2204,7 +2204,7 @@ impl cosmic::Application for AppModel {
                           icon_at_top: bool| {
             // A split number/unit value needs two text lines. The previous
             // fixed 24px item height clipped those lines in multiline mode.
-            let item_height = if icon_at_top { 40.0 } else { 24.0 };
+            let item_height = if icon_at_top { 28.0 } else { 24.0 };
             let mut item = widget::Row::new()
                 .width(cosmic::iced::Length::Shrink)
                 .spacing(5)
@@ -2282,6 +2282,7 @@ impl cosmic::Application for AppModel {
                                     .any(|hidden| hidden == "temperature"),
                         ))
                         .size(panel_text_size)
+                        .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
                         .into(),
                     self.settings.panel_multiline
                         && self
@@ -2329,6 +2330,7 @@ impl cosmic::Application for AppModel {
                                         || input_power.is_none()),
                             ))
                             .size(panel_text_size)
+                        .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
                             .into(),
                         self.settings.panel_multiline
                             && (self.settings.panel_net_power
@@ -2371,6 +2373,7 @@ impl cosmic::Application for AppModel {
                                     && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption"),
                             ))
                             .size(panel_text_size)
+                        .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
                             .into(),
                         self.settings.panel_multiline
                             && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption"),
@@ -2417,7 +2420,8 @@ impl cosmic::Application for AppModel {
                             // effective instead of aligning a shrink-wrapped label.
                             widget::container(
                                 widget::text::body(keep_value_unit_together(value))
-                                    .size(panel_text_size),
+                                    .size(panel_text_size)
+                        .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85)),
                             )
                             .width(cosmic::iced::Length::Shrink)
                             .align_bottom(24),
@@ -2485,6 +2489,7 @@ impl cosmic::Application for AppModel {
                                         || self.weather.is_none()),
                             ))
                             .size(panel_text_size)
+                        .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
                             .into(),
                         self.settings.panel_multiline
                             && (self.settings.hidden_panel_items.iter().any(|hidden| hidden == "weather")
