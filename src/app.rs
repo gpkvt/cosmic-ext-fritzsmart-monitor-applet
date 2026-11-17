@@ -264,10 +264,11 @@ fn build_debug_report(app: &AppModel, fritzbox_dump: &str) -> String {
     let history_diagnostics = serde_json::to_string_pretty(&app.history_storage_diagnostics)
         .unwrap_or_else(|error| format!("Could not serialize history diagnostics: {error}"));
     format!(
-        "FRITZ!Power Monitor debug report\nGenerated: {}\nApplication version: {}\nOperating system: {}\n\n[Connection]\nFRITZ!Box URL: {}\nUsername configured: {}\nPassword configured: {}\nInvalid certificates allowed: {}\nCustom CA configured: {}\nLast FRITZ!Box error: {}\n\n[Weather]\nEnabled: {}\nLast weather error: {}\nForecast error: {}\n\n[Settings]\nRefresh interval: {} seconds\nGraph range: {} minutes\nGraph style: {}\nSelected devices: {}\nDiscovered devices: {}\n\n[Current readings]\n{}\n\n[FRITZ!Box endpoint JSON dump]\n{}\n\n[HTTP requests]\n{}\n\n[Diagnostic activity]\n{}\n\n[History storage diagnostics]\n{}\n",
+        "FRITZ!Power Monitor debug report\nGenerated: {}\nApplication version: {}\nOperating system: {}\nCPU temperature: {}\n\n[Connection]\nFRITZ!Box URL: {}\nUsername configured: {}\nPassword configured: {}\nInvalid certificates allowed: {}\nCustom CA configured: {}\nLast FRITZ!Box error: {}\n\n[Weather]\nEnabled: {}\nLast weather error: {}\nForecast error: {}\n\n[Settings]\nRefresh interval: {} seconds\nGraph range: {} minutes\nGraph style: {}\nSelected devices: {}\nDiscovered devices: {}\n\n[Current readings]\n{}\n\n[FRITZ!Box endpoint JSON dump]\n{}\n\n[HTTP requests]\n{}\n\n[Diagnostic activity]\n{}\n\n[History storage diagnostics]\n{}\n",
         chrono::Local::now().format("%Y-%m-%d %H:%M:%S %:z"),
         env!("APP_VERSION"),
         os_release,
+        cpu_temperature,
         connection_url,
         !settings.username.is_empty(),
         !settings.password.is_empty(),
@@ -4309,6 +4310,28 @@ impl cosmic::Application for AppModel {
                     } else {
                         format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos")
                     }));
+
+                content = content.push(widget::text::title3(crate::i18n::tr(
+                    &self.settings.language,
+                    "Recent FRITZ!Box requests",
+                )));
+                if requests.is_empty() {
+                    content = content.push(widget::text::caption(crate::i18n::tr(
+                        &self.settings.language,
+                        "No FRITZ!Box requests recorded yet",
+                    )));
+                } else {
+                    for request in requests.iter().rev().take(8) {
+                        content = content.push(widget::text::caption(format!(
+                            "{} · {} {} {} · {}",
+                            request.timestamp,
+                            request.method,
+                            if request.https { "HTTPS" } else { "HTTP" },
+                            request.status,
+                            request.path,
+                        )));
+                    }
+                }
 
                 let switch_state = fritz_endpoint_status(
                     "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
