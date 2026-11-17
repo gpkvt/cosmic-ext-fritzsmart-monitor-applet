@@ -2270,7 +2270,9 @@ impl cosmic::Application for AppModel {
                           icon_at_top: bool| {
             let line_height = (panel_text_size * 0.65).max(1.0);
             let item_height = if icon_at_top {
-                (line_height * 2.0).max(24.0)
+                // The unpaired two-line item gets a deliberately prominent icon.
+                // Reserve enough height for the full 28 px glyph instead of clipping it.
+                32.0
             } else if self.settings.panel_multiline {
                 // Paired readings are stacked as separate panel_item rows.
                 // Do not give each compact line the full single-line height.
@@ -2299,14 +2301,15 @@ impl cosmic::Application for AppModel {
                 // In two-line mode, center the icon on the first text line;
                 // in single-line mode, center it on the value itself.
                 let icon_height = if icon_at_top {
-                    line_height
+                    28.0
                 } else {
                     item_height
                 };
+                let icon_width = if icon_at_top { 32.0 } else { 16.0 };
                 let icon_column = widget::container(icon)
-                    .width(cosmic::iced::Length::Fixed(16.0))
+                    .width(cosmic::iced::Length::Fixed(icon_width))
                     .height(cosmic::iced::Length::Fixed(icon_height))
-                    .center_x(16)
+                    .center_x(icon_width as u16)
                     .center_y(icon_height as u16);
                 item = item.push(icon_column);
             }
@@ -2354,19 +2357,13 @@ impl cosmic::Application for AppModel {
                     "Weather",
                     Some(
                         widget::icon::from_name(weather.icon_name())
-                            .size(
-                                if self.settings.panel_multiline
-                                    && self
-                                        .settings
-                                        .hidden_panel_items
-                                        .iter()
-                                        .any(|hidden| hidden == "temperature")
-                                {
-                                    14
-                                } else {
-                                    10
-                                },
-                            )
+                            .size(if self.settings.panel_multiline
+                                && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "temperature")
+                            {
+                                28
+                            } else {
+                                10
+                            })
                             .into(),
                     ),
                     panel_value(panel_value_with_unit(
@@ -2417,11 +2414,11 @@ impl cosmic::Application for AppModel {
                             .width(if self.settings.panel_multiline
                                 && (self.settings.panel_net_power
                                     || self.settings.hidden_panel_items.iter().any(|hidden| hidden == "solar-power")
-                                    || input_power.is_none()) { 14 } else { 10 })
+                                    || input_power.is_none()) { 28 } else { 10 })
                             .height(if self.settings.panel_multiline
                                 && (self.settings.panel_net_power
                                     || self.settings.hidden_panel_items.iter().any(|hidden| hidden == "solar-power")
-                                    || input_power.is_none()) { 14 } else { 10 })
+                                    || input_power.is_none()) { 28 } else { 10 })
                             .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
                                 color: Some(theme.cosmic().on_bg_color().into()),
                             }))
@@ -2459,9 +2456,9 @@ impl cosmic::Application for AppModel {
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2-5h14l2 5H3Z"/><path d="M4 9h16l-2 11H6L4 9Z"/><path d="M8 9l1 11M16 9l-1 11M5 13h14M6 17h12"/><path d="M12 1v2M2 5l2 1M22 5l-2 1"/></svg>"#.to_vec(),
                             ))
                             .width(if self.settings.panel_multiline
-                                && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption") { 14 } else { 10 })
+                                && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption") { 28 } else { 10 })
                             .height(if self.settings.panel_multiline
-                                && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption") { 14 } else { 10 })
+                                && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption") { 28 } else { 10 })
                             .class(cosmic::theme::Svg::custom(|theme| {
                                 cosmic::iced::widget::svg::Style {
                                     color: Some(theme.cosmic().on_bg_color().into()),
@@ -2544,11 +2541,11 @@ impl cosmic::Application for AppModel {
                             .width(if self.settings.panel_multiline
                                 && (self.settings.hidden_panel_items.iter().any(|hidden| hidden == "weather")
                                     || !self.settings.weather_enabled
-                                    || self.weather.is_none()) { 20 } else { 16 })
+                                    || self.weather.is_none()) { 28 } else { 16 })
                             .height(if self.settings.panel_multiline
                                 && (self.settings.hidden_panel_items.iter().any(|hidden| hidden == "weather")
                                     || !self.settings.weather_enabled
-                                    || self.weather.is_none()) { 20 } else { 16 })
+                                    || self.weather.is_none()) { 28 } else { 16 })
                             .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
                                 color: Some(theme.cosmic().on_bg_color().into()),
                             }))
@@ -6294,7 +6291,12 @@ impl cosmic::Application for AppModel {
                 match result {
                     Ok((images, attributions)) => {
                         if let Some(weather) = &mut self.weather {
-                            if !images.is_empty() {
+                            if images.is_empty() {
+                                record_diagnostic_event(
+                                    &mut self.diagnostic_events,
+                                    "Weather slideshow image timeout reached; no new matching Commons images were returned, keeping the current background.",
+                                );
+                            } else {
                                 let (frames, sequence, frame_sources) =
                                     build_weather_slideshow_frames(
                                         &images,
