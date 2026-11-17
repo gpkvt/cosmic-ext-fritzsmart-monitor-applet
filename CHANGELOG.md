@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- Right-aligned single-line panel values using the same fixed-width value container as two-line values.
+
+## [17.11.2026]
+
+### Fixed
+
 - Vertically aligned panel icons with their corresponding values; in two-line mode, icons now align with the first text line while single-line values remain vertically centered.
 - Preserved the configured panel text size in two-line mode instead of reducing it by half.
 
