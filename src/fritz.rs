@@ -1767,6 +1767,18 @@ mod tests {
     }
 
     #[test]
+    fn hidden_panel_items_parser_keeps_only_unique_known_items() {
+        assert_eq!(
+            parse_hidden_panel_items("temperature,weather,temperature,unknown"),
+            vec!["temperature", "weather"]
+                .into_iter()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        );
+        assert!(parse_hidden_panel_items("").is_empty());
+    }
+
+    #[test]
     fn panel_order_defaults_to_all_individual_panel_items() {
         assert_eq!(
             FritzSettings::default().panel_order,
