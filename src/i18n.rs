@@ -1,4 +1,4 @@
-//! English and German interface translations with desktop locale detection.
+//! Multilingual interface translations with desktop locale detection.
 
 use std::env;
 
@@ -7,7 +7,7 @@ pub fn language(setting: &str) -> &'static str {
     fn from_locale(value: &str) -> Option<&'static str> {
         let value = value.to_ascii_lowercase();
         let value = value.split(':').next().unwrap_or(&value);
-        let value = value.split(['_', '-', '.']).next().unwrap_or(&value);
+        let value = value.split(|c| c == '_' || c == '-' || c == '.').next().unwrap_or(&value);
         match value {
             "de" => Some("de"),
             "en" => Some("en"),
@@ -45,6 +45,15 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
     if lang != "de" {
         return match (lang, key) {
             // Spanish
+            ("es", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "El sistema sigue el idioma del escritorio. Idiomas disponibles: inglés, alemán, español, neerlandés, francés, italiano, sueco, portugués, polaco, danés y noruego.",
+            ("nl", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "Het systeem volgt de taal van je bureaublad. Beschikbare talen: Engels, Duits, Spaans, Nederlands, Frans, Italiaans, Zweeds, Portugees, Pools, Deens en Noors.",
+            ("fr", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "Le système suit la langue de votre bureau. Langues disponibles : anglais, allemand, espagnol, néerlandais, français, italien, suédois, portugais, polonais, danois et norvégien.",
+            ("it", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "Il sistema segue la lingua del desktop. Lingue disponibili: inglese, tedesco, spagnolo, olandese, francese, italiano, svedese, portoghese, polacco, danese e norvegese.",
+            ("sv", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "Systemet följer skrivbordets språk. Tillgängliga språk: engelska, tyska, spanska, nederländska, franska, italienska, svenska, portugisiska, polska, danska och norska.",
+            ("pt", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "O sistema segue o idioma do ambiente de trabalho. Idiomas disponíveis: inglês, alemão, espanhol, neerlandês, francês, italiano, sueco, português, polaco, dinamarquês e norueguês.",
+            ("pl", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "System używa języka pulpitu. Dostępne języki: angielski, niemiecki, hiszpański, niderlandzki, francuski, włoski, szwedzki, portugalski, polski, duński i norweski.",
+            ("da", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "Systemet følger sproget på skrivebordet. Tilgængelige sprog: engelsk, tysk, spansk, nederlandsk, fransk, italiensk, svensk, portugisisk, polsk, dansk og norsk.",
+            ("no", "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian.") => "Systemet følger språket på skrivebordet. Tilgjengelige språk: engelsk, tysk, spansk, nederlandsk, fransk, italiensk, svensk, portugisisk, polsk, dansk og norsk.",
             ("es", "Settings") => "Ajustes",
             ("es", "Configure your power monitor") => "Configura tu monitor de energía",
             ("es", "GENERAL") => "GENERAL",
@@ -603,7 +612,7 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "English" => "Englisch",
         "Deutsch" => "Deutsch",
         "Interface language" => "Sprache der Benutzeroberfläche",
-        "System follows your desktop language. English and German are currently available." => {
+        "System follows your desktop language. Available languages: English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian." => {
             "System folgt der Sprache Ihres Desktops. Englisch und Deutsch sind derzeit verfügbar."
         }
         "Adjusts the power and temperature text in the panel" => {
@@ -821,6 +830,24 @@ mod tests {
     fn explicit_language_overrides_desktop_locale() {
         assert_eq!(tr("de", "Settings"), "Einstellungen");
         assert_eq!(tr("en", "Settings"), "Settings");
+    }
+
+    #[test]
+    fn supported_languages_and_locale_variants_are_resolved() {
+        for language in ["en", "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no"] {
+            assert_eq!(super::language(language), language);
+        }
+        assert_eq!(super::language("fr_FR.UTF-8"), "fr");
+        assert_eq!(super::language("nb_NO.UTF-8"), "no");
+    }
+
+    #[test]
+    fn core_labels_are_translated_for_every_added_locale() {
+        for language in ["es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no"] {
+            assert_ne!(tr(language, "Settings"), "Settings", "{language}");
+            assert_ne!(tr(language, "Weather"), "Weather", "{language}");
+            assert_ne!(tr(language, "Connection"), "Connection", "{language}");
+        }
     }
 
     #[test]
