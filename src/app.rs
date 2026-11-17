@@ -1,6 +1,6 @@
 use crate::fritz::{
     FritzDevice, FritzFetchResult, FritzInternetBandwidth, FritzReading, FritzSettings,
-    TemperatureAlertThresholds, discover_devices, fetch_fritz_data,
+    TemperatureAlertThresholds, collect_fritzbox_debug_dump, discover_devices, fetch_fritz_data,
 };
 use crate::weather::{
     WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather,
@@ -142,6 +142,7 @@ pub enum Message {
     CopyDiagnosticUrl(String),
     ClearDiagnosticEvents,
     WriteDebugFile,
+    DebugDumpGenerated(Result<String, String>),
     FetchForecastFromDiagnostics,
     CheckLatestVersion,
     LatestVersionChecked(Result<String, String>),
@@ -177,7 +178,7 @@ fn record_diagnostic_event(events: &mut VecDeque<String>, message: impl Into<Str
     }
 }
 
-fn build_debug_report(app: &AppModel) -> String {
+fn build_debug_report(app: &AppModel, fritzbox_dump: &str) -> String {
     let settings = &app.settings;
     let connection_url = reqwest::Url::parse(&settings.url)
         .map(|mut url| {
@@ -260,7 +261,7 @@ fn build_debug_report(app: &AppModel) -> String {
     let history_diagnostics = serde_json::to_string_pretty(&app.history_storage_diagnostics)
         .unwrap_or_else(|error| format!("Could not serialize history diagnostics: {error}"));
     format!(
-        "FRITZ!Power Monitor debug report\nGenerated: {}\nApplication version: {}\nOperating system: {}\n\n[Connection]\nFRITZ!Box URL: {}\nUsername configured: {}\nPassword configured: {}\nInvalid certificates allowed: {}\nCustom CA configured: {}\nLast FRITZ!Box error: {}\n\n[Weather]\nEnabled: {}\nLast weather error: {}\nForecast error: {}\n\n[Settings]\nRefresh interval: {} seconds\nGraph range: {} minutes\nGraph style: {}\nSelected devices: {}\nDiscovered devices: {}\n\n[Current readings]\n{}\n\n[HTTP requests]\n{}\n\n[Diagnostic activity]\n{}\n\n[History storage diagnostics]\n{}\n",
+        "FRITZ!Power Monitor debug report\nGenerated: {}\nApplication version: {}\nOperating system: {}\n\n[Connection]\nFRITZ!Box URL: {}\nUsername configured: {}\nPassword configured: {}\nInvalid certificates allowed: {}\nCustom CA configured: {}\nLast FRITZ!Box error: {}\n\n[Weather]\nEnabled: {}\nLast weather error: {}\nForecast error: {}\n\n[Settings]\nRefresh interval: {} seconds\nGraph range: {} minutes\nGraph style: {}\nSelected devices: {}\nDiscovered devices: {}\n\n[Current readings]\n{}\n\n[FRITZ!Box endpoint JSON dump]\n{}\n\n[HTTP requests]\n{}\n\n[Diagnostic activity]\n{}\n\n[History storage diagnostics]\n{}\n",
         chrono::Local::now().format("%Y-%m-%d %H:%M:%S %:z"),
         env!("APP_VERSION"),
         os_release,
@@ -279,6 +280,7 @@ fn build_debug_report(app: &AppModel) -> String {
         settings.ains.len(),
         app.devices.len(),
         readings,
+        fritzbox_dump,
         request_log,
         activity,
         history_diagnostics
@@ -6504,9 +6506,20 @@ impl cosmic::Application for AppModel {
             Message::WriteDebugFile => {
                 record_diagnostic_event(
                     &mut self.diagnostic_events,
-                    "Debug report export requested.",
+                    "Debug report export requested; collecting a fresh FRITZ!Box endpoint dump.",
                 );
-                let report = build_debug_report(self);
+                let settings = self.settings.clone();
+                return Task::perform(
+                    async move {
+                        let dump = collect_fritzbox_debug_dump(settings).await;
+                        serde_json::to_string_pretty(&dump)
+                            .unwrap_or_else(|error| format!("Could not serialize FRITZ!Box dump: {error}"))
+                    },
+                    Message::DebugDumpGenerated,
+                );
+            }
+            Message::DebugDumpGenerated(fritzbox_dump) => {
+                let report = build_debug_report(self, &fritzbox_dump);
                 let path = std::env::var_os("HOME")
                     .map(std::path::PathBuf::from)
                     .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
@@ -6514,14 +6527,11 @@ impl cosmic::Application for AppModel {
                 match std::fs::write(&path, report) {
                     Ok(()) => record_diagnostic_event(
                         &mut self.diagnostic_events,
-                        format!("Debug report written to {}.", path.display()),
+                        format!("Debug report with FRITZ!Box endpoint dump written to {}.", path.display()),
                     ),
                     Err(error) => record_diagnostic_event(
                         &mut self.diagnostic_events,
-                        format!(
-                            "Could not write debug report to {}: {error}",
-                            path.display()
-                        ),
+                        format!("Could not write debug report to {}: {error}", path.display()),
                     ),
                 }
             }
