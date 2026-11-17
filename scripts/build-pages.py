@@ -103,16 +103,21 @@ def main() -> None:
     print("Copied LICENSE -> docs/LICENSE")
 
     sources = {
-        ROOT / "README.md": DOCS / "readme.html",
-        ROOT / "SECURITY.md": DOCS / "security.html",
+        DOCS / "readme.de.md": DOCS / "readme.html",
+        DOCS / "security.de.md": DOCS / "security.html",
     }
     for source in sorted(DOCS.rglob("*.md")):
+        if source in sources:
+            continue
         relative = source.relative_to(DOCS)
         sources[source] = (DOCS / relative).with_suffix(".html")
 
     for source, destination in sources.items():
         default_title = source.stem.replace("-", " ").replace("_", " ").title()
-        title = {ROOT / "README.md": "Cosmic FRITZ!Power Monitor Applet", ROOT / "SECURITY.md": "Security Policy"}.get(source, default_title)
+        title = {
+            DOCS / "readme.de.md": "COSMIC-FRITZ!Power-Monitor-Applet",
+            DOCS / "security.de.md": "Sicherheitsrichtlinie",
+        }.get(source, default_title)
         render(source, destination, title)
         print(f"Rendered {source.relative_to(ROOT)} -> {destination.relative_to(ROOT)}")
 
