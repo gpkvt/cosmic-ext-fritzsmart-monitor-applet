@@ -4353,8 +4353,14 @@ impl cosmic::Application for AppModel {
                 // Keep the city/temperature header inside the same full-width
                 // surface as the weather content so the photo starts directly
                 // behind it, with identical left and right alignment.
+                // Give the overlay's content an explicit height matching the
+                // inner area of the 260px photo card. Without a bounded height,
+                // Fill spacers inside weather_details can collapse to zero and
+                // leave the lower weather metrics outside the visible card.
                 let weather_content = widget::Column::new()
                     .spacing(8)
+                    .width(cosmic::iced::Length::Fill)
+                    .height(cosmic::iced::Length::Fixed(240.0))
                     .push(weather_heading)
                     .push(weather_details);
                 let current_image_handle = weather
@@ -4376,9 +4382,11 @@ impl cosmic::Application for AppModel {
                             .padding(10)
                             .clip(true)
                             .style(|_| cosmic::iced::widget::container::Style {
-                                // Keep the text layer transparent; the separate
-                                // background wash below it handles photo contrast.
-                                background: None,
+                                // A subtle dark wash keeps white weather values
+                                // readable across bright and dark photographs.
+                                background: Some(
+                                    cosmic::iced::Color::from_rgba(0.0, 0.0, 0.0, 0.38).into(),
+                                ),
                                 text_color: Some(cosmic::iced::Color::WHITE),
                                 ..Default::default()
                             });
