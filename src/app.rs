@@ -6683,10 +6683,6 @@ impl cosmic::Application for AppModel {
                 self.persist_settings();
             }
             Message::ToggleSettingsSection(section) => {
-            Message::ToggleGraphHistoryDiagnostics => {
-                self.graph_history_diagnostics_expanded = !self.graph_history_diagnostics_expanded;
-            }
-
                 self.active_settings_section = Some(section);
                 self.persist_layout_state();
                 if section == "diagnostics" {
@@ -6723,6 +6719,9 @@ impl cosmic::Application for AppModel {
                         cosmic::Action::App(Message::DevicesLoaded(result))
                     });
                 }
+            }
+            Message::ToggleGraphHistoryDiagnostics => {
+                self.graph_history_diagnostics_expanded = !self.graph_history_diagnostics_expanded;
             }
             Message::BackToSettingsCategories => {
                 self.active_settings_section = None;
