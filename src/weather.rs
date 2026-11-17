@@ -869,7 +869,7 @@ pub fn build_weather_slideshow_frames(
     images: &[Vec<u8>],
     display_seconds: u16,
 ) -> (Vec<Vec<u8>>, Vec<usize>, Vec<Vec<usize>>) {
-    use image::{DynamicImage, ImageBuffer, Rgba, imageops::FilterType};
+    use image::{DynamicImage, ImageBuffer, Rgba};
 
     // Weather cards never display photos at their original download resolution.
     // Resize once before generating transitions to avoid repeatedly processing
