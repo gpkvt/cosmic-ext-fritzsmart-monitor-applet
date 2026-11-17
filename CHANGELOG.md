@@ -5,6 +5,7 @@
 ### Fixed
 
 - Vertically aligned panel icons with their corresponding values; in two-line mode, icons now align with the first text line while single-line values remain vertically centered.
+- Preserved the configured panel text size in two-line mode instead of reducing it by half.
 
 ### Changed
 
