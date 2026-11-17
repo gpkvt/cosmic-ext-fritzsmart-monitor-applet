@@ -476,7 +476,7 @@ html[data-theme="dark"] .dot{background:#55cda5;box-shadow:0 0 0 4px #55cda520}
   localStorage.setItem('fritz-power-monitor-language',lang);
  };
  const lang=localStorage.getItem('fritz-power-monitor-language')||'de';applyLanguage(lang);
- languagePicker?.addEventListener('change',()=>applyLanguage(languagePicker.value));
+ languagePicker?.addEventListener('change',()=>{localStorage.setItem('fritz-power-monitor-language',languagePicker.value);location.reload()});
 })();
 </script>
   <script>
