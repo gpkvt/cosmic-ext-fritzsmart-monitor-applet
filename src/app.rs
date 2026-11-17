@@ -2222,18 +2222,26 @@ impl cosmic::Application for AppModel {
                     .spacing(0)
                     .width(cosmic::iced::Length::Fixed(width))
                     .push(
-                        widget::container(panel_text(upper.to_string()))
-                            .width(cosmic::iced::Length::Fixed(width))
-                            .height(cosmic::iced::Length::Fixed(line_height))
-                            .align_right(width as u16)
-                            .align_bottom(line_height as u16),
+                        widget::container(
+                            panel_text(upper.to_string())
+                                .width(cosmic::iced::Length::Fill)
+                                .align_x(cosmic::iced::Alignment::End),
+                        )
+                        .width(cosmic::iced::Length::Fixed(width))
+                        .height(cosmic::iced::Length::Fixed(line_height))
+                        .align_x(cosmic::iced::Alignment::End)
+                        .align_y(cosmic::iced::Alignment::End),
                     )
                     .push(
-                        widget::container(panel_text(lower.to_string()))
-                            .width(cosmic::iced::Length::Fixed(width))
-                            .height(cosmic::iced::Length::Fixed(line_height))
-                            .align_right(width as u16)
-                            .align_top(line_height as u16),
+                        widget::container(
+                            panel_text(lower.to_string())
+                                .width(cosmic::iced::Length::Fill)
+                                .align_x(cosmic::iced::Alignment::End),
+                        )
+                        .width(cosmic::iced::Length::Fixed(width))
+                        .height(cosmic::iced::Length::Fixed(line_height))
+                        .align_x(cosmic::iced::Alignment::End)
+                        .align_y(cosmic::iced::Alignment::Start),
                     )
                     .into()
             } else {
