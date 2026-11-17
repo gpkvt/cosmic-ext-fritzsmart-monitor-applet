@@ -3512,27 +3512,80 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("ja", "FRITZ!Box connection") => "FRITZ!Box 接続",
             ("ko", "FRITZ!Box connection") => "FRITZ!Box 연결",
             ("es", "Outdoor temperature source") => "Fuente de temperatura exterior",
-            ("es", "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.") => "Usar la lectura del sensor de un dispositivo FRITZ!Box seleccionado en lugar de la temperatura exterior de OpenWeatherMap.",
+            (
+                "es",
+                "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
+            ) => {
+                "Usar la lectura del sensor de un dispositivo FRITZ!Box seleccionado en lugar de la temperatura exterior de OpenWeatherMap."
+            }
             ("nl", "Outdoor temperature source") => "Bron buitentemperatuur",
-            ("nl", "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.") => "Gebruik de sensorwaarde van een geselecteerd FRITZ!Box-apparaat in plaats van de buitentemperatuur van OpenWeatherMap.",
+            (
+                "nl",
+                "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
+            ) => {
+                "Gebruik de sensorwaarde van een geselecteerd FRITZ!Box-apparaat in plaats van de buitentemperatuur van OpenWeatherMap."
+            }
             ("fr", "Outdoor temperature source") => "Source de la température extérieure",
-            ("fr", "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.") => "Utiliser la mesure du capteur d’un appareil FRITZ!Box sélectionné plutôt que la température extérieure indiquée par OpenWeatherMap.",
+            (
+                "fr",
+                "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
+            ) => {
+                "Utiliser la mesure du capteur d’un appareil FRITZ!Box sélectionné plutôt que la température extérieure indiquée par OpenWeatherMap."
+            }
             ("it", "Outdoor temperature source") => "Fonte della temperatura esterna",
-            ("it", "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.") => "Usa la lettura del sensore di un dispositivo FRITZ!Box selezionato invece della temperatura esterna riportata da OpenWeatherMap.",
+            (
+                "it",
+                "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
+            ) => {
+                "Usa la lettura del sensore di un dispositivo FRITZ!Box selezionato invece della temperatura esterna riportata da OpenWeatherMap."
+            }
             ("sv", "Outdoor temperature source") => "Källa för utomhustemperatur",
-            ("sv", "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.") => "Använd sensorvärdet från en vald FRITZ!Box-enhet i stället för utomhustemperaturen från OpenWeatherMap.",
+            (
+                "sv",
+                "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
+            ) => {
+                "Använd sensorvärdet från en vald FRITZ!Box-enhet i stället för utomhustemperaturen från OpenWeatherMap."
+            }
             ("pt", "Outdoor temperature source") => "Origem da temperatura exterior",
-            ("pt", "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.") => "Usar a leitura do sensor de um dispositivo FRITZ!Box selecionado em vez da temperatura exterior indicada pelo OpenWeatherMap.",
+            (
+                "pt",
+                "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
+            ) => {
+                "Usar a leitura do sensor de um dispositivo FRITZ!Box selecionado em vez da temperatura exterior indicada pelo OpenWeatherMap."
+            }
             ("pl", "Outdoor temperature source") => "Źródło temperatury zewnętrznej",
-            ("pl", "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.") => "Użyj odczytu czujnika wybranego urządzenia FRITZ!Box zamiast temperatury zewnętrznej podawanej przez OpenWeatherMap.",
+            (
+                "pl",
+                "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
+            ) => {
+                "Użyj odczytu czujnika wybranego urządzenia FRITZ!Box zamiast temperatury zewnętrznej podawanej przez OpenWeatherMap."
+            }
             ("da", "Outdoor temperature source") => "Kilde til udendørstemperatur",
-            ("da", "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.") => "Brug sensormålingen fra en valgt FRITZ!Box-enhed i stedet for udendørstemperaturen fra OpenWeatherMap.",
+            (
+                "da",
+                "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
+            ) => {
+                "Brug sensormålingen fra en valgt FRITZ!Box-enhed i stedet for udendørstemperaturen fra OpenWeatherMap."
+            }
             ("no", "Outdoor temperature source") => "Kilde for utetemperatur",
-            ("no", "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.") => "Bruk sensoravlesningen fra en valgt FRITZ!Box-enhet i stedet for utetemperaturen fra OpenWeatherMap.",
+            (
+                "no",
+                "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
+            ) => {
+                "Bruk sensoravlesningen fra en valgt FRITZ!Box-enhet i stedet for utetemperaturen fra OpenWeatherMap."
+            }
             ("ja", "Outdoor temperature source") => "屋外気温の取得元",
-            ("ja", "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.") => "OpenWeatherMapの屋外気温の代わりに、選択したFRITZ!Boxデバイスのセンサー値を使用します。",
+            (
+                "ja",
+                "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
+            ) => {
+                "OpenWeatherMapの屋外気温の代わりに、選択したFRITZ!Boxデバイスのセンサー値を使用します。"
+            }
             ("ko", "Outdoor temperature source") => "외부 온도 소스",
-            ("ko", "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.") => "OpenWeatherMap의 외부 온도 대신 선택한 FRITZ!Box 장치의 센서 값을 사용합니다.",
+            (
+                "ko",
+                "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
+            ) => "OpenWeatherMap의 외부 온도 대신 선택한 FRITZ!Box 장치의 센서 값을 사용합니다.",
             _ => key,
         };
     }
@@ -3875,7 +3928,9 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "FRITZ!Box connection" => "FRITZ!Box-Verbindung",
         "Outdoor temperature source" => "Quelle der Außentemperatur",
         "OpenWeatherMap" => "OpenWeatherMap",
-        "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap." => "Verwende den Sensorwert eines ausgewählten FRITZ!Box-Geräts statt der von OpenWeatherMap gemeldeten Außentemperatur.",
+        "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap." => {
+            "Verwende den Sensorwert eines ausgewählten FRITZ!Box-Geräts statt der von OpenWeatherMap gemeldeten Außentemperatur."
+        }
         _ => key,
     }
 }
