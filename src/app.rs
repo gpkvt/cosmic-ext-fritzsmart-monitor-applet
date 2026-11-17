@@ -69,6 +69,7 @@ pub struct AppModel {
     latest_version_loading: bool,
     update_installing: bool,
     update_status: Option<String>,
+    diagnostic_events: VecDeque<String>,
     flow_animation_frame: u8,
 }
 
@@ -120,6 +121,7 @@ pub enum Message {
     ToggleWeatherAttribution,
     TestNotification,
     CopyDiagnosticUrl(String),
+    ClearDiagnosticEvents,
     FetchForecastFromDiagnostics,
     CheckLatestVersion,
     LatestVersionChecked(Result<String, String>),
@@ -144,6 +146,14 @@ pub enum Message {
     WeatherLocationChanged(String),
     WeatherRefreshIntervalChanged(u16),
     WeatherSlideshowDurationChanged(u16),
+}
+
+fn record_diagnostic_event(events: &mut VecDeque<String>, message: impl Into<String>) {
+    let timestamp = chrono::Local::now().format("%H:%M:%S");
+    events.push_back(format!("{timestamp} · {}", message.into()));
+    while events.len() > 60 {
+        events.pop_front();
+    }
 }
 
 fn device_matches_search(device: &FritzDevice, query: &str) -> bool {
@@ -3353,6 +3363,35 @@ impl cosmic::Application for AppModel {
                     });
 
                 let requests = crate::fritz::http_request_diagnostics();
+                content = content
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3(crate::i18n::tr(
+                        &self.settings.language,
+                        "Recent FRITZ!Box HTTP requests",
+                    )));
+                if requests.is_empty() {
+                    content = content.push(widget::text::caption(crate::i18n::tr(
+                        &self.settings.language,
+                        "No HTTP responses recorded yet. Failed requests without an HTTP response are shown in Diagnostic activity.",
+                    )));
+                } else {
+                    for request in requests.iter().rev().take(15) {
+                        let scheme = if request.https { "HTTPS" } else { "HTTP" };
+                        let line = format!(
+                            "{} · {} · {} {} · {} {}",
+                            request.timestamp,
+                            request.method,
+                            scheme,
+                            request.status,
+                            request.path,
+                            if (200..300).contains(&request.status) { "OK" } else { "FAILED" },
+                        );
+                        content = content.push(
+                            widget::selectable_text::selectable_text(line)
+                                .width(cosmic::iced::Length::Fill),
+                        );
+                    }
+                }
                 let fritz_base = endpoint.trim_end_matches('/');
                 let fritz_endpoint_status = |path: &str| {
                     requests
@@ -3559,6 +3598,34 @@ impl cosmic::Application for AppModel {
                         10,
                     ));
                 }
+                content = content
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3(crate::i18n::tr(
+                        &self.settings.language,
+                        "Diagnostic activity",
+                    )))
+                    .push(widget::text::caption(crate::i18n::tr(
+                        &self.settings.language,
+                        "Live timeline of checks, requests, results and errors. Newest entries appear first.",
+                    )));
+                if self.diagnostic_events.is_empty() {
+                    content = content.push(widget::text::caption(crate::i18n::tr(
+                        &self.settings.language,
+                        "No diagnostic activity recorded in this session yet.",
+                    )));
+                } else {
+                    for event in self.diagnostic_events.iter().rev().take(30) {
+                        content = content.push(
+                            widget::selectable_text::selectable_text(event.as_str())
+                                .width(cosmic::iced::Length::Fill),
+                        );
+                    }
+                }
+                content = content.push(action_button(
+                    "edit-clear-all-symbolic",
+                    crate::i18n::tr(&self.settings.language, "Clear activity"),
+                    Message::ClearDiagnosticEvents,
+                ));
                 content = content.push(widget::divider::horizontal::default());
             }
             if self
@@ -5020,6 +5087,10 @@ impl cosmic::Application for AppModel {
                 }
                 self.refresh_started_at = Some(Instant::now());
                 self.next_refresh_at = None;
+                record_diagnostic_event(
+                    &mut self.diagnostic_events,
+                    "FRITZ!Box refresh started: requesting live readings and device inventory.",
+                );
 
                 // Advance the existing slideshow immediately so every manual
                 // reload visibly changes the weather background without waiting
@@ -5056,6 +5127,10 @@ impl cosmic::Application for AppModel {
                     self.next_weather_refresh_at = None;
                     let api_key = self.settings.openweathermap_api_key.clone();
                     let location = self.settings.weather_location.clone();
+                    record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        format!("Manual OpenWeatherMap refresh started for {location}."),
+                    );
                     tasks.push(Task::perform(fetch_weather(api_key, location), |result| {
                         cosmic::Action::App(Message::WeatherUpdated(Box::new(result)))
                     }));
@@ -5093,6 +5168,10 @@ impl cosmic::Application for AppModel {
                     self.next_weather_refresh_at = None;
                     let api_key = self.settings.openweathermap_api_key.clone();
                     let location = self.settings.weather_location.clone();
+                    record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        format!("Scheduled OpenWeatherMap refresh started for {location}."),
+                    );
                     return Task::perform(fetch_weather(api_key, location), move |result| {
                         cosmic::Action::App(Message::WeatherUpdated(Box::new(result)))
                     });
@@ -5103,6 +5182,10 @@ impl cosmic::Application for AppModel {
                 {
                     self.refresh_started_at = Some(Instant::now());
                     self.next_refresh_at = None;
+                    record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        "Scheduled FRITZ!Box refresh started.",
+                    );
                     return Task::perform(fetch_fritz_data(), |result| {
                         cosmic::Action::App(Message::Updated(Box::new(result)))
                     });
@@ -5194,6 +5277,10 @@ impl cosmic::Application for AppModel {
                             self.readings.clear();
                             self.error =
                                 Some("No selected devices returned usable readings".into());
+                            record_diagnostic_event(
+                                &mut self.diagnostic_events,
+                                "FRITZ!Box request returned successfully, but no selected devices supplied usable readings.",
+                            );
                         } else {
                             let total_power = output_power_w(&readings, &self.settings.input_ains);
                             let now = Instant::now();
@@ -5247,6 +5334,10 @@ impl cosmic::Application for AppModel {
                             self.error = None;
                             self.updated =
                                 Some(chrono::Local::now().format("%H:%M:%S").to_string());
+                            record_diagnostic_event(
+                                &mut self.diagnostic_events,
+                                format!("FRITZ!Box refresh succeeded: {} reading(s) loaded; {} configured device(s) unavailable.", self.readings.len(), result.missing_devices.len()),
+                            );
                         }
                     }
                     Err(error) => {
@@ -5255,6 +5346,10 @@ impl cosmic::Application for AppModel {
                         for reading in &mut self.readings {
                             reading.power_state = None;
                         }
+                        record_diagnostic_event(
+                            &mut self.diagnostic_events,
+                            format!("FRITZ!Box refresh failed: {error}"),
+                        );
                         self.error = Some(error);
                     }
                 }
@@ -5268,7 +5363,18 @@ impl cosmic::Application for AppModel {
             Message::CopyDiagnosticUrl(url) => {
                 return cosmic::iced::clipboard::write(url);
             }
+            Message::ClearDiagnosticEvents => {
+                self.diagnostic_events.clear();
+                record_diagnostic_event(
+                    &mut self.diagnostic_events,
+                    "Diagnostic activity log cleared.",
+                );
+            }
             Message::TestNotification => {
+                record_diagnostic_event(
+                    &mut self.diagnostic_events,
+                    "Desktop notification test requested.",
+                );
                 let _ = notify_rust::Notification::new()
                     .summary(crate::i18n::tr(
                         &self.settings.language,
@@ -5286,12 +5392,26 @@ impl cosmic::Application for AppModel {
                 }
                 self.latest_version_loading = true;
                 self.latest_version = None;
+                record_diagnostic_event(
+                    &mut self.diagnostic_events,
+                    "Release check started: querying the latest stable GitHub release.",
+                );
                 return Task::perform(fetch_latest_release_version(), |result| {
                     cosmic::Action::App(Message::LatestVersionChecked(result))
                 });
             }
             Message::LatestVersionChecked(result) => {
                 self.latest_version_loading = false;
+                match &result {
+                    Ok(version) => record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        format!("Release check succeeded: latest stable version is {version}; installed version is {}.", env!("APP_VERSION")),
+                    ),
+                    Err(error) => record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        format!("Release check failed: {error}"),
+                    ),
+                }
                 self.latest_version = Some(result);
                 self.update_status = None;
             }
@@ -5304,6 +5424,10 @@ impl cosmic::Application for AppModel {
                 };
                 self.update_installing = true;
                 self.update_status = None;
+                record_diagnostic_event(
+                    &mut self.diagnostic_events,
+                    format!("Update installation started for version {version}."),
+                );
                 let version = version.clone();
                 return Task::perform(crate::updater::install_update(version), |result| {
                     cosmic::Action::App(Message::LatestUpdateInstalled(result))
@@ -5311,6 +5435,16 @@ impl cosmic::Application for AppModel {
             }
             Message::LatestUpdateInstalled(result) => {
                 self.update_installing = false;
+                match &result {
+                    Ok(message) => record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        format!("Update installation completed: {message}"),
+                    ),
+                    Err(error) => record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        format!("Update installation failed: {error}"),
+                    ),
+                }
                 self.update_status = Some(match result {
                     Ok(message) => message,
                     Err(error) => format!(
@@ -5321,6 +5455,10 @@ impl cosmic::Application for AppModel {
             }
             Message::FetchForecastFromDiagnostics => {
                 let days = 7;
+                record_diagnostic_event(
+                    &mut self.diagnostic_events,
+                    format!("Open-Meteo forecast check started: resolving {} for {days} days.", self.settings.weather_location),
+                );
                 self.weather_forecast_days = Some(days);
                 self.weather_forecast = None;
                 self.weather_forecast_error = None;
@@ -5372,10 +5510,18 @@ impl cosmic::Application for AppModel {
                 self.weather_forecast_loading = false;
                 match result {
                     Ok(forecast) => {
+                        record_diagnostic_event(
+                            &mut self.diagnostic_events,
+                            format!("Open-Meteo forecast succeeded: {} day(s) received.", forecast.days.len()),
+                        );
                         self.weather_forecast = Some(forecast);
                         self.weather_forecast_error = None;
                     }
                     Err(error) => {
+                        record_diagnostic_event(
+                            &mut self.diagnostic_events,
+                            format!("Open-Meteo forecast failed: {error}"),
+                        );
                         self.weather_forecast_error = Some(error);
                     }
                 }
@@ -5556,6 +5702,10 @@ impl cosmic::Application for AppModel {
             Message::WeatherUpdated(result) => {
                 match *result {
                     Ok(mut weather) => {
+                        record_diagnostic_event(
+                            &mut self.diagnostic_events,
+                            format!("OpenWeatherMap refresh succeeded: current conditions received; {} background image(s) available.", weather.background_images.len()),
+                        );
                         let (frames, sequence, frame_sources) = build_weather_slideshow_frames(
                             &weather.background_images,
                             self.settings.weather_slideshow_interval_seconds,
@@ -5573,6 +5723,10 @@ impl cosmic::Application for AppModel {
                         self.weather_error = None;
                     }
                     Err(error) => {
+                        record_diagnostic_event(
+                            &mut self.diagnostic_events,
+                            format!("OpenWeatherMap refresh failed: {error}"),
+                        );
                         self.weather_error = Some(error);
                     }
                 }
@@ -5645,17 +5799,31 @@ impl cosmic::Application for AppModel {
             Message::ToggleSettingsSection(section) => {
                 self.active_settings_section = Some(section);
                 self.persist_layout_state();
+                if section == "diagnostics" {
+                    record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        "Diagnostics opened: showing the latest recorded service states; no automatic network probes are started.",
+                    );
+                }
                 if section == "diagnostics"
                     && self.latest_version.is_none()
                     && !self.latest_version_loading
                 {
                     self.latest_version_loading = true;
+                    record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        "Initial release check started while opening Diagnostics.",
+                    );
                     return Task::perform(fetch_latest_release_version(), |result| {
                         cosmic::Action::App(Message::LatestVersionChecked(result))
                     });
                 }
                 if section == "device" && !self.devices_loaded && !self.devices_loading {
                     self.devices_loading = true;
+                    record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        format!("Initial device discovery started against {}.", self.settings.url),
+                    );
                     let settings = self.settings.clone();
                     self.settings_status = Some("Connecting and loading devices…".into());
                     return Task::perform(discover_devices(settings), |result| {
@@ -5763,6 +5931,10 @@ impl cosmic::Application for AppModel {
                 }
                 self.devices_loading = true;
                 let settings = self.settings.clone();
+                record_diagnostic_event(
+                    &mut self.diagnostic_events,
+                    format!("Device discovery started against {}.", self.settings.url),
+                );
                 self.settings_status = Some("Connecting and loading devices…".into());
                 return Task::perform(discover_devices(settings), |result| {
                     cosmic::Action::App(Message::DevicesLoaded(result))
@@ -5803,8 +5975,16 @@ impl cosmic::Application for AppModel {
                             "Found {} compatible power-meter device(s)",
                             self.devices.len()
                         ));
+                        record_diagnostic_event(
+                            &mut self.diagnostic_events,
+                            format!("Device discovery succeeded: {} compatible power-meter device(s) found.", self.devices.len()),
+                        );
                     }
                     Err(error) => {
+                        record_diagnostic_event(
+                            &mut self.diagnostic_events,
+                            format!("Device discovery failed: {error}"),
+                        );
                         self.settings_status = Some(format!("Connection failed: {error}"))
                     }
                 }
