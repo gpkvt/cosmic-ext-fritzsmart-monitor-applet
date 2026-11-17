@@ -606,9 +606,8 @@ fn interactive_graph_inner(
         );
     }
     graph = graph.push(
-        widget::Row::new()
-            .align_y(cosmic::iced::Alignment::Center)
-            .spacing(6)
+        widget::Column::new()
+            .spacing(2)
             .push(widget::text::caption("CURRENT"))
             .push(widget::text(format!("{current_value:.1} {unit}"))),
     );
