@@ -2082,9 +2082,8 @@ impl cosmic::Application for AppModel {
         let history_window = graph_history_window(settings.graph_timespan_minutes);
         let history_storage_window = graph_history_storage_window(settings.graph_timespan_minutes);
         let (mut history, device_history) = crate::history::load(history_storage_window);
-        history.retain(|(timestamp, _)| {
-            Instant::now().duration_since(*timestamp) <= history_window
-        });
+        history
+            .retain(|(timestamp, _)| Instant::now().duration_since(*timestamp) <= history_window);
         let history_storage_diagnostics = crate::history::diagnostics(history_storage_window);
         let collapsed_menu_sections = settings.collapsed_menu_sections.iter().cloned().collect();
         let expanded_devices = settings.expanded_devices.iter().cloned().collect();
@@ -5909,8 +5908,7 @@ impl cosmic::Application for AppModel {
                             .iter()
                             .filter(|(timestamp, _, _)| now.duration_since(*timestamp) <= window)
                             .collect();
-                        let values =
-                            visible.iter().map(|(_, power, _)| *power as f64).collect();
+                        let values = visible.iter().map(|(_, power, _)| *power as f64).collect();
                         let axis_start = format_graph_axis_start(
                             self.settings.graph_timespan_minutes,
                             visible.first().map(|(timestamp, _, _)| {
@@ -6664,9 +6662,9 @@ impl cosmic::Application for AppModel {
                     (self.history, self.device_history) = crate::history::load(storage_window);
                     let window = graph_history_window(self.settings.graph_timespan_minutes);
                     let now = Instant::now();
-                    self.history.retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
-                    self.history_storage_diagnostics =
-                        crate::history::diagnostics(storage_window);
+                    self.history
+                        .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
+                    self.history_storage_diagnostics = crate::history::diagnostics(storage_window);
                     self.persist_settings();
                 }
             }
@@ -7057,9 +7055,9 @@ impl cosmic::Application for AppModel {
                 (self.history, self.device_history) = crate::history::load(storage_window);
                 let window = graph_history_window(self.settings.graph_timespan_minutes);
                 let now = Instant::now();
-                self.history.retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
-                self.history_storage_diagnostics =
-                    crate::history::diagnostics(storage_window);
+                self.history
+                    .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
+                self.history_storage_diagnostics = crate::history::diagnostics(storage_window);
                 self.persist_settings();
             }
             Message::GraphStyleChanged(value) => {
