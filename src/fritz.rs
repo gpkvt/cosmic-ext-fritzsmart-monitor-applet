@@ -1370,22 +1370,27 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
     let mut device_xml = None;
     match device_response {
         Ok(response) => {
-            let status = response.status();
-            record_http_response_with_method(response.url(), status, "GET");
-            let status = status.as_u16();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|error| format!("<body read error: {error}>"));
-            device_xml = Some(body.clone());
-            endpoints.push(json!({
-                "name": "device_list_and_all_device_data",
-                "method": "GET",
-                "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
-                "status": status,
-                "body_json": xml_response_as_json(&body),
-                "body_raw": body,
-            }));
+            let status = response.status().as_u16();
+            match read_xml_response(response, "FRITZ!Box debug device-list request failed").await {
+                Ok(body) => {
+                    device_xml = Some(body.clone());
+                    endpoints.push(json!({
+                        "name": "device_list_and_all_device_data",
+                        "method": "GET",
+                        "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
+                        "status": status,
+                        "body_json": xml_response_as_json(&body),
+                        "body_raw": body,
+                    }));
+                }
+                Err(error) => endpoints.push(json!({
+                    "name": "device_list_and_all_device_data",
+                    "method": "GET",
+                    "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
+                    "status": status,
+                    "error": error,
+                })),
+            }
         }
         Err(error) => endpoints.push(json!({
             "name": "device_list_and_all_device_data",
@@ -1420,23 +1425,33 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                     .await;
                 match response {
                     Ok(response) => {
-                        let status = response.status();
-                        record_http_response_with_method(response.url(), status, "GET");
-                        let status = status.as_u16();
-                        let body = response
-                            .text()
-                            .await
-                            .unwrap_or_else(|error| format!("<body read error: {error}>"));
-                        endpoints.push(json!({
-                            "name": "device_switch_state",
-                            "method": "GET",
-                            "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
-                            "device_name": device.children().find(|node| node.has_tag_name("name")).and_then(|node| node.text()).unwrap_or("Unnamed device"),
-                            "device_ain": ain,
-                            "status": status,
-                            "body_json": xml_response_as_json(&body),
-                            "body_raw": body,
-                        }));
+                        let status = response.status().as_u16();
+                        let device_name = device
+                            .children()
+                            .find(|node| node.has_tag_name("name"))
+                            .and_then(|node| node.text())
+                            .unwrap_or("Unnamed device");
+                        match read_xml_response(response, "FRITZ!Box debug switch-state request failed").await {
+                            Ok(body) => endpoints.push(json!({
+                                "name": "device_switch_state",
+                                "method": "GET",
+                                "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
+                                "device_name": device_name,
+                                "device_ain": ain,
+                                "status": status,
+                                "body_json": xml_response_as_json(&body),
+                                "body_raw": body,
+                            })),
+                            Err(error) => endpoints.push(json!({
+                                "name": "device_switch_state",
+                                "method": "GET",
+                                "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
+                                "device_name": device_name,
+                                "device_ain": ain,
+                                "status": status,
+                                "error": error,
+                            })),
+                        }
                     }
                     Err(error) => endpoints.push(json!({
                         "name": "device_switch_state",
@@ -1474,22 +1489,30 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
             .await
         {
             Ok(response) => {
-                let status = response.status();
-                record_http_response_with_method(response.url(), status, "POST");
-                let status = status.as_u16();
-                let response_body = response
-                    .text()
-                    .await
-                    .unwrap_or_else(|error| format!("<body read error: {error}>"));
-                endpoints.push(json!({
-                    "name": "wan_common_interface_link_properties",
-                    "method": "POST",
-                    "endpoint": endpoint_path,
-                    "soap_action": format!("{SERVICE}#GetCommonLinkProperties"),
-                    "status": status,
-                    "body_json": xml_response_as_json(&response_body),
-                    "body_raw": response_body,
-                }));
+                let status = response.status().as_u16();
+                match read_xml_response_with_method(
+                    response,
+                    "FRITZ!Box debug WAN interface request failed",
+                    "POST",
+                ).await {
+                    Ok(response_body) => endpoints.push(json!({
+                        "name": "wan_common_interface_link_properties",
+                        "method": "POST",
+                        "endpoint": endpoint_path,
+                        "soap_action": format!("{SERVICE}#GetCommonLinkProperties"),
+                        "status": status,
+                        "body_json": xml_response_as_json(&response_body),
+                        "body_raw": response_body,
+                    })),
+                    Err(error) => endpoints.push(json!({
+                        "name": "wan_common_interface_link_properties",
+                        "method": "POST",
+                        "endpoint": endpoint_path,
+                        "soap_action": format!("{SERVICE}#GetCommonLinkProperties"),
+                        "status": status,
+                        "error": error,
+                    })),
+                }
             }
             Err(error) => endpoints.push(json!({
                 "name": "wan_common_interface_link_properties",
