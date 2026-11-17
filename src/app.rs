@@ -886,7 +886,7 @@ fn live_power_summary(
         .push(
             widget::Row::new()
                 .width(cosmic::iced::Length::Fill)
-                .push(widget::text::caption(axis_start))
+                .push(widget::text::caption(axis_start.clone()))
                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                 .push(widget::text::caption("Now")),
         )
