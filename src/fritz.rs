@@ -698,7 +698,11 @@ impl FritzSettings {
                 "false"
             },
             parse_settings_section(&self.settings_section),
-            if self.setup_completed { "true" } else { "false" },
+            if self.setup_completed {
+                "true"
+            } else {
+                "false"
+            },
         );
         #[cfg(unix)]
         let mut file = {

@@ -2060,7 +2060,11 @@ impl cosmic::Application for AppModel {
                 settings_open: setup_assistant,
                 setup_assistant,
                 setup_step: 0,
-                active_settings_section: if setup_assistant { None } else { active_settings_section },
+                active_settings_section: if setup_assistant {
+                    None
+                } else {
+                    active_settings_section
+                },
                 history,
                 device_history,
                 collapsed_menu_sections,
@@ -2545,8 +2549,14 @@ impl cosmic::Application for AppModel {
                     _ => "You're ready to go",
                 };
                 content = content
-                    .push(widget::text::title2(crate::i18n::tr(&self.settings.language, step_title)))
-                    .push(widget::text::caption(format!("{} / 4", self.setup_step.min(3) + 1)))
+                    .push(widget::text::title2(crate::i18n::tr(
+                        &self.settings.language,
+                        step_title,
+                    )))
+                    .push(widget::text::caption(format!(
+                        "{} / 4",
+                        self.setup_step.min(3) + 1
+                    )))
                     .push(widget::divider::horizontal::default());
                 match self.setup_step {
                     0 => {
@@ -2569,16 +2579,24 @@ impl cosmic::Application for AppModel {
                             .push(widget::text::caption("Discover compatible FRITZ! smart-home devices, then select the devices to monitor."))
                             .push(action_button("view-refresh-symbolic", "Discover devices", Message::DiscoverDevices));
                         if self.devices_loading {
-                            content = content.push(widget::text::caption("Searching your FRITZ!Box…"));
+                            content =
+                                content.push(widget::text::caption("Searching your FRITZ!Box…"));
                         } else if let Some(error) = &self.error {
                             content = content.push(error_notice("FRITZ!Box connection", error));
                         }
                         for device in &self.devices {
-                            let selected = self.selected_ains.iter().any(|ain| crate::fritz::normalize_ain_for_selection(ain) == crate::fritz::normalize_ain_for_selection(&device.ain));
+                            let selected = self.selected_ains.iter().any(|ain| {
+                                crate::fritz::normalize_ain_for_selection(ain)
+                                    == crate::fritz::normalize_ain_for_selection(&device.ain)
+                            });
                             let ain = device.ain.clone();
-                            content = content.push(widget::checkbox(selected)
-                                .label(device.name.clone())
-                                .on_toggle(move |checked| Message::ToggleDevice(ain.clone(), checked)));
+                            content = content.push(
+                                widget::checkbox(selected)
+                                    .label(device.name.clone())
+                                    .on_toggle(move |checked| {
+                                        Message::ToggleDevice(ain.clone(), checked)
+                                    }),
+                            );
                         }
                         if self.devices_loaded && self.devices.is_empty() {
                             content = content.push(widget::text::caption("No compatible devices were found. You can continue and retry later in Settings → Devices."));
@@ -2598,20 +2616,40 @@ impl cosmic::Application for AppModel {
                     }
                     _ => {
                         content = content
-                            .push(widget::text::body("Setup is complete. Your choices are saved automatically."))
-                            .push(widget::text::caption(format!("{} device(s) selected", self.selected_ains.len())));
+                            .push(widget::text::body(
+                                "Setup is complete. Your choices are saved automatically.",
+                            ))
+                            .push(widget::text::caption(format!(
+                                "{} device(s) selected",
+                                self.selected_ains.len()
+                            )));
                     }
                 }
                 content = content.push(widget::divider::horizontal::default());
-                let mut actions = widget::Row::new().spacing(8).align_y(cosmic::iced::Alignment::Center);
+                let mut actions = widget::Row::new()
+                    .spacing(8)
+                    .align_y(cosmic::iced::Alignment::Center);
                 if self.setup_step > 0 {
-                    actions = actions.push(widget::button::text("Back").on_press(Message::SetupBack));
+                    actions =
+                        actions.push(widget::button::text("Back").on_press(Message::SetupBack));
                 }
                 actions = actions.push(widget::Space::new().width(cosmic::iced::Length::Fill));
                 if self.setup_step >= 4 {
-                    actions = actions.push(widget::button::text("Finish").on_press(Message::SetupFinish));
+                    actions =
+                        actions.push(widget::button::text("Finish").on_press(Message::SetupFinish));
                 } else {
-                    actions = actions.push(widget::button::text(if self.setup_step == 3 { "Finish setup" } else { "Continue" }).on_press(if self.setup_step == 3 { Message::SetupFinish } else { Message::SetupNext }));
+                    actions = actions.push(
+                        widget::button::text(if self.setup_step == 3 {
+                            "Finish setup"
+                        } else {
+                            "Continue"
+                        })
+                        .on_press(if self.setup_step == 3 {
+                            Message::SetupFinish
+                        } else {
+                            Message::SetupNext
+                        }),
+                    );
                 }
                 content = content.push(actions);
             } else if self.active_settings_section.is_some() {
