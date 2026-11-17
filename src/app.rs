@@ -4106,7 +4106,6 @@ impl cosmic::Application for AppModel {
                         if endpoint.is_empty() { crate::i18n::tr(&self.settings.language, "Not configured") } else { endpoint }
                     )))
                     .push(widget::divider::horizontal::default())
-                    .push(widget::divider::horizontal::default())
                     .push(widget::text::title3(crate::i18n::tr(
                         &self.settings.language,
                         "System notifications",
