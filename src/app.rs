@@ -560,6 +560,18 @@ fn graph_visual(
     )
 }
 
+fn graph_plot_bounds(minimum: f64, maximum: f64) -> (f64, f64) {
+    let range = (maximum - minimum).max(0.0);
+    // A steady load is still meaningful data. Without vertical padding its
+    // polyline lands directly on the bottom axis and looks like an empty graph.
+    let padding = if range <= f64::EPSILON {
+        minimum.abs().max(1.0) * 0.1
+    } else {
+        range * 0.08
+    };
+    (minimum - padding, maximum + padding)
+}
+
 fn graph_visual_large(
     values: impl Iterator<Item = f64>,
     style: &str,
@@ -572,7 +584,8 @@ fn graph_visual_large(
         style,
         unit,
         480.0,
-        cosmic::iced::Length::Fill,
+        // A concrete SVG height avoids zero-height allocation in nested popup columns.
+        cosmic::iced::Length::Fixed(480.0),
         axis_start,
     )
 }
@@ -596,7 +609,8 @@ fn graph_visual_with_dimensions(
     let values = if values.is_empty() { vec![0.0] } else { values };
     let minimum = values.iter().copied().reduce(f64::min).unwrap_or(0.0);
     let maximum = values.iter().copied().reduce(f64::max).unwrap_or(minimum);
-    let range = (maximum - minimum).max(1.0);
+    let (plot_minimum, plot_maximum) = graph_plot_bounds(minimum, maximum);
+    let plot_range = (plot_maximum - plot_minimum).max(1.0);
     let samples: Vec<f64> = if values.len() == 1 {
         vec![values[0]; COUNT]
     } else {
@@ -612,7 +626,7 @@ fn graph_visual_with_dimensions(
     let plot_top = 4.0;
     let plot_bottom = height - 4.0;
     let plot_height = plot_bottom - plot_top;
-    let y = |v: f64| plot_bottom - ((v - minimum) / range) * plot_height;
+    let y = |v: f64| plot_bottom - ((v - plot_minimum) / plot_range) * plot_height;
     let drawing = if style == "bar" {
         let slot = WIDTH / COUNT as f64;
         samples.iter().enumerate().map(|(i,v)| {
@@ -7569,6 +7583,21 @@ mod history_tests {
 
         assert_eq!(input_display_range(&history), (-100, -500));
         assert_eq!(input_display_range(&VecDeque::new()), (0, 0));
+    }
+
+    #[test]
+    fn graph_plot_bounds_keep_steady_values_away_from_the_axis() {
+        let (minimum, maximum) = graph_plot_bounds(250.0, 250.0);
+        assert!(minimum < 250.0);
+        assert!(maximum > 250.0);
+        assert_eq!((minimum + maximum) / 2.0, 250.0);
+    }
+
+    #[test]
+    fn graph_plot_bounds_add_padding_to_varying_values() {
+        let (minimum, maximum) = graph_plot_bounds(100.0, 200.0);
+        assert!(minimum < 100.0);
+        assert!(maximum > 200.0);
     }
 
     #[test]
