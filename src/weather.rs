@@ -493,10 +493,9 @@ async fn fetch_commons_background(
             let Ok(response) = client.get(image_url).send().await else { continue };
             if !response.status().is_success() { continue; }
             let Ok(bytes) = response.bytes().await else { continue };
-            // Create the soft, blocky mosaic used by image-backed profile headers:
-            // reduce the photo to a small grid, then enlarge with nearest-neighbour
-            // sampling. The dark translucent overlay is applied by the weather card.
-            let Some(image) = pixelate_background_image(bytes.to_vec(), 12) else { continue };
+            // Keep the original photograph intact. The weather card adds a
+            // transparent black chessboard overlay at display time.
+            let image = bytes.to_vec();
             let metadata = &info["extmetadata"];
             let artist = metadata["Artist"]["value"].as_str()
                 .or_else(|| metadata["Credit"]["value"].as_str())
@@ -630,36 +629,27 @@ fn generate_starry_night_background() -> Option<Vec<u8>> {
     Some(output.into_inner())
 }
 
-fn pixelate_background_image(bytes: Vec<u8>, block_size: u32) -> Option<Vec<u8>> {
-    use image::imageops::FilterType;
-
-    let decoded = image::load_from_memory(&bytes).ok()?.to_rgb8();
-    let (width, height) = decoded.dimensions();
-    if width == 0 || height == 0 {
-        return None;
-    }
-
-    let block_size = block_size.max(1);
-    let small_width = width.div_ceil(block_size).max(1);
-    let small_height = height.div_ceil(block_size).max(1);
-    let reduced = image::imageops::resize(
-        &decoded,
-        small_width,
-        small_height,
-        FilterType::Triangle,
-    );
-    let pixelated = image::imageops::resize(
-        &reduced,
-        width,
-        height,
-        FilterType::Nearest,
-    );
-
-    let mut output = std::io::Cursor::new(Vec::new());
-    image::DynamicImage::ImageRgb8(pixelated)
-        .write_to(&mut output, image::ImageFormat::Jpeg)
-        .ok()?;
-    Some(output.into_inner())
+/// A black chessboard texture for photo-backed weather cards. Every other
+/// square is black at 50% opacity; the alternating squares are fully transparent.
+pub fn chessboard_background_overlay() -> Option<Vec<u8>> {
+    static OVERLAY: LazyLock<Option<Vec<u8>>> = LazyLock::new(|| {
+        let width = 1200u32;
+        let height = 520u32;
+        let square_size = 16u32;
+        let image = image::RgbaImage::from_fn(width, height, |x, y| {
+            if ((x / square_size) + (y / square_size)) % 2 == 0 {
+                image::Rgba([0, 0, 0, 128])
+            } else {
+                image::Rgba([0, 0, 0, 0])
+            }
+        });
+        let mut output = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(image)
+            .write_to(&mut output, image::ImageFormat::Png)
+            .ok()?;
+        Some(output.into_inner())
+    });
+    OVERLAY.clone()
 }
 
 pub fn build_weather_slideshow_frames(
@@ -932,22 +922,14 @@ mod tests {
     }
 
     #[test]
-    fn pixelates_background_photos_without_changing_their_dimensions() {
-        let source = image::DynamicImage::ImageRgb8(image::RgbImage::from_fn(
-            24,
-            16,
-            |x, y| image::Rgb([(x * 10) as u8, (y * 10) as u8, 40]),
-        ));
-        let mut encoded = std::io::Cursor::new(Vec::new());
-        source
-            .write_to(&mut encoded, image::ImageFormat::Png)
-            .unwrap();
-
-        let pixelated = pixelate_background_image(encoded.into_inner(), 4).unwrap();
-        let decoded = image::load_from_memory(&pixelated).unwrap();
-        assert_eq!((decoded.width(), decoded.height()), (24, 16));
-        // Nearest-neighbour enlargement gives each source tile a flat colour.
-        assert_eq!(decoded.get_pixel(0, 0), decoded.get_pixel(1, 1));
+    fn chessboard_overlay_alternates_half_opacity_and_transparency() {
+        let bytes = chessboard_background_overlay().expect("overlay should render");
+        let decoded = image::load_from_memory(&bytes).unwrap().to_rgba8();
+        assert_eq!(decoded.dimensions(), (1200, 520));
+        assert_eq!(decoded.get_pixel(0, 0).0, [0, 0, 0, 128]);
+        assert_eq!(decoded.get_pixel(16, 0).0, [0, 0, 0, 0]);
+        assert_eq!(decoded.get_pixel(0, 16).0, [0, 0, 0, 0]);
+        assert_eq!(decoded.get_pixel(16, 16).0, [0, 0, 0, 128]);
     }
 
     #[test]

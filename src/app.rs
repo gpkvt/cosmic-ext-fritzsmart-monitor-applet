@@ -2,7 +2,7 @@ use crate::fritz::{
     FritzDevice, FritzFetchResult, FritzInternetBandwidth, FritzReading, FritzSettings,
     TemperatureAlertThresholds, discover_devices, fetch_fritz_data,
 };
-use crate::weather::{WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather, fetch_weather_forecast, starry_night_overlay};
+use crate::weather::{WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather, fetch_weather_forecast, starry_night_overlay, chessboard_background_overlay};
 use cosmic::iced::{
     Limits, Subscription, futures,
     platform_specific::shell::wayland::commands::popup::{destroy_popup, get_popup},
@@ -3355,23 +3355,20 @@ impl cosmic::Application for AppModel {
                                 weather_layers = weather_layers.push(star_layer);
                             }
                         }
-                        // Apply a 50%-opaque dark wash across the complete
-                        // photograph, above the image/stars and below the weather
-                        // text and controls.
-                        let background_overlay = widget::container(
-                            cosmic::iced::widget::Space::new()
-                                .width(cosmic::iced::Length::Fill)
-                                .height(cosmic::iced::Length::Fill),
-                        )
-                        .width(cosmic::iced::Length::Fill)
-                        .height(cosmic::iced::Length::Fixed(260.0))
-                        .style(|_| cosmic::iced::widget::container::Style {
-                            background: Some(
-                                cosmic::iced::Color::from_rgba(0.0, 0.0, 0.0, 0.50).into(),
-                            ),
-                            ..Default::default()
-                        });
-                        weather_layers = weather_layers.push(background_overlay);
+                        // A black chessboard texture replaces image pixelation:
+                        // alternating squares are 50% opaque and fully transparent.
+                        if let Some(pattern) = chessboard_background_overlay() {
+                            let pattern_layer = widget::container(
+                                widget::image::Image::new(widget::image::Handle::from_bytes(pattern))
+                                    .width(cosmic::iced::Length::Fill)
+                                    .height(cosmic::iced::Length::Fixed(260.0))
+                                    .content_fit(cosmic::iced::ContentFit::Fill),
+                            )
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .clip(true);
+                            weather_layers = weather_layers.push(pattern_layer);
+                        }
                         widget::container(
                             weather_layers.push(details),
                         )
