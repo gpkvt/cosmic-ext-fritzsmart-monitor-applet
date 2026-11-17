@@ -3282,16 +3282,9 @@ impl cosmic::Application for AppModel {
                             .padding(10)
                             .clip(true)
                             .style(|_| cosmic::iced::widget::container::Style {
-                                // A dark translucent wash keeps the photo visible
-                                // while providing strong contrast for white weather text.
-                                background: Some(
-                                    cosmic::iced::Color::from_rgba(
-                                        0.06,
-                                        0.07,
-                                        0.09,
-                                        if weather.icon_code.ends_with('n') { 0.30 } else { 0.26 },
-                                    ).into(),
-                                ),
+                                // Keep the text layer transparent; the separate
+                                // background wash below it handles photo contrast.
+                                background: None,
                                 text_color: Some(cosmic::iced::Color::WHITE),
                                 ..Default::default()
                             });
@@ -3324,6 +3317,23 @@ impl cosmic::Application for AppModel {
                                 weather_layers = weather_layers.push(star_layer);
                             }
                         }
+                        // Apply an 80%-transparent dark wash across the
+                        // complete photograph, above the image/stars and below
+                        // the weather text and controls.
+                        let background_overlay = widget::container(
+                            cosmic::iced::widget::Space::new()
+                                .width(cosmic::iced::Length::Fill)
+                                .height(cosmic::iced::Length::Fill),
+                        )
+                        .width(cosmic::iced::Length::Fill)
+                        .height(cosmic::iced::Length::Fixed(260.0))
+                        .style(|_| cosmic::iced::widget::container::Style {
+                            background: Some(
+                                cosmic::iced::Color::from_rgba(0.06, 0.07, 0.09, 0.20).into(),
+                            ),
+                            ..Default::default()
+                        });
+                        weather_layers = weather_layers.push(background_overlay);
                         widget::container(
                             weather_layers.push(details),
                         )
