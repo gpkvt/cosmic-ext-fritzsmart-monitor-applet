@@ -1,6 +1,6 @@
 use reqwest::Client;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::LazyLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 static COMMONS_SEARCH_OFFSET: AtomicUsize = AtomicUsize::new(0);
