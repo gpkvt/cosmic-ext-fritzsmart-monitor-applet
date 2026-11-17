@@ -559,7 +559,11 @@ fn graph_visual_with_dimensions(
             widget::Row::new()
                 .width(cosmic::iced::Length::Fill)
                 .push(widget::text::caption(format!("MIN {minimum:.1} {unit}")))
-                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(widget::text::caption(format!(
+                        "FRITZ!Power Monitor · v{}",
+                        env!("APP_VERSION")
+                    ))
+                    .width(cosmic::iced::Length::Fill))
                 .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
         )
         .push(graph);
@@ -4469,17 +4473,11 @@ impl cosmic::Application for AppModel {
                         .center_y(36),
                     )
                     .push(
-                        widget::Column::new()
-                            .spacing(1)
-                            .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::body(crate::i18n::tr(
-                                &self.settings.language,
-                                "FRITZ!Power Monitor",
-                            )))
-                            .push(widget::text::caption(format!(
-                                "v{}",
-                                env!("APP_VERSION")
-                            ))),
+                        widget::text::body(crate::i18n::tr(
+                            &self.settings.language,
+                            "FRITZ!Power Monitor",
+                        ))
+                        .width(cosmic::iced::Length::Fill),
                     )
                     .push(if self.refresh_started_at.is_some() {
                         icon_action_button(
