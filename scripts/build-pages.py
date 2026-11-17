@@ -40,13 +40,13 @@ def render(source: Path, destination: Path, title: str) -> None:
     )
     nav = (
         '<a class="brand" href="index.html"><img src="logo.svg" alt="">'
-        'FRITZ!Power Monitor</a><nav class="nav-links" aria-label="Main navigation">'
+        'FRITZ!Power Monitor</a><nav class="nav-links" aria-label="Hauptnavigation">'
         '<a href="index.html">Overview</a><a href="guide.html">User guide</a>'
         '<a href="readme.html">README</a><a href="security.html">Security</a>'
         '</nav>'
     )
     page = f"""<!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -59,7 +59,7 @@ def render(source: Path, destination: Path, title: str) -> None:
 <body>
 <header class="topbar"><div class="wrap nav">{nav}</div></header>
 <main class="wrap"><article><h1>{escape(title)}</h1>{body}
-<div class="page-foot"><a href="index.html">← Back to project overview</a></div>
+<div class="page-foot"><a href="index.html">← Zurück zur Projektübersicht</a></div>
 </article></main>
 </body>
 </html>
