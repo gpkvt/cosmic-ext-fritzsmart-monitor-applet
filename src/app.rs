@@ -4117,6 +4117,11 @@ impl cosmic::Application for AppModel {
                         }
                     )))
                     .push(widget::divider::horizontal::default())
+                    .push(diagnostic_section_heading(
+                        crate::i18n::tr(&self.settings.language, "Weather services"),
+                        crate::i18n::tr(&self.settings.language, "Latest request status for weather, forecasts and background images"),
+                    ))
+                    .push(widget::divider::horizontal::default())
                     .push(widget::text::title3(crate::i18n::tr(
                         &self.settings.language,
                         "System notifications",
@@ -4129,6 +4134,136 @@ impl cosmic::Application for AppModel {
                         "preferences-system-notifications-symbolic",
                         crate::i18n::tr(&self.settings.language, "Send test notification"),
                         Message::TestNotification,
+                    ));
+
+                let weather_provider_status = if !self.settings.weather_enabled {
+                    (
+                        crate::i18n::tr(&self.settings.language, "Not configured"),
+                        None,
+                    )
+                } else if self.weather.is_some() {
+                    (
+                        crate::i18n::tr(&self.settings.language, "Latest request succeeded"),
+                        Some(true),
+                    )
+                } else if self.weather_error.is_some() {
+                    (
+                        crate::i18n::tr(&self.settings.language, "Latest request failed"),
+                        Some(false),
+                    )
+                } else {
+                    (
+                        crate::i18n::tr(&self.settings.language, "Not checked yet"),
+                        None,
+                    )
+                };
+                content = content
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(
+                            &self.settings.language,
+                            "OpenWeatherMap · current weather",
+                        ),
+                        weather_provider_status.0,
+                        weather_provider_status.1,
+                    ))
+                    .push(diagnostic_url_button(
+                        "https://api.openweathermap.org/data/2.5/weather".into(),
+                    ));
+
+                let commons_status = if !self.settings.weather_enabled {
+                    (
+                        crate::i18n::tr(&self.settings.language, "Not configured"),
+                        None,
+                    )
+                } else if let Some(weather) = &self.weather {
+                    if !weather.background_images.is_empty() {
+                        (
+                            crate::i18n::tr(&self.settings.language, "Image loaded"),
+                            Some(true),
+                        )
+                    } else {
+                        (
+                            crate::i18n::tr(&self.settings.language, "No usable image loaded"),
+                            Some(false),
+                        )
+                    }
+                } else if self.weather_error.is_some() {
+                    (
+                        crate::i18n::tr(&self.settings.language, "Weather request failed"),
+                        Some(false),
+                    )
+                } else {
+                    (
+                        crate::i18n::tr(&self.settings.language, "Not checked yet"),
+                        None,
+                    )
+                };
+                content = content
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(
+                            &self.settings.language,
+                            "Wikimedia Commons · image search and download",
+                        ),
+                        commons_status.0,
+                        commons_status.1,
+                    ))
+                    .push(diagnostic_url_button(
+                        "https://commons.wikimedia.org/w/api.php".into(),
+                    ))
+                    .push(widget::text::caption(
+                        "Thumbnail URL is returned by the API.",
+                    ));
+
+                let forecast_status = if self.settings.weather_location.trim().is_empty() {
+                    (
+                        crate::i18n::tr(&self.settings.language, "Weather location not configured"),
+                        None,
+                    )
+                } else if self.weather_forecast_loading {
+                    (
+                        crate::i18n::tr(&self.settings.language, "Forecast request in progress"),
+                        None,
+                    )
+                } else if self.weather_forecast.is_some() {
+                    (
+                        crate::i18n::tr(&self.settings.language, "Forecast loaded"),
+                        Some(true),
+                    )
+                } else if self.weather_forecast_error.is_some() {
+                    (
+                        crate::i18n::tr(&self.settings.language, "Latest request failed"),
+                        Some(false),
+                    )
+                } else {
+                    (
+                        crate::i18n::tr(
+                            &self.settings.language,
+                            "Not checked · request a forecast to test",
+                        ),
+                        None,
+                    )
+                };
+                content = content
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "Open-Meteo · geocoding"),
+                        forecast_status.0,
+                        forecast_status.1,
+                    ))
+                    .push(diagnostic_url_button(
+                        "https://geocoding-api.open-meteo.com/v1/search".into(),
+                    ))
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "Open-Meteo · forecast"),
+                        forecast_status.0,
+                        forecast_status.1,
+                    ))
+                    .push(diagnostic_url_button(
+                        "https://api.open-meteo.com/v1/forecast".into(),
+                    ))
+                    .push(action_button(
+                        "view-refresh-symbolic",
+                        crate::i18n::tr(&self.settings.language, "Get 7-day forecast"),
+                        Message::FetchForecastFromDiagnostics,
                     ));
 
                 let requests = crate::fritz::http_request_diagnostics();
