@@ -4031,35 +4031,48 @@ impl cosmic::Application for AppModel {
                     )));
 
                 let now = Instant::now();
-                let device_history_json: Vec<serde_json::Value> = self.readings.iter().map(|reading| {
-                    let ain = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                    let samples = self.device_history.get(&ain);
-                    let (sample_count, first_age_seconds, last_age_seconds, min_power_w, max_power_w) =
-                        if let Some(samples) = samples {
-                            let first_age = samples.front().map(|(timestamp, _, _)| now.saturating_duration_since(*timestamp).as_secs());
-                            let last_age = samples.back().map(|(timestamp, _, _)| now.saturating_duration_since(*timestamp).as_secs());
+                let device_history_json: Vec<serde_json::Value> = self
+                    .readings
+                    .iter()
+                    .map(|reading| {
+                        let ain = crate::fritz::normalize_ain_for_selection(&reading.ain);
+                        let samples = self.device_history.get(&ain);
+                        let (
+                            sample_count,
+                            first_age_seconds,
+                            last_age_seconds,
+                            min_power_w,
+                            max_power_w,
+                        ) = if let Some(samples) = samples {
+                            let first_age = samples.front().map(|(timestamp, _, _)| {
+                                now.saturating_duration_since(*timestamp).as_secs()
+                            });
+                            let last_age = samples.back().map(|(timestamp, _, _)| {
+                                now.saturating_duration_since(*timestamp).as_secs()
+                            });
                             let min = samples.iter().map(|(_, power, _)| *power).min();
                             let max = samples.iter().map(|(_, power, _)| *power).max();
                             (samples.len(), first_age, last_age, min, max)
                         } else {
                             (0, None, None, None, None)
                         };
-                    serde_json::json!({
-                        "name": reading.name,
-                        "ain": reading.ain,
-                        "normalized_ain": ain,
-                        "current_reading_available": true,
-                        "current_power_w": reading.power_w,
-                        "current_temperature_c": reading.temperature_c,
-                        "history_entry_found": samples.is_some(),
-                        "sample_count": sample_count,
-                        "first_sample_age_seconds": first_age_seconds,
-                        "last_sample_age_seconds": last_age_seconds,
-                        "min_power_w": min_power_w,
-                        "max_power_w": max_power_w,
-                        "graph_power_values_retrievable": sample_count > 0
+                        serde_json::json!({
+                            "name": reading.name,
+                            "ain": reading.ain,
+                            "normalized_ain": ain,
+                            "current_reading_available": true,
+                            "current_power_w": reading.power_w,
+                            "current_temperature_c": reading.temperature_c,
+                            "history_entry_found": samples.is_some(),
+                            "sample_count": sample_count,
+                            "first_sample_age_seconds": first_age_seconds,
+                            "last_sample_age_seconds": last_age_seconds,
+                            "min_power_w": min_power_w,
+                            "max_power_w": max_power_w,
+                            "graph_power_values_retrievable": sample_count > 0
+                        })
                     })
-                }).collect();
+                    .collect();
                 let stored_device_histories: Vec<serde_json::Value> = self.device_history.iter().map(|(ain, samples)| {
                     let current_reading = self.readings.iter().find(|reading|
                         crate::fritz::normalize_ain_for_selection(&reading.ain) == *ain

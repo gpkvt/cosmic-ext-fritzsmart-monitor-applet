@@ -131,44 +131,49 @@ pub fn diagnostics(window: Duration) -> Value {
                 "reason": "history file does not exist yet"
             });
         }
-        Err(error) => return json!({
-            "available": false,
-            "path": path,
-            "exists": true,
-            "error": error.to_string()
-        }),
+        Err(error) => {
+            return json!({
+                "available": false,
+                "path": path,
+                "exists": true,
+                "error": error.to_string()
+            });
+        }
     };
     let contents = match fs::read_to_string(&path) {
         Ok(contents) => contents,
-        Err(error) => return json!({
-            "available": false,
-            "path": path,
-            "exists": true,
-            "file_bytes": metadata.len(),
-            "error": error.to_string()
-        }),
+        Err(error) => {
+            return json!({
+                "available": false,
+                "path": path,
+                "exists": true,
+                "file_bytes": metadata.len(),
+                "error": error.to_string()
+            });
+        }
     };
     let document = match serde_json::from_str::<Value>(&contents) {
         Ok(document) => document,
-        Err(error) => return json!({
-            "available": false,
-            "path": path,
-            "exists": true,
-            "file_bytes": metadata.len(),
-            "error": format!("invalid JSON: {error}")
-        }),
+        Err(error) => {
+            return json!({
+                "available": false,
+                "path": path,
+                "exists": true,
+                "file_bytes": metadata.len(),
+                "error": format!("invalid JSON: {error}")
+            });
+        }
     };
     let version = document.get("version").and_then(Value::as_u64);
-    let raw_power_samples = document.get("power").and_then(Value::as_array)
+    let raw_power_samples = document
+        .get("power")
+        .and_then(Value::as_array)
         .map_or(0, Vec::len);
     let raw_devices = document.get("devices").and_then(Value::as_object);
     let raw_device_samples: serde_json::Map<String, Value> = raw_devices
         .into_iter()
         .flat_map(|devices| devices.iter())
-        .map(|(ain, samples)| (
-            ain.clone(),
-            json!(samples.as_array().map_or(0, Vec::len))
-        ))
+        .map(|(ain, samples)| (ain.clone(), json!(samples.as_array().map_or(0, Vec::len))))
         .collect();
     let (power, devices) = load_from_path(&path, window);
     json!({
