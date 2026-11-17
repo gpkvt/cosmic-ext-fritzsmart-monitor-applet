@@ -2221,7 +2221,7 @@ impl cosmic::Application for AppModel {
                     .applet
                     .text(value)
                     .size(panel_text_size * 1.1)
-                    .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
+                    .line_height(cosmic::iced::widget::text::LineHeight::Relative(1.0))
                     .into()
             } else {
                 let width = text_width(&value);
