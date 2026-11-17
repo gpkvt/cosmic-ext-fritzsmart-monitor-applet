@@ -2201,19 +2201,17 @@ impl cosmic::Application for AppModel {
         // the top of its slot. This keeps the pair visually compact.
         // All panel readings use this renderer so typography, line height,
         // horizontal alignment and multiline positioning stay consistent.
-        let panel_text = |value: String, width: f32| {
+        let panel_text = |value: String| {
             self.core
                 .applet
                 .text(value)
                 .size(panel_text_size)
-                .width(cosmic::iced::Length::Fixed(width))
-                .align_x(cosmic::iced::Alignment::End)
                 .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
         };
         let panel_value = |value: String| -> cosmic::Element<'static, Message> {
-            // Give each value a content-sized alignment column. In multiline
-            // mode both lines share the width of the longer line, so their
-            // right edges line up instead of falling back to left alignment.
+            // Keep text at its natural width and position it inside a shared
+            // fixed-width column. Container alignment is reliable even when
+            // the text widget itself is shrink-wrapped.
             let text_width = |text: &str| {
                 (text.chars().count() as f32 * panel_text_size * 0.62).max(panel_text_size)
             };
@@ -2224,21 +2222,22 @@ impl cosmic::Application for AppModel {
                     .spacing(0)
                     .width(cosmic::iced::Length::Fixed(width))
                     .push(
-                        widget::container(panel_text(upper.to_string(), width))
+                        widget::container(panel_text(upper.to_string()))
                             .width(cosmic::iced::Length::Fixed(width))
                             .height(cosmic::iced::Length::Fixed(line_height))
+                            .align_right(width as u16)
                             .align_bottom(line_height as u16),
                     )
                     .push(
-                        widget::container(panel_text(lower.to_string(), width))
+                        widget::container(panel_text(lower.to_string()))
                             .width(cosmic::iced::Length::Fixed(width))
                             .height(cosmic::iced::Length::Fixed(line_height))
+                            .align_right(width as u16)
                             .align_top(line_height as u16),
                     )
                     .into()
             } else {
-                let width = text_width(&value);
-                panel_text(value, width).into()
+                panel_text(value).into()
             }
         };
 
