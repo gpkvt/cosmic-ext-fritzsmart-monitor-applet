@@ -357,9 +357,10 @@ fn parse_settings_section(value: &str) -> String {
 }
 
 fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
-    const SECTION_IDS: [&str; 12] = [
+    const SECTION_IDS: [&str; 14] = [
         "summary", "weather", "internet-bandwidth", "total-power-output", "total-power-input", "current-power-history",
         "graph-current-power", "graph-current-temperature", "graph-total-power-output", "graph-total-output-temperature", "graph-total-power-input", "graph-total-input-temperature",
+        "graph-bandwidth-download", "graph-bandwidth-upload",
     ];
     value
         .split(',')

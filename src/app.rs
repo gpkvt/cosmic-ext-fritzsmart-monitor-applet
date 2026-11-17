@@ -4210,31 +4210,33 @@ impl cosmic::Application for AppModel {
                                 ))),
                         )
                         .push(widget::divider::horizontal::default())
-                        .push(widget::text::caption(crate::i18n::tr(
-                            &self.settings.language,
+                        .push(collapsible_graph(
                             "DOWNLOAD HISTORY",
-                        )))
-                        .push(interactive_graph(
-                            &self.settings.language,
-                            crate::i18n::tr(&self.settings.language, "DOWNLOAD HISTORY"),
-                            self.bandwidth_history
-                                .iter()
-                                .map(|(_, download, _)| *download as f64 / 1_000_000.0),
-                            &self.settings.graph_style,
-                            "Mb/s",
+                            "graph-bandwidth-download",
+                            self.collapsed_menu_sections.contains("graph-bandwidth-download"),
+                            interactive_graph(
+                                &self.settings.language,
+                                crate::i18n::tr(&self.settings.language, "DOWNLOAD HISTORY"),
+                                self.bandwidth_history
+                                    .iter()
+                                    .map(|(_, download, _)| *download as f64 / 1_000_000.0),
+                                &self.settings.graph_style,
+                                "Mb/s",
+                            ),
                         ))
-                        .push(widget::text::caption(crate::i18n::tr(
-                            &self.settings.language,
+                        .push(collapsible_graph(
                             "UPLOAD HISTORY",
-                        )))
-                        .push(interactive_graph(
-                            &self.settings.language,
-                            crate::i18n::tr(&self.settings.language, "UPLOAD HISTORY"),
-                            self.bandwidth_history
-                                .iter()
-                                .map(|(_, _, upload)| *upload as f64 / 1_000_000.0),
-                            &self.settings.graph_style,
-                            "Mb/s",
+                            "graph-bandwidth-upload",
+                            self.collapsed_menu_sections.contains("graph-bandwidth-upload"),
+                            interactive_graph(
+                                &self.settings.language,
+                                crate::i18n::tr(&self.settings.language, "UPLOAD HISTORY"),
+                                self.bandwidth_history
+                                    .iter()
+                                    .map(|(_, _, upload)| *upload as f64 / 1_000_000.0),
+                                &self.settings.graph_style,
+                                "Mb/s",
+                            ),
                         ))
                 } else {
                     widget::Column::new()
