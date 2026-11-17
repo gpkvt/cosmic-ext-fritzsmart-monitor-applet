@@ -2441,59 +2441,32 @@ impl cosmic::Application for AppModel {
                         )
                     })
                     .unwrap_or_else(|| ("-- Mb/s".to_string(), "-- Mb/s".to_string()));
-                // Keep the Mb/s values right-aligned in a compact column,
-                // with a modest gap after each direction icon.
-                let bandwidth_row = |icon: &'static str, value: String| {
-                    widget::Row::new()
-                        .width(cosmic::iced::Length::Shrink)
-                        .height(cosmic::iced::Length::Fixed(24.0))
-                        .spacing(5)
-                        .align_y(cosmic::iced::Alignment::End)
-                        .push(
-                            // Match the shared 16px icon column used by all
-                            // other panel readings.
-                            widget::container(widget::icon::from_name(icon).size(10))
-                                .width(cosmic::iced::Length::Fixed(16.0))
-                                .center_x(16)
-                                .align_bottom(24),
-                        )
-                        .push(
-                            // The fill-width value area makes right alignment
-                            // effective instead of aligning a shrink-wrapped label.
-                            widget::container(panel_value(keep_value_unit_together(value)))
-                                .width(cosmic::iced::Length::Shrink)
-                                .align_bottom(24),
-                        )
+                // Render download and upload through the same panel-item
+                // layout used by every other reading.
+                let bandwidth_row = |label: &'static str, icon: &'static str, value: String| {
+                    panel_item(
+                        label,
+                        Some(widget::icon::from_name(icon).size(10).into()),
+                        panel_value(keep_value_unit_together(value)),
+                        false,
+                    )
                 };
                 let bandwidth_rows: cosmic::Element<'static, Message> =
                     if self.settings.panel_multiline {
                         widget::Column::new()
                             .spacing(0)
-                            .push(bandwidth_row("go-down-symbolic", download))
-                            .push(bandwidth_row("go-up-symbolic", upload))
+                            .push(bandwidth_row("Download", "go-down-symbolic", download))
+                            .push(bandwidth_row("Upload", "go-up-symbolic", upload))
                             .into()
                     } else {
                         widget::Row::new()
                             .spacing(4)
                             .align_y(cosmic::iced::Alignment::Center)
-                            .push(bandwidth_row("go-down-symbolic", download))
-                            .push(bandwidth_row("go-up-symbolic", upload))
+                            .push(bandwidth_row("Download", "go-down-symbolic", download))
+                            .push(bandwidth_row("Upload", "go-up-symbolic", upload))
                             .into()
                     };
-                let bandwidth_item = widget::container(bandwidth_rows);
-                panel_items.push((
-                    "internet-bandwidth",
-                    self.core
-                        .applet
-                        .applet_tooltip(
-                            bandwidth_item,
-                            "Internet bandwidth",
-                            false,
-                            Message::TooltipSurfaceAction,
-                            self.core.main_window_id(),
-                        )
-                        .into(),
-                ));
+                panel_items.push(("internet-bandwidth", bandwidth_rows));
             }
             if let Some(temperature) = temperature.filter(|_| {
                 !self
