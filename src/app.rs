@@ -4303,7 +4303,7 @@ impl cosmic::Application for AppModel {
                             )
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                             .push(
-                                widget::Column::new()
+                                widget::Row::new()
                                     .spacing(8)
                                     .push(widget::text::body(crate::i18n::tr(
                                         &self.settings.language,
