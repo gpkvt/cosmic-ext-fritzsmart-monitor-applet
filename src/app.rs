@@ -1274,10 +1274,11 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
 
 fn collapsible_graph(
     title: &'static str,
-    section_id: &'static str,
+    section_id: impl Into<String>,
     collapsed: bool,
     graph: cosmic::Element<'static, Message>,
 ) -> cosmic::Element<'static, Message> {
+    let section_id = section_id.into();
     let heading = widget::button::custom(
         widget::Row::new()
             .spacing(8)
@@ -4429,14 +4430,15 @@ impl cosmic::Application for AppModel {
                             "utilities-temperature-symbolic",
                             device_corner_radius,
                         ));
-                    let device_content = widget::Column::new()
-                        .spacing(10)
-                        .width(cosmic::iced::Length::Fill)
-                        // Keep the metric tiles inset, but let graph panels use
-                        // the full menu content width.
-                        .push(widget::container(metrics).padding([0, 12]))
-                        .push(
-                            widget::Column::new()
+                    let device_graph_pair_id = format!("device-graph-pair-{device_key}");
+                    let device_graph_pair_collapsed = self
+                        .collapsed_menu_sections
+                        .contains(&device_graph_pair_id);
+                    let device_graphs = collapsible_graph(
+                        "POWER & TEMPERATURE HISTORY",
+                        device_graph_pair_id,
+                        device_graph_pair_collapsed,
+                        widget::Column::new()
                                 .spacing(8)
                                 .width(cosmic::iced::Length::Fill)
                                 .push(
@@ -4648,8 +4650,16 @@ impl cosmic::Application for AppModel {
                                             ..Default::default()
                                         }
                                     }),
-                                ),
-                        );
+                                )
+                                .into(),
+                    );
+                    let device_content = widget::Column::new()
+                        .spacing(10)
+                        .width(cosmic::iced::Length::Fill)
+                        // Keep the metric tiles inset, but let graph panels use
+                        // the full menu content width.
+                        .push(widget::container(metrics).padding([0, 12]))
+                        .push(device_graphs);
                     // Use COSMIC's list-column disclosure pattern so the
                     // header, separator, and expanded content share native list spacing.
                     let mut card_column = widget::list::list_column()
