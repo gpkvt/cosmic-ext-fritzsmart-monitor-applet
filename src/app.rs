@@ -2192,48 +2192,42 @@ impl cosmic::Application for AppModel {
         // two-line layouts; multiline mode changes arrangement, not typography.
         let panel_text_size = f32::from(self.settings.panel_text_size);
 
-        // Split readings into two independently aligned line slots: the upper
-        // line sits on the bottom of its slot, and the lower line starts at
-        // the top of its slot. This keeps the pair visually compact.
-        // All panel readings use this renderer so typography, line height,
-        // horizontal alignment and multiline positioning stay consistent.
-        let panel_text = |value: String| {
-            self.core
+        // Render every panel value through the same fixed-width, right-aligned
+        // text slot. For multiline values, size the slot from the longest line
+        // so the number and unit share the same right edge as single-line values.
+        let panel_value = |value: String| -> cosmic::Element<'static, Message> {
+            let multiline = value.contains('\n');
+            let font_size = if multiline {
+                panel_text_size * 1.1
+            } else {
+                panel_text_size
+            };
+            let width = value
+                .lines()
+                .map(|line| line.chars().count())
+                .max()
+                .unwrap_or_default() as f32
+                * font_size
+                * 0.62;
+            let width = width.max(font_size);
+
+            let text = self
+                .core
                 .applet
                 .text(value)
-                .size(panel_text_size)
-                .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.65))
-        };
-        let panel_value = |value: String| -> cosmic::Element<'static, Message> {
-            // Keep text at its natural width and position it inside a shared
-            // fixed-width column. Container alignment is reliable even when
-            // the text widget itself is shrink-wrapped.
-            let text_width = |text: &str| {
-                (text.chars().count() as f32 * panel_text_size * 0.62).max(panel_text_size)
-            };
-            if value.contains('\n') {
-                // A single text widget avoids the extra line-box spacing
-                // introduced when each line is rendered as a separate widget.
-                // Keep the same configured font size and tighten only the
-                // multiline line height so the unit sits directly below
-                // the number.
-                self.core
-                    .applet
-                    .text(value)
-                    .size(panel_text_size * 1.1)
-                    .line_height(cosmic::iced::widget::text::LineHeight::Relative(1.0))
-                    .into()
-            } else {
-                let width = text_width(&value);
-                widget::container(
-                    panel_text(value)
-                        .width(cosmic::iced::Length::Fill)
-                        .align_x(cosmic::iced::Alignment::End),
-                )
+                .size(font_size)
+                .line_height(if multiline {
+                    cosmic::iced::widget::text::LineHeight::Relative(1.0)
+                } else {
+                    cosmic::iced::widget::text::LineHeight::Relative(0.65)
+                })
+                .width(cosmic::iced::Length::Fill)
+                .align_x(cosmic::iced::Alignment::End);
+
+            widget::container(text)
                 .width(cosmic::iced::Length::Fixed(width))
                 .align_x(cosmic::iced::Alignment::End)
                 .into()
-            }
         };
 
         // Keep every reading at its intrinsic width. Expanding each child to
