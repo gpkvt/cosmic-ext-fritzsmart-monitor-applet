@@ -2199,6 +2199,16 @@ impl cosmic::Application for AppModel {
         // Split readings into two independently aligned line slots: the upper
         // line sits on the bottom of its slot, and the lower line starts at
         // the top of its slot. This keeps the pair visually compact.
+        // All panel readings use this renderer so typography, line height,
+        // horizontal alignment and multiline positioning stay consistent.
+        let panel_text = |value: String| {
+            self.core
+                .applet
+                .text(value)
+                .size(panel_text_size)
+                .align_x(cosmic::iced::Alignment::End)
+                .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
+        };
         let panel_value = |value: String| -> cosmic::Element<'static, Message> {
             if let Some((upper, lower)) = value.split_once('\n') {
                 let line_height = 14.0;
@@ -2206,31 +2216,20 @@ impl cosmic::Application for AppModel {
                     .spacing(0)
                     .width(cosmic::iced::Length::Shrink)
                     .push(
-                        widget::container(
-                            self.core.applet.text(upper.to_string())
-                                .size(panel_text_size)
-                                .align_x(cosmic::iced::Alignment::End),
-                        )
-                        .width(cosmic::iced::Length::Shrink)
-                        .height(cosmic::iced::Length::Fixed(line_height))
-                        .align_bottom(line_height as u16),
+                        widget::container(panel_text(upper.to_string()))
+                            .width(cosmic::iced::Length::Shrink)
+                            .height(cosmic::iced::Length::Fixed(line_height))
+                            .align_bottom(line_height as u16),
                     )
                     .push(
-                        widget::container(
-                            self.core.applet.text(lower.to_string())
-                                .size(panel_text_size)
-                                .align_x(cosmic::iced::Alignment::End),
-                        )
-                        .width(cosmic::iced::Length::Shrink)
-                        .height(cosmic::iced::Length::Fixed(line_height))
-                        .align_top(line_height as u16),
+                        widget::container(panel_text(lower.to_string()))
+                            .width(cosmic::iced::Length::Shrink)
+                            .height(cosmic::iced::Length::Fixed(line_height))
+                            .align_top(line_height as u16),
                     )
                     .into()
             } else {
-                self.core.applet.text(value)
-                    .size(panel_text_size)
-                    .align_x(cosmic::iced::Alignment::End)
-                    .into()
+                panel_text(value).into()
             }
         };
 
@@ -2441,16 +2440,9 @@ impl cosmic::Application for AppModel {
                         .push(
                             // The fill-width value area makes right alignment
                             // effective instead of aligning a shrink-wrapped label.
-                            widget::container(
-                                widget::text::body(keep_value_unit_together(value))
-                                    .size(panel_text_size)
-                                    .align_x(cosmic::iced::Alignment::End)
-                                    .line_height(cosmic::iced::widget::text::LineHeight::Relative(
-                                        0.85,
-                                    )),
-                            )
-                            .width(cosmic::iced::Length::Shrink)
-                            .align_bottom(24),
+                            widget::container(panel_value(keep_value_unit_together(value)))
+                                .width(cosmic::iced::Length::Shrink)
+                                .align_bottom(24),
                         )
                 };
                 let bandwidth_rows: cosmic::Element<'static, Message> =
@@ -2589,11 +2581,7 @@ impl cosmic::Application for AppModel {
                         .size(self.settings.panel_text_size.into())
                         .into(),
                 ),
-                self.core
-                    .applet
-                    .text("Connection error")
-                    .size(f32::from(self.settings.panel_text_size))
-                    .into(),
+                panel_value("Connection error".to_string()),
                 false,
             ));
         }
@@ -2605,11 +2593,7 @@ impl cosmic::Application for AppModel {
                         .size(self.settings.panel_text_size.into())
                         .into(),
                 ),
-                self.core
-                    .applet
-                    .text("Weather unavailable")
-                    .size(f32::from(self.settings.panel_text_size))
-                    .into(),
+                panel_value("Weather unavailable".to_string()),
                 false,
             ));
         }
