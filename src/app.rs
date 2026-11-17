@@ -4227,7 +4227,11 @@ impl cosmic::Application for AppModel {
                             scheme,
                             request.status,
                             request.path,
-                            if (200..300).contains(&request.status) { "OK" } else { "FAILED" },
+                            if (200..300).contains(&request.status) {
+                                "OK"
+                            } else {
+                                "FAILED"
+                            },
                         );
                         content = content.push(
                             widget::selectable_text::selectable_text(line)
