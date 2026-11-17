@@ -357,13 +357,9 @@ fn parse_settings_section(value: &str) -> String {
 }
 
 fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
-    const SECTION_IDS: [&str; 6] = [
-        "summary",
-        "weather",
-        "internet-bandwidth",
-        "total-power-output",
-        "total-power-input",
-        "current-power-history",
+    const SECTION_IDS: [&str; 12] = [
+        "summary", "weather", "internet-bandwidth", "total-power-output", "total-power-input", "current-power-history",
+        "graph-current-power", "graph-current-temperature", "graph-total-power-output", "graph-total-output-temperature", "graph-total-power-input", "graph-total-input-temperature",
     ];
     value
         .split(',')
@@ -1356,7 +1352,7 @@ mod tests {
     #[test]
     fn parses_persisted_collapsed_menu_sections_safely() {
         assert_eq!(
-            parse_collapsed_menu_sections("weather,unknown,summary,weather,internet-bandwidth,total-power-output,total-power-input,current-power-history"),
+            parse_collapsed_menu_sections("weather,unknown,summary,weather,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature"),
             vec![
                 "weather".to_string(),
                 "summary".to_string(),
@@ -1364,6 +1360,12 @@ mod tests {
                 "total-power-output".to_string(),
                 "total-power-input".to_string(),
                 "current-power-history".to_string(),
+                "graph-current-power".to_string(),
+                "graph-current-temperature".to_string(),
+                "graph-total-power-output".to_string(),
+                "graph-total-output-temperature".to_string(),
+                "graph-total-power-input".to_string(),
+                "graph-total-input-temperature".to_string(),
             ]
         );
         assert!(parse_collapsed_menu_sections("").is_empty());
