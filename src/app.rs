@@ -4854,11 +4854,11 @@ impl cosmic::Application for AppModel {
             Message::TestNotification => {
                 let _ = notify_rust::Notification::new()
                     .summary(&crate::i18n::tr(
-                        self.settings.language,
+                        &self.settings.language,
                         "Fritz Power Monitor notification test",
                     ))
                     .body(&crate::i18n::tr(
-                        self.settings.language,
+                        &self.settings.language,
                         "Notifications are working correctly.",
                     ))
                     .show();
