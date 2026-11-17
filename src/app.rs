@@ -77,6 +77,7 @@ pub struct AppModel {
     update_installing: bool,
     update_status: Option<String>,
     diagnostic_events: VecDeque<String>,
+    graph_history_diagnostics_expanded: bool,
     history_storage_diagnostics: serde_json::Value,
     flow_animation_frame: u8,
 }
@@ -97,6 +98,7 @@ pub enum Message {
     SetupBack,
     SetupFinish,
     ToggleSettingsSection(&'static str),
+    ToggleGraphHistoryDiagnostics,
     LanguageChanged(String),
     BackToSettingsCategories,
     UrlChanged(String),
@@ -4031,92 +4033,113 @@ impl cosmic::Application for AppModel {
                         }
                     )));
 
-                let now = Instant::now();
-                let device_history_json: Vec<serde_json::Value> = self
-                    .readings
-                    .iter()
-                    .map(|reading| {
-                        let ain = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                        let samples = self.device_history.get(&ain);
-                        let (
-                            sample_count,
-                            first_age_seconds,
-                            last_age_seconds,
-                            min_power_w,
-                            max_power_w,
-                        ) = if let Some(samples) = samples {
-                            let first_age = samples.front().map(|(timestamp, _, _)| {
-                                now.saturating_duration_since(*timestamp).as_secs()
-                            });
-                            let last_age = samples.back().map(|(timestamp, _, _)| {
-                                now.saturating_duration_since(*timestamp).as_secs()
-                            });
-                            let min = samples.iter().map(|(_, power, _)| *power).min();
-                            let max = samples.iter().map(|(_, power, _)| *power).max();
-                            (samples.len(), first_age, last_age, min, max)
-                        } else {
-                            (0, None, None, None, None)
-                        };
-                        serde_json::json!({
-                            "name": reading.name,
-                            "ain": reading.ain,
-                            "normalized_ain": ain,
-                            "current_reading_available": true,
-                            "current_power_w": reading.power_w,
-                            "current_temperature_c": reading.temperature_c,
-                            "history_entry_found": samples.is_some(),
-                            "sample_count": sample_count,
-                            "first_sample_age_seconds": first_age_seconds,
-                            "last_sample_age_seconds": last_age_seconds,
-                            "min_power_w": min_power_w,
-                            "max_power_w": max_power_w,
-                            "graph_power_values_retrievable": sample_count > 0
+                content = content.push(widget::divider::horizontal::default()).push(
+                    widget::text::title3(crate::i18n::tr(
+                        &self.settings.language,
+                        "Graph history retrieval",
+                    )),
+                );
+                content = content.push(action_button(
+                    if self.graph_history_diagnostics_expanded {
+                        "pan-up-symbolic"
+                    } else {
+                        "view-list-symbolic"
+                    },
+                    if self.graph_history_diagnostics_expanded {
+                        "Hide JSON"
+                    } else {
+                        "Load JSON"
+                    },
+                    Message::ToggleGraphHistoryDiagnostics,
+                ));
+                if self.graph_history_diagnostics_expanded {
+                    let now = Instant::now();
+                    let device_history_json: Vec<serde_json::Value> = self
+                        .readings
+                        .iter()
+                        .map(|reading| {
+                            let ain = crate::fritz::normalize_ain_for_selection(&reading.ain);
+                            let samples = self.device_history.get(&ain);
+                            let (
+                                sample_count,
+                                first_age_seconds,
+                                last_age_seconds,
+                                min_power_w,
+                                max_power_w,
+                            ) = if let Some(samples) = samples {
+                                let first_age = samples.front().map(|(timestamp, _, _)| {
+                                    now.saturating_duration_since(*timestamp).as_secs()
+                                });
+                                let last_age = samples.back().map(|(timestamp, _, _)| {
+                                    now.saturating_duration_since(*timestamp).as_secs()
+                                });
+                                let min = samples.iter().map(|(_, power, _)| *power).min();
+                                let max = samples.iter().map(|(_, power, _)| *power).max();
+                                (samples.len(), first_age, last_age, min, max)
+                            } else {
+                                (0, None, None, None, None)
+                            };
+                            serde_json::json!({
+                                "name": reading.name,
+                                "ain": reading.ain,
+                                "normalized_ain": ain,
+                                "current_reading_available": true,
+                                "current_power_w": reading.power_w,
+                                "current_temperature_c": reading.temperature_c,
+                                "history_entry_found": samples.is_some(),
+                                "sample_count": sample_count,
+                                "first_sample_age_seconds": first_age_seconds,
+                                "last_sample_age_seconds": last_age_seconds,
+                                "min_power_w": min_power_w,
+                                "max_power_w": max_power_w,
+                                "graph_power_values_retrievable": sample_count > 0
+                            })
                         })
-                    })
-                    .collect();
-                let stored_device_histories: Vec<serde_json::Value> = self.device_history.iter().map(|(ain, samples)| {
-                    let current_reading = self.readings.iter().find(|reading|
-                        crate::fritz::normalize_ain_for_selection(&reading.ain) == *ain
-                    );
-                    serde_json::json!({
-                        "normalized_ain": ain,
-                        "live_device_found": current_reading.is_some(),
-                        "live_device_name": current_reading.map(|reading| reading.name.as_str()),
-                        "sample_count": samples.len(),
-                        "first_sample_age_seconds": samples.front().map(|(timestamp, _, _)| now.saturating_duration_since(*timestamp).as_secs()),
-                        "last_sample_age_seconds": samples.back().map(|(timestamp, _, _)| now.saturating_duration_since(*timestamp).as_secs()),
-                        "graph_power_values_retrievable": !samples.is_empty(),
-                        "graph_power_values_count": samples.iter().map(|(_, power, _)| *power as f64).count(),
-                        "power_min_w": samples.iter().map(|(_, power, _)| *power).min(),
-                        "power_max_w": samples.iter().map(|(_, power, _)| *power).max()
-                    })
-                }).collect();
-                let graph_diagnostics = serde_json::json!({
-                    "history_storage": self.history_storage_diagnostics,
-                    "runtime": {
-                        "configured_timespan_minutes": self.settings.graph_timespan_minutes,
-                        "current_readings": self.readings.len(),
-                        "device_history_entries": self.device_history.len(),
-                        "live_device_histories": device_history_json,
-                        "stored_device_histories": stored_device_histories,
-                        "overall_power_history_samples": self.history.len(),
-                        "overall_power_graph_values_retrievable": !self.history.is_empty()
-                    }
-                });
-                let graph_diagnostics_text = serde_json::to_string_pretty(&graph_diagnostics)
-                    .unwrap_or_else(|error| format!("{{\"serialization_error\":\"{error}\"}}"));
-                content = content
-                    .push(widget::divider::horizontal::default())
-                    .push(widget::text::title3(crate::i18n::tr(
-                        &self.settings.language,
-                        "Graph history retrieval (JSON)",
-                    )))
-                    .push(widget::text::caption(crate::i18n::tr(
-                        &self.settings.language,
-                        "Shows whether history was read from disk, matched to each live device and converted into graph values.",
-                    )))
-                    .push(widget::selectable_text::selectable_text(graph_diagnostics_text)
-                        .width(cosmic::iced::Length::Fill));
+                        .collect();
+                    let stored_device_histories: Vec<serde_json::Value> = self.device_history.iter().map(|(ain, samples)| {
+                        let current_reading = self.readings.iter().find(|reading|
+                            crate::fritz::normalize_ain_for_selection(&reading.ain) == *ain
+                        );
+                        serde_json::json!({
+                            "normalized_ain": ain,
+                            "live_device_found": current_reading.is_some(),
+                            "live_device_name": current_reading.map(|reading| reading.name.as_str()),
+                            "sample_count": samples.len(),
+                            "first_sample_age_seconds": samples.front().map(|(timestamp, _, _)| now.saturating_duration_since(*timestamp).as_secs()),
+                            "last_sample_age_seconds": samples.back().map(|(timestamp, _, _)| now.saturating_duration_since(*timestamp).as_secs()),
+                            "graph_power_values_retrievable": !samples.is_empty(),
+                            "graph_power_values_count": samples.iter().map(|(_, power, _)| *power as f64).count(),
+                            "power_min_w": samples.iter().map(|(_, power, _)| *power).min(),
+                            "power_max_w": samples.iter().map(|(_, power, _)| *power).max()
+                        })
+                    }).collect();
+                    let graph_diagnostics = serde_json::json!({
+                        "history_storage": self.history_storage_diagnostics,
+                        "runtime": {
+                            "configured_timespan_minutes": self.settings.graph_timespan_minutes,
+                            "current_readings": self.readings.len(),
+                            "device_history_entries": self.device_history.len(),
+                            "live_device_histories": device_history_json,
+                            "stored_device_histories": stored_device_histories,
+                            "overall_power_history_samples": self.history.len(),
+                            "overall_power_graph_values_retrievable": !self.history.is_empty()
+                        }
+                    });
+                    let graph_diagnostics_text = serde_json::to_string_pretty(&graph_diagnostics)
+                        .unwrap_or_else(|error| format!("{{\"serialization_error\":\"{error}\"}}"));
+                    content = content
+                        .push(widget::divider::horizontal::default())
+                        .push(widget::text::title3(crate::i18n::tr(
+                            &self.settings.language,
+                            "Graph history retrieval (JSON)",
+                        )))
+                        .push(widget::text::caption(crate::i18n::tr(
+                            &self.settings.language,
+                            "Shows whether history was read from disk, matched to each live device and converted into graph values.",
+                        )))
+                        .push(widget::selectable_text::selectable_text(graph_diagnostics_text)
+                            .width(cosmic::iced::Length::Fill));
+                }
 
                 let refresh_indicator = if self.refresh_started_at.is_some() {
                     icon_action_button(
@@ -6646,6 +6669,10 @@ impl cosmic::Application for AppModel {
                 self.persist_settings();
             }
             Message::ToggleSettingsSection(section) => {
+            Message::ToggleGraphHistoryDiagnostics => {
+                self.graph_history_diagnostics_expanded = !self.graph_history_diagnostics_expanded;
+            }
+
                 self.active_settings_section = Some(section);
                 self.persist_layout_state();
                 if section == "diagnostics" {
