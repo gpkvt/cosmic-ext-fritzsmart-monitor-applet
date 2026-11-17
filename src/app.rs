@@ -955,11 +955,11 @@ fn total_power_section(
         .push(widget::text::body(title))
         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
     if collapsed {
-        heading = heading.push(widget::text::title3(keep_value_unit_together(format!(
+        heading = heading.push(widget::text::body(keep_value_unit_together(format!(
             "{value_w} W"
         ))));
         if let Some(temperature) = temperature {
-            heading = heading.push(widget::text::title3(keep_value_unit_together(temperature)));
+            heading = heading.push(widget::text::body(keep_value_unit_together(temperature)));
         }
     }
     let heading = widget::button::custom(
@@ -4124,10 +4124,10 @@ impl cosmic::Application for AppModel {
                         let heading_row = if section.0 == "internet-bandwidth" {
                             heading_row.push(widget::text::caption(power))
                         } else {
-                            heading_row.push(widget::text::title3(power))
+                            heading_row.push(widget::text::body(power))
                         };
                         if let Some(temperature) = temperature {
-                            heading_row.push(widget::text::title3(temperature))
+                            heading_row.push(widget::text::body(temperature))
                         } else {
                             heading_row
                         }
