@@ -4678,6 +4678,9 @@ impl cosmic::Application for AppModel {
                             &readings,
                         );
                         if readings.is_empty() {
+                            // An empty successful fetch means every selected device
+                            // is missing. Do not leave old values visible as live data.
+                            self.readings.clear();
                             self.error =
                                 Some("No selected devices returned usable readings".into());
                         } else {
