@@ -4390,11 +4390,7 @@ impl cosmic::Application for AppModel {
                 .width(cosmic::iced::Length::Fill)
                 .align_y(cosmic::iced::Alignment::Center)
                 .push(
-                    widget::text::caption(format!(
-                        "FRITZ!Power Monitor · v{}",
-                        env!("APP_VERSION")
-                    ))
-                    .width(cosmic::iced::Length::Fill),
+                    widget::Space::new().width(cosmic::iced::Length::Fill),
                 )
                 .push(
                     widget::button::custom(widget::text::caption("Source code ↗"))
@@ -4473,11 +4469,17 @@ impl cosmic::Application for AppModel {
                         .center_y(36),
                     )
                     .push(
-                        widget::text::body(crate::i18n::tr(
-                            &self.settings.language,
-                            "FRITZ!Power Monitor",
-                        ))
-                        .width(cosmic::iced::Length::Fill),
+                        widget::Column::new()
+                            .spacing(1)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::body(crate::i18n::tr(
+                                &self.settings.language,
+                                "FRITZ!Power Monitor",
+                            )))
+                            .push(widget::text::caption(format!(
+                                "v{}",
+                                env!("APP_VERSION")
+                            ))),
                     )
                     .push(if self.refresh_started_at.is_some() {
                         icon_action_button(
