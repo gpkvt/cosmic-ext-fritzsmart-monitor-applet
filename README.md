@@ -22,7 +22,7 @@ FRITZ!Power Monitor connects directly to your router. It brings household power 
 - Optional OpenWeatherMap conditions, forecast and weather-matched Wikimedia Commons imagery.
 - Configurable refresh intervals, graph retention, panel display and popup layout.
 - Temperature alerts and supported smart-home device switching.
-- Interface translations for English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian. Untranslated strings fall back to English.
+- Interface translations for English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean. All 121 interface strings are covered; technical names and URLs remain unchanged where appropriate.
 
 ## Screenshots
 
