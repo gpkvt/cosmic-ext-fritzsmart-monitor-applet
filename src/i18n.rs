@@ -1477,6 +1477,52 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("no", "FRITZ!Box device unavailable") => "FRITZ!Box-enhet er utilgjengelig",
             ("no", "FRITZ!Box devices unavailable") => "FRITZ!Box-enheter er utilgjengelige",
 
+
+            // es weather setting descriptions
+            ("es", "e.g. Amsterdam or 52.37,4.90") => "p. ej., Ámsterdam o 52.37,4.90",
+            ("es", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Independiente de la actualización de FRITZ!Box; 10 minutos por defecto. Requiere una clave API y una ubicación.",
+            ("es", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Cada foto se muestra entre 5 segundos y 5 minutos antes de la transición de fundido.",
+
+            // nl weather setting descriptions
+            ("nl", "e.g. Amsterdam or 52.37,4.90") => "bijv. Amsterdam of 52.37,4.90",
+            ("nl", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Onafhankelijk van FRITZ!Box-vernieuwing; standaard 10 minuten. Een API-sleutel en locatie zijn vereist.",
+            ("nl", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Elke foto wordt 5 seconden tot 5 minuten getoond voordat de overgang begint.",
+
+            // fr weather setting descriptions
+            ("fr", "e.g. Amsterdam or 52.37,4.90") => "p. ex. Amsterdam ou 52.37,4.90",
+            ("fr", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Indépendant de l’actualisation FRITZ!Box ; 10 minutes par défaut. Une clé API et un lieu sont requis.",
+            ("fr", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Chaque photo s’affiche de 5 secondes à 5 minutes avant la transition en fondu.",
+
+            // it weather setting descriptions
+            ("it", "e.g. Amsterdam or 52.37,4.90") => "ad es. Amsterdam o 52.37,4.90",
+            ("it", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Indipendente dall'aggiornamento FRITZ!Box; 10 minuti per impostazione predefinita. Richiede una chiave API e una posizione.",
+            ("it", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Ogni foto viene mostrata da 5 secondi a 5 minuti prima della transizione con dissolvenza.",
+
+            // sv weather setting descriptions
+            ("sv", "e.g. Amsterdam or 52.37,4.90") => "t.ex. Amsterdam eller 52.37,4.90",
+            ("sv", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Oberoende av FRITZ!Box-uppdateringen; standard är 10 minuter. Kräver en API-nyckel och en plats.",
+            ("sv", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Varje foto visas i 5 sekunder till 5 minuter före övertoningen.",
+
+            // pt weather setting descriptions
+            ("pt", "e.g. Amsterdam or 52.37,4.90") => "por ex., Amesterdão ou 52.37,4.90",
+            ("pt", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Independente da atualização da FRITZ!Box; 10 minutos por predefinição. Requer uma chave de API e uma localização.",
+            ("pt", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Cada fotografia é apresentada durante 5 segundos a 5 minutos antes da transição gradual.",
+
+            // pl weather setting descriptions
+            ("pl", "e.g. Amsterdam or 52.37,4.90") => "np. Amsterdam lub 52.37,4.90",
+            ("pl", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Niezależne od odświeżania FRITZ!Box; domyślnie 10 minut. Wymaga klucza API i lokalizacji.",
+            ("pl", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Każde zdjęcie jest wyświetlane od 5 sekund do 5 minut przed przejściem z przenikaniem.",
+
+            // da weather setting descriptions
+            ("da", "e.g. Amsterdam or 52.37,4.90") => "f.eks. Amsterdam eller 52.37,4.90",
+            ("da", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Uafhængig af FRITZ!Box-opdatering; standard er 10 minutter. Kræver en API-nøgle og en placering.",
+            ("da", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Hvert foto vises i 5 sekunder til 5 minutter før overtoningen.",
+
+            // no weather setting descriptions
+            ("no", "e.g. Amsterdam or 52.37,4.90") => "f.eks. Amsterdam eller 52.37,4.90",
+            ("no", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.") => "Uavhengig av FRITZ!Box-oppdateringen; standard er 10 minutter. Krever en API-nøkkel og en plassering.",
+            ("no", "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.") => "Hvert bilde vises i 5 sekunder til 5 minutter før overgangen med toning.",
+
             _ => key,
         };
     }
