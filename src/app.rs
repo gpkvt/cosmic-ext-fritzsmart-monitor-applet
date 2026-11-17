@@ -155,7 +155,7 @@ pub enum Message {
     WeatherEnabledChanged(bool),
     OpenWeatherMapApiKeyChanged(String),
     WeatherLocationChanged(String),
-    WeatherTemperatureDeviceChanged(String),
+    ToggleExternalTemperature(String, bool),
     WeatherRefreshIntervalChanged(u16),
     WeatherSlideshowDurationChanged(u16),
 }
@@ -2822,40 +2822,6 @@ impl cosmic::Application for AppModel {
                                 .push(widget::toggler(self.settings.weather_enabled).on_toggle(Message::WeatherEnabledChanged)))
                             .push(widget::text::body(crate::i18n::tr(&self.settings.language, "OpenWeatherMap API key")))
                             .push(widget::secure_input(crate::i18n::tr(&self.settings.language, "API key"), &self.settings.openweathermap_api_key, None, true).on_input(Message::OpenWeatherMapApiKeyChanged))
-                            .push(widget::text::body(crate::i18n::tr(
-                        &self.settings.language,
-                        "Outdoor temperature source",
-                    )))
-                    .push({
-                        let mut labels = vec![
-                            crate::i18n::tr(&self.settings.language, "OpenWeatherMap").to_string(),
-                        ];
-                        labels.extend(self.devices.iter().map(|device| device.name.clone()));
-                        let selected = self.settings.weather_temperature_ain.as_str();
-                        let selected_index = if selected.is_empty() {
-                            0
-                        } else {
-                            self.devices
-                                .iter()
-                                .position(|device| {
-                                    crate::fritz::normalize_ain_for_selection(&device.ain)
-                                        == crate::fritz::normalize_ain_for_selection(selected)
-                                })
-                                .map(|index| index + 1)
-                                .unwrap_or(0)
-                        };
-                        let ains: Vec<String> = std::iter::once(String::new())
-                            .chain(self.devices.iter().map(|device| device.ain.clone()))
-                            .collect();
-                        widget::dropdown::dropdown(labels, Some(selected_index), move |index| {
-                            Message::WeatherTemperatureDeviceChanged(ains[index].clone())
-                        })
-                        .width(cosmic::iced::Length::Fill)
-                    })
-                    .push(widget::text::caption(crate::i18n::tr(
-                        &self.settings.language,
-                        "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
-                    )))
                     .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Location (city or latitude,longitude)")))
                             .push(widget::text_input(crate::i18n::tr(&self.settings.language, "e.g. Amsterdam or 52.37,4.90"), &self.settings.weather_location).on_input(Message::WeatherLocationChanged))
                             .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Weather is independent of FRITZ!Box monitoring. You can skip this and configure it later.")));
@@ -3419,6 +3385,10 @@ impl cosmic::Application for AppModel {
                             )
                             .on_input(Message::DeviceSearchChanged),
                         );
+                    content = content.push(widget::text::caption(crate::i18n::tr(
+                        &self.settings.language,
+                        "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
+                    )));
                     let mut ordered_devices: Vec<&FritzDevice> = self.devices.iter().collect();
                     ordered_devices.sort_by_key(|device| {
                         self.settings
@@ -3473,6 +3443,10 @@ impl cosmic::Application for AppModel {
                             .get(&normalized_ain)
                             .copied();
                         let is_input = self.settings.input_ains.contains(&normalized_ain);
+                        let is_external_temperature = !self.settings.weather_temperature_ain.is_empty()
+                            && crate::fritz::normalize_ain_for_selection(
+                                &self.settings.weather_temperature_ain,
+                            ) == normalized_ain;
                         let mut device_row = widget::Column::new()
                             .spacing(6)
                             .push(row)
@@ -3488,6 +3462,21 @@ impl cosmic::Application for AppModel {
                                         let ain = ain.clone();
                                         move |enabled| {
                                             Message::ToggleDeviceInput(ain.clone(), enabled)
+                                        }
+                                    })),
+                            )
+                            .push(
+                                widget::Row::new()
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(widget::text::caption(crate::i18n::tr(
+                                        &self.settings.language,
+                                        "Outdoor temperature source",
+                                    )))
+                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                    .push(widget::toggler(is_external_temperature).on_toggle({
+                                        let ain = ain.clone();
+                                        move |enabled| {
+                                            Message::ToggleExternalTemperature(ain.clone(), enabled)
                                         }
                                     })),
                             )
@@ -6451,10 +6440,6 @@ impl cosmic::Application for AppModel {
                 self.next_weather_refresh_at = None;
                 self.persist_settings();
             }
-            Message::WeatherTemperatureDeviceChanged(ain) => {
-                self.settings.weather_temperature_ain = ain;
-                self.persist_settings();
-            }
             Message::WeatherRefreshIntervalChanged(value) => {
                 self.settings.weather_refresh_interval_minutes = value.clamp(5, 60);
                 self.next_weather_refresh_at = None;
@@ -6671,12 +6656,21 @@ impl cosmic::Application for AppModel {
                 match result {
                     Ok(devices) => {
                         self.devices = devices;
+                        let mut settings_changed = false;
                         if !self.settings.input_defaults_initialized {
                             self.settings
                                 .input_ains
                                 .extend(solar_input_ains(&self.devices));
                             self.settings.input_defaults_initialized = true;
-                            self.persist_settings();
+                            settings_changed = true;
+                        }
+                        if !self.settings.weather_temperature_source_initialized
+                            && let Some(ain) =
+                                crate::fritz::default_external_temperature_ain(&self.devices)
+                        {
+                            self.settings.weather_temperature_ain = ain;
+                            self.settings.weather_temperature_source_initialized = true;
+                            settings_changed = true;
                         }
                         self.selected_ains = if self.settings.ains.is_empty() {
                             if self.settings.ain.trim().is_empty() {
@@ -6693,6 +6687,30 @@ impl cosmic::Application for AppModel {
                                     == crate::fritz::normalize_ain_for_selection(&device.ain)
                             })
                         });
+                        if !self.settings.weather_temperature_ain.is_empty()
+                            && self.devices.iter().any(|device| {
+                                crate::fritz::normalize_ain_for_selection(&device.ain)
+                                    == crate::fritz::normalize_ain_for_selection(
+                                        &self.settings.weather_temperature_ain,
+                                    )
+                            })
+                            && !self.selected_ains.iter().any(|selected| {
+                                crate::fritz::normalize_ain_for_selection(selected)
+                                    == crate::fritz::normalize_ain_for_selection(
+                                        &self.settings.weather_temperature_ain,
+                                    )
+                            })
+                        {
+                            self.selected_ains
+                                .push(self.settings.weather_temperature_ain.clone());
+                            settings_changed = true;
+                        }
+                        if settings_changed {
+                            self.settings.ains = self.selected_ains.clone();
+                            self.settings.ain =
+                                self.selected_ains.first().cloned().unwrap_or_default();
+                            self.persist_settings();
+                        }
                         self.settings_status = Some(format!(
                             "Found {} compatible power-meter device(s)",
                             self.devices.len()
@@ -6721,9 +6739,35 @@ impl cosmic::Application for AppModel {
                 });
                 if selected {
                     self.selected_ains.push(ain);
+                } else if crate::fritz::normalize_ain_for_selection(
+                    &self.settings.weather_temperature_ain,
+                ) == normalized
+                {
+                    self.settings.weather_temperature_ain.clear();
+                    self.settings.weather_temperature_source_initialized = true;
                 }
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
+                self.persist_settings();
+            }
+            Message::ToggleExternalTemperature(ain, enabled) => {
+                let key = crate::fritz::normalize_ain_for_selection(&ain);
+                if enabled {
+                    self.settings.weather_temperature_ain = ain.clone();
+                    if !self.selected_ains.iter().any(|selected| {
+                        crate::fritz::normalize_ain_for_selection(selected) == key
+                    }) {
+                        self.selected_ains.push(ain);
+                    }
+                    self.settings.ains = self.selected_ains.clone();
+                    self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
+                } else if crate::fritz::normalize_ain_for_selection(
+                    &self.settings.weather_temperature_ain,
+                ) == key
+                {
+                    self.settings.weather_temperature_ain.clear();
+                }
+                self.settings.weather_temperature_source_initialized = true;
                 self.persist_settings();
             }
             Message::ToggleDeviceInput(ain, enabled) => {
