@@ -258,13 +258,17 @@ fn build_debug_report(app: &AppModel, fritzbox_dump: &str) -> String {
             .collect::<Vec<_>>()
             .join("\n")
     };
+    let cpu_temperature = cpu_temperature_c()
+        .map(|temperature| format!("{temperature:.1} °C"))
+        .unwrap_or_else(|| "Not available".into());
     let history_diagnostics = serde_json::to_string_pretty(&app.history_storage_diagnostics)
         .unwrap_or_else(|error| format!("Could not serialize history diagnostics: {error}"));
     format!(
-        "FRITZ!Power Monitor debug report\nGenerated: {}\nApplication version: {}\nOperating system: {}\n\n[Connection]\nFRITZ!Box URL: {}\nUsername configured: {}\nPassword configured: {}\nInvalid certificates allowed: {}\nCustom CA configured: {}\nLast FRITZ!Box error: {}\n\n[Weather]\nEnabled: {}\nLast weather error: {}\nForecast error: {}\n\n[Settings]\nRefresh interval: {} seconds\nGraph range: {} minutes\nGraph style: {}\nSelected devices: {}\nDiscovered devices: {}\n\n[Current readings]\n{}\n\n[FRITZ!Box endpoint JSON dump]\n{}\n\n[HTTP requests]\n{}\n\n[Diagnostic activity]\n{}\n\n[History storage diagnostics]\n{}\n",
+        "FRITZ!Power Monitor debug report\nGenerated: {}\nApplication version: {}\nOperating system: {}\nCPU temperature: {}\n\n[Connection]\nFRITZ!Box URL: {}\nUsername configured: {}\nPassword configured: {}\nInvalid certificates allowed: {}\nCustom CA configured: {}\nLast FRITZ!Box error: {}\n\n[Weather]\nEnabled: {}\nLast weather error: {}\nForecast error: {}\n\n[Settings]\nRefresh interval: {} seconds\nGraph range: {} minutes\nGraph style: {}\nSelected devices: {}\nDiscovered devices: {}\n\n[Current readings]\n{}\n\n[FRITZ!Box endpoint JSON dump]\n{}\n\n[HTTP requests]\n{}\n\n[Diagnostic activity]\n{}\n\n[History storage diagnostics]\n{}\n",
         chrono::Local::now().format("%Y-%m-%d %H:%M:%S %:z"),
         env!("APP_VERSION"),
         os_release,
+        cpu_temperature,
         connection_url,
         !settings.username.is_empty(),
         !settings.password.is_empty(),
@@ -285,6 +289,38 @@ fn build_debug_report(app: &AppModel, fritzbox_dump: &str) -> String {
         activity,
         history_diagnostics
     )
+}
+
+fn cpu_temperature_c() -> Option<f64> {
+    let hwmon = std::fs::read_dir("/sys/class/hwmon").ok()?;
+    for device in hwmon.flatten() {
+        let name = std::fs::read_to_string(device.path().join("name"))
+            .unwrap_or_default().trim().to_ascii_lowercase();
+        if !["coretemp", "k10temp", "zenpower", "cpu_thermal"].contains(&name.as_str()) {
+            continue;
+        }
+        let Ok(entries) = std::fs::read_dir(device.path()) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            if !file_name.starts_with("temp") || !file_name.ends_with("_input") { continue; }
+            let label_path = entry.path().with_file_name(
+                format!("{}_label", file_name.trim_end_matches("_input")),
+            );
+            let label = std::fs::read_to_string(label_path)
+                .unwrap_or_default().trim().to_ascii_lowercase();
+            let preferred = ["package", "tctl", "tdie", "cpu"].iter().any(|part| label.contains(part));
+            if !preferred && !(label.is_empty() && file_name == "temp1_input") { continue; }
+            if let Ok(raw) = std::fs::read_to_string(entry.path()) {
+                if let Ok(value) = raw.trim().parse::<f64>() {
+                    let temperature = value / 1000.0;
+                    if (-20.0..=150.0).contains(&temperature) { return Some(temperature); }
+                }
+            }
+        }
+    }
+    None
 }
 
 fn device_matches_search(device: &FritzDevice, query: &str) -> bool {
@@ -4219,6 +4255,19 @@ impl cosmic::Application for AppModel {
                     ("Not checked yet".to_string(), None)
                 };
 
+                let cpu_temperature = cpu_temperature_c();
+                let cpu_temperature_label = cpu_temperature
+                    .map(|temperature| format!("{temperature:.1} °C"))
+                    .unwrap_or_else(|| crate::i18n::tr(&self.settings.language, "Not available").to_string());
+                content = content
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3(crate::i18n::tr(&self.settings.language, "System")))
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "CPU temperature"),
+                        &cpu_temperature_label,
+                        cpu_temperature.map(|temperature| Some(temperature < 90.0)).unwrap_or(None),
+                    ))
+                    .push(widget::divider::horizontal::default());
                 content = content
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::title3(crate::i18n::tr(
@@ -4264,6 +4313,28 @@ impl cosmic::Application for AppModel {
                         format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos")
                     }));
 
+                content = content.push(widget::text::title3(crate::i18n::tr(
+                    &self.settings.language,
+                    "Recent FRITZ!Box requests",
+                )));
+                if requests.is_empty() {
+                    content = content.push(widget::text::caption(crate::i18n::tr(
+                        &self.settings.language,
+                        "No FRITZ!Box requests recorded yet",
+                    )));
+                } else {
+                    for request in requests.iter().rev().take(8) {
+                        content = content.push(widget::text::caption(format!(
+                            "{} · {} {} {} · {}",
+                            request.timestamp,
+                            request.method,
+                            if request.https { "HTTPS" } else { "HTTP" },
+                            request.status,
+                            request.path,
+                        )));
+                    }
+                }
+
                 let switch_state = fritz_endpoint_status(
                     "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
                 );
@@ -4283,6 +4354,33 @@ impl cosmic::Application for AppModel {
                             self.settings.ains.len()
                         }
                     )));
+                content = content.push(widget::text::title3(crate::i18n::tr(
+                    &self.settings.language,
+                    "Current device readings",
+                )));
+                if self.readings.is_empty() {
+                    content = content.push(widget::text::caption(crate::i18n::tr(
+                        &self.settings.language,
+                        "No device readings available",
+                    )));
+                } else {
+                    for reading in &self.readings {
+                        let state = match reading.power_state {
+                            Some(true) => crate::i18n::tr(&self.settings.language, "On"),
+                            Some(false) => crate::i18n::tr(&self.settings.language, "Off"),
+                            None => crate::i18n::tr(&self.settings.language, "Unknown"),
+                        };
+                        content = content.push(
+                            widget::Row::new()
+                                .spacing(8)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::text::body(reading.name.clone()).width(cosmic::iced::Length::Fill))
+                                .push(widget::text::body(format!("{:.0} W", reading.power_w)))
+                                .push(widget::text::caption(format!("{:.1} °C · {state}", reading.temperature_c))),
+                        );
+                    }
+                }
+
 
                 content = content.push(widget::divider::horizontal::default()).push(
                     widget::text::title3(crate::i18n::tr(
