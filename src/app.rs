@@ -4413,9 +4413,12 @@ impl cosmic::Application for AppModel {
                                     )
                                     .push(
                                         widget::text::body(format!(
-                                            "{}  {:.1} m/s",
+                                            "{}  {:.1} m/s{}",
                                             crate::i18n::tr(&self.settings.language, "Wind"),
-                                            weather.wind_speed_mps
+                                            weather.wind_speed_mps,
+                                            crate::weather::wind_direction_compass(weather.wind_direction_degrees)
+                                                .map(|direction| format!(" · {direction}"))
+                                                .unwrap_or_default()
                                         ))
                                         .width(cosmic::iced::Length::Fill),
                                     ),
