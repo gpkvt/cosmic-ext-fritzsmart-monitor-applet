@@ -4,6 +4,7 @@
 from html import escape
 from pathlib import Path
 import re
+import shutil
 
 import markdown
 
@@ -68,6 +69,15 @@ def render(source: Path, destination: Path, title: str) -> None:
 
 
 def main() -> None:
+    # README.md links to the repository license using the relative URL
+    # "LICENSE". Since README is rendered under docs/, publish the license
+    # alongside the generated HTML so that link remains valid on GitHub Pages.
+    license_source = ROOT / "LICENSE"
+    if not license_source.is_file():
+        raise FileNotFoundError(f"Required license file is missing: {license_source}")
+    shutil.copyfile(license_source, DOCS / "LICENSE")
+    print("Copied LICENSE -> docs/LICENSE")
+
     sources = {
         ROOT / "README.md": DOCS / "readme.html",
         ROOT / "SECURITY.md": DOCS / "security.html",
