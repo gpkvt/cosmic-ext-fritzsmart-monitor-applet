@@ -2224,7 +2224,11 @@ impl cosmic::Application for AppModel {
                         .text(panel_value_with_unit(
                             format!("{:.0} °C", weather.temperature_c),
                             self.settings.panel_multiline
-                                && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "temperature"),
+                                && self
+                                    .settings
+                                    .hidden_panel_items
+                                    .iter()
+                                    .any(|hidden| hidden == "temperature"),
                         ))
                         .size(f32::from(self.settings.panel_text_size))
                         .into(),
