@@ -371,7 +371,12 @@ fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
     value
         .split(',')
         .map(str::trim)
-        .filter(|id| SECTION_IDS.contains(id))
+        .filter(|id| {
+            SECTION_IDS.contains(id)
+                || id.strip_prefix("device-graph-pair-").is_some_and(|ain| {
+                    !ain.is_empty() && ain.chars().all(|character| character.is_ascii_alphanumeric())
+                })
+        })
         .map(str::to_string)
         .fold(Vec::new(), |mut sections, id| {
             if !sections.contains(&id) {
@@ -1360,7 +1365,7 @@ mod tests {
     fn parses_persisted_collapsed_menu_sections_safely() {
         assert_eq!(
             parse_collapsed_menu_sections(
-                "weather,unknown,summary,weather,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature,graph-total-output-pair,graph-total-input-pair,graph-bandwidth-pair"
+                "weather,unknown,summary,weather,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature,graph-total-output-pair,graph-total-input-pair,graph-bandwidth-pair,device-graph-pair-0876101234567890,device-graph-pair-invalid!"
             ),
             vec![
                 "weather".to_string(),
@@ -1372,6 +1377,7 @@ mod tests {
                 "graph-total-output-pair".to_string(),
                 "graph-total-input-pair".to_string(),
                 "graph-bandwidth-pair".to_string(),
+                "device-graph-pair-0876101234567890".to_string(),
             ]
         );
         assert!(parse_collapsed_menu_sections("").is_empty());
