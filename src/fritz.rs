@@ -1705,10 +1705,22 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
             upload_bits_per_second: wan.upload_bits_per_second?,
         })
     });
-    result.system_info = device_info.ok().flatten().map(|mut info| {
-        info.wan = wan_info;
-        info
-    });
+    result.system_info = match (device_info.ok().flatten(), wan_info) {
+        (Some(mut info), wan) => {
+            info.wan = wan;
+            Some(info)
+        }
+        (None, Some(wan)) => Some(FritzBoxSystemInfo {
+            manufacturer: None,
+            model: None,
+            product_class: None,
+            hardware_version: None,
+            software_version: None,
+            uptime_seconds: None,
+            wan: Some(wan),
+        }),
+        (None, None) => None,
+    };
 
     // Query the dedicated switch-state endpoint: power-meter XML can lag behind
     // the actual actuator state on some FRITZ!Box devices.
