@@ -292,6 +292,7 @@ fn build_debug_report(app: &AppModel, fritzbox_dump: &str) -> String {
         settings.ains.len(),
         app.devices.len(),
         readings,
+        fritzbox_system_info,
         fritzbox_dump,
         request_log,
         activity,
