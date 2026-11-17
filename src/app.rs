@@ -4296,11 +4296,6 @@ impl cosmic::Application for AppModel {
                         widget::Row::new()
                             .spacing(8)
                             .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::text::caption(format!(
-                                "{}  {:.1} km",
-                                crate::i18n::tr(&self.settings.language, "Visibility"),
-                                f64::from(weather.visibility_m) / 1000.0
-                            )))
                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                             .push(widget::text::caption(format!(
                                 "{}  {sunrise}",
