@@ -1291,6 +1291,197 @@ async fn fetch_internet_bandwidth(client: &Client, base: &str) -> Option<FritzIn
     parse_internet_bandwidth(&xml)
 }
 
+fn xml_response_as_json(xml: &str) -> serde_json::Value {
+    use serde_json::{Map, Value, json};
+
+    fn node_value(node: Node<'_, '_>) -> Value {
+        let mut object = Map::new();
+        for attribute in node.attributes() {
+            object.insert(format!("@{}", attribute.name()), json!(attribute.value()));
+        }
+        for child in node.children().filter(|child| child.is_element()) {
+            let name = child.tag_name().name().to_string();
+            let value = node_value(child);
+            match object.get_mut(&name) {
+                Some(Value::Array(values)) => values.push(value),
+                Some(existing) => {
+                    let previous = std::mem::replace(existing, Value::Null);
+                    *existing = Value::Array(vec![previous, value]);
+                }
+                None => { object.insert(name, value); }
+            }
+        }
+        let text = node.text().unwrap_or("").trim();
+        if object.is_empty() {
+            json!(text)
+        } else {
+            if !text.is_empty() {
+                object.insert("#text".into(), json!(text));
+            }
+            Value::Object(object)
+        }
+    }
+
+    Document::parse(xml)
+        .ok()
+        .map(|document| node_value(document.root_element()))
+        .unwrap_or_else(|| json!({"raw": xml}))
+}
+
+/// Collect a fresh, credential-safe FRITZ!Box endpoint dump for diagnostics.
+/// Authentication responses are intentionally represented by status metadata only:
+/// they contain a live SID and must never be written to a shareable report.
+pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json::Value {
+    use serde_json::json;
+
+    let base = settings.url.trim_end_matches('/');
+    let mut endpoints = Vec::new();
+    let (client, sid) = match authenticated_client(&settings).await {
+        Ok(session) => session,
+        Err(error) => {
+            return json!({
+                "base_url": {
+                    "scheme": reqwest::Url::parse(base).map(|url| url.scheme().to_string()).unwrap_or_default(),
+                    "host": reqwest::Url::parse(base).ok().and_then(|url| url.host_str().map(str::to_string)),
+                },
+                "authentication": {"success": false, "error": error},
+                "endpoints": endpoints,
+            });
+        }
+    };
+
+    // The login endpoint is part of every session. Do not include the SID or
+    // the authentication response body in a diagnostic export.
+    endpoints.push(json!({
+        "name": "authentication",
+        "method": "GET",
+        "endpoint": "/login_sid.lua",
+        "authenticated": true,
+        "response_body": "<redacted: session identifier>",
+    }));
+
+    let device_response = client
+        .get(format!("{base}/webservices/homeautoswitch.lua"))
+        .query(&[("sid", sid.as_str()), ("switchcmd", "getdevicelistinfos")])
+        .send()
+        .await;
+    let mut device_xml = None;
+    match device_response {
+        Ok(response) => {
+            let status = response.status();
+            record_http_response_with_method(response.url(), status, "GET");
+            let status = status.as_u16();
+            let body = response.text().await.unwrap_or_else(|error| format!("<body read error: {error}>"));
+            device_xml = Some(body.clone());
+            endpoints.push(json!({
+                "name": "device_list_and_all_device_data",
+                "method": "GET",
+                "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
+                "status": status,
+                "body_json": xml_response_as_json(&body),
+                "body_raw": body,
+            }));
+        }
+        Err(error) => endpoints.push(json!({
+            "name": "device_list_and_all_device_data",
+            "method": "GET",
+            "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
+            "error": error.to_string(),
+        })),
+    }
+
+    // Query switch state individually for every switch-capable device present
+    // in the full inventory response, not just devices selected for the panel.
+    if let Some(xml) = device_xml.as_deref() {
+        if let Ok(document) = Document::parse(xml) {
+            for device in document.descendants().filter(|node| node.has_tag_name("device")) {
+                let Some(ain) = device.attribute("identifier") else { continue };
+                if !device.descendants().any(|node| node.has_tag_name("switch")) { continue; }
+                let response = client
+                    .get(format!("{base}/webservices/homeautoswitch.lua"))
+                    .query(&[("sid", sid.as_str()), ("switchcmd", "getswitchstate"), ("ain", ain)])
+                    .send()
+                    .await;
+                match response {
+                    Ok(response) => {
+                        let status = response.status();
+                        record_http_response_with_method(response.url(), status, "GET");
+                        let status = status.as_u16();
+                        let body = response.text().await.unwrap_or_else(|error| format!("<body read error: {error}>"));
+                        endpoints.push(json!({
+                            "name": "device_switch_state",
+                            "method": "GET",
+                            "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
+                            "device_name": device.children().find(|node| node.has_tag_name("name")).and_then(|node| node.text()).unwrap_or("Unnamed device"),
+                            "device_ain": ain,
+                            "status": status,
+                            "body_json": xml_response_as_json(&body),
+                            "body_raw": body,
+                        }));
+                    }
+                    Err(error) => endpoints.push(json!({
+                        "name": "device_switch_state",
+                        "method": "GET",
+                        "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
+                        "device_ain": ain,
+                        "error": error.to_string(),
+                    })),
+                }
+            }
+        }
+    }
+
+    // This is the WANCommonInterfaceConfig endpoint used by the live bandwidth
+    // display. Its URL uses the FRITZ!Box UPnP control port (49000/49443).
+    if let Some(endpoint) = wan_common_interface_url(base) {
+        const SERVICE: &str = "urn:schemas-upnp-org:service:WANCommonInterfaceConfig:1";
+        let body = format!(
+            r#"<?xml version="1.0" encoding="utf-8"?>
+            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"
+              s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+              <s:Body><u:GetCommonLinkProperties xmlns:u="{SERVICE}"></u:GetCommonLinkProperties></s:Body>
+            </s:Envelope>"#
+        );
+        let endpoint_path = endpoint.path().to_string();
+        match client.post(endpoint)
+            .header(reqwest::header::CONTENT_TYPE, "text/xml; charset=\"utf-8\"")
+            .header("SOAPACTION", format!("\"{SERVICE}#GetCommonLinkProperties\""))
+            .body(body)
+            .send().await {
+            Ok(response) => {
+                let status = response.status();
+                record_http_response_with_method(response.url(), status, "POST");
+                let status = status.as_u16();
+                let response_body = response.text().await.unwrap_or_else(|error| format!("<body read error: {error}>"));
+                endpoints.push(json!({
+                    "name": "wan_common_interface_link_properties",
+                    "method": "POST",
+                    "endpoint": endpoint_path,
+                    "soap_action": format!("{SERVICE}#GetCommonLinkProperties"),
+                    "status": status,
+                    "body_json": xml_response_as_json(&response_body),
+                    "body_raw": response_body,
+                }));
+            }
+            Err(error) => endpoints.push(json!({
+                "name": "wan_common_interface_link_properties",
+                "method": "POST",
+                "endpoint": endpoint_path,
+                "error": error.to_string(),
+            })),
+        }
+    }
+
+    json!({
+        "base_url": {
+            "scheme": reqwest::Url::parse(base).map(|url| url.scheme().to_string()).unwrap_or_default(),
+            "host": reqwest::Url::parse(base).ok().and_then(|url| url.host_str().map(str::to_string)),
+        },
+        "authentication": {"success": true, "session_id": "<redacted>"},
+        "endpoints": endpoints,
+    })
+}
+
 pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     let settings = FritzSettings::load()?;
     validate_settings(&settings, true)?;
