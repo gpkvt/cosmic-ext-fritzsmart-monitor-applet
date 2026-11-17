@@ -4097,13 +4097,24 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
                     .push(diagnostic_section_heading(
                         crate::i18n::tr(&self.settings.language, "FRITZ!Box connection"),
-                        crate::i18n::tr(&self.settings.language, "Address, transport security and authentication"),
+                        crate::i18n::tr(
+                            &self.settings.language,
+                            "Address, transport security and authentication",
+                        ),
                     ))
-                    .push(diagnostic_status_row(crate::i18n::tr(&self.settings.language, "HTTPS / TLS"), &tls_status, tls_ok))
+                    .push(diagnostic_status_row(
+                        crate::i18n::tr(&self.settings.language, "HTTPS / TLS"),
+                        &tls_status,
+                        tls_ok,
+                    ))
                     .push(widget::text::caption(format!(
                         "{}: {}",
                         crate::i18n::tr(&self.settings.language, "FRITZ!Box"),
-                        if endpoint.is_empty() { crate::i18n::tr(&self.settings.language, "Not configured") } else { endpoint }
+                        if endpoint.is_empty() {
+                            crate::i18n::tr(&self.settings.language, "Not configured")
+                        } else {
+                            endpoint
+                        }
                     )))
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::title3(crate::i18n::tr(
