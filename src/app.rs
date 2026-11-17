@@ -2184,8 +2184,8 @@ impl cosmic::Application for AppModel {
                 )
             });
 
-        // Use a compact, consistent value column: this keeps stacked readings
-        // right-aligned without restoring the excessive 88px gap.
+        // Keep every reading at its intrinsic width. Expanding each child to
+        // Fill inside the horizontal panel row pushes later readings off-screen.
         let panel_item = |label: &'static str,
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>,
@@ -2217,8 +2217,8 @@ impl cosmic::Application for AppModel {
                     icon_column.center_y(item_height as u16)
                 });
             }
-            // Give the value a real, expanding layout area so right/bottom
-            // alignment works for both one-line and two-line readings.
+            // Keep the value shrink-wrapped so it cannot consume the space
+            // needed by subsequent readings.
             let value = widget::container(value)
                 .width(cosmic::iced::Length::Shrink)
                 .align_bottom(item_height as u16);
