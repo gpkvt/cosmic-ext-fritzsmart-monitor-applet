@@ -289,10 +289,17 @@ fn parse_hidden_menu_elements(value: &str) -> Vec<String> {
 }
 
 fn parse_hidden_panel_items(value: &str) -> Vec<String> {
-    value.split(',').map(str::trim)
+    value
+        .split(',')
+        .map(str::trim)
         .filter(|id| PANEL_ITEM_IDS.contains(id))
         .map(str::to_string)
-        .fold(Vec::new(), |mut hidden, id| { if !hidden.contains(&id) { hidden.push(id); } hidden })
+        .fold(Vec::new(), |mut hidden, id| {
+            if !hidden.contains(&id) {
+                hidden.push(id);
+            }
+            hidden
+        })
 }
 
 fn parse_panel_order(value: &str) -> Vec<String> {
@@ -557,8 +564,10 @@ impl FritzSettings {
         input_ains.sort_unstable();
         let input_ains = input_ains.join(",");
         let menu_order = parse_menu_order(&self.menu_order.join(",")).join(",");
-        let hidden_menu_elements = parse_hidden_menu_elements(&self.hidden_menu_elements.join(",")).join(",");
-        let hidden_panel_items = parse_hidden_panel_items(&self.hidden_panel_items.join(",")).join(",");
+        let hidden_menu_elements =
+            parse_hidden_menu_elements(&self.hidden_menu_elements.join(",")).join(",");
+        let hidden_panel_items =
+            parse_hidden_panel_items(&self.hidden_panel_items.join(",")).join(",");
         let panel_order = parse_panel_order(&self.panel_order.join(",")).join(",");
         let device_order = parse_device_order(&self.device_order.join(",")).join(",");
         let collapsed_menu_sections =
