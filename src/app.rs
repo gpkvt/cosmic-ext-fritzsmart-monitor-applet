@@ -2526,55 +2526,13 @@ impl cosmic::Application for AppModel {
         }
         ordered_panel_items.extend(panel_items.drain(..));
 
-        if self.settings.panel_multiline {
-            // Keep related readings together in multiline mode. The order of
-            // members inside each group follows the configured panel order;
-            // the group itself occupies the position of its first member.
-            let mut panel_groups: Vec<(
-                Option<&'static str>,
-                Vec<cosmic::Element<'static, Message>>,
-            )> = Vec::new();
-            for (id, item) in ordered_panel_items {
-                let group_key = match id {
-                    "weather" | "temperature" => Some("weather-temperature"),
-                    "power-consumption" | "solar-power" => Some("power-solar"),
-                    _ => None,
-                };
-                if let Some(key) = group_key {
-                    if let Some((_, members)) = panel_groups
-                        .iter_mut()
-                        .find(|(existing, _)| *existing == Some(key))
-                    {
-                        members.push(item);
-                    } else {
-                        panel_groups.push((Some(key), vec![item]));
-                    }
-                } else {
-                    panel_groups.push((None, vec![item]));
-                }
-            }
-
-            for (_, mut members) in panel_groups {
-                if members.len() == 1 {
-                    content = content.push(members.remove(0));
-                } else {
-                    // Start every row at the same left edge so icon slots
-                    // line up vertically within the group. Values remain
-                    // right-aligned inside their own fixed-width slots.
-                    let mut rows = widget::Column::new()
-                        .spacing(0)
-                        .align_x(cosmic::iced::Alignment::Start);
-                    for member in members {
-                        rows = rows.push(member);
-                    }
-                    content = content.push(rows);
-                }
-            }
-        } else {
-            // Single-line mode keeps every reading independently positionable.
-            for (_, item) in ordered_panel_items {
-                content = content.push(item);
-            }
+        // Keep every icon/value pair as its own horizontal panel item.
+        // In multiline mode, only the odd item uses two text lines; do not
+        // stack related readings into vertical columns. This produces a
+        // consistent sequence of left-aligned icon slots and right-aligned
+        // value slots across the entire panel.
+        for (_, item) in ordered_panel_items {
+            content = content.push(item);
         }
         // Keep connection health visible even when the popup is closed.
         if self.error.is_some() {
