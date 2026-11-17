@@ -1396,7 +1396,7 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
             "name": "device_list_and_all_device_data",
             "method": "GET",
             "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
-            "error": error.to_string(),
+            "error": error.without_url().to_string(),
         })),
     }
 
@@ -1431,7 +1431,12 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                             .find(|node| node.has_tag_name("name"))
                             .and_then(|node| node.text())
                             .unwrap_or("Unnamed device");
-                        match read_xml_response(response, "FRITZ!Box debug switch-state request failed").await {
+                        match read_xml_response(
+                            response,
+                            "FRITZ!Box debug switch-state request failed",
+                        )
+                        .await
+                        {
                             Ok(body) => endpoints.push(json!({
                                 "name": "device_switch_state",
                                 "method": "GET",
@@ -1458,7 +1463,7 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                         "method": "GET",
                         "endpoint": "/webservices/homeautoswitch.lua?switchcmd=getswitchstate",
                         "device_ain": ain,
-                        "error": error.to_string(),
+                        "error": error.without_url().to_string(),
                     })),
                 }
             }
@@ -1494,7 +1499,9 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                     response,
                     "FRITZ!Box debug WAN interface request failed",
                     "POST",
-                ).await {
+                )
+                .await
+                {
                     Ok(response_body) => endpoints.push(json!({
                         "name": "wan_common_interface_link_properties",
                         "method": "POST",
@@ -1518,7 +1525,7 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                 "name": "wan_common_interface_link_properties",
                 "method": "POST",
                 "endpoint": endpoint_path,
-                "error": error.to_string(),
+                "error": error.without_url().to_string(),
             })),
         }
     }
