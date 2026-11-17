@@ -2196,6 +2196,44 @@ impl cosmic::Application for AppModel {
                 1.0
             };
 
+        // Split readings into two independently aligned line slots: the upper
+        // line sits on the bottom of its slot, and the lower line starts at
+        // the top of its slot. This keeps the pair visually compact.
+        let panel_value = |value: String| -> cosmic::Element<'static, Message> {
+            if let Some((upper, lower)) = value.split_once('\n') {
+                let line_height = 14.0;
+                widget::Column::new()
+                    .spacing(0)
+                    .width(cosmic::iced::Length::Shrink)
+                    .push(
+                        widget::container(
+                            self.core.applet.text(upper.to_string())
+                                .size(panel_text_size)
+                                .align_x(cosmic::iced::Alignment::End),
+                        )
+                        .width(cosmic::iced::Length::Shrink)
+                        .height(cosmic::iced::Length::Fixed(line_height))
+                        .align_bottom(line_height as u16),
+                    )
+                    .push(
+                        widget::container(
+                            self.core.applet.text(lower.to_string())
+                                .size(panel_text_size)
+                                .align_x(cosmic::iced::Alignment::End),
+                        )
+                        .width(cosmic::iced::Length::Shrink)
+                        .height(cosmic::iced::Length::Fixed(line_height))
+                        .align_top(line_height as u16),
+                    )
+                    .into()
+            } else {
+                self.core.applet.text(value)
+                    .size(panel_text_size)
+                    .align_x(cosmic::iced::Alignment::End)
+                    .into()
+            }
+        };
+
         // Keep every reading at its intrinsic width. Expanding each child to
         // Fill inside the horizontal panel row pushes later readings off-screen.
         let panel_item = |label: &'static str,
@@ -2263,9 +2301,7 @@ impl cosmic::Application for AppModel {
                 panel_item(
                     "Weather",
                     Some(widget::icon::from_name(weather.icon_name()).size(10).into()),
-                    self.core
-                        .applet
-                        .text(panel_value_with_unit(
+                    panel_value(panel_value_with_unit(
                             format!(
                                 "{:.0} °C",
                                 selected_weather_temperature(
@@ -2280,11 +2316,7 @@ impl cosmic::Application for AppModel {
                                     .hidden_panel_items
                                     .iter()
                                     .any(|hidden| hidden == "temperature"),
-                        ))
-                        .size(panel_text_size)
-                        .align_x(cosmic::iced::Alignment::End)
-                        .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
-                        .into(),
+                        )),
                     self.settings.panel_multiline
                         && self
                             .settings
@@ -2321,19 +2353,13 @@ impl cosmic::Application for AppModel {
                             }))
                             .into(),
                         ),
-                        self.core
-                            .applet
-                            .text(panel_value_with_unit(
+                        panel_value(panel_value_with_unit(
                                 power,
                                 self.settings.panel_multiline
                                     && (self.settings.panel_net_power
                                         || self.settings.hidden_panel_items.iter().any(|hidden| hidden == "solar-power")
                                         || input_power.is_none()),
-                            ))
-                            .size(panel_text_size)
-                        .align_x(cosmic::iced::Alignment::End)
-                        .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
-                            .into(),
+                            )),
                         self.settings.panel_multiline
                             && (self.settings.panel_net_power
                                 || self.settings.hidden_panel_items.iter().any(|hidden| hidden == "solar-power")
@@ -2367,17 +2393,11 @@ impl cosmic::Application for AppModel {
                             }))
                             .into(),
                         ),
-                        self.core
-                            .applet
-                            .text(panel_value_with_unit(
+                        panel_value(panel_value_with_unit(
                                 input_power,
                                 self.settings.panel_multiline
                                     && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption"),
-                            ))
-                            .size(panel_text_size)
-                        .align_x(cosmic::iced::Alignment::End)
-                        .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
-                            .into(),
+                            )),
                         self.settings.panel_multiline
                             && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption"),
                     )
@@ -2485,19 +2505,13 @@ impl cosmic::Application for AppModel {
                             }))
                             .into(),
                         ),
-                        self.core
-                            .applet
-                            .text(panel_value_with_unit(
+                        panel_value(panel_value_with_unit(
                                 temperature,
                                 self.settings.panel_multiline
                                     && (self.settings.hidden_panel_items.iter().any(|hidden| hidden == "weather")
                                         || !self.settings.weather_enabled
                                         || self.weather.is_none()),
-                            ))
-                            .size(panel_text_size)
-                        .align_x(cosmic::iced::Alignment::End)
-                        .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
-                            .into(),
+                            )),
                         self.settings.panel_multiline
                             && (self.settings.hidden_panel_items.iter().any(|hidden| hidden == "weather")
                                 || !self.settings.weather_enabled
