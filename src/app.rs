@@ -1070,8 +1070,7 @@ fn total_power_overview(
                 input_temperature_history.iter().map(|(_, value)| *value),
                 &settings.graph_style,
                 "°C",
-            ))
-            ;
+            ));
         let input_content = widget::Column::new()
             .spacing(8)
             .width(cosmic::iced::Length::Fill)
