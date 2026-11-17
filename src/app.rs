@@ -3330,10 +3330,24 @@ impl cosmic::Application for AppModel {
                                 )))
                                 .push(widget::text::caption(weather.location_name.clone())),
                         )
-                        .push(widget::text::title2(format!(
-                            "{:.0} °C",
-                            weather.temperature_c
-                        )))
+                        .push(
+                            widget::container(widget::text::title2(format!(
+                                "{:.0} °C",
+                                weather.temperature_c
+                            )))
+                            .padding([5, 9])
+                            .style(|_| cosmic::iced::widget::container::Style {
+                                background: Some(
+                                    cosmic::iced::Color::from_rgba(0.0, 0.0, 0.0, 0.88).into(),
+                                ),
+                                text_color: Some(cosmic::iced::Color::WHITE),
+                                border: cosmic::iced::Border {
+                                    radius: 8.0.into(),
+                                    ..Default::default()
+                                },
+                                ..Default::default()
+                            })
+                        )
                         .push(
                             widget::icon::from_name(if self.weather_forecast_expanded {
                                 "go-down-symbolic"
