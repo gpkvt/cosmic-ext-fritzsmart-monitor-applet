@@ -50,6 +50,9 @@ pub struct AppModel {
     refresh_started_at: Option<Instant>,
     weather: Option<WeatherData>,
     weather_slideshow_index: usize,
+    weather_slideshow_handles: Vec<widget::image::Handle>,
+    weather_background_handle: Option<widget::image::Handle>,
+    starry_night_handle: Option<widget::image::Handle>,
     weather_forecast: Option<WeatherForecast>,
     weather_forecast_days: Option<u8>,
     weather_forecast_error: Option<String>,
@@ -3877,17 +3880,17 @@ impl cosmic::Application for AppModel {
                     .spacing(8)
                     .push(weather_heading)
                     .push(weather_details);
-                let weather_card: cosmic::Element<'_, Message> = if let Some(image_bytes) = weather
+                let current_image_handle = weather
                     .slideshow_sequence
                     .get(self.weather_slideshow_index)
-                    .and_then(|frame| weather.slideshow_frames.get(*frame))
-                    .or(weather.background_image.as_ref())
-                {
-                    let photo =
-                        widget::image::Image::new(widget::image::Handle::from_bytes(image_bytes.clone()))
-                            .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(260.0))
-                            .content_fit(cosmic::iced::ContentFit::Fill);
+                    .and_then(|frame| self.weather_slideshow_handles.get(*frame))
+                    .cloned()
+                    .or_else(|| self.weather_background_handle.clone());
+                let weather_card: cosmic::Element<'_, Message> = if let Some(image_handle) = current_image_handle {
+                    let photo = widget::image::Image::new(image_handle)
+                        .width(cosmic::iced::Length::Fill)
+                        .height(cosmic::iced::Length::Fixed(260.0))
+                        .content_fit(cosmic::iced::ContentFit::Fill);
                     let details = widget::container(weather_content)
                         .width(cosmic::iced::Length::Fill)
                         .height(cosmic::iced::Length::Fixed(260.0))
@@ -3916,10 +3919,10 @@ impl cosmic::Application for AppModel {
                     // weather scenes without replacing the condition-matched
                     // photograph or obscuring its Commons attribution.
                     if weather.icon_code.ends_with('n')
-                        && let Some(stars) = starry_night_overlay()
+                        && let Some(stars) = self.starry_night_handle.clone()
                     {
                         let star_layer = widget::container(
-                            widget::image::Image::new(widget::image::Handle::from_bytes(stars))
+                            widget::image::Image::new(stars)
                                 .width(cosmic::iced::Length::Fill)
                                 .height(cosmic::iced::Length::Fixed(260.0))
                                 .content_fit(cosmic::iced::ContentFit::Fill),
@@ -5753,6 +5756,21 @@ impl cosmic::Application for AppModel {
                             .map(|background| semi_transparent_weather_photo(&background));
                         weather.slideshow_sequence = sequence;
                         weather.slideshow_frame_sources = frame_sources;
+                        self.weather_slideshow_handles = weather
+                            .slideshow_frames
+                            .iter()
+                            .cloned()
+                            .map(widget::image::Handle::from_bytes)
+                            .collect();
+                        self.weather_background_handle = weather
+                            .background_image
+                            .as_ref()
+                            .map(|bytes| widget::image::Handle::from_bytes(bytes.clone()));
+                        self.starry_night_handle = if weather.icon_code.ends_with('n') {
+                            starry_night_overlay().map(widget::image::Handle::from_bytes)
+                        } else {
+                            None
+                        };
                         let slideshow_len = weather.slideshow_sequence.len();
                         self.weather = Some(weather);
                         self.weather_slideshow_index = if slideshow_len == 0 {
@@ -5786,6 +5804,9 @@ impl cosmic::Application for AppModel {
                 self.next_weather_refresh_at = None;
                 if !enabled {
                     self.weather = None;
+                    self.weather_slideshow_handles.clear();
+                    self.weather_background_handle = None;
+                    self.starry_night_handle = None;
                     self.weather_error = None;
                     self.weather_forecast = None;
                     self.weather_forecast_error = None;
@@ -5821,9 +5842,18 @@ impl cosmic::Application for AppModel {
                         &weather.background_images,
                         self.settings.weather_slideshow_interval_seconds,
                     );
-                    weather.slideshow_frames = frames;
+                    weather.slideshow_frames = frames
+                        .iter()
+                        .map(|frame| semi_transparent_weather_photo(frame))
+                        .collect();
                     weather.slideshow_sequence = sequence;
                     weather.slideshow_frame_sources = frame_sources;
+                    self.weather_slideshow_handles = weather
+                        .slideshow_frames
+                        .iter()
+                        .cloned()
+                        .map(widget::image::Handle::from_bytes)
+                        .collect();
                     self.weather_slideshow_index = 0;
                 }
                 self.persist_settings();
