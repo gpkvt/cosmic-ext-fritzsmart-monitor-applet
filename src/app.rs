@@ -597,13 +597,7 @@ fn graph_visual_with_dimensions(
             widget::Row::new()
                 .width(cosmic::iced::Length::Fill)
                 .push(widget::text::caption(format!("MIN {minimum:.1} {unit}")))
-                .push(
-                    widget::text::caption(format!(
-                        "FRITZ!Power Monitor · v{}",
-                        env!("APP_VERSION")
-                    ))
-                    .width(cosmic::iced::Length::Fill),
-                )
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                 .push(widget::text::caption(format!("MAX {maximum:.1} {unit}"))),
         )
         .push(graph);
