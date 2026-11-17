@@ -2211,18 +2211,17 @@ impl cosmic::Application for AppModel {
             let text_width = |text: &str| {
                 (text.chars().count() as f32 * panel_text_size * 0.62).max(panel_text_size)
             };
-            if let Some((upper, lower)) = value.split_once('\n') {
-                // Use two naturally sized text rows with zero column spacing.
-                // This keeps split-unit values (including unpaired items) in
-                // the same compact layout without multiline text measurement
-                // shifting the lower line outside the value column.
-                // The icon already occupies the leading slot beside the
-                // first line. Start the unit directly below the number;
-                // adding whitespace here double-counts that icon offset.
-                widget::Column::new()
-                    .spacing(0)
-                    .push(panel_text(upper.to_string()))
-                    .push(panel_text(lower.to_string()))
+            if value.contains('\n') {
+                // A single text widget avoids the extra line-box spacing
+                // introduced when each line is rendered as a separate widget.
+                // Keep the same configured font size and tighten only the
+                // multiline line height so the unit sits directly below
+                // the number.
+                self.core
+                    .applet
+                    .text(value)
+                    .size(panel_text_size)
+                    .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.7))
                     .into()
             } else {
                 let width = text_width(&value);
