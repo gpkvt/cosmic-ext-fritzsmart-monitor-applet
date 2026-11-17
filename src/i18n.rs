@@ -2244,8 +2244,8 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
         "7d" => "7 T",
         "14d" => "14 T",
         "Refresh now" => "Jetzt aktualisieren",
-        "Display the maximum download and upload link speeds reported by your FRITZ!Box connection in Mbps." => {
-            "Maximale Download- und Upload-Verbindungsgeschwindigkeit Ihrer FRITZ!Box in Mbit/s anzeigen."
+        "Display the maximum download and upload link speeds reported by your FRITZ!Box connection in Mb/s." => {
+            "Maximale Download- und Upload-Verbindungsgeschwindigkeit Ihrer FRITZ!Box in Mb/s anzeigen."
         }
         "5 minutes to 4 years. Saved samples and the selected retention period survive applet restarts. Sampling adapts to retention, capped at about 50,000 samples per series." => {
             "5 Minuten bis 4 Jahre. Gespeicherte Messwerte und der gewählte Zeitraum bleiben nach Neustarts erhalten. Die Abtastrate passt sich an, maximal etwa 50.000 Messwerte pro Reihe."

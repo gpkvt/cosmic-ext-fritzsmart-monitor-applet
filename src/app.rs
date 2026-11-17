@@ -1204,7 +1204,7 @@ fn format_compact_decimal(value: f64) -> String {
 
 fn format_bandwidth(bits_per_second: u64) -> String {
     let megabits_per_second = bits_per_second as f64 / 1_000_000.0;
-    format!("{} Mbps", format_compact_decimal(megabits_per_second))
+    format!("{} Mb/s", format_compact_decimal(megabits_per_second))
 }
 
 fn menu_element_label(id: &str) -> &'static str {
@@ -1825,8 +1825,8 @@ impl cosmic::Application for AppModel {
                             format_bandwidth(bandwidth.upload_bits_per_second),
                         )
                     })
-                    .unwrap_or_else(|| ("-- Mbps".to_string(), "-- Mbps".to_string()));
-                // Keep the Mbps values right-aligned in a compact column,
+                    .unwrap_or_else(|| ("-- Mb/s".to_string(), "-- Mb/s".to_string()));
+                // Keep the Mb/s values right-aligned in a compact column,
                 // with a modest gap after each direction icon.
                 let bandwidth_row = |icon: &'static str, value: String| {
                     widget::Row::new()
@@ -2237,7 +2237,7 @@ impl cosmic::Application for AppModel {
                                     .width(cosmic::iced::Length::Fill)
                                     .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Show internet bandwidth")))
                                     .push(widget::text::caption(
-                                        "Display the maximum download and upload link speeds reported by your FRITZ!Box connection in Mbps.",
+                                        "Display the maximum download and upload link speeds reported by your FRITZ!Box connection in Mb/s.",
                                     )),
                             )
                             .push(
@@ -3713,7 +3713,7 @@ impl cosmic::Application for AppModel {
                                 .iter()
                                 .map(|(_, download, _)| *download as f64 / 1_000_000.0),
                             &self.settings.graph_style,
-                            "Mbps",
+                            "Mb/s",
                         ))
                         .push(widget::text::caption(crate::i18n::tr(
                             &self.settings.language,
@@ -3726,7 +3726,7 @@ impl cosmic::Application for AppModel {
                                 .iter()
                                 .map(|(_, _, upload)| *upload as f64 / 1_000_000.0),
                             &self.settings.graph_style,
-                            "Mbps",
+                            "Mb/s",
                         ))
                 } else {
                     widget::Column::new()
@@ -5583,9 +5583,9 @@ mod history_tests {
 
     #[test]
     fn panel_bandwidth_omits_trailing_decimal_zero() {
-        assert_eq!(format_bandwidth(1_000_000), "1 Mbps");
-        assert_eq!(format_bandwidth(1_500_000), "1.5 Mbps");
-        assert_eq!(format_bandwidth(0), "0 Mbps");
+        assert_eq!(format_bandwidth(1_000_000), "1 Mb/s");
+        assert_eq!(format_bandwidth(1_500_000), "1.5 Mb/s");
+        assert_eq!(format_bandwidth(0), "0 Mb/s");
     }
 
     #[test]
