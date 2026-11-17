@@ -5027,22 +5027,9 @@ impl cosmic::Application for AppModel {
                     .width(cosmic::iced::Length::Fill)
                     .padding([8, 12])
                     .class(cosmic::theme::Button::ListItem(heading_radius));
-                    let history_button: cosmic::Element<'_, Message> = if let Some(samples) =
-                        device_history.filter(|samples| !samples.is_empty())
+                    let history_button: cosmic::Element<'_, Message> = if device_history
+                        .is_some_and(|samples| !samples.is_empty())
                     {
-                        let values = samples
-                            .iter()
-                            .map(|(_, power, _)| *power as f64)
-                            .collect::<Vec<_>>();
-                        let axis_start = format_graph_axis_start(
-                            self.settings.graph_timespan_minutes,
-                            samples.front().map(|(timestamp, _, _)| {
-                                Instant::now()
-                                    .duration_since(*timestamp)
-                                    .as_secs()
-                                    .div_ceil(60)
-                            }),
-                        );
                         widget::button::custom(
                             widget::Row::new()
                                 .spacing(5)
