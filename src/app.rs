@@ -1977,7 +1977,9 @@ fn is_current_or_newer_version(current: &str, latest: &str) -> bool {
 }
 
 fn regular_clock_ticks() -> impl futures::Stream<Item = Message> {
-    clock_ticks(Duration::from_secs(1))
+    // Idle polling only needs to notice scheduled work and deadlines; a
+    // five-second cadence avoids rebuilding the entire applet every second.
+    clock_ticks(Duration::from_secs(5))
 }
 
 fn diagnostics_clock_ticks() -> impl futures::Stream<Item = Message> {
@@ -2115,11 +2117,22 @@ impl cosmic::Application for AppModel {
         // Use non-capturing function pointers: this libcosmic iced version's
         // Subscription::run accepts a fn pointer rather than a closure.
         // Refreshing gets frame-rate ticks for the spinner; otherwise a one-second tick updates countdowns and deadlines.
+        let now = Instant::now();
+        let needs_second_precision = self.settings_save_at.is_some()
+            || self.settings_saved_until.is_some()
+            || self.next_refresh_at.is_some_and(|deadline| {
+                deadline.saturating_duration_since(now) <= Duration::from_secs(15)
+            })
+            || self.next_weather_refresh_at.is_some_and(|deadline| {
+                deadline.saturating_duration_since(now) <= Duration::from_secs(15)
+            });
         let clock = if self.refresh_started_at.is_some() {
             Subscription::run(animation_ticks)
         } else if self.active_settings_section == Some("diagnostics") {
-            // Refresh the diagnostics view frequently so newly recorded HTTP
-            // responses appear while the section remains open.
+            // Keep live diagnostics responsive only while that page is open.
+            Subscription::run(diagnostics_clock_ticks)
+        } else if needs_second_precision {
+            // Preserve the final-second refresh countdown and short save status.
             Subscription::run(diagnostics_clock_ticks)
         } else {
             Subscription::run(regular_clock_ticks)
