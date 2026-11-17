@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- Remove an obsolete panel line-height calculation left behind by the enlarged odd-item icon layout.
+
+### Fixed
+
 - Rotate through different Wikimedia Commons search-result windows on weather image refresh, retain the current background when no new matching image is found, and report empty results in Diagnostics.
 
 - Enlarge the icon of an unpaired two-line panel item to 28 px and reserve a matching layout slot so the icon is not clipped.
