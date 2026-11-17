@@ -555,8 +555,30 @@ fn interactive_graph(
     style: &str,
     unit: &str,
 ) -> cosmic::Element<'static, Message> {
+    interactive_graph_inner(language, title, values, style, unit, None)
+}
+
+fn interactive_graph_with_axis(
+    language: &str,
+    title: &str,
+    values: impl Iterator<Item = f64>,
+    style: &str,
+    unit: &str,
+    axis_start: String,
+) -> cosmic::Element<'static, Message> {
+    interactive_graph_inner(language, title, values, style, unit, Some(axis_start))
+}
+
+fn interactive_graph_inner(
+    language: &str,
+    title: &str,
+    values: impl Iterator<Item = f64>,
+    style: &str,
+    unit: &str,
+    axis_start: Option<String>,
+) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
-    let graph = widget::Column::new()
+    let mut graph = widget::Column::new()
         .spacing(6)
         .push(
             widget::Row::new()
@@ -569,6 +591,15 @@ fn interactive_graph(
                 ))),
         )
         .push(graph_visual(values.iter().copied(), style, unit));
+    if let Some(axis_start) = axis_start {
+        graph = graph.push(
+            widget::Row::new()
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::caption(axis_start))
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(widget::text::caption("Now")),
+        );
+    }
     widget::button::custom(graph)
         .on_press(Message::ShowGraph(
             title.to_string(),
@@ -580,7 +611,6 @@ fn interactive_graph(
         .class(cosmic::theme::Button::Text)
         .into()
 }
-
 fn input_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
     readings
         .iter()
@@ -876,38 +906,26 @@ fn live_power_summary(
             language,
             "CURRENT POWER HISTORY",
         )))
-        .push(interactive_graph(
+        .push(interactive_graph_with_axis(
             language,
             crate::i18n::tr(language, "CURRENT POWER"),
             history.into_iter(),
             graph_style,
             "W",
+            axis_start.clone(),
         ))
-        .push(
-            widget::Row::new()
-                .width(cosmic::iced::Length::Fill)
-                .push(widget::text::caption(axis_start.clone()))
-                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                .push(widget::text::caption("Now")),
-        )
         .push(widget::text::caption(crate::i18n::tr(
             language,
             "AVERAGE TEMPERATURE HISTORY (°C)",
         )))
-        .push(interactive_graph(
+        .push(interactive_graph_with_axis(
             language,
             crate::i18n::tr(language, "AVERAGE TEMPERATURE"),
             temperature_history.into_iter(),
             graph_style,
             "°C",
-        ))
-        .push(
-            widget::Row::new()
-                .width(cosmic::iced::Length::Fill)
-                .push(widget::text::caption(axis_start))
-                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                .push(widget::text::caption("Now")),
-        );
+            axis_start,
+        ));
     surface_card(content.into(), 14)
 }
 
@@ -990,34 +1008,23 @@ fn total_power_overview(
     let output_graph = widget::Column::new()
         .spacing(4)
         .push(widget::text::caption("TOTAL POWER OUTPUT (W)"))
-        .push(interactive_graph(
+        .push(interactive_graph_with_axis(
             &settings.language,
             crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
             history.iter().map(|(_, value)| *value as f64),
             &settings.graph_style,
             "W",
+            axis_start.clone(),
         ))
-        .push(            widget::Row::new()
-                .width(cosmic::iced::Length::Fill)
-                .push(widget::text::caption(axis_start.clone()))
-                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                .push(widget::text::caption("Now")),
-        )
         .push(widget::text::caption("AVERAGE TEMPERATURE (°C)"))
-        .push(interactive_graph(
+        .push(interactive_graph_with_axis(
             &settings.language,
             crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
             output_temperature_history.iter().map(|(_, value)| *value),
             &settings.graph_style,
             "°C",
+            axis_start.clone(),
         ))
-        .push(
-            widget::Row::new()
-                .width(cosmic::iced::Length::Fill)
-                .push(widget::text::caption(axis_start.clone()))
-                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                .push(widget::text::caption("Now")),
-        )
         ;
     let output_content = widget::Column::new()
         .spacing(8)
@@ -1062,35 +1069,23 @@ fn total_power_overview(
         let input_graph = widget::Column::new()
             .spacing(4)
             .push(widget::text::caption("TOTAL POWER INPUT (W)"))
-            .push(interactive_graph(
+            .push(interactive_graph_with_axis(
                 &settings.language,
                 crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
                 input_history.iter().map(|(_, value)| *value as f64),
                 &settings.graph_style,
                 "W",
+                axis_start.clone(),
             ))
-            .push(
-                widget::Row::new()
-                    .width(cosmic::iced::Length::Fill)
-                    .push(widget::text::caption(axis_start.clone()))
-                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                    .push(widget::text::caption("Now")),
-            )
             .push(widget::text::caption("AVERAGE TEMPERATURE (°C)"))
-            .push(interactive_graph(
+            .push(interactive_graph_with_axis(
                 &settings.language,
                 crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
                 input_temperature_history.iter().map(|(_, value)| *value),
                 &settings.graph_style,
                 "°C",
-            ))
-            .push(
-                widget::Row::new()
-                    .width(cosmic::iced::Length::Fill)
-                    .push(widget::text::caption(axis_start))
-                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                    .push(widget::text::caption("Now")),
-            );
+                axis_start,
+            ));
         let input_content = widget::Column::new()
             .spacing(8)
             .width(cosmic::iced::Length::Fill)
