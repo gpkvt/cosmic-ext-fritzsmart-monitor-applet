@@ -33,7 +33,7 @@ jobs:
   version:
     # The version-bump commit is pushed to main with GITHUB_TOKEN. Ignore
     # that commit here so it cannot recursively start another release run.
-    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore(release)') }}
+    if: ${{ github.event_name != 'push' || (!startsWith(github.event.head_commit.message, 'chore(release)') && !startsWith(github.event.head_commit.message, 'style(rustfmt):')) }}
     name: Bump version and create release tag
     runs-on: ubuntu-24.04
     timeout-minutes: 20
