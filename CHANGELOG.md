@@ -8,6 +8,8 @@ Changes are tracked in date-based entries. See the [GitHub Releases](https://git
 
 ### Fixed
 
+- Align each split panel line to the shared value-column edge using explicit container and fill-width text alignment, rather than the legacy right-alignment helper.
+
 - Right-align split panel values through their fixed-width containers, keeping naturally sized text flush to the same right edge.
 
 ### Fixed
