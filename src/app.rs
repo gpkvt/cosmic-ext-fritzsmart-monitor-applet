@@ -4333,6 +4333,10 @@ impl cosmic::Application for AppModel {
             widget::Row::new()
                 .width(cosmic::iced::Length::Fill)
                 .align_y(cosmic::iced::Alignment::Center)
+                .push(widget::text::caption(format!(
+                    "FRITZ!Power Monitor · v{}",
+                    env!("APP_VERSION")
+                )))
                 .push(
                     widget::Space::new().width(cosmic::iced::Length::Fill),
                 )
