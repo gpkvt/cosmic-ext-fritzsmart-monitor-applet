@@ -4403,7 +4403,9 @@ impl cosmic::Application for AppModel {
                             })
                             .into()
                     };
-                weather_section = weather_section.push(weather_card);
+                // Keep the refresh indicator flush against the image. The
+                // surrounding weather section retains its normal spacing.
+                let mut weather_visual = widget::Column::new().spacing(0).push(weather_card);
                 if has_background_image && self.settings.weather_enabled {
                     let refresh_interval = Duration::from_secs(
                         u64::from(self.settings.weather_refresh_interval_minutes.clamp(5, 60)) * 60,
@@ -4421,13 +4423,14 @@ impl cosmic::Application for AppModel {
                         })
                         .unwrap_or(1.0)
                         .clamp(0.0, 1.0);
-                    weather_section = weather_section.push(
+                    weather_visual = weather_visual.push(
                         widget::progress_bar::linear::Linear::new()
                             .girth(2.0)
                             .progress(progress)
                             .width(cosmic::iced::Length::Fill),
                     );
                 }
+                weather_section = weather_section.push(weather_visual);
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
                     let forecast_range_selector = widget::Row::new()
