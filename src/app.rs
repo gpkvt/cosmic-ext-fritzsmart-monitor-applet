@@ -2212,11 +2212,16 @@ impl cosmic::Application for AppModel {
                 (text.chars().count() as f32 * panel_text_size * 0.62).max(panel_text_size)
             };
             if let Some((upper, lower)) = value.split_once('\n') {
-                // Render both lines in one text widget so the toolkit uses a
-                // single continuous line-height calculation with no gap
-                // introduced by separate row containers.
-                let stepped_value = format!("{upper}\n\u{00a0}\u{00a0}{lower}");
-                panel_text(stepped_value).into()
+                // Use two naturally sized text rows with zero column spacing.
+                // This keeps split-unit values (including unpaired items) in
+                // the same compact layout without multiline text measurement
+                // shifting the lower line outside the value column.
+                let lower = format!("\u{00a0}\u{00a0}{lower}");
+                widget::Column::new()
+                    .spacing(0)
+                    .push(panel_text(upper.to_string()))
+                    .push(panel_text(lower))
+                    .into()
             } else {
                 let width = text_width(&value);
                 widget::container(
