@@ -2790,30 +2790,30 @@ impl cosmic::Application for AppModel {
                 .push({
                     let controls: cosmic::Element<'_, Message> =
                         if self.history_graph_index.is_some() {
-                        let presets = [
-                            ("15m", 15),
-                            ("1h", 60),
-                            ("6h", 360),
-                            ("24h", 1_440),
-                            ("7d", 10_080),
-                            ("30d", 43_200),
-                        ];
-                        let mut ranges = widget::Row::new()
-                            .spacing(6)
-                            .align_y(cosmic::iced::Alignment::Center);
-                        for (label, minutes) in presets {
-                            let caption = if self.settings.graph_timespan_minutes == minutes {
-                                format!("✓ {label}")
-                            } else {
-                                label.to_string()
-                            };
-                            ranges = ranges.push(
-                                widget::button::custom(widget::text::caption(caption))
-                                    .on_press(Message::GraphHistoryTimespanChanged(minutes))
-                                    .padding([6, 10])
-                                    .class(cosmic::theme::Button::Text),
-                            );
-                        }
+                            let presets = [
+                                ("15m", 15),
+                                ("1h", 60),
+                                ("6h", 360),
+                                ("24h", 1_440),
+                                ("7d", 10_080),
+                                ("30d", 43_200),
+                            ];
+                            let mut ranges = widget::Row::new()
+                                .spacing(6)
+                                .align_y(cosmic::iced::Alignment::Center);
+                            for (label, minutes) in presets {
+                                let caption = if self.settings.graph_timespan_minutes == minutes {
+                                    format!("✓ {label}")
+                                } else {
+                                    label.to_string()
+                                };
+                                ranges = ranges.push(
+                                    widget::button::custom(widget::text::caption(caption))
+                                        .on_press(Message::GraphHistoryTimespanChanged(minutes))
+                                        .padding([6, 10])
+                                        .class(cosmic::theme::Button::Text),
+                                );
+                            }
                             widget::container(ranges)
                                 .width(cosmic::iced::Length::Fill)
                                 .into()
@@ -5098,8 +5098,9 @@ impl cosmic::Application for AppModel {
                     .width(cosmic::iced::Length::Fill)
                     .padding([8, 12])
                     .class(cosmic::theme::Button::ListItem(heading_radius));
-                    let history_button: cosmic::Element<'_, Message> =
-                        if device_history.is_some_and(|samples| !samples.is_empty()) {
+                    let history_button: cosmic::Element<'_, Message> = if device_history
+                        .is_some_and(|samples| !samples.is_empty())
+                    {
                         widget::button::custom(
                             widget::Row::new()
                                 .spacing(5)
@@ -5948,10 +5949,14 @@ impl cosmic::Application for AppModel {
                         self.history
                             .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
                         for samples in self.device_history.values_mut() {
-                            samples.retain(|(timestamp, _, _)| now.duration_since(*timestamp) <= window);
+                            samples.retain(|(timestamp, _, _)| {
+                                now.duration_since(*timestamp) <= window
+                            });
                         }
                         if let Some(index) = self.history_graph_index {
-                            if let Some((key, name)) = self.history_graph_devices.get(index).cloned() {
+                            if let Some((key, name)) =
+                                self.history_graph_devices.get(index).cloned()
+                            {
                                 if let Some(samples) = self.device_history.get(&key) {
                                     let values =
                                         samples.iter().map(|(_, power, _)| *power as f64).collect();
@@ -5974,7 +5979,9 @@ impl cosmic::Application for AppModel {
                                 }
                             }
                         }
-                        if let Err(error) = crate::history::save(&self.history, &self.device_history) {
+                        if let Err(error) =
+                            crate::history::save(&self.history, &self.device_history)
+                        {
                             eprintln!("Could not persist graph history: {error}");
                         }
                         self.persist_settings();
