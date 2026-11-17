@@ -4530,7 +4530,7 @@ impl cosmic::Application for AppModel {
                 ));
                 content = content.push(widget::text::caption(crate::i18n::tr(
                     &self.settings.language,
-                    "Writes a diagnostic report to ~/debug.txt. Passwords and API keys are excluded.",
+                    "Writes ~/debug.txt with live FRITZ!Box endpoint data for every device. Passwords, API keys and session IDs are excluded; device identifiers are included.",
                 )));
                 content = content.push(action_button(
                     "edit-clear-all-symbolic",
