@@ -1754,7 +1754,7 @@ dependencies = [
 
 [[package]]
 name = "fritz-power-monitor"
-version = "0.8.63"
+version = "0.8.64"
 dependencies = [
  "chrono",
  "futures",
