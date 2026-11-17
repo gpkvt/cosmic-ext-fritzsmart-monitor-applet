@@ -1440,6 +1440,43 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             ("no", "INTERNET BANDWIDTH") => "INTERNETTBÅNDBREDDE",
             ("no", "CONNECTION ERROR") => "TILKOBLINGSFEIL",
 
+
+            // es device availability states
+            ("es", "FRITZ!Box device unavailable") => "Dispositivo FRITZ!Box no disponible",
+            ("es", "FRITZ!Box devices unavailable") => "Dispositivos FRITZ!Box no disponibles",
+
+            // nl device availability states
+            ("nl", "FRITZ!Box device unavailable") => "FRITZ!Box-apparaat niet beschikbaar",
+            ("nl", "FRITZ!Box devices unavailable") => "FRITZ!Box-apparaten niet beschikbaar",
+
+            // fr device availability states
+            ("fr", "FRITZ!Box device unavailable") => "Appareil FRITZ!Box indisponible",
+            ("fr", "FRITZ!Box devices unavailable") => "Appareils FRITZ!Box indisponibles",
+
+            // it device availability states
+            ("it", "FRITZ!Box device unavailable") => "Dispositivo FRITZ!Box non disponibile",
+            ("it", "FRITZ!Box devices unavailable") => "Dispositivi FRITZ!Box non disponibili",
+
+            // sv device availability states
+            ("sv", "FRITZ!Box device unavailable") => "FRITZ!Box-enheten är inte tillgänglig",
+            ("sv", "FRITZ!Box devices unavailable") => "FRITZ!Box-enheterna är inte tillgängliga",
+
+            // pt device availability states
+            ("pt", "FRITZ!Box device unavailable") => "Dispositivo FRITZ!Box indisponível",
+            ("pt", "FRITZ!Box devices unavailable") => "Dispositivos FRITZ!Box indisponíveis",
+
+            // pl device availability states
+            ("pl", "FRITZ!Box device unavailable") => "Urządzenie FRITZ!Box jest niedostępne",
+            ("pl", "FRITZ!Box devices unavailable") => "Urządzenia FRITZ!Box są niedostępne",
+
+            // da device availability states
+            ("da", "FRITZ!Box device unavailable") => "FRITZ!Box-enhed ikke tilgængelig",
+            ("da", "FRITZ!Box devices unavailable") => "FRITZ!Box-enheder ikke tilgængelige",
+
+            // no device availability states
+            ("no", "FRITZ!Box device unavailable") => "FRITZ!Box-enhet er utilgjengelig",
+            ("no", "FRITZ!Box devices unavailable") => "FRITZ!Box-enheter er utilgjengelige",
+
             _ => key,
         };
     }
@@ -1719,7 +1756,7 @@ mod tests {
     #[test]
     fn expanded_interface_and_diagnostics_are_translated_for_every_added_locale() {
         for language in ["es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no"] {
-            for key in ["Panel item order", "Show internet bandwidth", "FRITZ!Box URL", "Connection security", "Send test notification", "Get 7-day forecast"] {
+            for key in ["Panel item order", "Show internet bandwidth", "FRITZ!Box URL", "Connection security", "Send test notification", "Get 7-day forecast", "Certificate validation disabled", "WEATHER UNAVAILABLE", "FRITZ!Box device unavailable"] {
                 assert_ne!(tr(language, key), key, "{language}: {key}");
             }
         }
