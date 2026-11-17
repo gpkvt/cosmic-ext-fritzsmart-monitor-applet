@@ -4209,9 +4209,6 @@ impl cosmic::Application for AppModel {
                     ))
                     .push(diagnostic_url_button(
                         "https://commons.wikimedia.org/w/api.php".into(),
-                    ))
-                    .push(widget::text::caption(
-                        "Thumbnail URL is returned by the API.",
                     ));
 
                 let forecast_status = if self.settings.weather_location.trim().is_empty() {
