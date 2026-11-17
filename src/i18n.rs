@@ -2432,7 +2432,7 @@ mod tests {
     #[test]
     fn language_picker_names_are_localized_for_every_supported_locale() {
         let languages = ["English", "German", "Spanish", "Dutch", "French", "Italian", "Swedish", "Portuguese", "Polish", "Danish", "Norwegian", "Japanese", "Korean"];
-        for locale in ["en", "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko"] {
+        for locale in ["de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko"] {
             for name in languages {
                 assert_ne!(tr(locale, name), name, "{locale}: {name}");
             }
