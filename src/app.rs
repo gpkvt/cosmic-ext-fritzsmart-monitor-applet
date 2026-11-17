@@ -4333,6 +4333,7 @@ impl cosmic::Application for AppModel {
                     .and_then(|frame| self.weather_slideshow_handles.get(*frame))
                     .cloned()
                     .or_else(|| self.weather_background_handle.clone());
+                let has_background_image = current_image_handle.is_some();
                 let weather_card: cosmic::Element<'_, Message> =
                     if let Some(image_handle) = current_image_handle {
                         let photo = widget::image::Image::new(image_handle)
@@ -4403,6 +4404,28 @@ impl cosmic::Application for AppModel {
                             .into()
                     };
                 weather_section = weather_section.push(weather_card);
+                if has_background_image && self.settings.weather_enabled {
+                    let refresh_interval = Duration::from_secs(
+                        u64::from(self.settings.weather_refresh_interval_minutes.clamp(5, 60)) * 60,
+                    );
+                    // A missing deadline means the request is currently in flight.
+                    // Keep the line full until the response arrives and starts the
+                    // next interval, so it resets only after the image fetch completes.
+                    let progress = self
+                        .next_weather_refresh_at
+                        .map(|deadline| {
+                            let remaining = deadline
+                                .saturating_duration_since(Instant::now())
+                                .as_secs_f32();
+                            1.0 - remaining / refresh_interval.as_secs_f32()
+                        })
+                        .unwrap_or(1.0)
+                        .clamp(0.0, 1.0);
+                    weather_section = weather_section.push(
+                        widget::progress_bar(0.0..=1.0, progress)
+                            .height(cosmic::iced::Length::Fixed(2.0)),
+                    );
+                }
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
                     let forecast_range_selector = widget::Row::new()
