@@ -2220,7 +2220,7 @@ impl cosmic::Application for AppModel {
                 self.core
                     .applet
                     .text(value)
-                    .size(panel_text_size)
+                    .size(panel_text_size * 1.1)
                     .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.85))
                     .into()
             } else {
@@ -2306,7 +2306,13 @@ impl cosmic::Application for AppModel {
                 "weather",
                 panel_item(
                     "Weather",
-                    Some(widget::icon::from_name(weather.icon_name()).size(10).into()),
+                    Some(
+                        widget::icon::from_name(weather.icon_name())
+                            .size(if self.settings.panel_multiline
+                                && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "temperature")
+                            { 14 } else { 10 })
+                            .into(),
+                    ),
                     panel_value(panel_value_with_unit(
                         format!(
                             "{:.0} °C",
@@ -2352,8 +2358,14 @@ impl cosmic::Application for AppModel {
                             widget::svg(widget::svg::Handle::from_memory(
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5M16 3v5"/><path d="M6 8h12v3a6 6 0 0 1-6 6h0a6 6 0 0 1-6-6V8Z"/><path d="M12 17v2a3 3 0 0 0 3 3h1"/></svg>"#.to_vec(),
                             ))
-                            .width(10)
-                            .height(10)
+                            .width(if self.settings.panel_multiline
+                                && (self.settings.panel_net_power
+                                    || self.settings.hidden_panel_items.iter().any(|hidden| hidden == "solar-power")
+                                    || input_power.is_none()) { 14 } else { 10 })
+                            .height(if self.settings.panel_multiline
+                                && (self.settings.panel_net_power
+                                    || self.settings.hidden_panel_items.iter().any(|hidden| hidden == "solar-power")
+                                    || input_power.is_none()) { 14 } else { 10 })
                             .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
                                 color: Some(theme.cosmic().on_bg_color().into()),
                             }))
@@ -2390,8 +2402,10 @@ impl cosmic::Application for AppModel {
                             widget::svg(widget::svg::Handle::from_memory(
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2-5h14l2 5H3Z"/><path d="M4 9h16l-2 11H6L4 9Z"/><path d="M8 9l1 11M16 9l-1 11M5 13h14M6 17h12"/><path d="M12 1v2M2 5l2 1M22 5l-2 1"/></svg>"#.to_vec(),
                             ))
-                            .width(10)
-                            .height(10)
+                            .width(if self.settings.panel_multiline
+                                && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption") { 14 } else { 10 })
+                            .height(if self.settings.panel_multiline
+                                && self.settings.hidden_panel_items.iter().any(|hidden| hidden == "power-consumption") { 14 } else { 10 })
                             .class(cosmic::theme::Svg::custom(|theme| {
                                 cosmic::iced::widget::svg::Style {
                                     color: Some(theme.cosmic().on_bg_color().into()),
@@ -2470,8 +2484,14 @@ impl cosmic::Application for AppModel {
                             widget::svg(widget::svg::Handle::from_memory(
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z"/><path d="M12 11v6"/></svg>"#.to_vec(),
                             ))
-                            .width(16)
-                            .height(16)
+                            .width(if self.settings.panel_multiline
+                                && (self.settings.hidden_panel_items.iter().any(|hidden| hidden == "weather")
+                                    || !self.settings.weather_enabled
+                                    || self.weather.is_none()) { 20 } else { 16 })
+                            .height(if self.settings.panel_multiline
+                                && (self.settings.hidden_panel_items.iter().any(|hidden| hidden == "weather")
+                                    || !self.settings.weather_enabled
+                                    || self.weather.is_none()) { 20 } else { 16 })
                             .class(cosmic::theme::Svg::custom(|theme| cosmic::iced::widget::svg::Style {
                                 color: Some(theme.cosmic().on_bg_color().into()),
                             }))
