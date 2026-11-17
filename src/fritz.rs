@@ -1573,6 +1573,7 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
         }
     }
 
+    let mut system_info: Option<FritzBoxSystemInfo> = None;
     // DeviceInfo exposes the router identity, installed FRITZ!OS release,
     // hardware revision and uptime. Never export the serial number or device log.
     if let Some(endpoint) = device_info_url(base) {
@@ -1602,14 +1603,17 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                 )
                 .await
                 {
-                    Ok(response_body) => endpoints.push(json!({
+                    Ok(response_body) => {
+                        system_info = parse_device_info(&response_body);
+                        endpoints.push(json!({
                         "name": "device_information",
                         "method": "POST",
                         "endpoint": endpoint_path,
                         "soap_action": format!("{SERVICE}#GetInfo"),
                         "status": status,
                         "body_json": redact_device_info_json(xml_response_as_json(&response_body)),
-                    })),
+                    }));
+                    },
                     Err(error) => endpoints.push(json!({
                         "name": "device_information",
                         "method": "POST",
@@ -1660,7 +1664,21 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                 )
                 .await
                 {
-                    Ok(response_body) => endpoints.push(json!({
+                    Ok(response_body) => {
+                        if let Some(wan_info) = parse_wan_link_info(&response_body) {
+                            system_info
+                                .get_or_insert_with(|| FritzBoxSystemInfo {
+                                    manufacturer: None,
+                                    model: None,
+                                    product_class: None,
+                                    hardware_version: None,
+                                    software_version: None,
+                                    uptime_seconds: None,
+                                    wan: None,
+                                })
+                                .wan = Some(wan_info);
+                        }
+                        endpoints.push(json!({
                         "name": "wan_common_interface_link_properties",
                         "method": "POST",
                         "endpoint": endpoint_path,
@@ -1668,7 +1686,8 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                         "status": status,
                         "body_json": xml_response_as_json(&response_body),
                         "body_raw": response_body,
-                    })),
+                    }));
+                    },
                     Err(error) => endpoints.push(json!({
                         "name": "wan_common_interface_link_properties",
                         "method": "POST",
@@ -1688,7 +1707,23 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
         }
     }
 
+    let system_info_json = system_info.as_ref().map(|info| json!({
+        "manufacturer": info.manufacturer,
+        "model": info.model,
+        "product_class": info.product_class,
+        "hardware_version": info.hardware_version,
+        "software_version": info.software_version,
+        "uptime_seconds": info.uptime_seconds,
+        "wan": info.wan.as_ref().map(|wan| json!({
+            "access_type": wan.access_type,
+            "physical_link_status": wan.physical_link_status,
+            "download_bits_per_second": wan.download_bits_per_second,
+            "upload_bits_per_second": wan.upload_bits_per_second,
+        })),
+    }));
+
     json!({
+        "system_info": system_info_json,
         "base_url": {
             "scheme": reqwest::Url::parse(base).map(|url| url.scheme().to_string()).unwrap_or_default(),
             "host": reqwest::Url::parse(base).ok().and_then(|url| url.host_str().map(str::to_string)),
