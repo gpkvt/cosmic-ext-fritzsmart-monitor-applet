@@ -959,7 +959,7 @@ fn total_power_section(
             "{value_w} W"
         ))));
         if let Some(temperature) = temperature {
-            heading = heading.push(widget::text::caption(temperature));
+            heading = heading.push(widget::text::title3(keep_value_unit_together(temperature)));
         }
     }
     let heading = widget::button::custom(
@@ -4127,7 +4127,7 @@ impl cosmic::Application for AppModel {
                             heading_row.push(widget::text::title3(power))
                         };
                         if let Some(temperature) = temperature {
-                            heading_row.push(widget::text::caption(temperature))
+                            heading_row.push(widget::text::title3(temperature))
                         } else {
                             heading_row
                         }
