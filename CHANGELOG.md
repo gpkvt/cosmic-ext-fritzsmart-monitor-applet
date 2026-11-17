@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- Corrected split-unit formatting for unpaired readings in two-line panel mode while keeping the two lines tightly stacked.
+
+## [17.11.2026]
+
+### Fixed
+
 - Removed the visible gap between the two lines in the compact panel layout by rendering the stepped value as one multiline text widget.
 
 ## [17.11.2026]
