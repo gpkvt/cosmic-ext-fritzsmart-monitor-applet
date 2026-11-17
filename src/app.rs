@@ -332,22 +332,15 @@ fn rebuild_device_history_graph(
         .flat_map(|samples| samples.iter())
         .filter(|(timestamp, _, _)| now.duration_since(*timestamp) <= window)
         .collect();
-    let values = visible
-        .iter()
-        .map(|(_, power, _)| *power as f64)
-        .collect();
+    let values = visible.iter().map(|(_, power, _)| *power as f64).collect();
     let axis_start = format_graph_axis_start(
         minutes,
-        visible.first().map(|(timestamp, _, _)| {
-            now.duration_since(*timestamp).as_secs().div_ceil(60)
-        }),
+        visible
+            .first()
+            .map(|(timestamp, _, _)| now.duration_since(*timestamp).as_secs().div_ceil(60)),
     );
     (
-        format!(
-            "{} · {}",
-            name,
-            crate::i18n::tr(language, "POWER (W)")
-        ),
+        format!("{} · {}", name, crate::i18n::tr(language, "POWER (W)")),
         values,
         "W".into(),
         Some(axis_start),
@@ -6002,7 +5995,8 @@ impl cosmic::Application for AppModel {
                         self.history = history;
                         self.device_history = device_history;
                         if let Some(index) = self.history_graph_index
-                            && let Some((key, name)) = self.history_graph_devices.get(index).cloned()
+                            && let Some((key, name)) =
+                                self.history_graph_devices.get(index).cloned()
                         {
                             self.expanded_graph = Some(rebuild_device_history_graph(
                                 &self.device_history,
@@ -6678,7 +6672,8 @@ impl cosmic::Application for AppModel {
                     (self.history, self.device_history) = crate::history::load(storage_window);
                     let window = graph_history_window(self.settings.graph_timespan_minutes);
                     let now = Instant::now();
-                    self.history.retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
+                    self.history
+                        .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
                     self.history_storage_diagnostics = crate::history::diagnostics(storage_window);
                     if let Some(index) = self.history_graph_index
                         && let Some((key, name)) = self.history_graph_devices.get(index).cloned()
@@ -7082,7 +7077,8 @@ impl cosmic::Application for AppModel {
                 (self.history, self.device_history) = crate::history::load(storage_window);
                 let window = graph_history_window(self.settings.graph_timespan_minutes);
                 let now = Instant::now();
-                self.history.retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
+                self.history
+                    .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
                 self.history_storage_diagnostics = crate::history::diagnostics(storage_window);
                 if let Some(index) = self.history_graph_index
                     && let Some((key, name)) = self.history_graph_devices.get(index).cloned()
