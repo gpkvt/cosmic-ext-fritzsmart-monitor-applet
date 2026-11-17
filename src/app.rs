@@ -5792,7 +5792,7 @@ impl cosmic::Application for AppModel {
                     self.weather_forecast_loading = false;
                     self.weather_forecast_expanded = false;
                 }
-                self.persist_settings();
+                self.persist_layout_state();
             }
             Message::OpenWeatherMapApiKeyChanged(value) => {
                 self.settings.openweathermap_api_key = value;
