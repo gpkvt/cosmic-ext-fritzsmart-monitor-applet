@@ -1793,7 +1793,19 @@ mod tests {
     #[test]
     fn expanded_interface_and_diagnostics_are_translated_for_every_added_locale() {
         for language in ["es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no"] {
-            for key in ["Panel item order", "Show internet bandwidth", "FRITZ!Box URL", "Connection security", "Send test notification", "Get 7-day forecast", "Certificate validation disabled", "WEATHER UNAVAILABLE", "FRITZ!Box device unavailable", "e.g. Amsterdam or 52.37,4.90", "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location."] {
+            for key in [
+                "Panel item order",
+                "Show internet bandwidth",
+                "FRITZ!Box URL",
+                "Connection security",
+                "Send test notification",
+                "Get 7-day forecast",
+                "Certificate validation disabled",
+                "WEATHER UNAVAILABLE",
+                "FRITZ!Box device unavailable",
+                "e.g. Amsterdam or 52.37,4.90",
+                "Independent of FRITZ!Box refresh; default 10 minutes. Requires an API key and location.",
+            ] {
                 assert_ne!(tr(language, key), key, "{language}: {key}");
             }
         }
