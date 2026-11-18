@@ -329,9 +329,7 @@ fn persist_devices(devices: &[TasmotaDevice]) {
         return;
     };
     let temporary = parent.join(format!(".fritz_solar_tasmota.{}.tmp", std::process::id()));
-    if std::fs::write(&temporary, contents).is_ok()
-        && std::fs::rename(&temporary, &path).is_err()
-    {
+    if std::fs::write(&temporary, contents).is_ok() && std::fs::rename(&temporary, &path).is_err() {
         let _ = std::fs::remove_file(temporary);
     }
 }
