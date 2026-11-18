@@ -353,12 +353,12 @@ fn cpu_temperature_c() -> Option<f64> {
             if !preferred && !(label.is_empty() && file_name == "temp1_input") {
                 continue;
             }
-            if let Ok(raw) = std::fs::read_to_string(entry.path()) {
-                if let Ok(value) = raw.trim().parse::<f64>() {
-                    let temperature = value / 1000.0;
-                    if (-20.0..=150.0).contains(&temperature) {
-                        return Some(temperature);
-                    }
+            if let Ok(raw) = std::fs::read_to_string(entry.path())
+                && let Ok(value) = raw.trim().parse::<f64>()
+            {
+                let temperature = value / 1000.0;
+                if (-20.0..=150.0).contains(&temperature) {
+                    return Some(temperature);
                 }
             }
         }
