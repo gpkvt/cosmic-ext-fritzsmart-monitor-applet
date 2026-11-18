@@ -8756,9 +8756,9 @@ mod history_tests {
                 power_toggle_allowed: true,
             },
         ];
-        let inputs = HashSet::from([
-            crate::fritz::normalize_ain_for_selection("TASMOTA:FFEEDDCCBBAA"),
-        ]);
+        let inputs = HashSet::from([crate::fritz::normalize_ain_for_selection(
+            "TASMOTA:FFEEDDCCBBAA",
+        )]);
 
         assert_eq!(output_power_w(&readings, &inputs), 475);
         assert_eq!(input_power_w(&readings, &inputs), -125);
