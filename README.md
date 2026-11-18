@@ -36,20 +36,22 @@ The screenshots below show the applet in the COSMIC desktop. Open the [screensho
 
 ## Installation
 
-### Download a release
+### Download and install
 
-Prebuilt Linux x86_64 packages are published on the [GitHub Releases page](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases).
+Download the latest portable `.tar.gz` archive from the [project website](https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/#downloads). The archive contains the executable, COSMIC desktop entry, application icon, README and license.
 
-| Package | Install / launch |
-| --- | --- |
-| Debian package | `sudo apt install ./fritz-power-monitor_VERSION_amd64.deb` |
-| AppImage | `chmod +x fritz-power-monitor-VERSION-x86_64.AppImage && ./fritz-power-monitor-VERSION-x86_64.AppImage` |
-| Flatpak bundle | `flatpak install --user ./fritz-power-monitor-VERSION.flatpak` |
-| Portable archive | Extract the archive and run the included `bin/fritz-power-monitor` executable. |
+Extract it and install the files for your user:
 
-Replace `VERSION` with the version in the downloaded filename. Packages are currently built for x86_64 Linux. Check each release for its artifacts and SHA-256 checksums.
+```sh
+tar -xzf fritz-power-monitor-vVERSION-x86_64-unknown-linux-gnu.tar.gz
+cd fritz-power-monitor-vVERSION-x86_64-unknown-linux-gnu
 
-The Flatpak bundle can be installed independently of any app-store listing. Availability in a software store depends on publication of the package by that store.
+install -Dm0755 bin/fritz-power-monitor ~/.local/bin/fritz-power-monitor
+install -Dm0644 share/applications/com.gpkvt.FritzPowerMonitor.desktop ~/.local/share/applications/com.gpkvt.FritzPowerMonitor.desktop
+install -Dm0644 share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg ~/.local/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg
+```
+
+Replace `VERSION` with the version in the downloaded filename. No root access is needed. Open **COSMIC Settings → Desktop → Panel**, choose **Configure panel applets** or **Add applet**, then add **FRITZ!Power Monitor**. If it is not listed, reopen Settings or log out and back in.
 
 ### Build and install from source
 
@@ -182,19 +184,9 @@ The **Diagnostics** settings category provides connection and device information
 
 The interface supports English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian. By default, it follows the COSMIC desktop language; an explicit language can also be selected in Settings. Translation coverage is being expanded, and strings not yet translated fall back to English.
 
-## Building release packages
+## Checks
 
-The packaging script builds Debian, AppImage and Flatpak packages on an x86_64 Linux host. Install its required build tools first (including Cargo, curl, dpkg tooling, Flatpak and flatpak-builder, Git, Python 3 with venv support, and desktop-file utilities).
-
-Run:
-
-```sh
-APP_VERSION=0.8.35 bash packaging/build-linux-packages.sh
-```
-
-The script writes the packages and a `SHA256SUMS` file to `dist/` by default. Set `OUTPUT_DIR` to use another destination. The version shown is an example; use the version you intend to package.
-
-Basic project checks:
+Run the basic project checks locally:
 
 ```sh
 cargo fmt --all -- --check
@@ -202,7 +194,7 @@ cargo test
 cargo build --release
 ```
 
-GitHub Actions also runs project checks and packaging-related validation for changes to the repository.
+GitHub Actions runs the project checks and validates release artifacts.
 
 ## Data, security and privacy
 
@@ -247,7 +239,7 @@ Bug reports, feature requests and contributions are welcome:
 
 - [Open an issue](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues)
 - [Browse the source](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet)
-- [View releases](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases)
+- [Download the latest archive](https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/#downloads)
 
 When reporting a problem, include your COSMIC version, FRITZ!OS version, applet version and relevant diagnostics. Redact passwords, API keys, public IP addresses and other private information.
 
