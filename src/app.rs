@@ -10160,3 +10160,54 @@ mod history_tests {
         }
     }
 }
+
+
+#[cfg(test)]
+mod daily_energy_history_tests {
+    use super::*;
+
+    #[test]
+    fn daily_energy_integrates_solar_and_grid_samples_separately() {
+        let now = Instant::now();
+        let devices = HashMap::from([
+            (
+                "solar-ain".to_string(),
+                VecDeque::from([
+                    (now - Duration::from_secs(60), -1000, 20.0),
+                    (now, -1000, 20.0),
+                ]),
+            ),
+            (
+                "grid-ain".to_string(),
+                VecDeque::from([
+                    (now - Duration::from_secs(60), 300, 20.0),
+                    (now, 300, 20.0),
+                ]),
+            ),
+        ]);
+        let input_ains = HashSet::from(["solar-ain".to_string()]);
+
+        let history = daily_energy_history(&devices, &input_ains, 60);
+        let (date, solar_wh, grid_wh) = history.last().unwrap();
+
+        assert_eq!(*date, chrono::Local::now().date_naive());
+        assert!((solar_wh.unwrap() - 1000.0 / 60.0).abs() < 0.01);
+        assert!((grid_wh.unwrap() - 300.0 / 60.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn daily_energy_ignores_long_gaps_in_recorded_samples() {
+        let now = Instant::now();
+        let devices = HashMap::from([(
+            "solar-ain".to_string(),
+            VecDeque::from([
+                (now - Duration::from_secs(600), -1000, 20.0),
+                (now, -1000, 20.0),
+            ]),
+        )]);
+        let input_ains = HashSet::from(["solar-ain".to_string()]);
+
+        let history = daily_energy_history(&devices, &input_ains, 60);
+        assert!(history.last().unwrap().1.is_none());
+    }
+}
