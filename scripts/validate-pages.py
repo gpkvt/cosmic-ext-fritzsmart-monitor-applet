@@ -76,7 +76,7 @@ for page in pages:
         )
         if expected_archive not in content:
             fail(f"index.html: portable archive link is not synchronized with release version {version}")
-        if re.search(r"releases/download/[^\\"']+\\.(?:deb|AppImage|flatpak)", content, re.I):
+        if re.search(r"releases/download/[^\"']+\.(?:deb|AppImage|flatpak)", content, re.I):
             fail("index.html: only the portable .tar.gz release archive may be linked")
         if any(term in content.lower() for term in ("linux packages", "download .deb", "download appimage", "download flatpak")):
             fail("index.html: obsolete package download section remains")
