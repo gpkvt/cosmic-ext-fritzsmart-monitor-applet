@@ -1,4 +1,8 @@
-use std::{collections::HashSet, net::IpAddr, time::{Duration, Instant}};
+use std::{
+    collections::HashSet,
+    net::IpAddr,
+    time::{Duration, Instant},
+};
 
 use mdns_sd::{ServiceDaemon, ServiceEvent};
 use reqwest::Client;
@@ -27,7 +31,9 @@ fn is_tasmota_service(info: &mdns_sd::ServiceInfo) -> bool {
 }
 
 fn json_string<'a>(value: &'a Value, path: &[&str]) -> Option<&'a str> {
-    path.iter().try_fold(value, |node, key| node.get(*key))?.as_str()
+    path.iter()
+        .try_fold(value, |node, key| node.get(*key))?
+        .as_str()
 }
 
 fn json_number(value: &Value, path: &[&str]) -> Option<f64> {
@@ -63,7 +69,8 @@ fn parse_reading(device: &TasmotaDevice, value: &Value) -> Result<TasmotaReading
 }
 
 fn discover_services() -> Result<Vec<(String, u16, IpAddr)>, String> {
-    let daemon = ServiceDaemon::new().map_err(|error| format!("mDNS discovery unavailable: {error}"))?;
+    let daemon =
+        ServiceDaemon::new().map_err(|error| format!("mDNS discovery unavailable: {error}"))?;
     let service_type = "_http._tcp.local.";
     let receiver = daemon
         .browse(service_type)
@@ -72,7 +79,8 @@ fn discover_services() -> Result<Vec<(String, u16, IpAddr)>, String> {
     let mut found = HashSet::new();
 
     while Instant::now() < deadline {
-        let wait = deadline.saturating_duration_since(Instant::now())
+        let wait = deadline
+            .saturating_duration_since(Instant::now())
             .min(Duration::from_millis(250));
         let Ok(event) = receiver.recv_timeout(wait) else {
             continue;
@@ -83,7 +91,11 @@ fn discover_services() -> Result<Vec<(String, u16, IpAddr)>, String> {
             }
             for address in info.get_addresses() {
                 if matches!(address, IpAddr::V4(_)) {
-                    found.insert((info.get_hostname().trim_end_matches('.').to_string(), info.get_port(), *address));
+                    found.insert((
+                        info.get_hostname().trim_end_matches('.').to_string(),
+                        info.get_port(),
+                        *address,
+                    ));
                 }
             }
         }
@@ -109,11 +121,16 @@ async fn query_status(
         .map_err(|error| format!("Tasmota at {address} is unreachable: {error}"))?
         .error_for_status()
         .map_err(|error| format!("Tasmota at {address} rejected the status request: {error}"))?;
-    response.json::<Value>().await
+    response
+        .json::<Value>()
+        .await
         .map_err(|error| format!("Tasmota at {address} returned invalid status JSON: {error}"))
 }
 
-pub async fn discover_devices(username: String, password: String) -> Result<Vec<TasmotaDevice>, String> {
+pub async fn discover_devices(
+    username: String,
+    password: String,
+) -> Result<Vec<TasmotaDevice>, String> {
     let services = tokio::task::spawn_blocking(discover_services)
         .await
         .map_err(|error| format!("Tasmota discovery task failed: {error}"))??;
@@ -129,9 +146,20 @@ pub async fn discover_devices(username: String, password: String) -> Result<Vec<
             continue;
         };
         let mac = json_string(&status, &["StatusNET", "Mac"])
-            .map(|value| value.chars().filter(|c| c.is_ascii_hexdigit()).collect::<String>().to_ascii_uppercase())
+            .map(|value| {
+                value
+                    .chars()
+                    .filter(|c| c.is_ascii_hexdigit())
+                    .collect::<String>()
+                    .to_ascii_uppercase()
+            })
             .filter(|value| value.len() == 12)
-            .unwrap_or_else(|| hostname.to_ascii_uppercase().replace(".LOCAL", "").replace('-', ""));
+            .unwrap_or_else(|| {
+                hostname
+                    .to_ascii_uppercase()
+                    .replace(".LOCAL", "")
+                    .replace('-', "")
+            });
         let name = json_string(&status, &["Status", "DeviceName"])
             .filter(|value| !value.trim().is_empty())
             .unwrap_or(&hostname)
@@ -159,7 +187,8 @@ pub async fn fetch_readings(
     let mut readings = Vec::new();
     let mut errors = Vec::new();
     for device in devices {
-        match query_status(&client, &device.address, username, password).await
+        match query_status(&client, &device.address, username, password)
+            .await
             .and_then(|status| parse_reading(device, &status))
         {
             Ok(reading) => readings.push(reading),
@@ -189,12 +218,20 @@ pub async fn set_power(
         .map_err(|error| format!("Tasmota power command failed: {error}"))?
         .error_for_status()
         .map_err(|error| format!("Tasmota rejected the power command: {error}"))?;
-    let result: Value = response.json().await
+    let result: Value = response
+        .json()
+        .await
         .map_err(|error| format!("Tasmota returned invalid power-command JSON: {error}"))?;
-    let actual = result.get("POWER").or_else(|| result.get("POWER1"))
+    let actual = result
+        .get("POWER")
+        .or_else(|| result.get("POWER1"))
         .and_then(Value::as_str)
         .is_some_and(|value| value.eq_ignore_ascii_case(if on { "ON" } else { "OFF" }));
-    if actual { Ok(()) } else { Err("Tasmota did not confirm the requested relay state".into()) }
+    if actual {
+        Ok(())
+    } else {
+        Err("Tasmota did not confirm the requested relay state".into())
+    }
 }
 
 #[cfg(test)]
