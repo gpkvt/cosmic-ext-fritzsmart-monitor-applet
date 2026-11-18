@@ -10,12 +10,8 @@ resolve_desktop_user() {
 
     entry="$(getent passwd "$candidate" 2>/dev/null || true)"
     [ -n "$entry" ] || return 1
-    old_ifs=$IFS
-    IFS=:
-    set -- $entry
-    IFS=$old_ifs
-    uid=$3
-    home=$6
+    uid="$(printf '%s\n' "$entry" | cut -d: -f3)"
+    home="$(printf '%s\n' "$entry" | cut -d: -f6)"
     [ -n "$uid" ] && [ "$uid" -ge 1000 ] 2>/dev/null || return 1
     case "$home" in
         /*) ;;
