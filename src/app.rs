@@ -1111,30 +1111,6 @@ fn graph_visual_with_dimensions(
         plot_left + plot_width / 2.0,
         height - 2.0
     );
-    let energy_label = if is_expanded && unit == "W" {
-        axis_start
-            .as_deref()
-            .and_then(parse_graph_axis_minutes)
-            .map(|minutes| {
-                let timespan = Duration::from_secs(u64::from(minutes) * 60);
-                let primary_energy = format_graph_energy(graph_energy_wh(&values, timespan));
-                let label = if secondary_values.is_empty() {
-                    format!("ENERGY  {primary_energy}")
-                } else {
-                    let secondary_energy =
-                        format_graph_energy(graph_energy_wh(&secondary_values, timespan));
-                    format!("ENERGY  Output {primary_energy}  ·  Input {secondary_energy}")
-                };
-                format!(
-                    "<text x=\"{:.2}\" y=\"36\" text-anchor=\"middle\" font-size=\"{font_size:.1}\" font-weight=\"600\" fill=\"#a0a0a0\">{}</text>",
-                    plot_left + plot_width / 2.0,
-                    escape_svg_text(&label)
-                )
-            })
-            .unwrap_or_default()
-    } else {
-        String::new()
-    };
     let min_max_labels = if graph_height > 200.0 {
         format!(
             r##"<text x="{plot_left:.2}" y="18" text-anchor="start" font-size="{font_size:.1}" font-weight="600" fill="#a0a0a0">MIN {}</text><text x="{plot_right:.2}" y="18" text-anchor="end" font-size="{font_size:.1}" font-weight="600" fill="#a0a0a0">MAX {}</text>"##,
@@ -1145,7 +1121,7 @@ fn graph_visual_with_dimensions(
         String::new()
     };
     let svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" preserveAspectRatio=\"none\" font-family=\"Inter, sans-serif\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{min_max_labels}{energy_label}{y_labels}{x_labels}{y_axis_title}{x_axis_title}{drawing}</svg>"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" preserveAspectRatio=\"none\" font-family=\"Inter, sans-serif\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{min_max_labels}{y_labels}{x_labels}{y_axis_title}{x_axis_title}{drawing}</svg>"
     );
     widget::Column::new()
         .spacing(2)
@@ -1175,9 +1151,15 @@ fn graph_stats_row(
     label: String,
     values: &[f64],
     unit: &str,
+    timespan: Duration,
     color: cosmic::iced::Color,
 ) -> cosmic::Element<'static, Message> {
     let metric_width = cosmic::iced::Length::Fixed(88.0);
+    let energy = if unit == "W" {
+        format_graph_energy(graph_energy_wh(values, timespan))
+    } else {
+        "—".to_string()
+    };
     let marker = widget::container(widget::text("●").size(14))
         .width(cosmic::iced::Length::Fixed(18.0))
         .style(move |_| cosmic::iced::widget::container::Style {
@@ -1203,6 +1185,7 @@ fn graph_stats_row(
         .push(widget::text::body(graph_stat_value(values, unit, "MIN")).width(metric_width))
         .push(widget::text::body(graph_stat_value(values, unit, "MAX")).width(metric_width))
         .push(widget::text::body(graph_stat_value(values, unit, "AVG")).width(metric_width))
+        .push(widget::text::body(energy).width(metric_width))
         .into()
 }
 
@@ -1210,6 +1193,7 @@ fn graph_stats_legend(
     title: &str,
     values: &[f64],
     unit: &str,
+    timespan: Duration,
     secondary: Option<(&[f64], &str)>,
 ) -> cosmic::Element<'static, Message> {
     let metric_width = cosmic::iced::Length::Fixed(88.0);
@@ -1219,7 +1203,8 @@ fn graph_stats_legend(
         .push(widget::text::caption("AXIS / SERIES").width(cosmic::iced::Length::Fill))
         .push(widget::text::caption("MIN").width(metric_width))
         .push(widget::text::caption("MAX").width(metric_width))
-        .push(widget::text::caption("AVG").width(metric_width));
+        .push(widget::text::caption("AVG").width(metric_width))
+        .push(widget::text::caption("TOTAL").width(metric_width));
     let mut legend = widget::Column::new()
         .spacing(6)
         .padding([8, 10])
@@ -1230,6 +1215,7 @@ fn graph_stats_legend(
             title.to_string(),
             values,
             unit,
+            timespan,
             cosmic::iced::Color::from_rgb(0.54, 0.71, 0.97),
         ));
     if let Some((secondary_values, secondary_label)) = secondary {
@@ -1237,6 +1223,7 @@ fn graph_stats_legend(
             secondary_label.to_string(),
             secondary_values,
             unit,
+            timespan,
             cosmic::iced::Color::from_rgb(0.51, 0.79, 0.58),
         ));
     }
@@ -1282,6 +1269,13 @@ fn graph_axis_start_for_samples(
             .div_ceil(60)
     });
     format_graph_axis_start(selected_minutes, age)
+}
+
+fn graph_samples_duration(samples: &[(Instant, f64)]) -> Duration {
+    match (samples.first(), samples.last()) {
+        (Some((start, _)), Some((end, _))) => end.saturating_duration_since(*start),
+        _ => Duration::ZERO,
+    }
 }
 
 fn graph_values_only(samples: &[(Instant, f64)]) -> Vec<f64> {
@@ -3526,7 +3520,14 @@ impl cosmic::Application for AppModel {
                         .as_ref()
                         .and_then(|(_, labels)| labels.split('|').next())
                         .unwrap_or(title);
-                    graph_stats_legend(primary_label, &primary_stats, unit, secondary)
+                    let timespan = graph_samples_duration(values);
+                    graph_stats_legend(
+                        primary_label,
+                        &primary_stats,
+                        unit,
+                        timespan,
+                        secondary,
+                    )
                 });
             // Applet popup surfaces do not receive the normal desktop
             // window background automatically. Apply COSMIC's window
