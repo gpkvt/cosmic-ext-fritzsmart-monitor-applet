@@ -3523,10 +3523,7 @@ impl cosmic::Application for AppModel {
                     widget::container(ranges).width(cosmic::iced::Length::Fill)
                 })
                 .push(
-                    if let Some((secondary_values, labels)) = &self.expanded_graph_secondary {
-                        let mut parts = labels.splitn(2, '|');
-                        let primary_label = parts.next().unwrap_or(title);
-                        let secondary_label = parts.next().unwrap_or("Input");
+                    if let Some((secondary_values, _)) = &self.expanded_graph_secondary {
                         graph_visual_large_multi(
                             graph_values_only(values).into_iter(),
                             graph_values_only(secondary_values).into_iter(),
