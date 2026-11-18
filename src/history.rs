@@ -208,10 +208,7 @@ fn load_from_path(path: &Path, window: Duration) -> (PowerHistory, DeviceHistory
     load_from_document(&document, window)
 }
 
-fn load_from_document(
-    document: &Value,
-    window: Duration,
-) -> (PowerHistory, DeviceHistory) {
+fn load_from_document(document: &Value, window: Duration) -> (PowerHistory, DeviceHistory) {
     if document.get("version").and_then(Value::as_u64) != Some(1) {
         return (PowerHistory::new(), DeviceHistory::new());
     }
