@@ -2501,4 +2501,16 @@ mod tests {
             .collect::<Vec<_>>()
         );
     }
+
+
+    #[test]
+    fn bounded_u16_settings_use_defaults_and_clamp_values() {
+        assert_eq!(parse_u16_setting("", 10, 5, 60), 10);
+        assert_eq!(parse_u16_setting("invalid", 10, 5, 60), 10);
+        assert_eq!(parse_u16_setting("1", 10, 5, 60), 5);
+        assert_eq!(parse_u16_setting("30", 10, 5, 60), 30);
+        assert_eq!(parse_u16_setting("90", 10, 5, 60), 60);
+        assert_eq!(parse_u16_setting("1", 10, 5, 300), 5);
+        assert_eq!(parse_u16_setting("600", 10, 5, 300), 300);
+    }
 }
