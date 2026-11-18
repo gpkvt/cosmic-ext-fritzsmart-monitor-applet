@@ -3872,6 +3872,48 @@ impl cosmic::Application for AppModel {
                         .step(1.0_f32),
                     )
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Adjusts the power and temperature text in the panel")))
+                    .push(
+                        widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::Column::new()
+                                    .spacing(3)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Show weather (OpenWeather)")))
+                                    .push(widget::text::caption(crate::i18n::tr(
+                                        &self.settings.language,
+                                        "Display the current OpenWeather conditions in the panel.",
+                                    ))),
+                            )
+                            .push(
+                                widget::container(
+                                    widget::toggler(!self.settings.hidden_panel_items.iter().any(|item| item == "weather"))
+                                        .on_toggle(|visible| Message::TogglePanelItemVisibility("weather", visible)),
+                                )
+                                .padding([8, 10]),
+                            ),
+                    )
+                    .push(
+                        widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::Column::new()
+                                    .spacing(3)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Show temperature (devices)")))
+                                    .push(widget::text::caption(crate::i18n::tr(
+                                        &self.settings.language,
+                                        "Display the temperature reported by selected devices in the panel.",
+                                    ))),
+                            )
+                            .push(
+                                widget::container(
+                                    widget::toggler(!self.settings.hidden_panel_items.iter().any(|item| item == "temperature"))
+                                        .on_toggle(|visible| Message::TogglePanelItemVisibility("temperature", visible)),
+                                )
+                                .padding([8, 10]),
+                            ),
+                    )
                     .push(widget::text::body(format!("{}: {} px", crate::i18n::tr(&self.settings.language, "Panel item spacing"), self.settings.panel_item_spacing)))
                     .push(widget::slider(0.0..=16.0, f32::from(self.settings.panel_item_spacing),
                         |value| Message::PanelItemSpacingChanged(value.round() as u8)).step(1.0_f32))
