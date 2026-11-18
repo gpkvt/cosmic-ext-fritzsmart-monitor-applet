@@ -844,6 +844,9 @@ fn parse_graph_axis_minutes(label: &str) -> Option<u32> {
     let mut total = 0u32;
     let mut number = String::new();
     for character in label.chars() {
+        if character.is_whitespace() {
+            continue;
+        }
         if character.is_ascii_digit() {
             number.push(character);
             continue;
@@ -1008,16 +1011,6 @@ fn graph_visual_with_dimensions(
                 .center_x(cosmic::iced::Length::Fill),
         )
         .into()
-}
-
-fn interactive_graph(
-    language: &str,
-    title: &str,
-    values: impl Iterator<Item = f64>,
-    style: &str,
-    unit: &str,
-) -> cosmic::Element<'static, Message> {
-    interactive_graph_inner(language, title, values, style, unit, None)
 }
 
 fn interactive_graph_with_axis(
@@ -8419,6 +8412,22 @@ mod history_tests {
         assert_eq!(format_graph_timespan(90), "1h 30m");
         assert_eq!(format_graph_timespan(1440), "1 day");
         assert_eq!(format_graph_timespan(2_102_400), "4 years");
+    }
+
+    #[test]
+    fn graph_axis_ticks_parse_compound_elapsed_times() {
+        assert_eq!(parse_graph_axis_minutes("3h ago"), Some(180));
+        assert_eq!(parse_graph_axis_minutes("1d 2h 30m ago"), Some(1590));
+        assert_eq!(parse_graph_axis_minutes("2d 2h 32m ago"), Some(3032));
+        assert_eq!(parse_graph_axis_minutes("Start"), None);
+    }
+
+    #[test]
+    fn graph_y_axis_ticks_keep_useful_precision_for_each_unit() {
+        assert_eq!(format_graph_y_tick(123.4, "W"), "123");
+        assert_eq!(format_graph_y_tick(12.34, "W"), "12.3");
+        assert_eq!(format_graph_y_tick(21.26, "°C"), "21.3");
+        assert_eq!(format_graph_y_tick(8.26, "Mb/s"), "8.3");
     }
 
     #[test]
