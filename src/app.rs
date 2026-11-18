@@ -127,7 +127,6 @@ pub enum Message {
     PanelRefreshButtonChanged(bool),
     PanelAverageTemperatureChanged(bool),
     PanelExcludeSolarTemperatureChanged(bool),
-    PanelInternetBandwidthChanged(bool),
     PanelNetPowerChanged(bool),
     GraphTimespanChanged(u32),
     GraphStyleChanged(String),
@@ -8300,22 +8299,6 @@ impl cosmic::Application for AppModel {
             Message::PanelNetPowerChanged(value) => {
                 self.settings.panel_net_power = value;
                 self.persist_settings();
-            }
-            Message::PanelInternetBandwidthChanged(value) => {
-                self.settings.panel_internet_bandwidth = value;
-                set_panel_item_visibility(
-                    &mut self.settings.hidden_panel_items,
-                    "internet-bandwidth",
-                    value,
-                );
-                self.persist_settings();
-                if value {
-                    self.refresh_started_at = Some(Instant::now());
-                    self.next_refresh_at = None;
-                    return Task::perform(fetch_fritz_data(), |result| {
-                        cosmic::Action::App(Message::Updated(Box::new(result)))
-                    });
-                }
             }
             Message::GraphTimespanChanged(value) => {
                 self.settings.graph_timespan_minutes = value.clamp(5, 2_102_400);
