@@ -6005,152 +6005,111 @@ impl cosmic::Application for AppModel {
                     let device_graph_pair_id = format!("device-graph-pair-{device_key}");
                     let device_graph_pair_collapsed =
                         self.collapsed_menu_sections.contains(&device_graph_pair_id);
-                    let device_graphs = collapsible_graph(
-                        if reading.temperature_c.is_finite() {
-                            "POWER & TEMPERATURE HISTORY"
-                        } else {
-                            "POWER HISTORY"
-                        },
-                        device_graph_pair_id,
-                        device_graph_pair_collapsed,
-                        widget::Column::new()
-                            .spacing(8)
-                            .width(cosmic::iced::Length::Fill)
-                            .push(
-                                widget::container(
-                                    widget::container(
-                                        widget::Column::new()
-                                            .spacing(4)
-                                            .width(cosmic::iced::Length::Fill)
-                                            .push(widget::text::caption(crate::i18n::tr(
-                                                &self.settings.language,
-                                                "POWER (W)",
-                                            )))
-                                            .push(interactive_graph_with_axis(
-                                                &self.settings.language,
-                                                &format!(
-                                                    "{} · {}",
-                                                    reading.name,
-                                                    crate::i18n::tr(
-                                                        &self.settings.language,
-                                                        "POWER (W)"
-                                                    )
-                                                ),
-                                                device_history.into_iter().flat_map(|samples| {
-                                                    samples.iter().map(|(timestamp, power, _)| {
-                                                        (*timestamp, *power as f64)
-                                                    })
-                                                }),
-                                                &self.settings.graph_style,
-                                                "W",
-                                                device_axis_start.clone(),
-                                            )),
-                                    )
-                                    .padding([8, 0])
-                                    .width(cosmic::iced::Length::Fill)
-                                    .style(move |theme| {
-                                        let cosmic = theme.cosmic();
-                                        cosmic::iced::widget::container::Style {
-                                            background: Some(
-                                                cosmic::iced::Color::from(
-                                                    cosmic.background(false).base,
-                                                )
-                                                .into(),
-                                            ),
-                                            border: cosmic::iced::Border {
-                                                radius: device_corner_radius,
-                                                ..Default::default()
-                                            },
-                                            ..Default::default()
-                                        }
+                    let power_graph = widget::container(
+                        widget::container(
+                            widget::Column::new()
+                                .spacing(4)
+                                .width(cosmic::iced::Length::Fill)
+                                .push(widget::text::caption(crate::i18n::tr(
+                                    &self.settings.language,
+                                    "POWER (W)",
+                                )))
+                                .push(interactive_graph_with_axis(
+                                    &self.settings.language,
+                                    &format!(
+                                        "{} · {}",
+                                        reading.name,
+                                        crate::i18n::tr(&self.settings.language, "POWER (W)")
+                                    ),
+                                    device_history.into_iter().flat_map(|samples| {
+                                        samples.iter().map(|(timestamp, power, _)| {
+                                            (*timestamp, *power as f64)
+                                        })
                                     }),
-                                )
-                                .padding(1)
-                                .width(cosmic::iced::Length::Fill)
-                                .style(move |theme| {
-                                    let cosmic = theme.cosmic();
-                                    cosmic::iced::widget::container::Style {
-                                        background: Some(
-                                            cosmic::iced::Color::from(
-                                                cosmic.background(false).small_widget,
-                                            )
-                                            .into(),
-                                        ),
-                                        border: cosmic::iced::Border {
-                                            radius: device_corner_radius,
-                                            ..Default::default()
-                                        },
-                                        ..Default::default()
-                                    }
-                                }),
-                            )
-                            .into(),
-                    );
+                                    &self.settings.graph_style,
+                                    "W",
+                                    device_axis_start.clone(),
+                                )),
+                        )
+                        .padding([8, 0])
+                        .width(cosmic::iced::Length::Fill)
+                        .style(move |theme| {
+                            let cosmic = theme.cosmic();
+                            cosmic::iced::widget::container::Style {
+                                background: Some(
+                                    cosmic::iced::Color::from(cosmic.background(false).base)
+                                        .into(),
+                                ),
+                                border: cosmic::iced::Border {
+                                    radius: device_corner_radius,
+                                    ..Default::default()
+                                },
+                                ..Default::default()
+                            }
+                        }),
+                    )
+                    .padding(1)
+                    .width(cosmic::iced::Length::Fill)
+                    .style(move |theme| {
+                        let cosmic = theme.cosmic();
+                        cosmic::iced::widget::container::Style {
+                            background: Some(
+                                cosmic::iced::Color::from(cosmic.background(false).small_widget)
+                                    .into(),
+                            ),
+                            border: cosmic::iced::Border {
+                                radius: device_corner_radius,
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        }
+                    });
+                    let mut device_graph_content = widget::Column::new()
+                        .spacing(8)
+                        .width(cosmic::iced::Length::Fill)
+                        .push(power_graph);
                     if reading.temperature_c.is_finite() {
-                        device_graphs = device_graphs.push(
+                        let temperature_graph = widget::container(
                             widget::container(
-                                widget::container(
-                                    widget::Column::new()
-                                        .spacing(4)
-                                        .width(cosmic::iced::Length::Fill)
-                                        .push(widget::text::caption(crate::i18n::tr(
-                                            &self.settings.language,
-                                            "TEMPERATURE (°C)",
-                                        )))
-                                        .push(interactive_graph_with_axis(
-                                            &self.settings.language,
-                                            &format!(
-                                                "{} · {}",
-                                                reading.name,
-                                                crate::i18n::tr(
-                                                    &self.settings.language,
-                                                    "TEMPERATURE (°C)"
-                                                )
-                                            ),
-                                            device_history.into_iter().flat_map(|samples| {
-                                                samples.iter().filter_map(
-                                                    |(timestamp, _, temperature)| {
-                                                        temperature.is_finite().then_some((
-                                                            *timestamp,
-                                                            *temperature,
-                                                        ))
-                                                    },
-                                                )
-                                            }),
-                                            &self.settings.graph_style,
-                                            "°C",
-                                            device_axis_start,
-                                        )),
-                                )
-                                .padding([8, 0])
-                                .width(cosmic::iced::Length::Fill)
-                                .style(move |theme| {
-                                    let cosmic = theme.cosmic();
-                                    cosmic::iced::widget::container::Style {
-                                        background: Some(
-                                            cosmic::iced::Color::from(
-                                                cosmic.background(false).base,
+                                widget::Column::new()
+                                    .spacing(4)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::caption(crate::i18n::tr(
+                                        &self.settings.language,
+                                        "TEMPERATURE (°C)",
+                                    )))
+                                    .push(interactive_graph_with_axis(
+                                        &self.settings.language,
+                                        &format!(
+                                            "{} · {}",
+                                            reading.name,
+                                            crate::i18n::tr(
+                                                &self.settings.language,
+                                                "TEMPERATURE (°C)"
                                             )
-                                            .into(),
                                         ),
-                                        border: cosmic::iced::Border {
-                                            radius: device_corner_radius,
-                                            ..Default::default()
-                                        },
-                                        ..Default::default()
-                                    }
-                                }),
+                                        device_history.into_iter().flat_map(|samples| {
+                                            samples.iter().filter_map(
+                                                |(timestamp, _, temperature)| {
+                                                    temperature
+                                                        .is_finite()
+                                                        .then_some((*timestamp, *temperature))
+                                                },
+                                            )
+                                        }),
+                                        &self.settings.graph_style,
+                                        "°C",
+                                        device_axis_start,
+                                    )),
                             )
-                            .padding(1)
+                            .padding([8, 0])
                             .width(cosmic::iced::Length::Fill)
                             .style(move |theme| {
                                 let cosmic = theme.cosmic();
                                 cosmic::iced::widget::container::Style {
                                     background: Some(
-                                        cosmic::iced::Color::from(
-                                            cosmic.background(false).small_widget,
-                                        )
-                                        .into(),
+                                        cosmic::iced::Color::from(cosmic.background(false).base)
+                                            .into(),
                                     ),
                                     border: cosmic::iced::Border {
                                         radius: device_corner_radius,
@@ -6159,9 +6118,34 @@ impl cosmic::Application for AppModel {
                                     ..Default::default()
                                 }
                             }),
-                        );
+                        )
+                        .padding(1)
+                        .width(cosmic::iced::Length::Fill)
+                        .style(move |theme| {
+                            let cosmic = theme.cosmic();
+                            cosmic::iced::widget::container::Style {
+                                background: Some(
+                                    cosmic::iced::Color::from(cosmic.background(false).small_widget)
+                                        .into(),
+                                ),
+                                border: cosmic::iced::Border {
+                                    radius: device_corner_radius,
+                                    ..Default::default()
+                                },
+                                ..Default::default()
+                            }
+                        });
+                        device_graph_content = device_graph_content.push(temperature_graph);
                     }
-
+                    let device_graphs = collapsible_graph(
+                        if reading.temperature_c.is_finite() {
+                            "POWER & TEMPERATURE HISTORY"
+                        } else {
+                            "POWER HISTORY"
+                        },
+                        device_graph_pair_id,
+                        device_graph_pair_collapsed,
+                        device_graph_content.into(),
                     );
                     let device_content = widget::Column::new()
                         .spacing(10)
