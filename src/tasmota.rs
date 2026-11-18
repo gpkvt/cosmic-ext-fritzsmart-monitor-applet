@@ -122,21 +122,26 @@ async fn query_status(
         ])
         .send()
         .await
-        .map_err(|error| format!("Tasmota at {address} is unreachable: {}", error.without_url()))?
+        .map_err(|error| {
+            format!(
+                "Tasmota at {address} is unreachable: {}",
+                error.without_url()
+            )
+        })?
         .error_for_status()
-        .map_err(|error| format!(
-            "Tasmota at {address} rejected the status request: {}",
-            error.without_url()
-        ))?;
-    response
-        .json::<Value>()
-        .await
-        .map_err(|error| format!(
+        .map_err(|error| {
+            format!(
+                "Tasmota at {address} rejected the status request: {}",
+                error.without_url()
+            )
+        })?;
+    response.json::<Value>().await.map_err(|error| {
+        format!(
             "Tasmota at {address} returned invalid status JSON: {}",
             error.without_url()
-        ))
+        )
+    })
 }
-
 
 fn device_cache() -> &'static Mutex<Option<(Instant, Vec<TasmotaDevice>)>> {
     static CACHE: OnceLock<Mutex<Option<(Instant, Vec<TasmotaDevice>)>>> = OnceLock::new();
@@ -208,7 +213,8 @@ pub async fn discover_devices(
     devices.dedup_by(|a, b| a.id == b.id);
     *device_cache()
         .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some((Instant::now(), devices.clone()));
+        .unwrap_or_else(std::sync::PoisonError::into_inner) =
+        Some((Instant::now(), devices.clone()));
     Ok(devices)
 }
 
@@ -257,17 +263,18 @@ pub async fn set_power(
         .await
         .map_err(|error| format!("Tasmota power command failed: {}", error.without_url()))?
         .error_for_status()
-        .map_err(|error| format!(
-            "Tasmota rejected the power command: {}",
-            error.without_url()
-        ))?;
-    let result: Value = response
-        .json()
-        .await
-        .map_err(|error| format!(
+        .map_err(|error| {
+            format!(
+                "Tasmota rejected the power command: {}",
+                error.without_url()
+            )
+        })?;
+    let result: Value = response.json().await.map_err(|error| {
+        format!(
             "Tasmota returned invalid power-command JSON: {}",
             error.without_url()
-        ))?;
+        )
+    })?;
     let actual = result
         .get("POWER")
         .or_else(|| result.get("POWER1"))
