@@ -933,7 +933,11 @@ pub fn build_weather_slideshow_frames(
                     let value = (f32::from(a[channel]) * (1.0 - amount)
                         + f32::from(b[channel]) * amount)
                         .round() as u8;
-                    if channel == 3 { (u16::from(value) * 3 / 5) as u8 } else { value }
+                    if channel == 3 {
+                        (u16::from(value) * 3 / 5) as u8
+                    } else {
+                        value
+                    }
                 }));
             }
             let mut output = std::io::Cursor::new(Vec::new());
