@@ -32,11 +32,22 @@ pub fn take_discovery_diagnostics() -> Vec<String> {
         .unwrap_or_default()
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 pub struct TasmotaDevice {
     pub id: String,
     pub name: String,
     pub address: String,
+}
+
+impl Default for TasmotaDevice {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            name: String::new(),
+            address: String::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -282,6 +293,36 @@ fn device_cache() -> &'static Mutex<Option<(Instant, Vec<TasmotaDevice>)>> {
     CACHE.get_or_init(|| Mutex::new(None))
 }
 
+fn persisted_devices_path() -> Option<std::path::PathBuf> {
+    std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .map(|home| home.join(".config").join("fritz_solar_tasmota.json"))
+}
+
+fn load_persisted_devices() -> Vec<TasmotaDevice> {
+    let Some(path) = persisted_devices_path() else { return Vec::new() };
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|contents| serde_json::from_str::<Vec<TasmotaDevice>>(&contents).ok())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|device| !device.id.trim().is_empty() && !device.address.trim().is_empty())
+        .collect()
+}
+
+fn persist_devices(devices: &[TasmotaDevice]) {
+    let Some(path) = persisted_devices_path() else { return };
+    let Some(parent) = path.parent() else { return };
+    if std::fs::create_dir_all(parent).is_err() { return; }
+    let Ok(contents) = serde_json::to_vec_pretty(devices) else { return };
+    let temporary = parent.join(format!(".fritz_solar_tasmota.{}.tmp", std::process::id()));
+    if std::fs::write(&temporary, contents).is_ok() {
+        if std::fs::rename(&temporary, &path).is_err() {
+            let _ = std::fs::remove_file(temporary);
+        }
+    }
+}
+
 /// Return recently discovered devices without repeating network discovery on every
 /// power-reading refresh. The cache expires so DHCP changes are picked up.
 pub async fn known_devices(
@@ -298,8 +339,20 @@ pub async fn known_devices(
             return Ok(devices.clone());
         }
     }
-    // Startup refreshes must not run the expensive /24 scan. mDNS is the fast
-    // path here; the full subnet scan remains available from explicit discovery.
+    // Reuse confirmed IP addresses immediately after process restart. The
+    // reading request validates reachability; manual discovery refreshes DHCP changes.
+    let persisted = load_persisted_devices();
+    if !persisted.is_empty() {
+        *device_cache().lock().unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Some((Instant::now(), persisted.clone()));
+        record_discovery_diagnostic(format!(
+            "Restored {} Tasmota device address(es) from the local discovery cache.",
+            persisted.len()
+        ));
+        return Ok(persisted);
+    }
+    // Startup refreshes must not run the expensive /24 scan. The mDNS
+    // path is fast; the full subnet scan remains available from explicit discovery.
     discover_devices_with_options(
         username,
         password,
@@ -471,6 +524,7 @@ async fn discover_devices_with_options(
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner) =
         Some((Instant::now(), devices.clone()));
+    persist_devices(&devices);
     Ok(devices)
 }
 
