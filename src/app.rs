@@ -2260,6 +2260,15 @@ fn set_panel_item_visibility(hidden_items: &mut Vec<String>, id: &str, visible: 
     }
 }
 
+/// Effective panel availability, including options that constrain an item.
+fn panel_item_is_enabled(settings: &FritzSettings, id: &str) -> bool {
+    match id {
+        "solar-power" => !settings.panel_net_power,
+        "internet-bandwidth" => settings.panel_internet_bandwidth,
+        _ => true,
+    } && panel_item_is_visible(&settings.hidden_panel_items, id)
+}
+
 fn format_compact_decimal(value: f64) -> String {
     let formatted = format!("{value:.1}");
     formatted
@@ -3200,8 +3209,7 @@ impl cosmic::Application for AppModel {
                     .into(),
                 ));
             }
-            if !self.settings.panel_net_power
-                && panel_item_is_visible(&self.settings.hidden_panel_items, "solar-power")
+            if panel_item_is_enabled(&self.settings, "solar-power")
                 && let Some(input_power) = input_power
             {
                 panel_items.push((
@@ -3228,8 +3236,7 @@ impl cosmic::Application for AppModel {
                 ));
             }
 
-            if self.settings.panel_internet_bandwidth
-                && panel_item_is_visible(&self.settings.hidden_panel_items, "internet-bandwidth")
+            if panel_item_is_enabled(&self.settings, "internet-bandwidth")
             {
                 let (download, upload) = self
                     .internet_bandwidth
@@ -4262,7 +4269,10 @@ impl cosmic::Application for AppModel {
                     .settings
                     .panel_order
                     .iter()
-                    .filter(|item| item.as_str() != "solar-power" || has_input_device)
+                    .filter(|item| {
+                        (item.as_str() != "solar-power"
+                            || (has_input_device && !self.settings.panel_net_power))
+                    })
                     .collect();
                 for (index, item) in visible_panel_order.iter().enumerate() {
                     let id = match item.as_str() {
@@ -4273,7 +4283,7 @@ impl cosmic::Application for AppModel {
                         "temperature" => "temperature",
                         _ => continue,
                     };
-                    let visible = panel_item_is_visible(&self.settings.hidden_panel_items, id);
+                    let visible = panel_item_is_enabled(&self.settings, id);
                     let mut row =
                         widget::Row::new()
                             .spacing(8)
@@ -7840,6 +7850,9 @@ impl cosmic::Application for AppModel {
             }
             Message::TogglePanelItemVisibility(item, visible) => {
                 set_panel_item_visibility(&mut self.settings.hidden_panel_items, item, visible);
+                if item == "internet-bandwidth" {
+                    self.settings.panel_internet_bandwidth = visible;
+                }
                 self.persist_settings();
             }
             Message::MovePanelItem(item, move_up) => {
@@ -8350,6 +8363,7 @@ impl cosmic::Application for AppModel {
             }
             Message::PanelInternetBandwidthChanged(value) => {
                 self.settings.panel_internet_bandwidth = value;
+                set_panel_item_visibility(&mut self.settings.hidden_panel_items, "internet-bandwidth", value);
                 self.persist_settings();
                 if value {
                     self.refresh_started_at = Some(Instant::now());
