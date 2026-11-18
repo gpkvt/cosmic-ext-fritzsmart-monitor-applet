@@ -32,22 +32,12 @@ pub fn take_discovery_diagnostics() -> Vec<String> {
         .unwrap_or_default()
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct TasmotaDevice {
     pub id: String,
     pub name: String,
     pub address: String,
-}
-
-impl Default for TasmotaDevice {
-    fn default() -> Self {
-        Self {
-            id: String::new(),
-            name: String::new(),
-            address: String::new(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -301,8 +291,10 @@ async fn query_status(
     })
 }
 
-fn device_cache() -> &'static Mutex<Option<(Instant, Vec<TasmotaDevice>)>> {
-    static CACHE: OnceLock<Mutex<Option<(Instant, Vec<TasmotaDevice>)>>> = OnceLock::new();
+type DeviceCache = Mutex<Option<(Instant, Vec<TasmotaDevice>)>>;
+
+fn device_cache() -> &'static DeviceCache {
+    static CACHE: OnceLock<DeviceCache> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(None))
 }
 
@@ -337,10 +329,10 @@ fn persist_devices(devices: &[TasmotaDevice]) {
         return;
     };
     let temporary = parent.join(format!(".fritz_solar_tasmota.{}.tmp", std::process::id()));
-    if std::fs::write(&temporary, contents).is_ok() {
-        if std::fs::rename(&temporary, &path).is_err() {
-            let _ = std::fs::remove_file(temporary);
-        }
+    if std::fs::write(&temporary, contents).is_ok()
+        && std::fs::rename(&temporary, &path).is_err()
+    {
+        let _ = std::fs::remove_file(temporary);
     }
 }
 
@@ -355,10 +347,9 @@ pub async fn known_devices(
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .as_ref()
+        && discovered_at.elapsed() < Duration::from_secs(60)
     {
-        if discovered_at.elapsed() < Duration::from_secs(60) {
-            return Ok(devices.clone());
-        }
+        return Ok(devices.clone());
     }
     // Reuse confirmed IP addresses immediately after process restart. The
     // reading request validates reachability; manual discovery refreshes DHCP changes.
@@ -473,7 +464,7 @@ async fn discover_devices_with_options(
                 let address = format!("{ip}:{port}");
                 let result = query_status(&client, &address, &username, &password).await;
                 let completed = completed_probes.fetch_add(1, Ordering::Relaxed) + 1;
-                if completed % 16 == 0 || completed == total_probes {
+                if completed.is_multiple_of(16) || completed == total_probes {
                     record_discovery_diagnostic(format!(
                         "Tasmota scan progress: completed {completed}/{total_probes} endpoint probes."
                     ));
@@ -511,8 +502,7 @@ async fn discover_devices_with_options(
                         hostname
                             .to_ascii_uppercase()
                             .replace(".LOCAL", "")
-                            .replace('-', "")
-                            .replace('.', "")
+                            .replace(['-', '.'], "")
                     });
                 let name = json_string(&status, &["Status", "DeviceName"])
                     .filter(|value| !value.trim().is_empty())
@@ -537,7 +527,7 @@ async fn discover_devices_with_options(
             }
         }
     }
-    devices.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    devices.sort_by_key(|device| device.name.to_lowercase());
     devices.dedup_by(|a, b| a.id == b.id);
     record_discovery_diagnostic(format!(
         "Tasmota discovery complete: {} device(s) accepted, {rejected} endpoint(s) rejected, {ip_scan_responses} device response(s) found by IP scan.",

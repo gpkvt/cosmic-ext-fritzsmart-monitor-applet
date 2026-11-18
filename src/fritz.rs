@@ -1940,12 +1940,13 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
         }
     }
 
-    if let Some(error) = fritz_error.as_ref() {
-        if !result.readings.is_empty() && !selected_fritz.is_empty() {
-            result
-                .missing_devices
-                .push(("FRITZ!Box".into(), error.clone()));
-        }
+    if let Some(error) = fritz_error.as_ref()
+        && !result.readings.is_empty()
+        && !selected_fritz.is_empty()
+    {
+        result
+            .missing_devices
+            .push(("FRITZ!Box".into(), error.clone()));
     }
 
     if result.readings.is_empty() {
