@@ -9035,7 +9035,10 @@ impl cosmic::Application for AppModel {
                         return Task::none();
                     };
                     cosmic::iced::window::monitor_size(main_window_id).map(move |size| {
-                        Message::PopupMonitorSize(id, size.map(|size| size.height))
+                        cosmic::Action::App(Message::PopupMonitorSize(
+                            id,
+                            size.map(|size| size.height),
+                        ))
                     })
                 };
             }
