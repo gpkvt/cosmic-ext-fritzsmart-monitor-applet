@@ -906,6 +906,27 @@ fn parse_graph_axis_minutes(label: &str) -> Option<u32> {
     number.is_empty().then_some(total)
 }
 
+fn graph_energy_wh(values: &[f64], timespan: Duration) -> f64 {
+    if values.len() < 2 || timespan.is_zero() {
+        return 0.0;
+    }
+    let sample_interval_hours = timespan.as_secs_f64()
+        / (values.len() - 1) as f64
+        / 3600.0;
+    values
+        .windows(2)
+        .map(|pair| (pair[0].abs() + pair[1].abs()) / 2.0 * sample_interval_hours)
+        .sum()
+}
+
+fn format_graph_energy(energy_wh: f64) -> String {
+    if energy_wh >= 1000.0 {
+        format!("{:.2} kWh", energy_wh / 1000.0)
+    } else {
+        format!("{energy_wh:.1} Wh")
+    }
+}
+
 fn escape_svg_text(value: &str) -> String {
     value
         .replace('&', "&amp;")
@@ -1138,6 +1159,30 @@ fn graph_visual_with_dimensions(
         plot_left + plot_width / 2.0,
         height - 2.0
     );
+    let energy_label = if is_expanded && unit == "W" {
+        axis_start
+            .as_deref()
+            .and_then(parse_graph_axis_minutes)
+            .map(|minutes| {
+                let timespan = Duration::from_secs(u64::from(minutes) * 60);
+                let primary_energy = format_graph_energy(graph_energy_wh(&values, timespan));
+                let label = if secondary_values.is_empty() {
+                    format!("ENERGY  {primary_energy}")
+                } else {
+                    let secondary_energy =
+                        format_graph_energy(graph_energy_wh(&secondary_values, timespan));
+                    format!("ENERGY  Output {primary_energy}  ·  Input {secondary_energy}")
+                };
+                format!(
+                    "<text x=\"{:.2}\" y=\"36\" text-anchor=\"middle\" font-size=\"{font_size:.1}\" font-weight=\"600\" fill=\"#a0a0a0\">{}</text>",
+                    plot_left + plot_width / 2.0,
+                    escape_svg_text(&label)
+                )
+            })
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
     let min_max_labels = if graph_height > 200.0 {
         format!(
             r##"<text x="{plot_left:.2}" y="18" text-anchor="start" font-size="{font_size:.1}" font-weight="600" fill="#a0a0a0">MIN {}</text><text x="{plot_right:.2}" y="18" text-anchor="end" font-size="{font_size:.1}" font-weight="600" fill="#a0a0a0">MAX {}</text>"##,
@@ -1148,7 +1193,7 @@ fn graph_visual_with_dimensions(
         String::new()
     };
     let svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" preserveAspectRatio=\"none\" font-family=\"Inter, sans-serif\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{min_max_labels}{legend}{y_labels}{x_labels}{y_axis_title}{x_axis_title}{drawing}</svg>"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" preserveAspectRatio=\"none\" font-family=\"Inter, sans-serif\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{min_max_labels}{energy_label}{legend}{y_labels}{x_labels}{y_axis_title}{x_axis_title}{drawing}</svg>"
     );
     widget::Column::new()
         .spacing(2)
@@ -8641,6 +8686,18 @@ mod history_tests {
         assert_eq!(input_display_power_w(0), 0);
         assert_eq!(input_display_power_w(350), 350);
         assert_eq!(input_display_range(&VecDeque::new()), (0, 0));
+    }
+
+    #[test]
+    fn expanded_power_graph_energy_uses_trapezoidal_integration() {
+        let one_hour = Duration::from_secs(3600);
+        assert!((graph_energy_wh(&[1000.0, 1000.0], one_hour) - 1000.0).abs() < f64::EPSILON);
+        assert!((graph_energy_wh(&[1000.0, 2000.0, 1000.0], one_hour) - 1500.0).abs() < f64::EPSILON);
+        assert!((graph_energy_wh(&[-500.0, -500.0], one_hour) - 500.0).abs() < f64::EPSILON);
+        assert_eq!(graph_energy_wh(&[500.0], one_hour), 0.0);
+        assert_eq!(graph_energy_wh(&[500.0, 500.0], Duration::ZERO), 0.0);
+        assert_eq!(format_graph_energy(999.9), "999.9 Wh");
+        assert_eq!(format_graph_energy(1500.0), "1.50 kWh");
     }
 
     #[test]
