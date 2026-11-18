@@ -32,7 +32,8 @@ pub fn take_discovery_diagnostics() -> Vec<String> {
         .unwrap_or_default()
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 pub struct TasmotaDevice {
     pub id: String,
     pub name: String,
@@ -280,6 +281,36 @@ async fn query_status(
 fn device_cache() -> &'static Mutex<Option<(Instant, Vec<TasmotaDevice>)>> {
     static CACHE: OnceLock<Mutex<Option<(Instant, Vec<TasmotaDevice>)>>> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(None))
+}
+
+fn persisted_devices_path() -> Option<std::path::PathBuf> {
+    std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .map(|home| home.join(".config").join("fritz_solar_tasmota.json"))
+}
+
+fn load_persisted_devices() -> Vec<TasmotaDevice> {
+    let Some(path) = persisted_devices_path() else { return Vec::new() };
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|contents| serde_json::from_str::<Vec<TasmotaDevice>>(&contents).ok())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|device| !device.id.trim().is_empty() && !device.address.trim().is_empty())
+        .collect()
+}
+
+fn persist_devices(devices: &[TasmotaDevice]) {
+    let Some(path) = persisted_devices_path() else { return };
+    let Some(parent) = path.parent() else { return };
+    if std::fs::create_dir_all(parent).is_err() { return; }
+    let Ok(contents) = serde_json::to_vec_pretty(devices) else { return };
+    let temporary = parent.join(format!(".fritz_solar_tasmota.{}.tmp", std::process::id()));
+    if std::fs::write(&temporary, contents).is_ok() {
+        if std::fs::rename(&temporary, &path).is_err() {
+            let _ = std::fs::remove_file(temporary);
+        }
+    }
 }
 
 /// Return recently discovered devices without repeating network discovery on every
