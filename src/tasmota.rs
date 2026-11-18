@@ -9,7 +9,6 @@ use std::{
 };
 
 use futures::StreamExt;
-use if_addrs::IfAddr;
 use mdns_sd::{ServiceDaemon, ServiceEvent};
 use reqwest::Client;
 use serde_json::Value;
@@ -305,6 +304,7 @@ pub async fn known_devices(
 pub async fn discover_devices(
     username: String,
     password: String,
+    fritzbox_url: String,
 ) -> Result<Vec<TasmotaDevice>, String> {
     record_discovery_diagnostic(
         "Starting Tasmota discovery: browsing _http._tcp.local. for six seconds.",
