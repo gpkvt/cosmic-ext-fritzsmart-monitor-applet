@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     net::{IpAddr, Ipv4Addr},
     sync::{LazyLock, Mutex, OnceLock},
     time::{Duration, Instant},
