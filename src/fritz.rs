@@ -768,7 +768,11 @@ impl FritzSettings {
             } else {
                 "false"
             },
-            if self.device_selection_initialized { "true" } else { "false" },
+            if self.device_selection_initialized {
+                "true"
+            } else {
+                "false"
+            },
         );
         #[cfg(unix)]
         let mut file = {

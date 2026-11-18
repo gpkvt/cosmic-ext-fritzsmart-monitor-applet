@@ -2735,7 +2735,11 @@ impl cosmic::Application for AppModel {
             }
         }
         if !settings.device_selection_initialized && !settings.known_devices.is_empty() {
-            settings.ains = settings.known_devices.iter().map(|device| device.ain.clone()).collect();
+            settings.ains = settings
+                .known_devices
+                .iter()
+                .map(|device| device.ain.clone())
+                .collect();
             settings.ain = settings.ains.first().cloned().unwrap_or_default();
             settings.device_selection_initialized = true;
             if let Err(error) = settings.save() {
@@ -8279,7 +8283,10 @@ impl cosmic::Application for AppModel {
                                 } else {
                                     // First discovery on a fresh configuration: make the
                                     // discovered inventory immediately usable by default.
-                                    self.devices.iter().map(|device| device.ain.clone()).collect()
+                                    self.devices
+                                        .iter()
+                                        .map(|device| device.ain.clone())
+                                        .collect()
                                 }
                             } else {
                                 vec![self.settings.ain.clone()]
@@ -8308,7 +8315,10 @@ impl cosmic::Application for AppModel {
                                 .push(self.settings.weather_temperature_ain.clone());
                             settings_changed = true;
                         }
-                        if settings_changed || inventory_changed || !self.settings.device_selection_initialized {
+                        if settings_changed
+                            || inventory_changed
+                            || !self.settings.device_selection_initialized
+                        {
                             self.settings.device_selection_initialized = true;
                             self.settings.ains = self.selected_ains.clone();
                             self.settings.ain =
