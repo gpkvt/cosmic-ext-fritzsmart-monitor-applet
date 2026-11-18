@@ -4026,7 +4026,7 @@ impl cosmic::Application for AppModel {
                     .iter()
                     .map(|item| (*item).clone())
                     .collect();
-                for item in &visible_panel_order {
+                for (index, item) in visible_panel_order.iter().enumerate() {
                     let id = match item.as_str() {
                         "weather" => "weather",
                         "power-consumption" => "power-consumption",
