@@ -1,13 +1,32 @@
 use std::{
-    collections::HashSet,
+    collections::{HashSet, VecDeque},
     net::IpAddr,
-    sync::{Mutex, OnceLock},
+    sync::{LazyLock, Mutex, OnceLock},
     time::{Duration, Instant},
 };
 
 use mdns_sd::{ServiceDaemon, ServiceEvent};
 use reqwest::Client;
 use serde_json::Value;
+
+static DISCOVERY_DIAGNOSTICS: LazyLock<Mutex<VecDeque<String>>> =
+    LazyLock::new(|| Mutex::new(VecDeque::new()));
+
+fn record_discovery_diagnostic(message: impl Into<String>) {
+    if let Ok(mut events) = DISCOVERY_DIAGNOSTICS.lock() {
+        events.push_back(message.into());
+        while events.len() > 40 {
+            events.pop_front();
+        }
+    }
+}
+
+pub fn take_discovery_diagnostics() -> Vec<String> {
+    DISCOVERY_DIAGNOSTICS
+        .lock()
+        .map(|mut events| events.drain(..).collect())
+        .unwrap_or_default()
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TasmotaDevice {
@@ -25,10 +44,14 @@ pub struct TasmotaReading {
 }
 
 fn is_tasmota_service(info: &mdns_sd::ServiceInfo) -> bool {
-    info.get_property_val_str("devicetype")
-        .is_some_and(|value| value.eq_ignore_ascii_case("tasmota"))
-        || info.get_fullname().to_ascii_lowercase().contains("tasmota")
-        || info.get_hostname().to_ascii_lowercase().contains("tasmota")
+    let identity_matches = [info.get_fullname(), info.get_hostname()]
+        .iter()
+        .any(|value| value.to_ascii_lowercase().contains("tasmota"));
+    let txt_matches = ["devicetype", "app", "type", "device", "vendor", "manufacturer"]
+        .iter()
+        .filter_map(|key| info.get_property_val_str(key))
+        .any(|value| value.to_ascii_lowercase().contains("tasmota"));
+    identity_matches || txt_matches
 }
 
 fn json_string<'a>(value: &'a Value, path: &[&str]) -> Option<&'a str> {
@@ -76,8 +99,10 @@ fn discover_services() -> Result<Vec<(String, u16, IpAddr)>, String> {
     let receiver = daemon
         .browse(service_type)
         .map_err(|error| format!("Cannot browse local HTTP services: {error}"))?;
-    let deadline = Instant::now() + Duration::from_secs(4);
+    let deadline = Instant::now() + Duration::from_secs(6);
     let mut found = HashSet::new();
+    let mut resolved_services = 0usize;
+    let mut matching_services = 0usize;
 
     while Instant::now() < deadline {
         let wait = deadline
@@ -87,9 +112,17 @@ fn discover_services() -> Result<Vec<(String, u16, IpAddr)>, String> {
             continue;
         };
         if let ServiceEvent::ServiceResolved(info) = event {
+            resolved_services += 1;
             if !is_tasmota_service(&info) {
                 continue;
             }
+            matching_services += 1;
+            let addresses: Vec<_> = info.get_addresses().iter().map(ToString::to_string).collect();
+            record_discovery_diagnostic(format!(
+                "mDNS Tasmota candidate: service={}, host={}, port={}, addresses={}",
+                info.get_fullname(), info.get_hostname(), info.get_port(),
+                if addresses.is_empty() { "none".into() } else { addresses.join(", ") }
+            ));
             for address in info.get_addresses() {
                 if matches!(address, IpAddr::V4(_)) {
                     found.insert((
@@ -104,6 +137,15 @@ fn discover_services() -> Result<Vec<(String, u16, IpAddr)>, String> {
 
     let _ = daemon.stop_browse(service_type);
     let _ = daemon.shutdown();
+    record_discovery_diagnostic(format!(
+        "mDNS scan finished: {resolved_services} HTTP service(s) resolved, {matching_services} Tasmota candidate(s), {} IPv4 endpoint(s).",
+        found.len()
+    ));
+    if matching_services == 0 {
+        record_discovery_diagnostic(
+            "No Tasmota mDNS identity matched. Checked service/host names and TXT fields devicetype, app, type, device, vendor and manufacturer."
+        );
+    }
     Ok(found.into_iter().collect())
 }
 
@@ -170,21 +212,37 @@ pub async fn discover_devices(
     username: String,
     password: String,
 ) -> Result<Vec<TasmotaDevice>, String> {
+    record_discovery_diagnostic("Starting Tasmota discovery: browsing _http._tcp.local. for six seconds.");
+    record_discovery_diagnostic(format!(
+        "Tasmota authentication: username configured={}, password configured={}.",
+        !username.trim().is_empty(), !password.is_empty()
+    ));
     let services = tokio::task::spawn_blocking(discover_services)
         .await
-        .map_err(|error| format!("Tasmota discovery task failed: {error}"))??;
+        .map_err(|error| {
+            let message = format!("Tasmota discovery task failed: {error}");
+            record_discovery_diagnostic(message.clone());
+            message
+        })??;
     let client = Client::builder()
         .timeout(Duration::from_secs(5))
         .build()
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| {
+            let message = format!("Could not create Tasmota HTTP client: {error}");
+            record_discovery_diagnostic(message.clone());
+            message
+        })?;
     let mut devices = Vec::new();
+    let mut rejected = 0usize;
 
     for (hostname, port, ip) in services {
         let address = format!("{ip}:{port}");
-        let Ok(status) = query_status(&client, &address, &username, &password).await else {
-            continue;
-        };
-        let mac = json_string(&status, &["StatusNET", "Mac"])
+        match query_status(&client, &address, &username, &password).await {
+            Ok(status) => {
+                record_discovery_diagnostic(format!(
+                    "Tasmota status probe succeeded: {hostname} at {address}."
+                ));
+                let mac = json_string(&status, &["StatusNET", "Mac"])
             .map(|value| {
                 value
                     .chars()
@@ -199,18 +257,33 @@ pub async fn discover_devices(
                     .replace(".LOCAL", "")
                     .replace('-', "")
             });
-        let name = json_string(&status, &["Status", "DeviceName"])
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or(&hostname)
-            .to_string();
-        devices.push(TasmotaDevice {
-            id: format!("TASMOTA:{mac}"),
-            name,
-            address,
-        });
+                let name = json_string(&status, &["Status", "DeviceName"])
+                    .filter(|value| !value.trim().is_empty())
+                    .unwrap_or(&hostname)
+                    .to_string();
+                devices.push(TasmotaDevice {
+                    id: format!("TASMOTA:{mac}"),
+                    name: name.clone(),
+                    address: address.clone(),
+                });
+                record_discovery_diagnostic(format!(
+                    "Tasmota device accepted: name={name}, id=TASMOTA:{mac}, endpoint={address}."
+                ));
+            }
+            Err(error) => {
+                rejected += 1;
+                record_discovery_diagnostic(format!(
+                    "Tasmota candidate rejected at {address}: {error}"
+                ));
+            }
+        }
     }
     devices.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     devices.dedup_by(|a, b| a.id == b.id);
+    record_discovery_diagnostic(format!(
+        "Tasmota discovery complete: {} device(s) accepted, {rejected} candidate(s) rejected.",
+        devices.len()
+    ));
     *device_cache()
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner) =
