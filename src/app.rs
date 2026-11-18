@@ -857,7 +857,6 @@ fn output_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i6
         .sum()
 }
 
-
 /// Integrate recorded per-device power samples into local calendar days.
 /// Intervals are split at midnight and long gaps are excluded.
 fn daily_energy_history(
@@ -885,8 +884,7 @@ fn daily_energy_history(
             else {
                 continue;
             };
-            let Some(end_wall) = wall_now.checked_sub(now.saturating_duration_since(*end))
-            else {
+            let Some(end_wall) = wall_now.checked_sub(now.saturating_duration_since(*end)) else {
                 continue;
             };
             let start_local: chrono::DateTime<chrono::Local> = start_wall.into();
@@ -907,10 +905,8 @@ fn daily_energy_history(
                     break;
                 };
                 let segment_end = end_local.min(next_midnight);
-                let segment_start_seconds = cursor
-                    .signed_duration_since(start_local)
-                    .num_milliseconds() as f64
-                    / 1000.0;
+                let segment_start_seconds =
+                    cursor.signed_duration_since(start_local).num_milliseconds() as f64 / 1000.0;
                 let segment_end_seconds = segment_end
                     .signed_duration_since(start_local)
                     .num_milliseconds() as f64
@@ -919,16 +915,19 @@ fn daily_energy_history(
                 let end_fraction = (segment_end_seconds / total_seconds).clamp(0.0, 1.0);
                 let power_at_start = start_w + (end_w - start_w) * start_fraction;
                 let power_at_end = start_w + (end_w - start_w) * end_fraction;
-                let segment_hours = segment_end
-                    .signed_duration_since(cursor)
-                    .num_milliseconds() as f64
+                let segment_hours = segment_end.signed_duration_since(cursor).num_milliseconds()
+                    as f64
                     / 3_600_000.0;
                 let energy_wh = (power_at_start + power_at_end) / 2.0 * segment_hours;
                 let date = cursor.date_naive();
 
                 if date >= first_day && date <= today && energy_wh.is_finite() {
                     let entry = totals.entry(date).or_default();
-                    let total = if is_solar_input { &mut entry.0 } else { &mut entry.1 };
+                    let total = if is_solar_input {
+                        &mut entry.0
+                    } else {
+                        &mut entry.1
+                    };
                     *total = Some((*total).unwrap_or_default() + energy_wh);
                 }
                 if segment_end <= cursor {
@@ -962,11 +961,14 @@ fn daily_energy_history_section(
             .align_y(cosmic::iced::Alignment::Center)
             .push(widget::text::body("DAILY ENERGY · LAST 14 DAYS"))
             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-            .push(widget::icon::from_name(if collapsed {
-                "go-next-symbolic"
-            } else {
-                "go-down-symbolic"
-            }).size(16)),
+            .push(
+                widget::icon::from_name(if collapsed {
+                    "go-next-symbolic"
+                } else {
+                    "go-down-symbolic"
+                })
+                .size(16),
+            ),
     )
     .on_press(Message::ToggleMenuSection("daily-energy-history".into()))
     .width(cosmic::iced::Length::Fill)
@@ -997,7 +999,9 @@ fn daily_energy_history_section(
                 date.format("%a, %d %b").to_string()
             };
             let format_wh = |value: Option<f64>| {
-                value.map(|wh| format!("{wh:.0} Wh")).unwrap_or_else(|| "—".into())
+                value
+                    .map(|wh| format!("{wh:.0} Wh"))
+                    .unwrap_or_else(|| "—".into())
             };
             rows = rows.push(
                 widget::Row::new()
@@ -6736,7 +6740,8 @@ impl cosmic::Application for AppModel {
                         &self.device_history,
                         &self.settings.input_ains,
                         self.settings.refresh_interval_seconds,
-                        self.collapsed_menu_sections.contains("daily-energy-history"),
+                        self.collapsed_menu_sections
+                            .contains("daily-energy-history"),
                     ),
                 ));
                 menu_cards.retain(|(key, _)| {
@@ -10161,7 +10166,6 @@ mod history_tests {
     }
 }
 
-
 #[cfg(test)]
 mod daily_energy_history_tests {
     use super::*;
@@ -10179,10 +10183,7 @@ mod daily_energy_history_tests {
             ),
             (
                 "grid-ain".to_string(),
-                VecDeque::from([
-                    (now - Duration::from_secs(60), 300, 20.0),
-                    (now, 300, 20.0),
-                ]),
+                VecDeque::from([(now - Duration::from_secs(60), 300, 20.0), (now, 300, 20.0)]),
             ),
         ]);
         let input_ains = HashSet::from(["solar-ain".to_string()]);
