@@ -121,13 +121,19 @@ async fn query_status(
         ])
         .send()
         .await
-        .map_err(|error| format!("Tasmota at {address} is unreachable: {error}"))?
+        .map_err(|error| format!("Tasmota at {address} is unreachable: {}", error.without_url()))?
         .error_for_status()
-        .map_err(|error| format!("Tasmota at {address} rejected the status request: {error}"))?;
+        .map_err(|error| format!(
+            "Tasmota at {address} rejected the status request: {}",
+            error.without_url()
+        ))?;
     response
         .json::<Value>()
         .await
-        .map_err(|error| format!("Tasmota at {address} returned invalid status JSON: {error}"))
+        .map_err(|error| format!(
+            "Tasmota at {address} returned invalid status JSON: {}",
+            error.without_url()
+        ))
 }
 
 pub async fn discover_devices(
@@ -221,13 +227,19 @@ pub async fn set_power(
         ])
         .send()
         .await
-        .map_err(|error| format!("Tasmota power command failed: {error}"))?
+        .map_err(|error| format!("Tasmota power command failed: {}", error.without_url()))?
         .error_for_status()
-        .map_err(|error| format!("Tasmota rejected the power command: {error}"))?;
+        .map_err(|error| format!(
+            "Tasmota rejected the power command: {}",
+            error.without_url()
+        ))?;
     let result: Value = response
         .json()
         .await
-        .map_err(|error| format!("Tasmota returned invalid power-command JSON: {error}"))?;
+        .map_err(|error| format!(
+            "Tasmota returned invalid power-command JSON: {}",
+            error.without_url()
+        ))?;
     let actual = result
         .get("POWER")
         .or_else(|| result.get("POWER1"))
