@@ -4073,22 +4073,20 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption(
                         "Search the local network for Tasmota devices using mDNS. All configured Tasmota devices use the shared credentials above.",
                     ))
-                    .push(if self.devices_loading {
-                        widget::text::caption("Searching for devices…").into()
-                    } else {
-                        action_button(
-                            "view-refresh-symbolic",
-                            "Search for Tasmota devices",
-                            Message::DiscoverDevices,
-                        )
-                        .into()
-                    })
-                    .push(if let Some(status) = &self.settings_status {
-                        widget::text::caption(status.clone()).into()
-                    } else {
-                        widget::Space::new().height(0).into()
-                    })
-                    .push(widget::divider::horizontal::default())
+                    ;
+                if self.devices_loading {
+                    content = content.push(widget::text::caption("Searching for devices…"));
+                } else {
+                    content = content.push(action_button(
+                        "view-refresh-symbolic",
+                        "Search for Tasmota devices",
+                        Message::DiscoverDevices,
+                    ));
+                }
+                if let Some(status) = &self.settings_status {
+                    content = content.push(widget::text::caption(status.clone()));
+                }
+                content = content.push(widget::divider::horizontal::default())
                     .push(
                         widget::Row::new()
                             .width(cosmic::iced::Length::Fill)
