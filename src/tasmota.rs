@@ -114,8 +114,11 @@ async fn query_status(
 ) -> Result<Value, String> {
     let response = client
         .get(format!("http://{address}/cm"))
-        .query(&[("cmnd", "Status 0")])
-        .basic_auth(username, Some(password))
+        .query(&[
+            ("user", username),
+            ("password", password),
+            ("cmnd", "Status 0"),
+        ])
         .send()
         .await
         .map_err(|error| format!("Tasmota at {address} is unreachable: {error}"))?
@@ -211,8 +214,11 @@ pub async fn set_power(
     let command = if on { "Power On" } else { "Power Off" };
     let response = client
         .get(format!("http://{}/cm", device.address))
-        .query(&[("cmnd", command)])
-        .basic_auth(username, Some(password))
+        .query(&[
+            ("user", username),
+            ("password", password),
+            ("cmnd", command),
+        ])
         .send()
         .await
         .map_err(|error| format!("Tasmota power command failed: {error}"))?
