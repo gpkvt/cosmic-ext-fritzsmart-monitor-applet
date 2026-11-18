@@ -814,7 +814,7 @@ fn output_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i6
 fn graph_visual(
     values: impl Iterator<Item = f64>,
     style: &str,
-    _title: &str,
+    title: &str,
     unit: &str,
     axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
@@ -951,7 +951,7 @@ fn format_graph_y_tick(value: f64, unit: &str) -> String {
 fn graph_visual_with_dimensions(
     values: impl Iterator<Item = f64>,
     style: &str,
-    title: &str,
+    _title: &str,
     unit: &str,
     graph_height: f64,
     widget_height: cosmic::iced::Length,
@@ -6815,8 +6815,10 @@ impl cosmic::Application for AppModel {
                                     now.duration_since(*timestamp) <= window
                                 })
                                 .collect();
-                            let values =
-                                visible.iter().map(|(_, power, _)| *power as f64).collect();
+                            let values: Vec<f64> = visible
+                                .iter()
+                                .map(|(_, power, _)| *power as f64)
+                                .collect();
                             let axis_start = format_graph_axis_start(
                                 self.settings.graph_timespan_minutes,
                                 visible.first().map(|(timestamp, _, _)| {
