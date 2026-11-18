@@ -1841,13 +1841,20 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
                     power_controllable: true,
                     power_toggle_allowed: true,
                 }));
-                if !errors.is_empty() && result.readings.is_empty() {
-                    fritz_error = Some(errors.join("; "));
+                if !errors.is_empty() {
+                    result.missing_devices.push(("TASMOTA".into(), errors.join("; ")));
                 }
             }
             Err(error) => {
-                if result.readings.is_empty() { fritz_error = Some(error); }
+                if result.readings.is_empty() { fritz_error = Some(error.clone()); }
+                else { result.missing_devices.push(("TASMOTA".into(), error)); }
             }
+        }
+    }
+
+    if let Some(error) = fritz_error.as_ref() {
+        if !result.readings.is_empty() && !selected_fritz.is_empty() {
+            result.missing_devices.push(("FRITZ!Box".into(), error.clone()));
         }
     }
 
