@@ -475,6 +475,21 @@ fn clear_confirmed_power_changes(
     }
 }
 
+fn notify_new_devices(names: &[String]) {
+    if names.is_empty() {
+        return;
+    }
+    let body = names.join("\n");
+    let _ = notify_rust::Notification::new()
+        .summary(if names.len() == 1 {
+            "New device discovered"
+        } else {
+            "New devices discovered"
+        })
+        .body(&body)
+        .show();
+}
+
 fn notify_missing_devices(names: &[String], language: &str) {
     if names.is_empty() {
         return;
@@ -8354,6 +8369,7 @@ impl cosmic::Application for AppModel {
                         // discovery response. Merge discoveries into it and never prune entries
                         // just because a device is temporarily offline or undiscoverable.
                         let mut inventory_changed = false;
+                        let mut newly_discovered = Vec::new();
                         for discovered in devices {
                             let key = crate::fritz::normalize_ain_for_selection(&discovered.ain);
                             if let Some(existing) = self.devices.iter_mut().find(|device| {
@@ -8367,9 +8383,25 @@ impl cosmic::Application for AppModel {
                                     inventory_changed = true;
                                 }
                             } else {
+                                let device_type = if key.starts_with("TASMOTA:") {
+                                    "Tasmota"
+                                } else {
+                                    "FRITZ!Box"
+                                };
+                                newly_discovered.push(format!("{device_type}: {}", discovered.name));
                                 self.devices.push(discovered);
                                 inventory_changed = true;
                             }
+                        }
+                        if !newly_discovered.is_empty() {
+                            record_diagnostic_event(
+                                &mut self.diagnostic_events,
+                                format!(
+                                    "New devices discovered: {}.",
+                                    newly_discovered.join(", ")
+                                ),
+                            );
+                            notify_new_devices(&newly_discovered);
                         }
                         self.settings.known_devices = self.devices.clone();
                         let mut settings_changed = false;
