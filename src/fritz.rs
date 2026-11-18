@@ -1064,6 +1064,7 @@ pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<FritzDevice
     let tasmota_result = crate::tasmota::discover_devices(
         settings.tasmota_username.clone(),
         settings.tasmota_password.clone(),
+        settings.url.clone(),
     )
     .await;
     let mut devices = fritz_result.unwrap_or_default();
