@@ -59,7 +59,19 @@ impl WeatherData {
 /// Labels use the east abbreviation "O" (Oost/Ost).
 pub fn wind_direction_compass(degrees: Option<u16>) -> Option<&'static str> {
     const DIRECTIONS: [&str; 8] = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
-    degrees.map(|bearing| DIRECTIONS[((usize::from(bearing % 360) + 22) / 45) % 8])
+    degrees.map(|bearing| {
+        let sector = match bearing % 360 {
+            0..=22 | 338..=359 => 0,
+            23..=67 => 1,
+            68..=112 => 2,
+            113..=157 => 3,
+            158..=202 => 4,
+            203..=247 => 5,
+            248..=292 => 6,
+            _ => 7,
+        };
+        DIRECTIONS[sector]
+    })
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1078,7 +1090,7 @@ mod tests {
     #[test]
     fn commons_photo_search_matches_condition_and_time_of_day() {
         for (icon, expected) in [
-            ("01d", "sunny blue sky landscape"),
+            ("01d", "sunny blue sky mountain landscape"),
             ("01n", "clear starry night sky landscape"),
             ("10n", "rain falling over forest at night"),
             ("10d", "rain shower over green countryside"),
