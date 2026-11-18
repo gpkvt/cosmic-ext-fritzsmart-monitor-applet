@@ -930,10 +930,21 @@ fn graph_visual_with_dimensions(
             )
         }).collect::<String>()
     } else {
-        let points = samples.iter().enumerate()
-            .map(|(i, value)| format!("{:.2},{:.2}", plot_left + i as f64 * plot_width / (COUNT - 1) as f64, y(*value)))
-            .collect::<Vec<_>>().join(" ");
-        format!("<polyline points=\"{points}\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>")
+        let points = samples
+            .iter()
+            .enumerate()
+            .map(|(i, value)| {
+                format!(
+                    "{:.2},{:.2}",
+                    plot_left + i as f64 * plot_width / (COUNT - 1) as f64,
+                    y(*value)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+        format!(
+            "<polyline points=\"{points}\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
+        )
     };
 
     let grid = (0..=GRID_ROWS)
@@ -1001,9 +1012,11 @@ fn graph_visual_with_dimensions(
     widget::Column::new()
         .spacing(2)
         .push(
-            widget::svg(cosmic::iced::widget::svg::Handle::from_memory(svg.into_bytes()))
-                .width(cosmic::iced::Length::Fill)
-                .height(widget_height),
+            widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
+                svg.into_bytes(),
+            ))
+            .width(cosmic::iced::Length::Fill)
+            .height(widget_height),
         )
         .push(
             widget::container(widget::text::caption("TIME"))
@@ -5386,7 +5399,10 @@ impl cosmic::Application for AppModel {
                 let bandwidth_axis_start = format_graph_axis_start(
                     self.settings.graph_timespan_minutes,
                     self.bandwidth_history.front().map(|(timestamp, _, _)| {
-                        Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)
+                        Instant::now()
+                            .duration_since(*timestamp)
+                            .as_secs()
+                            .div_ceil(60)
                     }),
                 );
                 let bandwidth_card = if let Some(bandwidth) = self.internet_bandwidth.as_ref() {
@@ -5622,7 +5638,10 @@ impl cosmic::Application for AppModel {
                         self.settings.graph_timespan_minutes,
                         device_history.and_then(|samples| {
                             samples.front().map(|(timestamp, _, _)| {
-                                Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)
+                                Instant::now()
+                                    .duration_since(*timestamp)
+                                    .as_secs()
+                                    .div_ceil(60)
                             })
                         }),
                     );
