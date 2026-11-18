@@ -1771,7 +1771,6 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
 
 pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     let settings = FritzSettings::load()?;
-    validate_settings(&settings, true)?;
     let selected_ains = if settings.ains.is_empty() {
         vec![settings.ain.clone()]
     } else {
@@ -1787,6 +1786,17 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
         .filter(|id| !id.to_ascii_uppercase().starts_with("TASMOTA:"))
         .cloned()
         .collect();
+
+    if !selected_fritz.is_empty() {
+        validate_settings(&settings, true)?;
+    } else if selected_tasmota.is_empty() {
+        return Err("Select at least one device to monitor".into());
+    }
+    if !selected_tasmota.is_empty()
+        && (settings.tasmota_username.trim().is_empty() || settings.tasmota_password.is_empty())
+    {
+        return Err("Enter the shared Tasmota username and password in Connection settings".into());
+    }
 
     let mut result = FritzFetchResult {
         readings: Vec::new(),
