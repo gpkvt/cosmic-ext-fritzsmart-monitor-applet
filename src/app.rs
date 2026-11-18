@@ -2731,6 +2731,14 @@ impl cosmic::Application for AppModel {
                 eprintln!("Could not persist completed setup migration: {error}");
             }
         }
+        if !settings.device_selection_initialized && !settings.known_devices.is_empty() {
+            settings.ains = settings.known_devices.iter().map(|device| device.ain.clone()).collect();
+            settings.ain = settings.ains.first().cloned().unwrap_or_default();
+            settings.device_selection_initialized = true;
+            if let Err(error) = settings.save() {
+                eprintln!("Could not restore selection from saved device inventory: {error}");
+            }
+        }
         let setup_assistant = !settings.setup_completed;
         if setup_assistant && settings.url.trim().is_empty() {
             settings.url = "http://fritz.box".into();
@@ -8367,6 +8375,7 @@ impl cosmic::Application for AppModel {
                 }
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
+                self.settings.device_selection_initialized = true;
                 self.persist_settings();
             }
             Message::ToggleExternalTemperature(ain, enabled) => {
