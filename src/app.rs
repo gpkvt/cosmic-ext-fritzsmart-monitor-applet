@@ -6323,6 +6323,71 @@ impl cosmic::Application for AppModel {
                         });
                     menu_cards.push((format!("2-{device_key}"), device_card.into()));
                 }
+
+                // Keep every selected device visible in the popup even when its
+                // latest request failed. This is especially important for Tasmota:
+                // its inventory is persistent, while live readings are transient.
+                let mut missing_devices: Vec<_> = self
+                    .devices
+                    .iter()
+                    .filter(|device| {
+                        self.selected_ains.iter().any(|selected| {
+                            crate::fritz::normalize_ain_for_selection(selected)
+                                == crate::fritz::normalize_ain_for_selection(&device.ain)
+                        }) && !self.readings.iter().any(|reading| {
+                            crate::fritz::normalize_ain_for_selection(&reading.ain)
+                                == crate::fritz::normalize_ain_for_selection(&device.ain)
+                        })
+                    })
+                    .collect();
+                missing_devices.sort_by_key(|device| {
+                    self.settings
+                        .device_order
+                        .iter()
+                        .position(|ain| {
+                            crate::fritz::normalize_ain_for_selection(ain)
+                                == crate::fritz::normalize_ain_for_selection(&device.ain)
+                        })
+                        .unwrap_or(usize::MAX)
+                });
+                for device in missing_devices {
+                    let device_key =
+                        crate::fritz::normalize_ain_for_selection(&device.ain);
+                    let device_row = widget::list::list_column()
+                        .style(cosmic::theme::Container::Transparent)
+                        .list_item_padding([0, 0])
+                        .add(
+                            widget::Row::new()
+                                .spacing(12)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::icon::from_name("computer-symbolic").size(20))
+                                .push(
+                                    widget::Column::new()
+                                        .spacing(2)
+                                        .width(cosmic::iced::Length::Fill)
+                                        .push(widget::text::body(device.name.clone()))
+                                        .push(widget::text::caption(crate::i18n::tr(
+                                            &self.settings.language,
+                                            "No live reading available",
+                                        ))),
+                                )
+                                .push(widget::icon::from_name("dialog-warning-symbolic").size(16)),
+                        );
+                    let device_card = widget::container(device_row)
+                        .width(cosmic::iced::Length::Fill)
+                        .style(|theme| {
+                            let cosmic = theme.cosmic();
+                            cosmic::iced::widget::container::Style {
+                                background: Some(
+                                    cosmic::iced::Color::from(cosmic.background(false).small_widget)
+                                        .into(),
+                                ),
+                                ..Default::default()
+                            }
+                        });
+                    menu_cards.push((format!("2-{device_key}"), device_card.into()));
+                }
+
                 if let Some(power_sections) = total_power_overview(
                     &self.readings,
                     &self.settings,
