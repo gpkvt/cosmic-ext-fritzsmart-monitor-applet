@@ -70,6 +70,7 @@ pub struct AppModel {
     quick_refresh_interval: u32,
     quick_graph_timespan: u32,
     expanded_graph: Option<(String, Vec<f64>, String, Option<String>)>,
+    expanded_graph_secondary: Option<(Vec<f64>, String)>,
     history_graph_devices: Vec<(String, String)>,
     history_graph_index: Option<usize>,
     next_weather_refresh_at: Option<Instant>,
@@ -121,6 +122,7 @@ pub enum Message {
     GraphTimespanChanged(u32),
     GraphStyleChanged(String),
     ShowGraph(String, Vec<f64>, String, Option<String>),
+    ShowCombinedGraph(String, Vec<f64>, Vec<f64>, String, Option<String>, String, String),
     ShowDeviceHistoryGraph(String),
     NavigateDeviceHistory(isize),
     GraphHistoryTimespanChanged(u32),
@@ -812,6 +814,8 @@ fn graph_visual(
         120.0,
         cosmic::iced::Length::Fixed(120.0),
         axis_start,
+        None,
+        None,
     )
 }
 
@@ -842,7 +846,19 @@ fn graph_visual_large(
         480.0,
         cosmic::iced::Length::Fixed(480.0),
         axis_start,
+        None,
+        None,
     )
+}
+
+fn graph_visual_large_multi(
+    values: impl Iterator<Item = f64>, secondary_values: impl Iterator<Item = f64>,
+    style: &str, title: &str, unit: &str, axis_start: Option<String>,
+    primary_label: &str, secondary_label: &str,
+) -> cosmic::Element<'static, Message> {
+    graph_visual_with_dimensions(values, style, title, unit, 480.0,
+        cosmic::iced::Length::Fixed(480.0), axis_start,
+        Some(secondary_values.collect()), Some(format!("{primary_label}|{secondary_label}")))
 }
 
 fn parse_graph_axis_minutes(label: &str) -> Option<u32> {
@@ -896,6 +912,8 @@ fn graph_visual_with_dimensions(
     graph_height: f64,
     widget_height: cosmic::iced::Length,
     axis_start: Option<String>,
+    secondary_values: Option<Vec<f64>>,
+    secondary_labels: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
     let current_value = values.last().copied().unwrap_or(0.0);
@@ -906,22 +924,23 @@ fn graph_visual_with_dimensions(
     const GRID_COLUMNS: usize = 4;
     let height = graph_height;
     let values = if values.is_empty() { vec![0.0] } else { values };
-    let minimum = values.iter().copied().reduce(f64::min).unwrap_or(0.0);
-    let maximum = values.iter().copied().reduce(f64::max).unwrap_or(minimum);
+    let secondary_values = secondary_values.unwrap_or_default();
+    let minimum = values.iter().chain(secondary_values.iter()).copied().reduce(f64::min).unwrap_or(0.0);
+    let maximum = values.iter().chain(secondary_values.iter()).copied().reduce(f64::max).unwrap_or(minimum);
     let (plot_minimum, plot_maximum) = graph_plot_bounds(minimum, maximum);
     let plot_range = (plot_maximum - plot_minimum).max(1.0);
-    let samples: Vec<f64> = if values.len() == 1 {
-        vec![values[0]; COUNT]
-    } else {
-        (0..COUNT)
-            .map(|i| {
-                let p = i as f64 * (values.len() - 1) as f64 / (COUNT - 1) as f64;
-                let l = p.floor() as usize;
-                let r = (l + 1).min(values.len() - 1);
-                values[l] + (values[r] - values[l]) * (p - l as f64)
-            })
-            .collect()
+    let resample = |series: &[f64]| -> Vec<f64> {
+        if series.is_empty() { return vec![0.0; COUNT]; }
+        if series.len() == 1 { return vec![series[0]; COUNT]; }
+        (0..COUNT).map(|i| {
+            let p = i as f64 * (series.len() - 1) as f64 / (COUNT - 1) as f64;
+            let left = p.floor() as usize;
+            let right = (left + 1).min(series.len() - 1);
+            series[left] + (series[right] - series[left]) * (p - left as f64)
+        }).collect()
     };
+    let samples = resample(&values);
+    let secondary_samples = (!secondary_values.is_empty()).then(|| resample(&secondary_values));
 
     // Reserve space inside the SVG for readable, aligned axis ticks. The same
     // layout scales from compact menu graphs to the expanded graph window.
@@ -935,35 +954,28 @@ fn graph_visual_with_dimensions(
     let y = |value: f64| plot_bottom - ((value - plot_minimum) / plot_range) * plot_height;
     let font_size = if graph_height > 200.0 { 18.0 } else { 12.0 };
 
-    let drawing = if style == "bar" {
+    let primary_drawing = if style == "bar" {
         let slot = plot_width / COUNT as f64;
         samples.iter().enumerate().map(|(i, value)| {
             let top = y(*value);
-            format!(
-                "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"2\" fill=\"#8ab4f8\"/>",
-                plot_left + i as f64 * slot + 1.0,
-                top,
-                (slot - 2.0).max(1.0),
-                (plot_bottom - top).max(1.0)
-            )
+            let bar_width = if secondary_samples.is_some() { slot * 0.44 } else { slot - 2.0 };
+            format!("<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"2\" fill=\"#8ab4f8\"/>", plot_left + i as f64 * slot + 1.0, top, bar_width.max(1.0), (plot_bottom - top).max(1.0))
         }).collect::<String>()
     } else {
-        let points = samples
-            .iter()
-            .enumerate()
-            .map(|(i, value)| {
-                format!(
-                    "{:.2},{:.2}",
-                    plot_left + i as f64 * plot_width / (COUNT - 1) as f64,
-                    y(*value)
-                )
-            })
-            .collect::<Vec<_>>()
-            .join(" ");
-        format!(
-            "<polyline points=\"{points}\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
-        )
+        let points = samples.iter().enumerate().map(|(i, value)| format!("{:.2},{:.2}", plot_left + i as f64 * plot_width / (COUNT - 1) as f64, y(*value))).collect::<Vec<_>>().join(" ");
+        format!("<polyline points=\"{points}\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>")
     };
+    let secondary_drawing = secondary_samples.as_ref().map(|series| if style == "bar" {
+        let slot = plot_width / COUNT as f64;
+        series.iter().enumerate().map(|(i, value)| {
+            let top = y(*value);
+            format!("<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"2\" fill=\"#81c995\"/>", plot_left + i as f64 * slot + slot * 0.5, top, (slot * 0.44).max(1.0), (plot_bottom - top).max(1.0))
+        }).collect::<String>()
+    } else {
+        let points = series.iter().enumerate().map(|(i, value)| format!("{:.2},{:.2}", plot_left + i as f64 * plot_width / (COUNT - 1) as f64, y(*value))).collect::<Vec<_>>().join(" ");
+        format!("<polyline points=\"{points}\" fill=\"none\" stroke=\"#81c995\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>")
+    }).unwrap_or_default();
+    let drawing = format!("{primary_drawing}{secondary_drawing}");
 
     let grid = (0..=GRID_ROWS)
         .map(|row| {
@@ -1029,17 +1041,17 @@ fn graph_visual_with_dimensions(
     // The expanded view gets a centered series key on its own header row.
     let legend = if is_expanded {
         let legend_y = 34.0;
-        let legend_title = escape_svg_text(title);
-        let legend_unit = escape_svg_text(unit);
-        format!(
-            "<g aria-label=\"Legend\"><path d=\"M{:.2} {legend_y:.2}h18\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"3\" stroke-linecap=\"round\"/><text x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{legend_title} ({legend_unit})</text></g>",
-            plot_left + plot_width / 2.0 - 62.0,
-            plot_left + plot_width / 2.0 + 8.0,
-            legend_y + font_size * 0.35
-        )
-    } else {
-        String::new()
-    };
+        if let Some(labels) = secondary_labels.as_deref() {
+            let mut parts = labels.splitn(2, '|');
+            let primary_label = escape_svg_text(parts.next().unwrap_or(title));
+            let secondary_label = escape_svg_text(parts.next().unwrap_or("Input"));
+            format!("<g aria-label=\"Legend\"><path d=\"M{:.2} {legend_y:.2}h18\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"3\"/><text x=\"{:.2}\" y=\"{:.2}\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{primary_label}</text><path d=\"M{:.2} {legend_y:.2}h18\" fill=\"none\" stroke=\"#81c995\" stroke-width=\"3\"/><text x=\"{:.2}\" y=\"{:.2}\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{secondary_label}</text></g>", plot_left + plot_width / 2.0 - 150.0, plot_left + plot_width / 2.0 - 126.0, legend_y + font_size * 0.35, plot_left + plot_width / 2.0 + 20.0, plot_left + plot_width / 2.0 + 44.0, legend_y + font_size * 0.35)
+        } else {
+            let legend_title = escape_svg_text(title);
+            let legend_unit = escape_svg_text(unit);
+            format!("<g aria-label=\"Legend\"><path d=\"M{:.2} {legend_y:.2}h18\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"3\" stroke-linecap=\"round\"/><text x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{legend_title} ({legend_unit})</text></g>", plot_left + plot_width / 2.0 - 62.0, plot_left + plot_width / 2.0 + 8.0, legend_y + font_size * 0.35)
+        }
+    } else { String::new() };
     let x_axis_title = format!(
         "<text x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">TIME</text>",
         plot_left + plot_width / 2.0,
@@ -1078,6 +1090,23 @@ fn interactive_graph_with_axis(
     axis_start: String,
 ) -> cosmic::Element<'static, Message> {
     interactive_graph_inner(language, title, values, style, unit, Some(axis_start))
+}
+
+fn interactive_combined_graph_with_axis(
+    language: &str, title: &str, output_values: Vec<f64>, input_values: Vec<f64>,
+    style: &str, unit: &str, axis_start: String, output_label: &str, input_label: &str,
+) -> cosmic::Element<'static, Message> {
+    let graph = widget::Column::new().spacing(6)
+        .push(widget::Row::new().align_y(cosmic::iced::Alignment::Center)
+            .push(widget::text::body(title.to_string()).width(cosmic::iced::Length::Fill))
+            .push(widget::icon::from_name("zoom-in-symbolic").size(16))
+            .push(widget::text::caption(crate::i18n::tr(language, "Open graph"))))
+        .push(graph_visual_with_dimensions(output_values.iter().copied(), style, title, unit, 120.0,
+            cosmic::iced::Length::Fixed(120.0), Some(axis_start.clone()), Some(input_values.clone()),
+            Some(format!("{output_label}|{input_label}"))));
+    widget::button::custom(graph)
+        .on_press(Message::ShowCombinedGraph(title.to_string(), output_values, input_values, unit.to_string(), Some(axis_start), output_label.to_string(), input_label.to_string()))
+        .padding(0).width(cosmic::iced::Length::Fill).class(cosmic::theme::Button::Text).into()
 }
 
 fn interactive_graph_inner(
@@ -1142,6 +1171,19 @@ fn average_temperature_c(readings: &[FritzReading], exclude_solar: bool) -> Opti
         (sum + reading.temperature_c, count + 1)
     });
     (count > 0).then(|| sum / count as f64)
+}
+
+fn aligned_power_series(output_history: &VecDeque<(Instant, i64)>, input_history: &VecDeque<(Instant, i64)>) -> (Vec<f64>, Vec<f64>) {
+    let input_by_time: HashMap<Instant, i64> = input_history.iter().copied().collect();
+    let mut output_values = Vec::new();
+    let mut input_values = Vec::new();
+    for (timestamp, output) in output_history {
+        if let Some(input) = input_by_time.get(timestamp) {
+            output_values.push(*output as f64);
+            input_values.push(input_display_power_w(*input) as f64);
+        }
+    }
+    (output_values, input_values)
 }
 
 fn rebuild_input_power_history(
@@ -1753,19 +1795,23 @@ fn total_power_overview(
             .map(|(timestamp, _)| Instant::now().duration_since(*timestamp).as_secs() / 60),
     );
 
+    let (combined_output_values, combined_input_values) = aligned_power_series(history, &input_history);
     let output_graph = collapsible_graph(
-        "POWER OUTPUT & TEMPERATURE",
-        "graph-total-output-pair",
+        "TOTAL POWER INPUT & OUTPUT",
+        "graph-total-power-pair",
         collapsed_sections.contains("graph-total-output-pair"),
         widget::Column::new()
             .spacing(8)
-            .push(interactive_graph_with_axis(
+            .push(interactive_combined_graph_with_axis(
                 &settings.language,
-                crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-                history.iter().map(|(_, value)| *value as f64),
+                crate::i18n::tr(&settings.language, "TOTAL POWER INPUT & OUTPUT"),
+                combined_output_values,
+                combined_input_values,
                 &settings.graph_style,
                 "W",
                 axis_start.clone(),
+                &crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
+                &crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
             ))
             .push(interactive_graph_with_axis(
                 &settings.language,
@@ -1829,21 +1875,11 @@ fn total_power_overview(
                 ))
             });
         let mut input_graph = widget::Column::new().spacing(8).push(collapsible_graph(
-            "POWER INPUT & TEMPERATURE",
-            "graph-total-input-pair",
-            collapsed_sections.contains("graph-total-input-pair"),
+            "INPUT TEMPERATURE",
+            "graph-total-input-temperature",
+            collapsed_sections.contains("graph-total-input-temperature"),
             widget::Column::new()
                 .spacing(8)
-                .push(interactive_graph_with_axis(
-                    &settings.language,
-                    crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
-                    input_history
-                        .iter()
-                        .map(|(_, value)| input_display_power_w(*value) as f64),
-                    &settings.graph_style,
-                    "W",
-                    axis_start.clone(),
-                ))
                 .push(interactive_graph_with_axis(
                     &settings.language,
                     crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
@@ -3207,13 +3243,14 @@ impl cosmic::Application for AppModel {
                         };
                     controls
                 })
-                .push(graph_visual_large(
-                    values.iter().copied(),
-                    &self.settings.graph_style,
-                    title,
-                    unit,
-                    axis_start.clone(),
-                ));
+                .push(if let Some((secondary_values, labels)) = &self.expanded_graph_secondary {
+                    let mut parts = labels.splitn(2, '|');
+                    let primary_label = parts.next().unwrap_or(title);
+                    let secondary_label = parts.next().unwrap_or("Input");
+                    graph_visual_large_multi(values.iter().copied(), secondary_values.iter().copied(), &self.settings.graph_style, title, unit, axis_start.clone(), primary_label, secondary_label)
+                } else {
+                    graph_visual_large(values.iter().copied(), &self.settings.graph_style, title, unit, axis_start.clone())
+                });
             // Applet popup surfaces do not receive the normal desktop
             // window background automatically. Apply COSMIC's window
             // background style to the entire graph surface so it has a
@@ -6329,7 +6366,14 @@ impl cosmic::Application for AppModel {
             Message::ShowGraph(title, values, unit, axis_start) => {
                 self.history_graph_devices.clear();
                 self.history_graph_index = None;
+                self.expanded_graph_secondary = None;
                 self.expanded_graph = Some((title, values, unit, axis_start));
+            }
+            Message::ShowCombinedGraph(title, output_values, input_values, unit, axis_start, output_label, input_label) => {
+                self.history_graph_devices.clear();
+                self.history_graph_index = None;
+                self.expanded_graph_secondary = Some((input_values, format!("{output_label}|{input_label}")));
+                self.expanded_graph = Some((title, output_values, unit, axis_start));
                 if self.graph_window.is_none() {
                     // Applets must create secondary surfaces through the
                     // applet popup API. window::open() creates a local window
@@ -6505,6 +6549,7 @@ impl cosmic::Application for AppModel {
             }
             Message::CloseGraph => {
                 self.expanded_graph = None;
+                self.expanded_graph_secondary = None;
                 self.history_graph_devices.clear();
                 self.history_graph_index = None;
                 if let Some(id) = self.graph_window.take() {
