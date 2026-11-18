@@ -2262,12 +2262,11 @@ fn set_panel_item_visibility(hidden_items: &mut Vec<String>, id: &str, visible: 
 
 /// Effective panel availability, including options that constrain an item.
 fn panel_item_is_enabled(settings: &FritzSettings, id: &str) -> bool {
-    match id {
+    (match id {
         "solar-power" => !settings.panel_net_power,
         "internet-bandwidth" => settings.panel_internet_bandwidth,
         _ => true,
-    }
-    &&panel_item_is_visible(&settings.hidden_panel_items, id)
+    }) && panel_item_is_visible(&settings.hidden_panel_items, id)
 }
 
 fn format_compact_decimal(value: f64) -> String {
