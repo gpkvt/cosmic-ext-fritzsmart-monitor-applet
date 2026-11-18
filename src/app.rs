@@ -3791,7 +3791,7 @@ impl cosmic::Application for AppModel {
                     ),
                     (
                         "Layout",
-                        "Choose what appears and in which order",
+                        "Arrange popup sections",
                         vec![("Menu order", "menu-order")],
                     ),
                     (
@@ -3868,48 +3868,8 @@ impl cosmic::Application for AppModel {
                         .step(1.0_f32),
                     )
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Adjusts the power and temperature text in the panel")))
-                    .push(
-                        widget::Row::new()
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(
-                                widget::Column::new()
-                                    .spacing(3)
-                                    .width(cosmic::iced::Length::Fill)
-                                    
-                                    .push(widget::text::caption(crate::i18n::tr(
-                                        &self.settings.language,
-                                        "Display the current OpenWeather conditions in the panel.",
-                                    ))),
-                            )
-                            .push(
-                                widget::container(
-                                    widget::toggler(panel_item_is_visible(&self.settings.hidden_panel_items, "weather"))
-                                        .on_toggle(|visible| Message::TogglePanelItemVisibility("weather", visible)),
-                                )
-                                .padding([8, 10]),
-                            ),
-                    )
-                    .push(
-                        widget::Row::new()
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(
-                                widget::Column::new()
-                                    .spacing(3)
-                                    .width(cosmic::iced::Length::Fill)
-                                    
-                                    .push(widget::text::caption(crate::i18n::tr(
-                                        &self.settings.language,
-                                        "Display the temperature reported by selected devices in the panel.",
-                                    ))),
-                            )
-                            .push(
-                                widget::container(
-                                    widget::toggler(panel_item_is_visible(&self.settings.hidden_panel_items, "temperature"))
-                                        .on_toggle(|visible| Message::TogglePanelItemVisibility("temperature", visible)),
-                                )
-                                .padding([8, 10]),
-                            ),
-                    )
+
+
                     .push(widget::text::body(format!("{}: {} px", crate::i18n::tr(&self.settings.language, "Panel item spacing"), self.settings.panel_item_spacing)))
                     .push(widget::slider(0.0..=16.0, f32::from(self.settings.panel_item_spacing),
                         |value| Message::PanelItemSpacingChanged(value.round() as u8)).step(1.0_f32))
@@ -3938,26 +3898,7 @@ impl cosmic::Application for AppModel {
                             widget::toggler(self.settings.panel_refresh_button)
                                 .on_toggle(Message::PanelRefreshButtonChanged)
                         ).padding([8, 10])))
-                    .push(
-                        widget::Row::new()
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(
-                                widget::Column::new()
-                                    .spacing(3)
-                                    .width(cosmic::iced::Length::Fill)
-                                    
-                                    .push(widget::text::caption(
-                                        "Display the maximum download and upload link speeds reported by your FRITZ!Box connection in Mb/s.",
-                                    )),
-                            )
-                            .push(
-                                widget::container(
-                                    widget::toggler(self.settings.panel_internet_bandwidth)
-                                        .on_toggle(Message::PanelInternetBandwidthChanged),
-                                )
-                                .padding([8, 10]),
-                            ),
-                    );
+;
                 if has_input_device {
                     content = content.push(
                         widget::Row::new()
