@@ -4068,6 +4068,27 @@ impl cosmic::Application for AppModel {
                         )
                         .on_input(Message::TasmotaPasswordChanged),
                     )
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::body("Device discovery"))
+                    .push(widget::text::caption(
+                        "Search the local network for Tasmota devices using mDNS. All configured Tasmota devices use the shared credentials above.",
+                    ))
+                    .push(if self.devices_loading {
+                        widget::text::caption("Searching for devices…").into()
+                    } else {
+                        action_button(
+                            "view-refresh-symbolic",
+                            "Search for Tasmota devices",
+                            Message::DiscoverDevices,
+                        )
+                        .into()
+                    })
+                    .push(if let Some(status) = &self.settings_status {
+                        widget::text::caption(status.clone()).into()
+                    } else {
+                        widget::Space::new().height(0).into()
+                    })
+                    .push(widget::divider::horizontal::default())
                     .push(
                         widget::Row::new()
                             .width(cosmic::iced::Length::Fill)
