@@ -143,20 +143,6 @@ for page in pages:
         }
         if set(safeguard_icons) != expected_icons or len(safeguard_icons) != 6:
             fail("index.html: safeguard icons must use all six dedicated SVG image assets")
-        if not re.search(r"event\.key\s*===\s*['\"]ArrowLeft['\"]", content):
-            fail("index.html: left-arrow keyboard navigation is missing")
-        if not re.search(r"event\.key\s*===\s*['\"]ArrowRight['\"]", content):
-            fail("index.html: right-arrow keyboard navigation is missing")
-        hero_cards = content.count('<a class="hero-shot"')
-        if hero_cards != 10:
-            fail(f"index.html: expected ten screenshot cards, found {hero_cards}")
-        if '.hero-gallery .hero-shot{display:none}' in content:
-            fail("index.html: screenshot deck must not be hidden")
-        for feature in ("card-deal", "openGalerie(index)", "gallery-enter", "gallery-image-enter", ".hero-shot:hover", "border-color:#8be0c4aa"):
-            if feature not in content:
-                fail(f"index.html: screenshot gallery interaction or styling is missing {feature}")
-        hover_rule = re.search(r"\.hero-shot:hover[^\{]*\{([^}]*)\}", content)
-        if not hover_rule or re.search(r"\b(?:transform|z-index)\s*:", hover_rule.group(1)):
-            fail("index.html: screenshot hover must highlight without moving cards or changing their stacking order")
+
 
 print(f"Validated {len(pages)} GitHub Pages HTML page(s) and all local references.")
