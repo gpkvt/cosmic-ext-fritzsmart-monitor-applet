@@ -3174,8 +3174,7 @@ impl cosmic::Application for AppModel {
             ));
         }
         if self.error.is_none() {
-            if panel_item_is_visible(&self.settings.hidden_panel_items, "power-consumption")
-            {
+            if panel_item_is_visible(&self.settings.hidden_panel_items, "power-consumption") {
                 panel_items.push((
                     "power-consumption",
                     panel_item(
@@ -3270,9 +3269,9 @@ impl cosmic::Application for AppModel {
                     };
                 panel_items.push(("internet-bandwidth", bandwidth_rows));
             }
-            if let Some(temperature) = temperature.filter(|_| {
-                panel_item_is_visible(&self.settings.hidden_panel_items, "temperature")
-            }) {
+            if let Some(temperature) = temperature
+                .filter(|_| panel_item_is_visible(&self.settings.hidden_panel_items, "temperature"))
+            {
                 panel_items.push((
                     "temperature",
                     panel_item(
@@ -7840,11 +7839,7 @@ impl cosmic::Application for AppModel {
                 self.persist_settings();
             }
             Message::TogglePanelItemVisibility(item, visible) => {
-                set_panel_item_visibility(
-                    &mut self.settings.hidden_panel_items,
-                    item,
-                    visible,
-                );
+                set_panel_item_visibility(&mut self.settings.hidden_panel_items, item, visible);
                 self.persist_settings();
             }
             Message::MovePanelItem(item, move_up) => {
@@ -9253,7 +9248,10 @@ mod history_tests {
         hidden.push("weather".into());
         set_panel_item_visibility(&mut hidden, "weather", true);
         assert!(panel_item_is_visible(&hidden, "weather"));
-        assert_eq!(hidden.iter().filter(|id| id.as_str() == "weather").count(), 0);
+        assert_eq!(
+            hidden.iter().filter(|id| id.as_str() == "weather").count(),
+            0
+        );
 
         set_panel_item_visibility(&mut hidden, "temperature", false);
         assert!(!panel_item_is_visible(&hidden, "temperature"));
