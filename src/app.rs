@@ -2777,6 +2777,10 @@ impl cosmic::Application for AppModel {
         };
         let quick_refresh_interval = settings.refresh_interval_seconds;
         let known_devices = settings.known_devices.clone();
+        // The persisted inventory is already a complete, usable device list.
+        // Mark it loaded immediately so the UI never waits for network discovery
+        // before showing devices restored from the user's settings.
+        let saved_devices_loaded = !known_devices.is_empty();
         let quick_graph_timespan = settings.graph_timespan_minutes;
         let restore_forecast = weather_forecast_expanded
             && settings.weather_enabled
@@ -2814,6 +2818,8 @@ impl cosmic::Application for AppModel {
                 core,
                 selected_ains: initial_device_selection(&settings),
                 devices: known_devices,
+                devices_loaded: saved_devices_loaded,
+                devices_loading: startup_discovery,
                 settings,
                 settings_open: setup_assistant,
                 setup_assistant,
