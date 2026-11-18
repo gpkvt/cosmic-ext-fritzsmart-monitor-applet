@@ -1,6 +1,7 @@
 use std::{
     collections::HashSet,
     net::IpAddr,
+    sync::{Mutex, OnceLock},
     time::{Duration, Instant},
 };
 
@@ -136,6 +137,30 @@ async fn query_status(
         ))
 }
 
+
+fn device_cache() -> &'static Mutex<Option<(Instant, Vec<TasmotaDevice>)>> {
+    static CACHE: OnceLock<Mutex<Option<(Instant, Vec<TasmotaDevice>)>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(None))
+}
+
+/// Return recently discovered devices without repeating the four-second mDNS scan
+/// on every power-reading refresh. The cache expires so DHCP changes are picked up.
+pub async fn known_devices(
+    username: String,
+    password: String,
+) -> Result<Vec<TasmotaDevice>, String> {
+    if let Some((discovered_at, devices)) = device_cache()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+    {
+        if discovered_at.elapsed() < Duration::from_secs(60) {
+            return Ok(devices.clone());
+        }
+    }
+    discover_devices(username, password).await
+}
+
 pub async fn discover_devices(
     username: String,
     password: String,
@@ -181,6 +206,9 @@ pub async fn discover_devices(
     }
     devices.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     devices.dedup_by(|a, b| a.id == b.id);
+    *device_cache()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some((Instant::now(), devices.clone()));
     Ok(devices)
 }
 
