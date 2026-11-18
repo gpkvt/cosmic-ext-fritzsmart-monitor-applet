@@ -1765,26 +1765,20 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
     .class(cosmic::theme::Button::Text);
     content = content.push(history_heading);
     if !history_collapsed {
-        content = content.push(
-            widget::Column::new()
-                .spacing(8)
-                .push(interactive_graph_with_axis(
-                    &language,
-                    crate::i18n::tr(&language, "TOTAL POWER INPUT"),
-                    input_history.into_iter(),
-                    &graph_style,
-                    "W",
-                    axis_start.clone(),
-                ))
-                .push(interactive_graph_with_axis(
-                    &language,
-                    crate::i18n::tr(&language, "TOTAL POWER OUTPUT"),
-                    output_history.into_iter(),
-                    &graph_style,
-                    "W",
-                    axis_start,
-                )),
-        );
+        let output_label = crate::i18n::tr(&language, "TOTAL POWER OUTPUT");
+        let input_label = crate::i18n::tr(&language, "TOTAL POWER INPUT");
+        let combined_title = format!("{output_label} & {input_label}");
+        content = content.push(interactive_combined_graph_with_axis(
+            &language,
+            &combined_title,
+            output_history,
+            input_history,
+            &graph_style,
+            "W",
+            axis_start,
+            &output_label,
+            &input_label,
+        ));
     }
     surface_card(content.into(), 14)
 }
@@ -1901,40 +1895,20 @@ fn total_power_overview(
             .map(|(timestamp, _)| Instant::now().duration_since(*timestamp).as_secs() / 60),
     );
 
-    let (combined_output_values, combined_input_values) =
-        aligned_power_series(history, &input_history);
-    let output_label = crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT");
-    let input_label = crate::i18n::tr(&settings.language, "TOTAL POWER INPUT");
-    let combined_title = format!("{output_label} & {input_label}");
-    let power_graph: cosmic::Element<'static, Message> = if has_input_readings {
-        interactive_combined_graph_with_axis(
-            &settings.language,
-            &combined_title,
-            combined_output_values,
-            combined_input_values,
-            &settings.graph_style,
-            "W",
-            axis_start.clone(),
-            &output_label,
-            &input_label,
-        )
-    } else {
-        interactive_graph_with_axis(
-            &settings.language,
-            crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-            history.iter().map(|(_, value)| *value as f64),
-            &settings.graph_style,
-            "W",
-            axis_start.clone(),
-        )
-    };
     let output_graph = collapsible_graph(
-        "TOTAL POWER INPUT & OUTPUT",
-        "graph-total-power-pair",
-        collapsed_sections.contains("graph-total-power-pair"),
+        "POWER OUTPUT & TEMPERATURE",
+        "graph-total-output-pair",
+        collapsed_sections.contains("graph-total-output-pair"),
         widget::Column::new()
             .spacing(8)
-            .push(power_graph)
+            .push(interactive_graph_with_axis(
+                &settings.language,
+                crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
+                history.iter().map(|(_, value)| *value as f64),
+                &settings.graph_style,
+                "W",
+                axis_start.clone(),
+            ))
             .push(interactive_graph_with_axis(
                 &settings.language,
                 crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
@@ -1992,11 +1966,21 @@ fn total_power_overview(
                 ))
             });
         let mut input_graph = widget::Column::new().spacing(8).push(collapsible_graph(
-            "INPUT TEMPERATURE",
-            "graph-total-input-temperature",
-            collapsed_sections.contains("graph-total-input-temperature"),
+            "POWER INPUT & TEMPERATURE",
+            "graph-total-input-pair",
+            collapsed_sections.contains("graph-total-input-pair"),
             widget::Column::new()
                 .spacing(8)
+                .push(interactive_graph_with_axis(
+                    &settings.language,
+                    crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
+                    input_history
+                        .iter()
+                        .map(|(_, value)| input_display_power_w(*value) as f64),
+                    &settings.graph_style,
+                    "W",
+                    axis_start.clone(),
+                ))
                 .push(interactive_graph_with_axis(
                     &settings.language,
                     crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
@@ -5584,18 +5568,20 @@ impl cosmic::Application for AppModel {
                 );
                 let summary_card = live_power_summary(LivePowerSummaryData {
                     energy_flow,
-                    input_history: rebuild_input_power_history(
-                        &self.device_history,
-                        &self.settings.input_ains,
-                    )
-                    .iter()
-                    .map(|(_, value)| *value as f64)
-                    .collect(),
-                    output_history: self
-                        .history
-                        .iter()
-                        .map(|(_, value)| *value as f64)
-                        .collect(),
+                    input_history: {
+                        let input = rebuild_input_power_history(
+                            &self.device_history,
+                            &self.settings.input_ains,
+                        );
+                        aligned_power_series(&self.history, &input).1
+                    },
+                    output_history: {
+                        let input = rebuild_input_power_history(
+                            &self.device_history,
+                            &self.settings.input_ains,
+                        );
+                        aligned_power_series(&self.history, &input).0
+                    },
                     graph_style: self.settings.graph_style.clone(),
                     language: self.settings.language.clone(),
                     axis_start: format_graph_axis_start(
