@@ -860,19 +860,16 @@ fn output_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i6
 fn graph_visual(
     values: impl Iterator<Item = f64>,
     style: &str,
-    title: &str,
     unit: &str,
     axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     graph_visual_with_dimensions(
         values,
         style,
-        title,
         unit,
         160.0,
         cosmic::iced::Length::Fixed(160.0),
         axis_start,
-        None,
         None,
     )
 }
@@ -892,19 +889,16 @@ fn graph_plot_bounds(minimum: f64, maximum: f64) -> (f64, f64) {
 fn graph_visual_large(
     values: impl Iterator<Item = f64>,
     style: &str,
-    title: &str,
     unit: &str,
     axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     graph_visual_with_dimensions(
         values,
         style,
-        title,
         unit,
         390.0,
         cosmic::iced::Length::Fixed(390.0),
         axis_start,
-        None,
         None,
     )
 }
@@ -913,22 +907,17 @@ fn graph_visual_large_multi(
     values: impl Iterator<Item = f64>,
     secondary_values: impl Iterator<Item = f64>,
     style: &str,
-    title: &str,
     unit: &str,
     axis_start: Option<String>,
-    primary_label: &str,
-    secondary_label: &str,
 ) -> cosmic::Element<'static, Message> {
     graph_visual_with_dimensions(
         values,
         style,
-        title,
         unit,
         390.0,
         cosmic::iced::Length::Fixed(390.0),
         axis_start,
         Some(secondary_values.collect()),
-        Some(format!("{primary_label}|{secondary_label}")),
     )
 }
 
@@ -998,13 +987,11 @@ fn format_graph_y_tick(value: f64, unit: &str) -> String {
 fn graph_visual_with_dimensions(
     values: impl Iterator<Item = f64>,
     style: &str,
-    _title: &str,
     unit: &str,
     graph_height: f64,
     widget_height: cosmic::iced::Length,
     axis_start: Option<String>,
     secondary_values: Option<Vec<f64>>,
-    _secondary_labels: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
     let current_value = values.last().copied().unwrap_or(0.0);
@@ -1341,7 +1328,6 @@ fn interactive_graph_with_axis(
 }
 
 fn interactive_graph_card(
-    _language: &str,
     title: &str,
     visual: cosmic::Element<'static, Message>,
     message: Message,
@@ -1364,7 +1350,6 @@ fn interactive_graph_card(
 }
 
 fn interactive_combined_graph_with_axis(
-    language: &str,
     title: &str,
     output_values: GraphSamples,
     input_values: GraphSamples,
@@ -1377,16 +1362,13 @@ fn interactive_combined_graph_with_axis(
     let visual = graph_visual_with_dimensions(
         graph_values_only(&output_values).into_iter(),
         style,
-        title,
         unit,
         160.0,
         cosmic::iced::Length::Fixed(160.0),
         Some(axis_start.clone()),
         Some(graph_values_only(&input_values)),
-        Some(format!("{output_label}|{input_label}")),
     );
     interactive_graph_card(
-        language,
         title,
         visual,
         Message::ShowCombinedGraph(
@@ -1413,12 +1395,10 @@ fn interactive_graph_inner(
     let visual = graph_visual(
         graph_values_only(&values).into_iter(),
         style,
-        title,
         unit,
         axis_start.clone(),
     );
     interactive_graph_card(
-        language,
         title,
         visual,
         Message::ShowGraph(title.to_string(), values, unit.to_string(), axis_start),
@@ -1960,15 +1940,14 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
         let input_label = crate::i18n::tr(&language, "TOTAL POWER INPUT");
         let combined_title = format!("{output_label} & {input_label}");
         content = content.push(interactive_combined_graph_with_axis(
-            &language,
             &combined_title,
             output_history,
             input_history,
             &graph_style,
             "W",
             axis_start,
-            &output_label,
-            &input_label,
+            output_label,
+            input_label,
         ));
     }
     surface_card(content.into(), 14)
@@ -3552,17 +3531,13 @@ impl cosmic::Application for AppModel {
                             graph_values_only(values).into_iter(),
                             graph_values_only(secondary_values).into_iter(),
                             &self.settings.graph_style,
-                            title,
                             unit,
                             axis_start.clone(),
-                            primary_label,
-                            secondary_label,
                         )
                     } else {
                         graph_visual_large(
                             graph_values_only(values).into_iter(),
                             &self.settings.graph_style,
-                            title,
                             unit,
                             axis_start.clone(),
                         )
