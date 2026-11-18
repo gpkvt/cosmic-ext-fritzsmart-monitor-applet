@@ -206,74 +206,42 @@ fn discover_services() -> Result<Vec<(String, u16, IpAddr)>, String> {
     Ok(found.into_iter().collect())
 }
 
-/// Enumerate usable hosts on the IPv4 subnets assigned to this machine.
-/// Subnets larger than 4094 hosts are skipped to keep discovery bounded.
-fn scan_local_ipv4_addresses() -> Vec<Ipv4Addr> {
-    let interfaces = match if_addrs::get_if_addrs() {
-        Ok(interfaces) => interfaces,
-        Err(error) => {
+/// Enumerate usable hosts in the /24 containing the configured FRITZ!Box IPv4 address.
+/// This deliberately avoids scanning Docker, VPN and other unrelated local networks.
+fn scan_fritzbox_ipv4_addresses(fritzbox_url: &str) -> Vec<Ipv4Addr> {
+    let fritzbox_ip = match reqwest::Url::parse(fritzbox_url)
+        .ok()
+        .and_then(|url| url.host_str().and_then(|host| host.parse::<Ipv4Addr>().ok()))
+    {
+        Some(ip) if !ip.is_loopback() && !ip.is_unspecified() => ip,
+        _ => {
             record_discovery_diagnostic(format!(
-                "Tasmota IP scan could not enumerate network interfaces: {error}"
+                "Tasmota IP range scan skipped: FRITZ!Box URL does not contain a usable IPv4 literal ({fritzbox_url}). mDNS discovery remains enabled."
             ));
             return Vec::new();
         }
     };
-    let mut addresses = HashSet::new();
-    let mut ranges = HashSet::new();
 
-    for interface in interfaces {
-        let IfAddr::V4(interface) = interface.addr else {
-            continue;
-        };
-        let ip = interface.ip;
-        let mask = u32::from(interface.netmask);
-        if ip.is_loopback() || ip.is_unspecified() || mask == 0 {
-            continue;
-        }
-        let prefix = mask.count_ones();
-        let expected_mask = u32::MAX.checked_shl(32 - prefix).unwrap_or(0);
-        if mask != expected_mask || prefix > 30 {
-            continue;
-        }
+    let ip_number = u32::from(fritzbox_ip);
+    let mask = u32::from(Ipv4Addr::new(255, 255, 255, 0));
+    let network = ip_number & mask;
+    let broadcast = network | !mask;
+    let range = format!("{}/24", Ipv4Addr::from(network));
+    record_discovery_diagnostic(format!(
+        "Tasmota IP scan: scanning {range} (254 usable addresses), containing FRITZ!Box {fritzbox_ip}."
+    ));
 
-        let ip_number = u32::from(ip);
-        let network = ip_number & mask;
-        let broadcast = network | !mask;
-        let host_count = broadcast.saturating_sub(network).saturating_sub(1);
-        if host_count == 0 || host_count > 4094 {
-            record_discovery_diagnostic(format!(
-                "Tasmota IP scan skipped {}/{}: subnet contains {host_count} usable hosts (limit 4094).",
-                ip, prefix
-            ));
-            continue;
-        }
-
-        let range = format!("{}/{}", Ipv4Addr::from(network), prefix);
-        if ranges.insert(range.clone()) {
-            record_discovery_diagnostic(format!(
-                "Tasmota IP scan: scanning {range} ({host_count} usable addresses) on interface {}.",
-                ip
-            ));
-        }
-
-        for host in (network + 1)..broadcast {
-            let address = Ipv4Addr::from(host);
-            if address != ip {
-                addresses.insert(address);
-            }
-        }
-    }
-
-    let mut addresses: Vec<_> = addresses.into_iter().collect();
+    let mut addresses: Vec<_> = ((network + 1)..broadcast)
+        .map(Ipv4Addr::from)
+        .filter(|address| *address != fritzbox_ip)
+        .collect();
     addresses.sort_unstable();
     record_discovery_diagnostic(format!(
-        "Tasmota IP scan prepared {} unique IPv4 address(es) across {} local subnet(s).",
-        addresses.len(),
-        ranges.len()
+        "Tasmota IP scan prepared {} address(es) in {range}.",
+        addresses.len()
     ));
     addresses
 }
-
 async fn query_status(
     client: &Client,
     address: &str,
@@ -320,6 +288,7 @@ fn device_cache() -> &'static Mutex<Option<(Instant, Vec<TasmotaDevice>)>> {
 pub async fn known_devices(
     username: String,
     password: String,
+    fritzbox_url: String,
 ) -> Result<Vec<TasmotaDevice>, String> {
     if let Some((discovered_at, devices)) = device_cache()
         .lock()
@@ -366,18 +335,18 @@ pub async fn discover_devices(
             message
         })?;
     // Keep mDNS as the fast path, then supplement it with a bounded scan of
-    // every local IPv4 subnet. The HTTP status response is the final identity check.
+    // the FRITZ!Box /24. The HTTP status response is the final identity check.
     let mut endpoints: HashMap<(String, u16, IpAddr), bool> = HashMap::new();
     for (hostname, port, ip) in services {
         endpoints.insert((hostname, port, ip), true);
     }
-    for ip in scan_local_ipv4_addresses() {
+    for ip in scan_fritzbox_ipv4_addresses(&fritzbox_url) {
         endpoints
             .entry((ip.to_string(), 80, IpAddr::V4(ip)))
             .or_insert(false);
     }
     record_discovery_diagnostic(format!(
-        "Tasmota discovery probing {} unique endpoint(s) (mDNS plus local IP scan), with up to 32 requests in parallel.",
+        "Tasmota discovery probing {} unique endpoint(s) (mDNS plus FRITZ!Box /24 scan), with up to 32 requests in parallel.",
         endpoints.len()
     ));
 
