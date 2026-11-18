@@ -6351,8 +6351,7 @@ impl cosmic::Application for AppModel {
                         .unwrap_or(usize::MAX)
                 });
                 for device in missing_devices {
-                    let device_key =
-                        crate::fritz::normalize_ain_for_selection(&device.ain);
+                    let device_key = crate::fritz::normalize_ain_for_selection(&device.ain);
                     let device_row = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
                         .list_item_padding([0, 0])
@@ -6379,8 +6378,10 @@ impl cosmic::Application for AppModel {
                             let cosmic = theme.cosmic();
                             cosmic::iced::widget::container::Style {
                                 background: Some(
-                                    cosmic::iced::Color::from(cosmic.background(false).small_widget)
-                                        .into(),
+                                    cosmic::iced::Color::from(
+                                        cosmic.background(false).small_widget,
+                                    )
+                                    .into(),
                                 ),
                                 ..Default::default()
                             }
