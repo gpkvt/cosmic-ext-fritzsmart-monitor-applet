@@ -5721,7 +5721,7 @@ impl cosmic::Application for AppModel {
                                                 &self.settings.language,
                                                 "TEMPERATURE (°C)",
                                             )))
-                                            .push(interactive_graph(
+                                            .push(interactive_graph_with_axis(
                                                 &self.settings.language,
                                                 &format!(
                                                     "{} · {}",
