@@ -3894,64 +3894,6 @@ impl cosmic::Application for AppModel {
                             widget::toggler(self.settings.panel_refresh_button)
                                 .on_toggle(Message::PanelRefreshButtonChanged)
                         ).padding([8, 10])));
-                if has_input_device {
-                    content = content.push(
-                        widget::Row::new()
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(
-                                widget::Column::new()
-                                    .spacing(3)
-                                    .width(cosmic::iced::Length::Fill)
-                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Combine consumption and solar power")))
-                                    .push(widget::text::caption(crate::i18n::tr(
-                                        &self.settings.language,
-                                        "Show one net power value: total consumption minus solar generation.",
-                                    ))),
-                            )
-                            .push(
-                                widget::container(
-                                    widget::toggler(self.settings.panel_net_power)
-                                        .on_toggle(Message::PanelNetPowerChanged),
-                                )
-                                .padding([8, 10]),
-                            ),
-                    );
-                }
-                content = content.push(
-                    widget::Row::new()
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(
-                            widget::Column::new()
-                                .spacing(3)
-                                .width(cosmic::iced::Length::Fill)
-                                .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Average temperature")))
-                                .push(widget::text::caption(
-                                    "When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.",
-                                )),
-                        )
-                        .push(
-                                widget::container(
-                                    widget::toggler(self.settings.panel_average_temperature)
-                                        .on_toggle(Message::PanelAverageTemperatureChanged),
-                                )
-                                .padding([8, 10]),
-                            ),
-                    );
-                if self.settings.panel_average_temperature && has_input_device {
-                    content = content.push(
-                        widget::Row::new()
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::Column::new()
-                                .spacing(3)
-                                .width(cosmic::iced::Length::Fill)
-                                .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Exclude solar devices")))
-                                .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Ignore temperatures from devices whose name contains “solar” when calculating the average."))))
-                            .push(widget::container(
-                                widget::toggler(self.settings.panel_exclude_solar_temperature)
-                                    .on_toggle(Message::PanelExcludeSolarTemperatureChanged)
-                            ).padding([8, 10]))
-                    );
-                }
                 content = content
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::body(crate::i18n::tr(
@@ -4005,6 +3947,96 @@ impl cosmic::Application for AppModel {
                         Message::MovePanelItem(id, false),
                     ));
                     content = content.push(row);
+
+                    // Keep options directly beneath the panel item they affect.
+                    if id == "power-consumption" && has_input_device {
+                        content = content.push(
+                            widget::container(
+                                widget::Row::new()
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(
+                                        widget::Column::new()
+                                            .spacing(3)
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::text::body(crate::i18n::tr(
+                                                &self.settings.language,
+                                                "Combine consumption and solar power",
+                                            )))
+                                            .push(widget::text::caption(crate::i18n::tr(
+                                                &self.settings.language,
+                                                "Show one net power value: total consumption minus solar generation.",
+                                            ))),
+                                    )
+                                    .push(
+                                        widget::container(
+                                            widget::toggler(self.settings.panel_net_power)
+                                                .on_toggle(Message::PanelNetPowerChanged),
+                                        )
+                                        .padding([8, 10]),
+                                    ),
+                            )
+                            .padding([4, 0, 4, 24]),
+                        );
+                    }
+
+                    if id == "temperature" {
+                        content = content.push(
+                            widget::container(
+                                widget::Row::new()
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(
+                                        widget::Column::new()
+                                            .spacing(3)
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::text::body(crate::i18n::tr(
+                                                &self.settings.language,
+                                                "Average temperature",
+                                            )))
+                                            .push(widget::text::caption(
+                                                "When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.",
+                                            )),
+                                    )
+                                    .push(
+                                        widget::container(
+                                            widget::toggler(self.settings.panel_average_temperature)
+                                                .on_toggle(Message::PanelAverageTemperatureChanged),
+                                        )
+                                        .padding([8, 10]),
+                                    ),
+                            )
+                            .padding([4, 0, 4, 24]),
+                        );
+                        if self.settings.panel_average_temperature && has_input_device {
+                            content = content.push(
+                                widget::container(
+                                    widget::Row::new()
+                                        .align_y(cosmic::iced::Alignment::Center)
+                                        .push(
+                                            widget::Column::new()
+                                                .spacing(3)
+                                                .width(cosmic::iced::Length::Fill)
+                                                .push(widget::text::body(crate::i18n::tr(
+                                                    &self.settings.language,
+                                                    "Exclude solar devices",
+                                                )))
+                                                .push(widget::text::caption(crate::i18n::tr(
+                                                    &self.settings.language,
+                                                    "Ignore temperatures from devices whose name contains “solar” when calculating the average.",
+                                                ))),
+                                        )
+                                        .push(
+                                            widget::container(
+                                                widget::toggler(self.settings.panel_exclude_solar_temperature)
+                                                    .on_toggle(Message::PanelExcludeSolarTemperatureChanged),
+                                            )
+                                            .padding([8, 10]),
+                                        ),
+                                )
+                                .padding([4, 0, 4, 40]),
+                            );
+                        }
+                    }
+
                     if index + 1 < visible_panel_order.len() {
                         content = content.push(widget::divider::horizontal::default());
                     }
