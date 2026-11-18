@@ -112,7 +112,7 @@ for page in pages:
         hero_images = hero_gallery.group(1).count('<img ')
         if hero_cards != 10 or hero_images != 10:
             fail(f"index.html: expected ten visible screenshot cards with images, found {hero_cards} cards and {hero_images} images")
-        for feature in (".hero-gallery{position:relative;display:block", ".hero-gallery .hero-shot:nth-of-type(1)", "rotate(-23deg)", "rotate(-11deg)", "rotate(11deg)", "rotate(23deg)", ".hero-gallery .hero-shot:nth-of-type(n+6){display:none!important}", ".hero-gallery .gallery-all{position:absolute", "View all 10 screenshots", ".hero-gallery .hero-shot img", "object-fit:contain", ".hero-gallery .hero-shot:hover", "prefers-reduced-motion:reduce", "openGallery("):
+        for feature in (".hero-gallery{position:relative;display:block;height:270px", ".hero-shot{position:absolute;top:24px;left:50%", "width:176px;height:158px", "rotate(-17deg)", "rotate(-9deg)", "rotate(9deg)", "rotate(17deg)", ".hero-shot:nth-of-type(n+6){display:none}", ".hero-shot img", "height:108px", "object-fit:contain", ".hero-shot:hover", ".gallery-all{position:absolute", "openGallery("):
             if feature not in content:
                 fail(f"index.html: visible screenshot card gallery is missing {feature}")
 
