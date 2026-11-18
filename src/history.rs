@@ -358,6 +358,29 @@ mod tests {
     }
 
     #[test]
+    fn parsed_history_document_loads_power_and_device_samples() {
+        let now_epoch = epoch_now().unwrap();
+        let document = json!({
+            "version": 1,
+            "power": [{"timestamp": now_epoch, "power_w": 125}],
+            "devices": {
+                "123456": [{
+                    "timestamp": now_epoch,
+                    "power_w": 100,
+                    "temperature_c": 21.5
+                }]
+            }
+        });
+        let (power, devices) = load_from_document(&document, Duration::from_secs(60));
+        assert_eq!(power.len(), 1);
+        assert_eq!(power[0].1, 125);
+        let device = devices.get("123456").unwrap();
+        assert_eq!(device.len(), 1);
+        assert_eq!(device[0].1, 100);
+        assert!((device[0].2 - 21.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
     fn corrupt_or_unknown_history_is_ignored() {
         let path = temporary_path();
         fs::write(&path, "not json").unwrap();
