@@ -2970,26 +2970,51 @@ impl cosmic::Application for AppModel {
                 * 0.62;
             let width = width.max(font_size);
 
-            let text = self
-                .core
-                .applet
-                .text(value)
-                .size(font_size)
-                // Use the same line-height in every multiline-panel item.
-                // This keeps the first and second baselines aligned when a
-                // two-line Watt value sits beside two stacked single-line items.
-                .line_height(if self.settings.panel_multiline {
-                    cosmic::iced::widget::text::LineHeight::Relative(1.0)
-                } else {
-                    cosmic::iced::widget::text::LineHeight::Relative(0.65)
-                })
-                .width(cosmic::iced::Length::Fill)
-                .align_x(cosmic::iced::Alignment::End);
-
-            widget::container(text)
-                .width(cosmic::iced::Length::Fixed(width))
-                .align_x(cosmic::iced::Alignment::End)
-                .into()
+            let lines: Vec<String> = value.lines().map(str::to_owned).collect();
+            if lines.len() > 1 {
+                // Build the two lines as separate fixed-height rows. Relying on
+                // embedded newlines lets the text renderer choose its own line
+                // metrics, which can collapse the value and unit into one row
+                // in the COSMIC panel.
+                let row_height = (font_size * 1.15).clamp(16.0, 22.0);
+                let column = lines.into_iter().fold(
+                    widget::Column::new().spacing(0),
+                    |column, line| {
+                        let text = self
+                            .core
+                            .applet
+                            .text(line)
+                            .size(font_size)
+                            .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.65))
+                            .width(cosmic::iced::Length::Fill)
+                            .align_x(cosmic::iced::Alignment::End);
+                        column.push(
+                            widget::container(text)
+                                .width(cosmic::iced::Length::Fill)
+                                .height(cosmic::iced::Length::Fixed(row_height))
+                                .align_x(cosmic::iced::Alignment::End)
+                                .center_y(row_height as u16),
+                        )
+                    },
+                );
+                widget::container(column)
+                    .width(cosmic::iced::Length::Fixed(width))
+                    .align_x(cosmic::iced::Alignment::End)
+                    .into()
+            } else {
+                let text = self
+                    .core
+                    .applet
+                    .text(value)
+                    .size(font_size)
+                    .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.65))
+                    .width(cosmic::iced::Length::Fill)
+                    .align_x(cosmic::iced::Alignment::End);
+                widget::container(text)
+                    .width(cosmic::iced::Length::Fixed(width))
+                    .align_x(cosmic::iced::Alignment::End)
+                    .into()
+            }
         };
 
         // Keep every reading at its intrinsic width. Expanding each child to
