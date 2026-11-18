@@ -1946,7 +1946,7 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
             &graph_style,
             "W",
             axis_start,
-            (&output_label, &input_label),
+            (output_label, input_label),
         ));
     }
     surface_card(content.into(), 14)
