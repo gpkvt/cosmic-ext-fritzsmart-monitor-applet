@@ -1032,9 +1032,9 @@ fn graph_visual_with_dimensions(
         let legend_title = escape_svg_text(title);
         let legend_unit = escape_svg_text(unit);
         format!(
-            "<g aria-label=\\"Legend\\"><path d=\\"M{:.2} {legend_y:.2}h20\\" fill=\\"none\\" stroke=\\"#8ab4f8\\" stroke-width=\\"3\\" stroke-linecap=\\"round\\"/><text x=\\"{:.2}\\" y=\\"{:.2}\\" font-size=\\"{font_size:.1}\\" fill=\\"#a0a0a0\\">{legend_title} ({legend_unit})</text></g>",
-            plot_left + plot_width / 2.0 - 72.0,
-            plot_left + plot_width / 2.0 - 46.0,
+            "<g aria-label=\\"Legend\\"><path d=\\"M{:.2} {legend_y:.2}h18\\" fill=\\"none\\" stroke=\\"#8ab4f8\\" stroke-width=\\"3\\" stroke-linecap=\\"round\\"/><text x=\\"{:.2}\\" y=\\"{:.2}\\" text-anchor=\\"middle\\" font-size=\\"{font_size:.1}\\" fill=\\"#a0a0a0\\">{legend_title} ({legend_unit})</text></g>",
+            plot_left + plot_width / 2.0 - 62.0,
+            plot_left + plot_width / 2.0 + 8.0,
             legend_y + font_size * 0.35
         )
     } else {
