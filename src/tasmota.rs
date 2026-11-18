@@ -282,8 +282,8 @@ fn device_cache() -> &'static Mutex<Option<(Instant, Vec<TasmotaDevice>)>> {
     CACHE.get_or_init(|| Mutex::new(None))
 }
 
-/// Return recently discovered devices without repeating the four-second mDNS scan
-/// on every power-reading refresh. The cache expires so DHCP changes are picked up.
+/// Return recently discovered devices without repeating network discovery on every
+/// power-reading refresh. The cache expires so DHCP changes are picked up.
 pub async fn known_devices(
     username: String,
     password: String,
@@ -377,8 +377,9 @@ async fn discover_devices_with_options(
         }
     }
     record_discovery_diagnostic(format!(
-        "Tasmota discovery probing {} unique endpoint(s) (mDNS plus FRITZ!Box /24 scan), with up to 32 requests in parallel.",
-        endpoints.len()
+        "Tasmota discovery probing {} unique endpoint(s) ({}), with up to 32 requests in parallel.",
+        endpoints.len(),
+        if scan_subnet { "mDNS plus FRITZ!Box /24 scan" } else { "mDNS only" }
     ));
 
     let total_probes = endpoints.len();
@@ -479,13 +480,18 @@ pub async fn fetch_readings(
         Ok(client) => client,
         Err(error) => return (Vec::new(), vec![error.to_string()]),
     };
-    let mut readings = Vec::new();
-    let mut errors = Vec::new();
-    for device in devices {
-        match query_status(&client, &device.address, username, password)
+    // Probe selected Tasmota devices concurrently. Serial requests made the
+    // initial refresh take up to five seconds per device on an unresponsive LAN.
+    let results = futures::future::join_all(devices.iter().map(|device| async {
+        query_status(&client, &device.address, username, password)
             .await
             .and_then(|status| parse_reading(device, &status))
-        {
+    }))
+    .await;
+    let mut readings = Vec::new();
+    let mut errors = Vec::new();
+    for result in results {
+        match result {
             Ok(reading) => readings.push(reading),
             Err(error) => errors.push(error),
         }
