@@ -6756,7 +6756,7 @@ impl cosmic::Application for AppModel {
                             .map(|(timestamp, power, _)| (*timestamp, *power as f64))
                             .collect();
                         self.expanded_graph_max_timespan_minutes =
-                            graph_max_timespan_minutes(&values);
+                            max_device_history_minutes(samples, Instant::now());
                         self.expanded_graph_view_timespan_minutes =
                             self.expanded_graph_max_timespan_minutes;
                         let axis_start = graph_axis_start_for_samples(
@@ -6843,7 +6843,7 @@ impl cosmic::Application for AppModel {
                             self.expanded_graph_full_values = Some(values.clone());
                             self.expanded_graph_full_secondary = None;
                             self.expanded_graph_max_timespan_minutes =
-                                graph_max_timespan_minutes(&values);
+                                max_device_history_minutes(samples, Instant::now());
                             self.expanded_graph_view_timespan_minutes =
                                 self.expanded_graph_max_timespan_minutes;
                             let axis_start = graph_axis_start_for_samples(
@@ -8256,7 +8256,10 @@ mod history_tests {
             (now - Duration::from_secs(10), 4.0),
         ];
         let one_minute = graph_values_for_timespan(&samples, 1);
-        assert_eq!(one_minute.iter().map(|(_, value)| *value).collect::<Vec<_>>(), vec![3.0, 4.0]);
+        assert_eq!(
+            one_minute.iter().map(|(_, value)| *value).collect::<Vec<_>>(),
+            vec![3.0, 4.0]
+        );
         let three_minutes = graph_values_for_timespan(&samples, 3);
         assert_eq!(three_minutes.len(), 4);
         assert!(graph_max_timespan_minutes(&samples) >= 3);
