@@ -878,7 +878,8 @@ pub fn build_weather_slideshow_frames(
 ) -> (Vec<Vec<u8>>, Vec<usize>, Vec<Vec<usize>>) {
     use image::{DynamicImage, ImageBuffer, Rgba};
 
-    // Weather cards never display photos at their original download resolution.
+    // Weather photos retain 60% opacity so the scenery remains clearly visible
+    // while white weather text stays readable.
     // Resize once before generating transitions to avoid repeatedly processing
     // multi-megapixel images for every slideshow frame.
     const MAX_WIDTH: u32 = 1280;
@@ -903,7 +904,7 @@ pub fn build_weather_slideshow_frames(
         let mut output = std::io::Cursor::new(Vec::new());
         let mut still = current.clone();
         for pixel in still.pixels_mut() {
-            pixel[3] /= 2;
+            pixel[3] = (u16::from(pixel[3]) * 3 / 5) as u8;
         }
         if DynamicImage::ImageRgba8(still)
             .write_to(&mut output, image::ImageFormat::Png)
@@ -932,7 +933,7 @@ pub fn build_weather_slideshow_frames(
                     let value = (f32::from(a[channel]) * (1.0 - amount)
                         + f32::from(b[channel]) * amount)
                         .round() as u8;
-                    if channel == 3 { value / 2 } else { value }
+                    if channel == 3 { (u16::from(value) * 3 / 5) as u8 } else { value }
                 }));
             }
             let mut output = std::io::Cursor::new(Vec::new());
