@@ -494,7 +494,7 @@ impl FritzSettings {
             );
         }
         let get = |key: &str| values.get(key).cloned().unwrap_or_default();
-        let settings = Self {
+        let mut settings = Self {
             language: match get("LANGUAGE").as_str() {
                 "de" => "de".into(),
                 "en" => "en".into(),
@@ -594,6 +594,10 @@ impl FritzSettings {
             setup_completed: !values.contains_key("SETUP_COMPLETED")
                 || get("SETUP_COMPLETED").eq_ignore_ascii_case("true"),
         };
+        // Device inventory is stored independently from general preferences so
+        // a damaged or partially-written settings file cannot hide saved devices.
+        settings.known_devices = load_device_inventory()
+            .unwrap_or_else(|| settings.known_devices.clone());
         Ok(settings)
     }
 
@@ -614,6 +618,7 @@ impl FritzSettings {
                 return Err("Configuration values must not contain newlines".into());
             }
         }
+        save_device_inventory(&self.known_devices)?;
         let path = config_path()?;
         let parent = path.parent().ok_or("Invalid configuration path")?;
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -800,6 +805,39 @@ impl FritzSettings {
         }
         Ok(())
     }
+}
+
+fn device_inventory_path() -> Result<std::path::PathBuf, String> {
+    let home = env::var("HOME").map_err(|_| "HOME is not set".to_string())?;
+    Ok(std::path::PathBuf::from(home).join(".config/fritz_solar_devices.json"))
+}
+
+fn load_device_inventory() -> Option<Vec<FritzDevice>> {
+    let path = device_inventory_path().ok()?;
+    let contents = fs::read_to_string(path).ok()?;
+    serde_json::from_str(&contents).ok()
+}
+
+fn save_device_inventory(devices: &[FritzDevice]) -> Result<(), String> {
+    let path = device_inventory_path()?;
+    let parent = path.parent().ok_or("Invalid device inventory path")?;
+    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let contents = serde_json::to_vec_pretty(devices)
+        .map_err(|error| format!("Cannot serialize device inventory: {error}"))?;
+    let temporary = parent.join(format!(".fritz_solar_devices.{}.tmp", std::process::id()));
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
+        .map_err(|error| error.to_string())?;
+    let result = file.write_all(&contents)
+        .and_then(|_| file.sync_all())
+        .and_then(|_| fs::rename(&temporary, &path));
+    if let Err(error) = result {
+        let _ = fs::remove_file(&temporary);
+        return Err(error.to_string());
+    }
+    Ok(())
 }
 
 fn config_path() -> Result<std::path::PathBuf, String> {
