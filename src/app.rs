@@ -542,16 +542,14 @@ fn rebuild_device_history_graph(
     language: &str,
     minutes: u32,
 ) -> (String, GraphSamples, String, Option<String>) {
-    let now = Instant::now();
-    let window = graph_history_window(minutes);
     let values: GraphSamples = device_history
         .get(ain)
         .into_iter()
         .flat_map(|samples| samples.iter())
-        .filter(|(timestamp, _, _)| now.duration_since(*timestamp) <= window)
         .map(|(timestamp, power, _)| (*timestamp, *power as f64))
         .collect();
-    let axis_start = graph_axis_start_for_samples(&values, minutes);
+    let visible = graph_values_for_timespan(&values, minutes);
+    let axis_start = graph_axis_start_for_samples(&visible, minutes);
     (
         format!("{} · {}", name, crate::i18n::tr(language, "POWER (W)")),
         values,
@@ -6658,13 +6656,19 @@ impl cosmic::Application for AppModel {
                 self.expanded_graph_full_values = Some(values.clone());
                 self.expanded_graph_full_secondary = None;
                 self.expanded_graph_max_timespan_minutes = graph_max_timespan_minutes(&values);
-                self.expanded_graph_view_timespan_minutes =
-                    self.expanded_graph_max_timespan_minutes;
-                let axis_start = graph_axis_start_for_samples(
+                self.expanded_graph_view_timespan_minutes = self
+                    .settings
+                    .graph_timespan_minutes
+                    .clamp(5, self.expanded_graph_max_timespan_minutes.max(5));
+                let visible = graph_values_for_timespan(
                     &values,
                     self.expanded_graph_view_timespan_minutes,
                 );
-                self.expanded_graph = Some((title, values, unit, Some(axis_start)));
+                let axis_start = graph_axis_start_for_samples(
+                    &visible,
+                    self.expanded_graph_view_timespan_minutes,
+                );
+                self.expanded_graph = Some((title, visible, unit, Some(axis_start)));
                 if self.graph_window.is_none() {
                     let Some(main_window_id) = self.core.main_window_id() else {
                         self.expanded_graph = None;
@@ -6704,15 +6708,27 @@ impl cosmic::Application for AppModel {
                 self.expanded_graph_max_timespan_minutes =
                     graph_max_timespan_minutes(&output_values)
                         .max(graph_max_timespan_minutes(&input_values));
-                self.expanded_graph_view_timespan_minutes =
-                    self.expanded_graph_max_timespan_minutes;
-                let axis_start = graph_axis_start_for_samples(
+                self.expanded_graph_view_timespan_minutes = self
+                    .settings
+                    .graph_timespan_minutes
+                    .clamp(5, self.expanded_graph_max_timespan_minutes.max(5));
+                let visible_output = graph_values_for_timespan(
                     &output_values,
                     self.expanded_graph_view_timespan_minutes,
                 );
-                self.expanded_graph_secondary =
-                    Some((input_values, format!("{output_label}|{input_label}")));
-                self.expanded_graph = Some((title, output_values, unit, Some(axis_start)));
+                let visible_input = graph_values_for_timespan(
+                    &input_values,
+                    self.expanded_graph_view_timespan_minutes,
+                );
+                let axis_start = graph_axis_start_for_samples(
+                    &visible_output,
+                    self.expanded_graph_view_timespan_minutes,
+                );
+                self.expanded_graph_secondary = Some((
+                    visible_input,
+                    format!("{output_label}|{input_label}"),
+                ));
+                self.expanded_graph = Some((title, visible_output, unit, Some(axis_start)));
                 if self.graph_window.is_none() {
                     // Applets must create secondary surfaces through the
                     // applet popup API. window::open() creates a local window
@@ -6776,20 +6792,26 @@ impl cosmic::Application for AppModel {
                             .collect();
                         self.expanded_graph_max_timespan_minutes =
                             max_device_history_minutes(samples, Instant::now());
-                        self.expanded_graph_view_timespan_minutes =
-                            self.expanded_graph_max_timespan_minutes;
-                        let axis_start = graph_axis_start_for_samples(
+                        self.expanded_graph_view_timespan_minutes = self
+                            .settings
+                            .graph_timespan_minutes
+                            .clamp(5, self.expanded_graph_max_timespan_minutes.max(5));
+                        let visible = graph_values_for_timespan(
                             &values,
                             self.expanded_graph_view_timespan_minutes,
                         );
-                        self.expanded_graph_full_values = Some(values.clone());
+                        let axis_start = graph_axis_start_for_samples(
+                            &visible,
+                            self.expanded_graph_view_timespan_minutes,
+                        );
+                        self.expanded_graph_full_values = Some(values);
                         self.expanded_graph = Some((
                             format!(
                                 "{} · {}",
                                 name,
                                 crate::i18n::tr(&self.settings.language, "POWER (W)")
                             ),
-                            values,
+                            visible,
                             "W".into(),
                             Some(axis_start),
                         ));
@@ -6863,10 +6885,16 @@ impl cosmic::Application for AppModel {
                             self.expanded_graph_full_secondary = None;
                             self.expanded_graph_max_timespan_minutes =
                                 max_device_history_minutes(samples, Instant::now());
-                            self.expanded_graph_view_timespan_minutes =
-                                self.expanded_graph_max_timespan_minutes;
-                            let axis_start = graph_axis_start_for_samples(
+                            self.expanded_graph_view_timespan_minutes = self
+                                .settings
+                                .graph_timespan_minutes
+                                .clamp(5, self.expanded_graph_max_timespan_minutes.max(5));
+                            let visible = graph_values_for_timespan(
                                 &values,
+                                self.expanded_graph_view_timespan_minutes,
+                            );
+                            let axis_start = graph_axis_start_for_samples(
+                                &visible,
                                 self.expanded_graph_view_timespan_minutes,
                             );
                             self.expanded_graph = Some((
@@ -6875,7 +6903,7 @@ impl cosmic::Application for AppModel {
                                     name,
                                     crate::i18n::tr(&self.settings.language, "POWER (W)")
                                 ),
-                                values,
+                                visible,
                                 "W".into(),
                                 Some(axis_start),
                             ));
