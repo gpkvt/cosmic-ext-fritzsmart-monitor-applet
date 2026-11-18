@@ -1271,7 +1271,10 @@ fn graph_max_timespan_minutes(samples: &[(Instant, f64)]) -> u32 {
         .unwrap_or(5)
 }
 
-fn graph_axis_start_for_samples(samples: &[(Instant, f64)], selected_minutes: u32) -> String {
+fn graph_axis_start_for_samples(
+    samples: &[(Instant, f64)],
+    selected_minutes: u32,
+) -> String {
     let age = samples.first().map(|(timestamp, _)| {
         Instant::now()
             .saturating_duration_since(*timestamp)
@@ -2044,7 +2047,9 @@ fn total_power_overview(
             .push(interactive_graph_with_axis(
                 &settings.language,
                 crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-                history.iter().map(|(timestamp, value)| (*timestamp, *value as f64)),
+                history
+                    .iter()
+                    .map(|(timestamp, value)| (*timestamp, *value as f64)),
                 &settings.graph_style,
                 "W",
                 axis_start.clone(),
@@ -2052,7 +2057,9 @@ fn total_power_overview(
             .push(interactive_graph_with_axis(
                 &settings.language,
                 crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
-                output_temperature_history.iter().map(|(timestamp, value)| (*timestamp, *value)),
+                output_temperature_history
+                    .iter()
+                    .map(|(timestamp, value)| (*timestamp, *value)),
                 &settings.graph_style,
                 "°C",
                 axis_start.clone(),
@@ -2116,7 +2123,9 @@ fn total_power_overview(
                     crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
                     input_history
                         .iter()
-                        .map(|(timestamp, value)| (*timestamp, input_display_power_w(*value) as f64)),
+                        .map(|(timestamp, value)| {
+                            (*timestamp, input_display_power_w(*value) as f64)
+                        }),
                     &settings.graph_style,
                     "W",
                     axis_start.clone(),
@@ -2124,7 +2133,9 @@ fn total_power_overview(
                 .push(interactive_graph_with_axis(
                     &settings.language,
                     crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
-                    input_temperature_history.iter().map(|(timestamp, value)| (*timestamp, *value)),
+                    input_temperature_history
+                        .iter()
+                        .map(|(timestamp, value)| (*timestamp, *value)),
                     &settings.graph_style,
                     "°C",
                     axis_start.clone(),
@@ -5808,7 +5819,9 @@ impl cosmic::Application for AppModel {
                                     crate::i18n::tr(&self.settings.language, "DOWNLOAD HISTORY"),
                                     self.bandwidth_history
                                         .iter()
-                                        .map(|(timestamp, download, _)| (*timestamp, *download as f64 / 1_000_000.0)),
+                                        .map(|(timestamp, download, _)| {
+                                            (*timestamp, *download as f64 / 1_000_000.0)
+                                        }),
                                     &self.settings.graph_style,
                                     "Mb/s",
                                     bandwidth_axis_start.clone(),
@@ -5818,7 +5831,9 @@ impl cosmic::Application for AppModel {
                                     crate::i18n::tr(&self.settings.language, "UPLOAD HISTORY"),
                                     self.bandwidth_history
                                         .iter()
-                                        .map(|(timestamp, _, upload)| (*timestamp, *upload as f64 / 1_000_000.0)),
+                                        .map(|(timestamp, _, upload)| {
+                                            (*timestamp, *upload as f64 / 1_000_000.0)
+                                        }),
                                     &self.settings.graph_style,
                                     "Mb/s",
                                     bandwidth_axis_start,
@@ -6032,7 +6047,9 @@ impl cosmic::Application for AppModel {
                                                 device_history.into_iter().flat_map(|samples| {
                                                     samples
                                                         .iter()
-                                                        .map(|(timestamp, power, _)| (*timestamp, *power as f64))
+                                                        .map(|(timestamp, power, _)| {
+                                                            (*timestamp, *power as f64)
+                                                        })
                                                 }),
                                                 &self.settings.graph_style,
                                                 "W",
@@ -6100,7 +6117,9 @@ impl cosmic::Application for AppModel {
                                                 device_history.into_iter().flat_map(|samples| {
                                                     samples
                                                         .iter()
-                                                        .map(|(timestamp, _, temperature)| (*timestamp, *temperature))
+                                                        .map(|(timestamp, _, temperature)| {
+                                                            (*timestamp, *temperature)
+                                                        })
                                                 }),
                                                 &self.settings.graph_style,
                                                 "°C",
@@ -6683,8 +6702,9 @@ impl cosmic::Application for AppModel {
                 self.history_graph_index = None;
                 self.expanded_graph_full_values = Some(output_values.clone());
                 self.expanded_graph_full_secondary = Some(input_values.clone());
-                self.expanded_graph_max_timespan_minutes = graph_max_timespan_minutes(&output_values)
-                    .max(graph_max_timespan_minutes(&input_values));
+                self.expanded_graph_max_timespan_minutes =
+                    graph_max_timespan_minutes(&output_values)
+                        .max(graph_max_timespan_minutes(&input_values));
                 self.expanded_graph_view_timespan_minutes =
                     self.expanded_graph_max_timespan_minutes;
                 let axis_start = graph_axis_start_for_samples(
