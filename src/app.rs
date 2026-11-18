@@ -1007,8 +1007,17 @@ fn graph_visual_with_dimensions(
         plot_top + plot_height / 2.0,
         plot_top + plot_height / 2.0
     );
+    let min_max_labels = if graph_height > 200.0 {
+        format!(
+            "<text x=\\"{plot_left:.2}\\" y=\\"18\\" text-anchor=\\"start\\" font-size=\\"{font_size:.1}\\" font-weight=\\"600\\" fill=\\"#a0a0a0\\">MIN {}</text><text x=\\"{plot_right:.2}\\" y=\\"18\\" text-anchor=\\"end\\" font-size=\\"{font_size:.1}\\" font-weight=\\"600\\" fill=\\"#a0a0a0\\">MAX {}</text>",
+            format_graph_y_tick(minimum, unit),
+            format_graph_y_tick(maximum, unit)
+        )
+    } else {
+        String::new()
+    };
     let svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" preserveAspectRatio=\"none\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{y_labels}{x_labels}{y_axis_title}{drawing}</svg>"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" preserveAspectRatio=\"none\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{min_max_labels}{y_labels}{x_labels}{y_axis_title}{drawing}</svg>"
     );
     widget::Column::new()
         .spacing(2)
