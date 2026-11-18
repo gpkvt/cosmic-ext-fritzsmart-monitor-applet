@@ -7248,7 +7248,16 @@ impl cosmic::Application for AppModel {
                     .width(cosmic::iced::Length::Fixed(680.0))
                     .height(cosmic::iced::Length::Fill),
             )
-            .max_height(self.popup_max_height.unwrap_or(800.0))
+            // libcosmic's popup_container applies a hard-coded 360 px width
+            // limit. Override those autosize limits here as well as the
+            // Wayland positioner limits, otherwise wider content is still
+            // measured and rendered at the original width.
+            .limits(
+                Limits::NONE
+                    .min_width(720.0)
+                    .max_width(720.0)
+                    .max_height(self.popup_max_height.unwrap_or(800.0)),
+            )
             .into()
     }
 
