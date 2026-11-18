@@ -48,6 +48,16 @@ fn instant_from_epoch(
     now.checked_sub(age)
 }
 
+fn sample_instant(
+    sample: &Value,
+    now_epoch: i64,
+    now: Instant,
+    window: Duration,
+) -> Option<Instant> {
+    let timestamp = sample.get("timestamp").and_then(Value::as_i64)?;
+    instant_from_epoch(timestamp, now_epoch, now, window)
+}
+
 fn parse_power_history(
     value: Option<&Value>,
     now_epoch: i64,
@@ -57,18 +67,51 @@ fn parse_power_history(
     let mut history = VecDeque::new();
     if let Some(samples) = value.and_then(Value::as_array) {
         for sample in samples {
-            let (Some(timestamp), Some(power)) = (
-                sample.get("timestamp").and_then(Value::as_i64),
-                sample.get("power_w").and_then(Value::as_i64),
-            ) else {
+            let Some(power) = sample.get("power_w").and_then(Value::as_i64) else {
                 continue;
             };
-            if let Some(instant) = instant_from_epoch(timestamp, now_epoch, now, window) {
+            if let Some(instant) = sample_instant(sample, now_epoch, now, window) {
                 history.push_back((instant, power));
             }
         }
     }
     history
+}
+
+fn parse_device_history(
+    value: Option<&Value>,
+    now_epoch: i64,
+    now: Instant,
+    window: Duration,
+) -> DeviceHistory {
+    let mut histories = HashMap::new();
+    let Some(devices) = value.and_then(Value::as_object) else {
+        return histories;
+    };
+    for (ain, values) in devices {
+        let Some(samples) = values.as_array() else {
+            continue;
+        };
+        let mut history = VecDeque::new();
+        for sample in samples {
+            let (Some(power), Some(temperature)) = (
+                sample.get("power_w").and_then(Value::as_i64),
+                sample.get("temperature_c").and_then(Value::as_f64),
+            ) else {
+                continue;
+            };
+            if !temperature.is_finite() {
+                continue;
+            }
+            if let Some(instant) = sample_instant(sample, now_epoch, now, window) {
+                history.push_back((instant, power, temperature));
+            }
+        }
+        if !history.is_empty() {
+            histories.insert(ain.clone(), history);
+        }
+    }
+    histories
 }
 
 fn parse_device_history(
