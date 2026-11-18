@@ -600,10 +600,8 @@ impl FritzSettings {
         // must never hide devices that are still present in KNOWN_DEVICES.
         let legacy_devices = std::mem::take(&mut settings.known_devices);
         let inventory = load_device_inventory();
-        settings.known_devices = merge_device_inventories(
-            inventory.clone().unwrap_or_default(),
-            legacy_devices,
-        );
+        settings.known_devices =
+            merge_device_inventories(inventory.clone().unwrap_or_default(), legacy_devices);
         if !settings.known_devices.is_empty()
             && inventory.as_deref() != Some(settings.known_devices.as_slice())
             && let Err(error) = save_device_inventory(&settings.known_devices)
@@ -2106,12 +2104,10 @@ mod tests {
 
     #[test]
     fn startup_inventory_merge_restores_legacy_devices_without_duplicates() {
-        let inventory = vec![
-            FritzDevice {
-                name: "Saved Tasmota plug".into(),
-                ain: "TASMOTA:192.168.42.20".into(),
-            },
-        ];
+        let inventory = vec![FritzDevice {
+            name: "Saved Tasmota plug".into(),
+            ain: "TASMOTA:192.168.42.20".into(),
+        }];
         let legacy = vec![
             FritzDevice {
                 name: "Legacy FRITZ!DECT".into(),
