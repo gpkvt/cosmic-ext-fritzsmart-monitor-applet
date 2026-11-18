@@ -8214,7 +8214,9 @@ impl cosmic::Application for AppModel {
                             if let Some(existing) = self.devices.iter_mut().find(|device| {
                                 crate::fritz::normalize_ain_for_selection(&device.ain) == key
                             }) {
-                                if existing.name != discovered.name || existing.ain != discovered.ain {
+                                if existing.name != discovered.name
+                                    || existing.ain != discovered.ain
+                                {
                                     existing.name = discovered.name;
                                     existing.ain = discovered.ain;
                                     inventory_changed = true;
