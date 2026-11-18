@@ -258,6 +258,16 @@ fn default_menu_order() -> Vec<String> {
         .collect()
 }
 
+fn unique_strings(values: impl IntoIterator<Item = String>) -> Vec<String> {
+    let mut unique = Vec::new();
+    for value in values {
+        if !unique.contains(&value) {
+            unique.push(value);
+        }
+    }
+    unique
+}
+
 fn parse_menu_order(value: &str) -> Vec<String> {
     if value.trim().is_empty() {
         return default_menu_order();
@@ -275,12 +285,8 @@ fn parse_menu_order(value: &str) -> Vec<String> {
         })
         .filter(|id| MENU_ELEMENT_IDS.contains(id))
         .map(str::to_string)
-        .fold(Vec::new(), |mut order, id| {
-            if !order.contains(&id) {
-                order.push(id);
-            }
-            order
-        });
+        .collect::<Vec<_>>();
+    let mut order = unique_strings(order);
     if !order.iter().any(|id| id == "internet-bandwidth") {
         let insert_at = order
             .iter()
@@ -323,12 +329,8 @@ fn parse_unique_known_ids(value: &str, allowed: &[&str]) -> Vec<String> {
         .map(str::trim)
         .filter(|id| allowed.contains(id))
         .map(str::to_string)
-        .fold(Vec::new(), |mut ids, id| {
-            if !ids.contains(&id) {
-                ids.push(id);
-            }
-            ids
-        })
+        .collect::<Vec<_>>();
+    unique_strings(ids)
 }
 
 fn parse_hidden_menu_elements(value: &str) -> Vec<String> {
@@ -349,12 +351,8 @@ fn parse_panel_order(value: &str) -> Vec<String> {
         })
         .filter(|id| PANEL_ITEM_IDS.contains(id) && !id.is_empty())
         .map(str::to_string)
-        .fold(Vec::new(), |mut order, id| {
-            if !order.contains(&id) {
-                order.push(id);
-            }
-            order
-        });
+        .collect::<Vec<_>>();
+    let mut order = unique_strings(order);
     for id in PANEL_ITEM_IDS {
         if !order.iter().any(|existing| existing == id) {
             order.push(id.to_string());
@@ -409,12 +407,8 @@ fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
                 })
         })
         .map(str::to_string)
-        .fold(Vec::new(), |mut sections, id| {
-            if !sections.contains(&id) {
-                sections.push(id);
-            }
-            sections
-        })
+        .collect::<Vec<_>>();
+    unique_strings(sections)
 }
 
 fn parse_expanded_devices(value: &str) -> Vec<String> {
