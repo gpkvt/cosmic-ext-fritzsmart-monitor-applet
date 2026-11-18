@@ -2786,27 +2786,12 @@ impl cosmic::Application for AppModel {
             && settings.weather_enabled
             && !settings.weather_location.trim().is_empty();
         let forecast_location = settings.weather_location.clone();
-        // Load the saved/discovered device inventory before requesting live
-        // readings. This guarantees the selected device IDs are reconciled first,
-        // so startup cannot briefly show the empty-selection prompt.
-        let startup_discovery = settings.setup_completed
-            && ((!settings.url.trim().is_empty()
-                && !settings.username.trim().is_empty()
-                && !settings.password.is_empty())
-                || !settings.tasmota_username.trim().is_empty()
-                || !settings.tasmota_password.is_empty());
-        let mut tasks = Vec::new();
-        if startup_discovery {
-            let discovery_settings = settings.clone();
-            tasks.push(Task::perform(
-                discover_devices(discovery_settings),
-                |result| cosmic::Action::App(Message::DevicesLoaded(result)),
-            ));
-        } else {
-            tasks.push(Task::perform(fetch_fritz_data(), |result| {
-                cosmic::Action::App(Message::Updated(Box::new(result)))
-            }));
-        }
+        // Device discovery is intentionally user-initiated from Settings → Devices.
+        // The saved inventory is restored synchronously above; startup only fetches
+        // readings for the already configured selection.
+        let mut tasks = vec![Task::perform(fetch_fritz_data(), |result| {
+            cosmic::Action::App(Message::Updated(Box::new(result)))
+        })];
         if restore_forecast {
             tasks.push(Task::perform(
                 fetch_weather_forecast(forecast_location, 7),
@@ -2819,7 +2804,7 @@ impl cosmic::Application for AppModel {
                 selected_ains: initial_device_selection(&settings),
                 devices: known_devices,
                 devices_loaded: saved_devices_loaded,
-                devices_loading: startup_discovery,
+                devices_loading: false,
                 settings,
                 settings_open: setup_assistant,
                 setup_assistant,
@@ -2842,7 +2827,7 @@ impl cosmic::Application for AppModel {
                 weather_forecast_days: restore_forecast.then_some(7),
                 weather_forecast_loading: restore_forecast,
                 refresh_started_at: Some(Instant::now()),
-                startup_readings_pending: startup_discovery,
+                startup_readings_pending: false,
                 ..Default::default()
             },
             Task::batch(tasks),
@@ -7046,7 +7031,7 @@ impl cosmic::Application for AppModel {
                 self.next_refresh_at = None;
                 record_diagnostic_event(
                     &mut self.diagnostic_events,
-                    "FRITZ!Box refresh started: requesting live readings and device inventory.",
+                    "FRITZ!Box refresh started: requesting live readings for the saved device selection.",
                 );
 
                 // A manual reload refreshes the weather photo/slideshow as well
@@ -7056,16 +7041,8 @@ impl cosmic::Application for AppModel {
                     cosmic::Action::App(Message::Updated(Box::new(result)))
                 })];
 
-                // A manual reload must refresh the discovered device inventory
-                // as well as the selected devices' live readings. This picks up
-                // newly connected/renamed devices without reopening Settings.
-                if !self.devices_loading {
-                    self.devices_loading = true;
-                    let settings = self.settings.clone();
-                    tasks.push(Task::perform(discover_devices(settings), |result| {
-                        cosmic::Action::App(Message::DevicesLoaded(result))
-                    }));
-                }
+                // Device discovery is deliberately separate from normal refreshes
+                // and is available only through the explicit action in Settings → Devices.
 
                 if self.settings.weather_enabled
                     && !self.settings.openweathermap_api_key.trim().is_empty()
@@ -8001,13 +7978,7 @@ impl cosmic::Application for AppModel {
             }
             Message::SetupNext => {
                 self.setup_step = self.setup_step.saturating_add(1).min(4);
-                if self.setup_step == 2 && !self.devices_loaded && !self.devices_loading {
-                    self.devices_loading = true;
-                    let settings = self.settings.clone();
-                    return Task::perform(discover_devices(settings), |result| {
-                        cosmic::Action::App(Message::DevicesLoaded(result))
-                    });
-                }
+                // Device discovery is started explicitly from Settings → Devices.
             }
             Message::SetupBack => {
                 self.setup_step = self.setup_step.saturating_sub(1);
@@ -8040,21 +8011,6 @@ impl cosmic::Application for AppModel {
                     );
                     return Task::perform(fetch_latest_release_version(), |result| {
                         cosmic::Action::App(Message::LatestVersionChecked(result))
-                    });
-                }
-                if section == "device" && !self.devices_loaded && !self.devices_loading {
-                    self.devices_loading = true;
-                    record_diagnostic_event(
-                        &mut self.diagnostic_events,
-                        format!(
-                            "Initial device discovery started against {}.",
-                            self.settings.url
-                        ),
-                    );
-                    let settings = self.settings.clone();
-                    self.settings_status = Some("Connecting and loading devices…".into());
-                    return Task::perform(discover_devices(settings), |result| {
-                        cosmic::Action::App(Message::DevicesLoaded(result))
                     });
                 }
             }
