@@ -8271,9 +8271,13 @@ impl cosmic::Application for AppModel {
                         }
                         self.selected_ains = if self.settings.ains.is_empty() {
                             if self.settings.ain.trim().is_empty() {
-                                // First discovery on a fresh configuration: make the
-                                // discovered inventory immediately usable by default.
-                                self.devices.iter().map(|device| device.ain.clone()).collect()
+                                if self.settings.device_selection_initialized {
+                                    Vec::new()
+                                } else {
+                                    // First discovery on a fresh configuration: make the
+                                    // discovered inventory immediately usable by default.
+                                    self.devices.iter().map(|device| device.ain.clone()).collect()
+                                }
                             } else {
                                 vec![self.settings.ain.clone()]
                             }
@@ -8301,7 +8305,8 @@ impl cosmic::Application for AppModel {
                                 .push(self.settings.weather_temperature_ain.clone());
                             settings_changed = true;
                         }
-                        if settings_changed || inventory_changed {
+                        if settings_changed || inventory_changed || !self.settings.device_selection_initialized {
+                            self.settings.device_selection_initialized = true;
                             self.settings.ains = self.selected_ains.clone();
                             self.settings.ain =
                                 self.selected_ains.first().cloned().unwrap_or_default();
