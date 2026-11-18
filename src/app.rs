@@ -3868,8 +3868,6 @@ impl cosmic::Application for AppModel {
                         .step(1.0_f32),
                     )
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Adjusts the power and temperature text in the panel")))
-
-
                     .push(widget::text::body(format!("{}: {} px", crate::i18n::tr(&self.settings.language, "Panel item spacing"), self.settings.panel_item_spacing)))
                     .push(widget::slider(0.0..=16.0, f32::from(self.settings.panel_item_spacing),
                         |value| Message::PanelItemSpacingChanged(value.round() as u8)).step(1.0_f32))
@@ -3897,8 +3895,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::container(
                             widget::toggler(self.settings.panel_refresh_button)
                                 .on_toggle(Message::PanelRefreshButtonChanged)
-                        ).padding([8, 10])))
-;
+                        ).padding([8, 10]));
                 if has_input_device {
                     content = content.push(
                         widget::Row::new()
