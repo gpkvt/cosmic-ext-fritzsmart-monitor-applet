@@ -6538,10 +6538,49 @@ impl cosmic::Application for AppModel {
                         ));
                 }
             } else {
-                content = content.push(widget::text::body(crate::i18n::tr(
-                    &self.settings.language,
-                    "No devices selected. Select devices in Settings.",
-                )));
+                let selected_devices: Vec<_> = self
+                    .devices
+                    .iter()
+                    .filter(|device| {
+                        self.selected_ains.iter().any(|ain| {
+                            crate::fritz::normalize_ain_for_selection(ain)
+                                == crate::fritz::normalize_ain_for_selection(&device.ain)
+                        })
+                    })
+                    .collect();
+                if !selected_devices.is_empty() {
+                    let mut loading_list = widget::Column::new().spacing(8);
+                    for device in selected_devices {
+                        loading_list = loading_list.push(
+                            widget::Row::new()
+                                .spacing(12)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::icon::from_name("computer-symbolic").size(20))
+                                .push(
+                                    widget::Column::new()
+                                        .spacing(2)
+                                        .width(cosmic::iced::Length::Fill)
+                                        .push(widget::text::body(device.name.clone()))
+                                        .push(widget::text::caption(crate::i18n::tr(
+                                            &self.settings.language,
+                                            "Waiting for first reading…",
+                                        ))),
+                                )
+                                .push(widget::icon::from_name("view-refresh-symbolic").size(16)),
+                        );
+                    }
+                    content = content.push(loading_list);
+                } else if !self.selected_ains.is_empty() {
+                    content = content.push(widget::text::body(crate::i18n::tr(
+                        &self.settings.language,
+                        "Loading saved devices…",
+                    )));
+                } else {
+                    content = content.push(widget::text::body(crate::i18n::tr(
+                        &self.settings.language,
+                        "No devices selected. Select devices in Settings.",
+                    )));
+                }
             }
 
             if let Some(weather_card) = weather_menu_card.take() {
