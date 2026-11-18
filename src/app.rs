@@ -8205,17 +8205,23 @@ impl cosmic::Application for AppModel {
                                 devices.len()
                             ),
                         );
-                        // Keep the saved inventory intact across refreshes. Discovery is additive:
-                        // newly seen devices are added and known IDs may receive updated names.
+                        // The inventory is durable user data, not a cache of the latest
+                        // discovery response. Merge discoveries into it and never prune entries
+                        // just because a device is temporarily offline or undiscoverable.
+                        let mut inventory_changed = false;
                         for discovered in devices {
                             let key = crate::fritz::normalize_ain_for_selection(&discovered.ain);
                             if let Some(existing) = self.devices.iter_mut().find(|device| {
                                 crate::fritz::normalize_ain_for_selection(&device.ain) == key
                             }) {
-                                existing.name = discovered.name;
-                                existing.ain = discovered.ain;
+                                if existing.name != discovered.name || existing.ain != discovered.ain {
+                                    existing.name = discovered.name;
+                                    existing.ain = discovered.ain;
+                                    inventory_changed = true;
+                                }
                             } else {
                                 self.devices.push(discovered);
+                                inventory_changed = true;
                             }
                         }
                         self.settings.known_devices = self.devices.clone();
@@ -8244,12 +8250,9 @@ impl cosmic::Application for AppModel {
                         } else {
                             self.settings.ains.clone()
                         };
-                        self.selected_ains.retain(|selected| {
-                            self.devices.iter().any(|device| {
-                                crate::fritz::normalize_ain_for_selection(selected)
-                                    == crate::fritz::normalize_ain_for_selection(&device.ain)
-                            })
-                        });
+                        // Keep selected IDs even while their devices are offline or a
+                        // discovery pass cannot currently see them. Only explicit removal
+                        // in the device settings may remove a configured device.
                         if !self.settings.weather_temperature_ain.is_empty()
                             && self.devices.iter().any(|device| {
                                 crate::fritz::normalize_ain_for_selection(&device.ain)
@@ -8268,7 +8271,7 @@ impl cosmic::Application for AppModel {
                                 .push(self.settings.weather_temperature_ain.clone());
                             settings_changed = true;
                         }
-                        if settings_changed {
+                        if settings_changed || inventory_changed {
                             self.settings.ains = self.selected_ains.clone();
                             self.settings.ain =
                                 self.selected_ains.first().cloned().unwrap_or_default();
