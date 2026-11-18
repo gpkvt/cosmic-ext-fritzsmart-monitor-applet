@@ -16,7 +16,6 @@ class PageParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.ids = set()
         self.references = []
-        self.gallery_images = 0
         self.text_parts = []
         self.suppressed = []
         self.duplicate_ids = set()
@@ -33,8 +32,6 @@ class PageParser(HTMLParser):
             value = values.get(attribute)
             if value:
                 self.references.append((attribute, value))
-        if tag == "img" and values.get("id") == "gallery-image":
-            self.gallery_images += 1
 
     def handle_endtag(self, tag):
         if tag in self.suppressed:
@@ -117,12 +114,21 @@ for page in pages:
         for expected in expected_downloads:
             if expected not in content:
                 fail(f"index.html: package download links are not synchronized with Cargo version {version}: {expected}")
-        required_ids = {"screenshot-dialog", "gallery-image", "gallery-previous", "gallery-next", "gallery-count", "release-assets"}
+        required_ids = {"release-assets"}
         missing = required_ids - parser.ids
         if missing:
             fail(f"index.html: missing required elements: {', '.join(sorted(missing))}")
-        if parser.gallery_images != 1:
-            fail(f"index.html: expected one gallery image element, found {parser.gallery_images}")
+        inline_screenshots = re.findall(
+            r'<img\b[^>]*\bsrc="[^"]*Screenshot_[^"]+"',
+            content,
+        )
+        if len(inline_screenshots) != 10:
+            fail(
+                "index.html: expected ten contextual inline screenshots, "
+                f"found {len(inline_screenshots)}"
+            )
+        if content.count("<figcaption>") < 10:
+            fail("index.html: every contextual screenshot must have a caption")
         safeguard_icons = re.findall(
             r'<div class="detail-icon"[^>]*>\s*<img src="icons/([a-z-]+\.svg)" alt="" width="28" height="28"></div>',
             content,
@@ -137,20 +143,6 @@ for page in pages:
         }
         if set(safeguard_icons) != expected_icons or len(safeguard_icons) != 6:
             fail("index.html: safeguard icons must use all six dedicated SVG image assets")
-        if not re.search(r"event\.key\s*===\s*['\"]ArrowLeft['\"]", content):
-            fail("index.html: left-arrow keyboard navigation is missing")
-        if not re.search(r"event\.key\s*===\s*['\"]ArrowRight['\"]", content):
-            fail("index.html: right-arrow keyboard navigation is missing")
-        hero_cards = content.count('<a class="hero-shot"')
-        if hero_cards != 10:
-            fail(f"index.html: expected ten screenshot cards, found {hero_cards}")
-        if '.hero-gallery .hero-shot{display:none}' in content:
-            fail("index.html: screenshot deck must not be hidden")
-        for feature in ("card-deal", "openGalerie(index)", "gallery-enter", "gallery-image-enter", ".hero-shot:hover", "border-color:#8be0c4aa"):
-            if feature not in content:
-                fail(f"index.html: screenshot gallery interaction or styling is missing {feature}")
-        hover_rule = re.search(r"\.hero-shot:hover[^\{]*\{([^}]*)\}", content)
-        if not hover_rule or re.search(r"\b(?:transform|z-index)\s*:", hover_rule.group(1)):
-            fail("index.html: screenshot hover must highlight without moving cards or changing their stacking order")
+
 
 print(f"Validated {len(pages)} GitHub Pages HTML page(s) and all local references.")
