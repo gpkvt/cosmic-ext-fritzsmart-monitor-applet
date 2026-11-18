@@ -2248,6 +2248,18 @@ fn panel_item_label(id: &str) -> &'static str {
     }
 }
 
+/// Shared persisted visibility state for the Panel settings and item-order controls.
+fn panel_item_is_visible(hidden_items: &[String], id: &str) -> bool {
+    !hidden_items.iter().any(|hidden| hidden == id)
+}
+
+fn set_panel_item_visibility(hidden_items: &mut Vec<String>, id: &str, visible: bool) {
+    hidden_items.retain(|hidden| hidden != id);
+    if !visible {
+        hidden_items.push(id.to_string());
+    }
+}
+
 fn format_compact_decimal(value: f64) -> String {
     let formatted = format!("{value:.1}");
     formatted
@@ -3111,11 +3123,7 @@ impl cosmic::Application for AppModel {
         let mut panel_items: Vec<(&str, cosmic::Element<'static, Message>)> = Vec::new();
 
         if self.settings.weather_enabled
-            && !self
-                .settings
-                .hidden_panel_items
-                .iter()
-                .any(|hidden| hidden == "weather")
+            && panel_item_is_visible(&self.settings.hidden_panel_items, "weather")
             && let Some(weather) = &self.weather
         {
             panel_items.push((
@@ -3166,11 +3174,7 @@ impl cosmic::Application for AppModel {
             ));
         }
         if self.error.is_none() {
-            if !self
-                .settings
-                .hidden_panel_items
-                .iter()
-                .any(|hidden| hidden == "power-consumption")
+            if panel_item_is_visible(&self.settings.hidden_panel_items, "power-consumption")
             {
                 panel_items.push((
                     "power-consumption",
@@ -3198,11 +3202,7 @@ impl cosmic::Application for AppModel {
                 ));
             }
             if !self.settings.panel_net_power
-                && !self
-                    .settings
-                    .hidden_panel_items
-                    .iter()
-                    .any(|hidden| hidden == "solar-power")
+                && panel_item_is_visible(&self.settings.hidden_panel_items, "solar-power")
                 && let Some(input_power) = input_power
             {
                 panel_items.push((
@@ -3230,11 +3230,7 @@ impl cosmic::Application for AppModel {
             }
 
             if self.settings.panel_internet_bandwidth
-                && !self
-                    .settings
-                    .hidden_panel_items
-                    .iter()
-                    .any(|hidden| hidden == "internet-bandwidth")
+                && panel_item_is_visible(&self.settings.hidden_panel_items, "internet-bandwidth")
             {
                 let (download, upload) = self
                     .internet_bandwidth
@@ -3275,11 +3271,7 @@ impl cosmic::Application for AppModel {
                 panel_items.push(("internet-bandwidth", bandwidth_rows));
             }
             if let Some(temperature) = temperature.filter(|_| {
-                !self
-                    .settings
-                    .hidden_panel_items
-                    .iter()
-                    .any(|hidden| hidden == "temperature")
+                panel_item_is_visible(&self.settings.hidden_panel_items, "temperature")
             }) {
                 panel_items.push((
                     "temperature",
@@ -3887,7 +3879,7 @@ impl cosmic::Application for AppModel {
                             )
                             .push(
                                 widget::container(
-                                    widget::toggler(!self.settings.hidden_panel_items.iter().any(|item| item == "weather"))
+                                    widget::toggler(panel_item_is_visible(&self.settings.hidden_panel_items, "weather"))
                                         .on_toggle(|visible| Message::TogglePanelItemVisibility("weather", visible)),
                                 )
                                 .padding([8, 10]),
@@ -3908,7 +3900,7 @@ impl cosmic::Application for AppModel {
                             )
                             .push(
                                 widget::container(
-                                    widget::toggler(!self.settings.hidden_panel_items.iter().any(|item| item == "temperature"))
+                                    widget::toggler(panel_item_is_visible(&self.settings.hidden_panel_items, "temperature"))
                                         .on_toggle(|visible| Message::TogglePanelItemVisibility("temperature", visible)),
                                 )
                                 .padding([8, 10]),
@@ -4282,11 +4274,7 @@ impl cosmic::Application for AppModel {
                         "temperature" => "temperature",
                         _ => continue,
                     };
-                    let visible = !self
-                        .settings
-                        .hidden_panel_items
-                        .iter()
-                        .any(|hidden| hidden == id);
+                    let visible = panel_item_is_visible(&self.settings.hidden_panel_items, id);
                     let mut row =
                         widget::Row::new()
                             .spacing(8)
@@ -7852,12 +7840,11 @@ impl cosmic::Application for AppModel {
                 self.persist_settings();
             }
             Message::TogglePanelItemVisibility(item, visible) => {
-                self.settings
-                    .hidden_panel_items
-                    .retain(|hidden| hidden != item);
-                if !visible {
-                    self.settings.hidden_panel_items.push(item.to_string());
-                }
+                set_panel_item_visibility(
+                    &mut self.settings.hidden_panel_items,
+                    item,
+                    visible,
+                );
                 self.persist_settings();
             }
             Message::MovePanelItem(item, move_up) => {
@@ -9249,6 +9236,27 @@ mod history_tests {
         assert_eq!(format_bandwidth(1_000_000), "1 Mb/s");
         assert_eq!(format_bandwidth(1_500_000), "1.5 Mb/s");
         assert_eq!(format_bandwidth(0), "0 Mb/s");
+    }
+
+    #[test]
+    fn panel_visibility_controls_share_one_persisted_state() {
+        let mut hidden = Vec::new();
+
+        assert!(panel_item_is_visible(&hidden, "weather"));
+        assert!(panel_item_is_visible(&hidden, "temperature"));
+
+        set_panel_item_visibility(&mut hidden, "weather", false);
+        assert!(!panel_item_is_visible(&hidden, "weather"));
+        assert!(panel_item_is_visible(&hidden, "temperature"));
+
+        // Re-enabling an item removes its hidden flag, including duplicates.
+        hidden.push("weather".into());
+        set_panel_item_visibility(&mut hidden, "weather", true);
+        assert!(panel_item_is_visible(&hidden, "weather"));
+        assert_eq!(hidden.iter().filter(|id| id.as_str() == "weather").count(), 0);
+
+        set_panel_item_visibility(&mut hidden, "temperature", false);
+        assert!(!panel_item_is_visible(&hidden, "temperature"));
     }
 
     #[test]
