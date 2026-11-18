@@ -7243,7 +7243,7 @@ impl cosmic::Application for AppModel {
             .applet
             .popup_container(
                 widget::container(popup_content)
-                    .width(cosmic::iced::Length::Fixed(440.0))
+                    .width(cosmic::iced::Length::Fixed(680.0))
                     .height(cosmic::iced::Length::Fill),
             )
             .max_height(800.0)
@@ -9037,8 +9037,8 @@ impl cosmic::Application for AppModel {
                             .applet
                             .get_popup_settings(main_window_id, id, None, None, None);
                     settings.positioner.size_limits = Limits::NONE
-                        .max_width(480.0)
-                        .min_width(480.0)
+                        .max_width(720.0)
+                        .min_width(720.0)
                         .max_height(800.0);
                     get_popup(settings)
                 };
