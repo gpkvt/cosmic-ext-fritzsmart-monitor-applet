@@ -6510,7 +6510,7 @@ impl cosmic::Application for AppModel {
                     });
                 content = content.push(device_list);
             } else if self.devices.is_empty() {
-                if self.devices_loading || self.refresh_started_at.is_some() {
+                if self.devices_loading {
                     content = content.push(
                         widget::Row::new()
                             .spacing(8)
@@ -6518,7 +6518,7 @@ impl cosmic::Application for AppModel {
                             .push(widget::icon::from_name("view-refresh-symbolic").size(16))
                             .push(widget::text::body(crate::i18n::tr(
                                 &self.settings.language,
-                                "Loading saved devices…",
+                                "Discovering devices…",
                             ))),
                     );
                 } else {
