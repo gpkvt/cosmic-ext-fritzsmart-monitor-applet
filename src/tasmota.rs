@@ -298,7 +298,7 @@ pub async fn known_devices(
             return Ok(devices.clone());
         }
     }
-    discover_devices(username, password).await
+    discover_devices(username, password, fritzbox_url).await
 }
 
 pub async fn discover_devices(

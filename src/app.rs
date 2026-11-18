@@ -8204,7 +8204,7 @@ impl cosmic::Application for AppModel {
                             }
                         }
                         self.settings.known_devices = self.devices.clone();
-                        let mut settings_changed = true; = false;
+                        let mut settings_changed = false;
                         if !self.settings.input_defaults_initialized {
                             self.settings
                                 .input_ains
