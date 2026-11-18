@@ -1420,34 +1420,39 @@ fn aligned_power_series(
     (output_values, input_values)
 }
 
-fn rebuild_input_power_history(
+fn rebuild_power_history(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     input_ains: &HashSet<String>,
+    include_inputs: bool,
 ) -> VecDeque<(Instant, i64)> {
     let mut samples = BTreeMap::<Instant, i64>::new();
     for (ain, history) in device_history {
-        if input_ains.contains(ain) {
+        if input_ains.contains(ain) == include_inputs {
             for (timestamp, power_w, _) in history {
-                *samples.entry(*timestamp).or_default() += signed_device_power(*power_w, true);
+                let power = if include_inputs {
+                    signed_device_power(*power_w, true)
+                } else {
+                    *power_w
+                };
+                *samples.entry(*timestamp).or_default() += power;
             }
         }
     }
     samples.into_iter().collect()
 }
 
+fn rebuild_input_power_history(
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    input_ains: &HashSet<String>,
+) -> VecDeque<(Instant, i64)> {
+    rebuild_power_history(device_history, input_ains, true)
+}
+
 fn rebuild_output_power_history(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     input_ains: &HashSet<String>,
 ) -> VecDeque<(Instant, i64)> {
-    let mut samples = BTreeMap::<Instant, i64>::new();
-    for (ain, history) in device_history {
-        if !input_ains.contains(ain) {
-            for (timestamp, power_w, _) in history {
-                *samples.entry(*timestamp).or_default() += *power_w;
-            }
-        }
-    }
-    samples.into_iter().collect()
+    rebuild_power_history(device_history, input_ains, false)
 }
 
 fn rebuild_temperature_history(
@@ -8271,6 +8276,30 @@ impl cosmic::Application for AppModel {
 #[cfg(test)]
 mod history_tests {
     use super::*;
+
+    #[test]
+    fn power_history_aggregation_keeps_input_and_output_semantics() {
+        let now = Instant::now();
+        let mut history = HashMap::new();
+        history.insert(
+            "input".to_string(),
+            VecDeque::from([(now, 120, 20.0), (now + Duration::from_secs(1), 80, 21.0)]),
+        );
+        history.insert(
+            "output".to_string(),
+            VecDeque::from([(now, 75, 19.0), (now + Duration::from_secs(1), 25, 18.0)]),
+        );
+        let inputs = HashSet::from(["input".to_string()]);
+
+        assert_eq!(
+            rebuild_input_power_history(&history, &inputs),
+            VecDeque::from([(now, -120), (now + Duration::from_secs(1), -80)])
+        );
+        assert_eq!(
+            rebuild_output_power_history(&history, &inputs),
+            VecDeque::from([(now, 75), (now + Duration::from_secs(1), 25)])
+        );
+    }
 
     #[test]
     fn expanded_graph_timespan_filters_by_sample_timestamps() {
