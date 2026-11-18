@@ -2043,7 +2043,7 @@ fn total_power_overview(
             .push(interactive_graph_with_axis(
                 &settings.language,
                 crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-                history.iter().map(|(_, value)| *value as f64),
+                history.iter().map(|(timestamp, value)| (*timestamp, *value as f64)),
                 &settings.graph_style,
                 "W",
                 axis_start.clone(),
@@ -2051,7 +2051,7 @@ fn total_power_overview(
             .push(interactive_graph_with_axis(
                 &settings.language,
                 crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
-                output_temperature_history.iter().map(|(_, value)| *value),
+                output_temperature_history.iter().map(|(timestamp, value)| (*timestamp, *value)),
                 &settings.graph_style,
                 "°C",
                 axis_start.clone(),
@@ -2115,7 +2115,7 @@ fn total_power_overview(
                     crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
                     input_history
                         .iter()
-                        .map(|(_, value)| input_display_power_w(*value) as f64),
+                        .map(|(timestamp, value)| (*timestamp, input_display_power_w(*value) as f64)),
                     &settings.graph_style,
                     "W",
                     axis_start.clone(),
@@ -2123,7 +2123,7 @@ fn total_power_overview(
                 .push(interactive_graph_with_axis(
                     &settings.language,
                     crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
-                    input_temperature_history.iter().map(|(_, value)| *value),
+                    input_temperature_history.iter().map(|(timestamp, value)| (*timestamp, *value)),
                     &settings.graph_style,
                     "°C",
                     axis_start.clone(),
@@ -5806,7 +5806,7 @@ impl cosmic::Application for AppModel {
                                     crate::i18n::tr(&self.settings.language, "DOWNLOAD HISTORY"),
                                     self.bandwidth_history
                                         .iter()
-                                        .map(|(_, download, _)| *download as f64 / 1_000_000.0),
+                                        .map(|(timestamp, download, _)| (*timestamp, *download as f64 / 1_000_000.0)),
                                     &self.settings.graph_style,
                                     "Mb/s",
                                     bandwidth_axis_start.clone(),
@@ -5816,7 +5816,7 @@ impl cosmic::Application for AppModel {
                                     crate::i18n::tr(&self.settings.language, "UPLOAD HISTORY"),
                                     self.bandwidth_history
                                         .iter()
-                                        .map(|(_, _, upload)| *upload as f64 / 1_000_000.0),
+                                        .map(|(timestamp, _, upload)| (*timestamp, *upload as f64 / 1_000_000.0)),
                                     &self.settings.graph_style,
                                     "Mb/s",
                                     bandwidth_axis_start,
@@ -6030,7 +6030,7 @@ impl cosmic::Application for AppModel {
                                                 device_history.into_iter().flat_map(|samples| {
                                                     samples
                                                         .iter()
-                                                        .map(|(_, power, _)| *power as f64)
+                                                        .map(|(timestamp, power, _)| (*timestamp, *power as f64))
                                                 }),
                                                 &self.settings.graph_style,
                                                 "W",
@@ -6098,7 +6098,7 @@ impl cosmic::Application for AppModel {
                                                 device_history.into_iter().flat_map(|samples| {
                                                     samples
                                                         .iter()
-                                                        .map(|(_, _, temperature)| *temperature)
+                                                        .map(|(timestamp, _, temperature)| (*timestamp, *temperature))
                                                 }),
                                                 &self.settings.graph_style,
                                                 "°C",
