@@ -8134,6 +8134,12 @@ impl cosmic::Application for AppModel {
                 self.device_search = value;
             }
             Message::DevicesLoaded(result) => {
+                for diagnostic in crate::tasmota::take_discovery_diagnostics() {
+                    record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        format!("Tasmota discovery: {diagnostic}"),
+                    );
+                }
                 self.devices_loading = false;
                 self.devices_loaded = result.is_ok();
                 match result {
