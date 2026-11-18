@@ -8689,6 +8689,18 @@ mod history_tests {
     }
 
     #[test]
+    fn expanded_power_graph_energy_uses_trapezoidal_integration() {
+        let one_hour = Duration::from_secs(3600);
+        assert!((graph_energy_wh(&[1000.0, 1000.0], one_hour) - 1000.0).abs() < f64::EPSILON);
+        assert!((graph_energy_wh(&[1000.0, 2000.0, 1000.0], one_hour) - 1500.0).abs() < f64::EPSILON);
+        assert!((graph_energy_wh(&[-500.0, -500.0], one_hour) - 500.0).abs() < f64::EPSILON);
+        assert_eq!(graph_energy_wh(&[500.0], one_hour), 0.0);
+        assert_eq!(graph_energy_wh(&[500.0, 500.0], Duration::ZERO), 0.0);
+        assert_eq!(format_graph_energy(999.9), "999.9 Wh");
+        assert_eq!(format_graph_energy(1500.0), "1.50 kWh");
+    }
+
+    #[test]
     fn graph_plot_bounds_keep_steady_values_away_from_the_axis() {
         let (minimum, maximum) = graph_plot_bounds(250.0, 250.0);
         assert!(minimum < 250.0);
