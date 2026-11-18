@@ -40,6 +40,16 @@ pub struct TasmotaDevice {
     pub address: String,
 }
 
+impl Default for TasmotaDevice {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            name: String::new(),
+            address: String::new(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct TasmotaReading {
     pub id: String,
