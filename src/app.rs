@@ -71,6 +71,10 @@ pub struct AppModel {
     quick_graph_timespan: u32,
     expanded_graph: Option<(String, Vec<f64>, String, Option<String>)>,
     expanded_graph_secondary: Option<(Vec<f64>, String)>,
+    expanded_graph_full_values: Option<Vec<f64>>,
+    expanded_graph_full_secondary: Option<Vec<f64>>,
+    expanded_graph_max_timespan_minutes: u32,
+    expanded_graph_view_timespan_minutes: u32,
     history_graph_devices: Vec<(String, String)>,
     history_graph_index: Option<usize>,
     next_weather_refresh_at: Option<Instant>,
@@ -851,8 +855,8 @@ fn graph_visual_large(
         style,
         title,
         unit,
-        480.0,
-        cosmic::iced::Length::Fixed(480.0),
+        390.0,
+        cosmic::iced::Length::Fixed(390.0),
         axis_start,
         None,
         None,
@@ -874,8 +878,8 @@ fn graph_visual_large_multi(
         style,
         title,
         unit,
-        480.0,
-        cosmic::iced::Length::Fixed(480.0),
+        390.0,
+        cosmic::iced::Length::Fixed(390.0),
         axis_start,
         Some(secondary_values.collect()),
         Some(format!("{primary_label}|{secondary_label}")),
@@ -953,7 +957,7 @@ fn graph_visual_with_dimensions(
     widget_height: cosmic::iced::Length,
     axis_start: Option<String>,
     secondary_values: Option<Vec<f64>>,
-    secondary_labels: Option<String>,
+    _secondary_labels: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
     let current_value = values.last().copied().unwrap_or(0.0);
@@ -1105,53 +1109,6 @@ fn graph_visual_with_dimensions(
         plot_top + plot_height / 2.0,
         plot_top + plot_height / 2.0
     );
-    // Compact menu graphs rely on their surrounding metric labels. In the
-    // expanded view, place a centered legend below the time ticks so it never
-    // competes with the plot header or the axis labels.
-    let legend = if is_expanded {
-        let entries: Vec<(&str, &str)> = if let Some(labels) = secondary_labels.as_deref() {
-            let mut parts = labels.splitn(2, '|');
-            vec![
-                (parts.next().unwrap_or(title), "#8ab4f8"),
-                (parts.next().unwrap_or("Input"), "#81c995"),
-            ]
-        } else {
-            vec![(title, "#8ab4f8")]
-        };
-        let labels: Vec<String> = entries
-            .iter()
-            .map(|(label, _)| {
-                if secondary_labels.is_some() {
-                    escape_svg_text(label)
-                } else {
-                    format!("{} ({})", escape_svg_text(label), escape_svg_text(unit))
-                }
-            })
-            .collect();
-        let entry_widths: Vec<f64> = labels
-            .iter()
-            .map(|label| 18.0 + 10.0 + label.chars().count() as f64 * font_size * 0.56)
-            .collect();
-        let gap = 28.0;
-        let total_width =
-            entry_widths.iter().sum::<f64>() + gap * entries.len().saturating_sub(1) as f64;
-        let mut x = (plot_left + plot_right - total_width) / 2.0;
-        let legend_y = height - 55.0;
-        let mut markup = String::from("<g aria-label=\"Legend\">");
-        for ((entry, label), entry_width) in entries.iter().zip(labels.iter()).zip(entry_widths) {
-            let color = entry.1;
-            markup.push_str(&format!(
-                "<path d=\"M{x:.2} {legend_y:.2}h18\" fill=\"none\" stroke=\"{color}\" stroke-width=\"3\" stroke-linecap=\"round\"/><text x=\"{:.2}\" y=\"{:.2}\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{label}</text>",
-                x + 26.0,
-                legend_y + font_size * 0.35
-            ));
-            x += entry_width + gap;
-        }
-        markup.push_str("</g>");
-        markup
-    } else {
-        String::new()
-    };
     let x_axis_title = format!(
         "<text x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">TIME</text>",
         plot_left + plot_width / 2.0,
@@ -1191,7 +1148,7 @@ fn graph_visual_with_dimensions(
         String::new()
     };
     let svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" preserveAspectRatio=\"none\" font-family=\"Inter, sans-serif\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{min_max_labels}{energy_label}{legend}{y_labels}{x_labels}{y_axis_title}{x_axis_title}{drawing}</svg>"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" preserveAspectRatio=\"none\" font-family=\"Inter, sans-serif\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{min_max_labels}{energy_label}{y_labels}{x_labels}{y_axis_title}{x_axis_title}{drawing}</svg>"
     );
     widget::Column::new()
         .spacing(2)
@@ -1203,6 +1160,106 @@ fn graph_visual_with_dimensions(
             .height(widget_height),
         )
         .into()
+}
+
+fn graph_stat_value(values: &[f64], unit: &str, statistic: &str) -> String {
+    if values.is_empty() {
+        return "—".into();
+    }
+    let value = match statistic {
+        "MIN" => values.iter().copied().reduce(f64::min).unwrap_or_default(),
+        "MAX" => values.iter().copied().reduce(f64::max).unwrap_or_default(),
+        _ => values.iter().sum::<f64>() / values.len() as f64,
+    };
+    format!("{} {unit}", format_graph_y_tick(value, unit))
+}
+
+fn graph_stats_row(
+    label: String,
+    values: &[f64],
+    unit: &str,
+    color: cosmic::iced::Color,
+) -> cosmic::Element<'static, Message> {
+    let metric_width = cosmic::iced::Length::Fixed(88.0);
+    let marker = widget::container(widget::text("●").size(14))
+        .width(cosmic::iced::Length::Fixed(18.0))
+        .style(move |_| cosmic::iced::widget::container::Style {
+            text_color: Some(color),
+            ..Default::default()
+        });
+    let axis_label = if label.contains(unit) {
+        label
+    } else {
+        format!("{label} ({unit})")
+    };
+    widget::Row::new()
+        .spacing(8)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(
+            widget::Row::new()
+                .spacing(6)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(marker)
+                .push(
+                    widget::text::body(axis_label)
+                        .width(cosmic::iced::Length::Fill),
+                )
+                .width(cosmic::iced::Length::Fill),
+        )
+        .push(widget::text::body(graph_stat_value(values, unit, "MIN")).width(metric_width))
+        .push(widget::text::body(graph_stat_value(values, unit, "MAX")).width(metric_width))
+        .push(widget::text::body(graph_stat_value(values, unit, "AVG")).width(metric_width))
+        .into()
+}
+
+fn graph_stats_legend(
+    title: &str,
+    values: &[f64],
+    unit: &str,
+    secondary: Option<(&[f64], &str)>,
+) -> cosmic::Element<'static, Message> {
+    let metric_width = cosmic::iced::Length::Fixed(88.0);
+    let heading = widget::Row::new()
+        .spacing(8)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(widget::text::caption("AXIS / SERIES").width(cosmic::iced::Length::Fill))
+        .push(widget::text::caption("MIN").width(metric_width))
+        .push(widget::text::caption("MAX").width(metric_width))
+        .push(widget::text::caption("AVG").width(metric_width));
+    let mut legend = widget::Column::new()
+        .spacing(6)
+        .padding([8, 10])
+        .width(cosmic::iced::Length::Fill)
+        .push(widget::divider::horizontal::default())
+        .push(heading)
+        .push(graph_stats_row(
+            title.to_string(),
+            values,
+            unit,
+            cosmic::iced::Color::from_rgb(0.54, 0.71, 0.97),
+        ));
+    if let Some((secondary_values, secondary_label)) = secondary {
+        legend = legend.push(graph_stats_row(
+            secondary_label.to_string(),
+            secondary_values,
+            unit,
+            cosmic::iced::Color::from_rgb(0.51, 0.79, 0.58),
+        ));
+    }
+    legend.into()
+}
+
+fn graph_values_for_timespan(
+    values: &[f64],
+    selected_minutes: u32,
+    maximum_minutes: u32,
+) -> Vec<f64> {
+    if values.is_empty() || maximum_minutes == 0 || selected_minutes >= maximum_minutes {
+        return values.to_vec();
+    }
+    let fraction = f64::from(selected_minutes) / f64::from(maximum_minutes);
+    let count = ((values.len() as f64 * fraction).ceil() as usize).clamp(1, values.len());
+    values[values.len() - count..].to_vec()
 }
 
 fn interactive_graph_with_axis(
@@ -3288,9 +3345,8 @@ impl cosmic::Application for AppModel {
                 .padding(8)
                 .width(cosmic::iced::Length::Fill)
                 .height(cosmic::iced::Length::Fill)
-                // Keep the expanded graph's information hierarchy consistent
-                // with compact graphs: title first, then MIN/MAX/CURRENT,
-                // the plot, and finally the time axis. Only the plot size differs.
+                // Expanded graphs share a Grafana-style time-range control,
+                // full-size plot, and bottom statistics legend.
                 .push({
                     let mut header = widget::Row::new()
                         .spacing(8)
@@ -3357,51 +3413,37 @@ impl cosmic::Application for AppModel {
                     )
                 })
                 .push({
-                    let controls: cosmic::Element<'_, Message> =
-                        if self.history_graph_index.is_some() {
-                            let max_minutes = self
-                                .history_graph_index
-                                .and_then(|index| self.history_graph_devices.get(index))
-                                .and_then(|(key, _)| self.device_history.get(key))
-                                .map(|samples| max_device_history_minutes(samples, Instant::now()))
-                                .unwrap_or(5);
-                            let mut presets = vec![
-                                ("15m".to_string(), 15),
-                                ("1h".to_string(), 60),
-                                ("6h".to_string(), 360),
-                                ("24h".to_string(), 1_440),
-                                ("7d".to_string(), 10_080),
-                            ];
-                            presets.retain(|(_, minutes)| *minutes <= max_minutes);
-                            if !presets.iter().any(|(_, minutes)| *minutes == max_minutes) {
-                                presets.push((format_graph_timespan(max_minutes), max_minutes));
-                            }
-                            let mut ranges = widget::Row::new()
-                                .spacing(6)
-                                .align_y(cosmic::iced::Alignment::Center);
-                            for (label, minutes) in presets {
-                                let is_selected = self.settings.graph_timespan_minutes == minutes
-                                    || (minutes == max_minutes
-                                        && self.settings.graph_timespan_minutes >= max_minutes);
-                                let caption = if is_selected {
-                                    format!("✓ {label}")
-                                } else {
-                                    label
-                                };
-                                ranges = ranges.push(
-                                    widget::button::custom(widget::text::caption(caption))
-                                        .on_press(Message::GraphHistoryTimespanChanged(minutes))
-                                        .padding([6, 10])
-                                        .class(cosmic::theme::Button::Text),
-                                );
-                            }
-                            widget::container(ranges)
-                                .width(cosmic::iced::Length::Fill)
-                                .into()
-                        } else {
-                            widget::Space::new().height(0).into()
-                        };
-                    controls
+                    let max_minutes = self.expanded_graph_max_timespan_minutes.max(5);
+                    let mut presets = vec![
+                        ("15m".to_string(), 15),
+                        ("1h".to_string(), 60),
+                        ("6h".to_string(), 360),
+                        ("24h".to_string(), 1_440),
+                        ("7d".to_string(), 10_080),
+                    ];
+                    presets.retain(|(_, minutes)| *minutes <= max_minutes);
+                    if !presets.iter().any(|(_, minutes)| *minutes == max_minutes) {
+                        presets.push((format_graph_timespan(max_minutes), max_minutes));
+                    }
+                    let mut ranges = widget::Row::new()
+                        .spacing(6)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::caption("TIME RANGE").width(cosmic::iced::Length::Fill));
+                    for (label, minutes) in presets {
+                        let is_selected = self.expanded_graph_view_timespan_minutes == minutes
+                            || (minutes == max_minutes
+                                && self.expanded_graph_view_timespan_minutes >= max_minutes);
+                        let caption = if is_selected { format!("✓ {label}") } else { label };
+                        ranges = ranges.push(
+                            widget::button::custom(widget::text::caption(caption))
+                                .on_press(Message::GraphHistoryTimespanChanged(minutes))
+                                .padding([6, 10])
+                                .class(cosmic::theme::Button::Text),
+                        );
+                    }
+                    widget::container(ranges)
+                        .width(cosmic::iced::Length::Fill)
+                        .into()
                 })
                 .push(
                     if let Some((secondary_values, labels)) = &self.expanded_graph_secondary {
@@ -3427,7 +3469,28 @@ impl cosmic::Application for AppModel {
                             axis_start.clone(),
                         )
                     },
-                );
+                )
+                .push({
+                    let secondary = self.expanded_graph_secondary.as_ref().map(
+                        |(series, labels)| {
+                            let mut parts = labels.splitn(2, '|');
+                            let _primary = parts.next();
+                            let secondary_label = parts.next().unwrap_or("Input");
+                            (series.as_slice(), secondary_label)
+                        },
+                    );
+                    let primary_label = self
+                        .expanded_graph_secondary
+                        .as_ref()
+                        .and_then(|(_, labels)| labels.split('|').next())
+                        .unwrap_or(title);
+                    graph_stats_legend(
+                        primary_label,
+                        values,
+                        unit,
+                        secondary,
+                    )
+                });
             // Applet popup surfaces do not receive the normal desktop
             // window background automatically. Apply COSMIC's window
             // background style to the entire graph surface so it has a
@@ -6546,6 +6609,10 @@ impl cosmic::Application for AppModel {
                 self.history_graph_devices.clear();
                 self.history_graph_index = None;
                 self.expanded_graph_secondary = None;
+                self.expanded_graph_full_values = Some(values.clone());
+                self.expanded_graph_full_secondary = None;
+                self.expanded_graph_max_timespan_minutes = self.settings.graph_timespan_minutes.max(5);
+                self.expanded_graph_view_timespan_minutes = self.expanded_graph_max_timespan_minutes;
                 self.expanded_graph = Some((title, values, unit, axis_start));
                 if self.graph_window.is_none() {
                     let Some(main_window_id) = self.core.main_window_id() else {
@@ -6581,6 +6648,10 @@ impl cosmic::Application for AppModel {
             ) => {
                 self.history_graph_devices.clear();
                 self.history_graph_index = None;
+                self.expanded_graph_full_values = Some(output_values.clone());
+                self.expanded_graph_full_secondary = Some(input_values.clone());
+                self.expanded_graph_max_timespan_minutes = self.settings.graph_timespan_minutes.max(5);
+                self.expanded_graph_view_timespan_minutes = self.expanded_graph_max_timespan_minutes;
                 self.expanded_graph_secondary =
                     Some((input_values, format!("{output_label}|{input_label}")));
                 self.expanded_graph = Some((title, output_values, unit, axis_start));
@@ -6612,6 +6683,7 @@ impl cosmic::Application for AppModel {
             }
             Message::ShowDeviceHistoryGraph(ain) => {
                 self.expanded_graph_secondary = None;
+                self.expanded_graph_full_secondary = None;
                 let mut ordered: Vec<_> = self.readings.iter().collect();
                 ordered.sort_by_key(|reading| {
                     self.settings
@@ -6653,6 +6725,11 @@ impl cosmic::Application for AppModel {
                                 now.duration_since(*timestamp).as_secs().div_ceil(60)
                             }),
                         );
+                        self.expanded_graph_full_values = Some(values.clone());
+                        self.expanded_graph_max_timespan_minutes =
+                            self.settings.graph_timespan_minutes.max(5);
+                        self.expanded_graph_view_timespan_minutes =
+                            self.expanded_graph_max_timespan_minutes;
                         self.expanded_graph = Some((
                             format!(
                                 "{} · {}",
@@ -6690,33 +6767,37 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::GraphHistoryTimespanChanged(minutes) => {
-                if self.history_graph_index.is_some() {
-                    let minutes = minutes.clamp(5, 2_102_400);
-                    if self.settings.graph_timespan_minutes != minutes {
-                        self.settings.graph_timespan_minutes = minutes;
-                        self.quick_graph_timespan = minutes;
-                        let now = Instant::now();
-                        let window = graph_history_window(minutes);
-                        let storage_window = graph_history_storage_window(minutes);
-                        let (mut history, device_history) = crate::history::load(storage_window);
-                        history.retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
-                        self.history = history;
-                        self.device_history = device_history;
-                        if let Some(index) = self.history_graph_index
-                            && let Some((key, name)) =
-                                self.history_graph_devices.get(index).cloned()
-                        {
-                            self.expanded_graph = Some(rebuild_device_history_graph(
-                                &self.device_history,
-                                &key,
-                                &name,
-                                &self.settings.language,
+                let minutes = minutes.clamp(5, self.expanded_graph_max_timespan_minutes.max(5));
+                if self.expanded_graph_view_timespan_minutes != minutes {
+                    self.expanded_graph_view_timespan_minutes = minutes;
+                    if let Some(full_values) = self.expanded_graph_full_values.as_ref() {
+                        let values = graph_values_for_timespan(
+                            full_values,
+                            minutes,
+                            self.expanded_graph_max_timespan_minutes,
+                        );
+                        let secondary = self.expanded_graph_full_secondary.as_ref().map(|series| {
+                            graph_values_for_timespan(
+                                series,
                                 minutes,
+                                self.expanded_graph_max_timespan_minutes,
+                            )
+                        });
+                        if let Some((title, _, unit, _)) = self.expanded_graph.as_ref() {
+                            let axis_start = format_graph_axis_start(minutes, None);
+                            self.expanded_graph = Some((
+                                title.clone(),
+                                values,
+                                unit.clone(),
+                                Some(axis_start),
                             ));
+                            if let (Some(series), Some((_, labels))) =
+                                (secondary, self.expanded_graph_secondary.as_ref())
+                            {
+                                self.expanded_graph_secondary =
+                                    Some((series, labels.clone()));
+                            }
                         }
-                        self.history_storage_diagnostics =
-                            crate::history::diagnostics(storage_window);
-                        self.persist_settings();
                     }
                 }
             }
@@ -6745,6 +6826,12 @@ impl cosmic::Application for AppModel {
                                     now.duration_since(*timestamp).as_secs().div_ceil(60)
                                 }),
                             );
+                            self.expanded_graph_full_values = Some(values.clone());
+                            self.expanded_graph_full_secondary = None;
+                            self.expanded_graph_max_timespan_minutes =
+                                self.settings.graph_timespan_minutes.max(5);
+                            self.expanded_graph_view_timespan_minutes =
+                                self.expanded_graph_max_timespan_minutes;
                             self.expanded_graph = Some((
                                 format!(
                                     "{} · {}",
@@ -6762,6 +6849,8 @@ impl cosmic::Application for AppModel {
             Message::CloseGraph => {
                 self.expanded_graph = None;
                 self.expanded_graph_secondary = None;
+                self.expanded_graph_full_values = None;
+                self.expanded_graph_full_secondary = None;
                 self.history_graph_devices.clear();
                 self.history_graph_index = None;
                 if let Some(id) = self.graph_window.take() {
@@ -8075,6 +8164,9 @@ impl cosmic::Application for AppModel {
                 if self.graph_window == Some(id) {
                     self.graph_window = None;
                     self.expanded_graph = None;
+                    self.expanded_graph_secondary = None;
+                    self.expanded_graph_full_values = None;
+                    self.expanded_graph_full_secondary = None;
                     self.history_graph_devices.clear();
                     self.history_graph_index = None;
                 }
@@ -8095,6 +8187,24 @@ impl cosmic::Application for AppModel {
 #[cfg(test)]
 mod history_tests {
     use super::*;
+
+    #[test]
+    fn expanded_graph_timespan_keeps_the_most_recent_samples() {
+        let values = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        assert_eq!(graph_values_for_timespan(&values, 30, 60), vec![5.0, 6.0, 7.0, 8.0]);
+        assert_eq!(graph_values_for_timespan(&values, 60, 60), values);
+        assert_eq!(graph_values_for_timespan(&values, 5, 60), vec![8.0]);
+        assert_eq!(graph_values_for_timespan(&[], 15, 60), Vec::<f64>::new());
+    }
+
+    #[test]
+    fn expanded_graph_legend_statistics_use_selected_series_values() {
+        let values = vec![10.0, 20.0, 30.0];
+        assert_eq!(graph_stat_value(&values, "W", "MIN"), "10.0 W");
+        assert_eq!(graph_stat_value(&values, "W", "MAX"), "30.0 W");
+        assert_eq!(graph_stat_value(&values, "W", "AVG"), "20.0 W");
+        assert_eq!(graph_stat_value(&[], "W", "AVG"), "—");
+    }
 
     #[test]
     fn router_uptime_is_formatted_without_losing_days() {
