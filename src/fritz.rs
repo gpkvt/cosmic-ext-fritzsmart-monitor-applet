@@ -473,17 +473,18 @@ fn parse_temperature_alerts(value: &str) -> HashMap<String, TemperatureAlertThre
 impl FritzSettings {
     pub fn load() -> Result<Self, String> {
         let path = config_path()?;
-        let contents = fs::read_to_string(&path)
-            .map_err(|_| format!("Cannot read configuration file: {}", path.display()))?;
+        // Preferences and the device inventory are loaded independently. If the
+        // preferences file is missing or damaged, saved devices must still load.
+        let contents = fs::read_to_string(&path).unwrap_or_default();
         let mut values = HashMap::new();
-        for (line_number, line) in contents.lines().enumerate() {
+        for line in contents.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
-            let (key, value) = line
-                .split_once('=')
-                .ok_or_else(|| format!("Invalid configuration on line {}", line_number + 1))?;
+            let Some((key, value)) = line.split_once('=') else {
+                continue;
+            };
             values.insert(
                 key.trim().to_string(),
                 value
@@ -596,8 +597,13 @@ impl FritzSettings {
         };
         // Device inventory is stored independently from general preferences so
         // a damaged or partially-written settings file cannot hide saved devices.
-        settings.known_devices = load_device_inventory()
-            .unwrap_or_else(|| settings.known_devices.clone());
+        if let Some(devices) = load_device_inventory() {
+            settings.known_devices = devices;
+        } else if !settings.known_devices.is_empty()
+            && let Err(error) = save_device_inventory(&settings.known_devices)
+        {
+            eprintln!("Could not migrate legacy device inventory: {error}");
+        }
         Ok(settings)
     }
 
