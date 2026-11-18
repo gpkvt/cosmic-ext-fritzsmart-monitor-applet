@@ -1025,16 +1025,40 @@ async fn authenticated_client(settings: &FritzSettings) -> Result<(Client, Strin
 }
 
 pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<FritzDevice>, String> {
-    let (client, sid) = authenticated_client(&settings).await?;
-    let base = settings.url.trim_end_matches('/');
-    let device_response = client
-        .get(format!("{base}/webservices/homeautoswitch.lua"))
-        .query(&[("sid", sid.as_str()), ("switchcmd", "getdevicelistinfos")])
-        .send()
-        .await
-        .map_err(|error| format!("FRITZ!Box device request failed: {error}"))?;
-    let xml = read_xml_response(device_response, "FRITZ!Box device request failed").await?;
-    parse_devices_xml(&xml)
+    let fritz_result = async {
+        let (client, sid) = authenticated_client(&settings).await?;
+        let base = settings.url.trim_end_matches('/');
+        let response = client
+            .get(format!("{base}/webservices/homeautoswitch.lua"))
+            .query(&[("sid", sid.as_str()), ("switchcmd", "getdevicelistinfos")])
+            .send()
+            .await
+            .map_err(|error| format!("FRITZ!Box device request failed: {error}"))?;
+        let xml = read_xml_response(response, "FRITZ!Box device request failed").await?;
+        parse_devices_xml(&xml)
+    }.await;
+
+    // Tasmota discovery is independent of FRITZ!Box availability and uses the
+    // same credentials configured for the FRITZ!Box connection.
+    let tasmota_result = crate::tasmota::discover_devices(
+        settings.username.clone(),
+        settings.password.clone(),
+    ).await;
+    let mut devices = fritz_result.unwrap_or_default();
+    if let Ok(tasmota_devices) = tasmota_result {
+        devices.extend(tasmota_devices.into_iter().map(|device| FritzDevice {
+            name: device.name,
+            ain: device.id,
+        }));
+    }
+    devices.sort_by_key(|device| device.name.to_lowercase());
+    devices.dedup_by(|left, right| {
+        normalize_ain_for_selection(&left.ain) == normalize_ain_for_selection(&right.ain)
+    });
+    if devices.is_empty() {
+        return Err("No compatible FRITZ!Box or Tasmota power-monitoring devices were discovered".into());
+    }
+    Ok(devices)
 }
 
 fn parse_devices_xml(xml: &str) -> Result<Vec<FritzDevice>, String> {
@@ -1738,63 +1762,115 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     } else {
         settings.ains.clone()
     };
-    let (client, sid) = authenticated_client(&settings).await?;
-    let base = settings.url.trim_end_matches('/');
-    let devices_xml = fetch_device_list_xml(&client, base, &sid).await?;
-    let mut result = parse_fetch_result_xml(&devices_xml, &selected_ains)?;
-    // Popup-menu bandwidth is independent of panel visibility. Always fetch
-    // the optional WAN statistics so the dedicated menu section remains live
-    // even when the panel bandwidth item is disabled.
-    // DeviceInfo and WAN link statistics are optional TR-064 services. Query
-    // them independently so unsupported firmware does not break device readings.
-    let (device_info, wan_info) = tokio::join!(
-        tokio::time::timeout(Duration::from_secs(3), fetch_device_info(&client, base)),
-        tokio::time::timeout(Duration::from_secs(3), fetch_wan_link_info(&client, base)),
-    );
-    let wan_info = wan_info.ok().flatten();
-    result.internet_bandwidth = wan_info.as_ref().and_then(|wan| {
-        Some(FritzInternetBandwidth {
-            download_bits_per_second: wan.download_bits_per_second?,
-            upload_bits_per_second: wan.upload_bits_per_second?,
-        })
-    });
-    result.system_info = match (device_info.ok().flatten(), wan_info) {
-        (Some(mut info), wan) => {
-            info.wan = wan;
-            Some(info)
-        }
-        (None, Some(wan)) => Some(FritzBoxSystemInfo {
-            manufacturer: None,
-            model: None,
-            product_class: None,
-            hardware_version: None,
-            software_version: None,
-            uptime_seconds: None,
-            wan: Some(wan),
-        }),
-        (None, None) => None,
-    };
+    let selected_tasmota: Vec<String> = selected_ains.iter()
+        .filter(|id| id.to_ascii_uppercase().starts_with("TASMOTA:"))
+        .cloned()
+        .collect();
+    let selected_fritz: Vec<String> = selected_ains.iter()
+        .filter(|id| !id.to_ascii_uppercase().starts_with("TASMOTA:"))
+        .cloned()
+        .collect();
 
-    // Query the dedicated switch-state endpoint: power-meter XML can lag behind
-    // the actual actuator state on some FRITZ!Box devices.
-    let states = futures::future::join_all(result.readings.iter().map(|reading| async {
-        if reading.power_controllable {
-            fetch_switch_state(&client, base, &sid, &reading.ain).await
-        } else {
-            Ok(None)
-        }
-    }))
-    .await;
-    for (reading, state) in result.readings.iter_mut().zip(states) {
-        if reading.power_controllable {
-            reading.power_state = state.unwrap_or(None);
+    let mut result = FritzFetchResult {
+        readings: Vec::new(),
+        missing_devices: Vec::new(),
+        internet_bandwidth: None,
+        system_info: None,
+    };
+    let mut fritz_error = None;
+
+    if !selected_fritz.is_empty() {
+        let fritz_result = async {
+            let (client, sid) = authenticated_client(&settings).await?;
+            let base = settings.url.trim_end_matches('/');
+            let devices_xml = fetch_device_list_xml(&client, base, &sid).await?;
+            let mut fetched = parse_fetch_result_xml(&devices_xml, &selected_fritz)?;
+            let (device_info, wan_info) = tokio::join!(
+                tokio::time::timeout(Duration::from_secs(3), fetch_device_info(&client, base)),
+                tokio::time::timeout(Duration::from_secs(3), fetch_wan_link_info(&client, base)),
+            );
+            let wan_info = wan_info.ok().flatten();
+            fetched.internet_bandwidth = wan_info.as_ref().and_then(|wan| Some(FritzInternetBandwidth {
+                download_bits_per_second: wan.download_bits_per_second?,
+                upload_bits_per_second: wan.upload_bits_per_second?,
+            }));
+            fetched.system_info = match (device_info.ok().flatten(), wan_info) {
+                (Some(mut info), wan) => { info.wan = wan; Some(info) }
+                (None, Some(wan)) => Some(FritzBoxSystemInfo {
+                    manufacturer: None, model: None, product_class: None,
+                    hardware_version: None, software_version: None,
+                    uptime_seconds: None, wan: Some(wan),
+                }),
+                (None, None) => None,
+            };
+            let states = futures::future::join_all(fetched.readings.iter().map(|reading| async {
+                if reading.power_controllable {
+                    fetch_switch_state(&client, base, &sid, &reading.ain).await
+                } else { Ok(None) }
+            })).await;
+            for (reading, state) in fetched.readings.iter_mut().zip(states) {
+                if reading.power_controllable { reading.power_state = state.unwrap_or(None); }
+            }
+            Ok::<FritzFetchResult, String>(fetched)
+        }.await;
+        match fritz_result {
+            Ok(fetched) => result = fetched,
+            Err(error) => fritz_error = Some(error),
         }
     }
 
+    if !selected_tasmota.is_empty() {
+        match crate::tasmota::discover_devices(settings.username.clone(), settings.password.clone()).await {
+            Ok(devices) => {
+                let wanted: HashSet<String> = selected_tasmota.iter()
+                    .map(|id| normalize_ain_for_selection(id)).collect();
+                let devices: Vec<_> = devices.into_iter()
+                    .filter(|device| wanted.contains(&normalize_ain_for_selection(&device.id)))
+                    .collect();
+                let (readings, errors) = crate::tasmota::fetch_readings(
+                    &devices, &settings.username, &settings.password
+                ).await;
+                result.readings.extend(readings.into_iter().map(|reading| FritzReading {
+                    ain: reading.id,
+                    name: reading.name,
+                    power_w: reading.power_w,
+                    // NaN is an internal "not supported" sentinel. All
+                    // temperature aggregation and presentation must filter it.
+                    temperature_c: f64::NAN,
+                    power_state: reading.power_state,
+                    power_controllable: true,
+                    power_toggle_allowed: true,
+                }));
+                if !errors.is_empty() && result.readings.is_empty() {
+                    fritz_error = Some(errors.join("; "));
+                }
+            }
+            Err(error) => {
+                if result.readings.is_empty() { fritz_error = Some(error); }
+            }
+        }
+    }
+
+    if result.readings.is_empty() {
+        return Err(fritz_error.unwrap_or_else(|| "No selected devices returned usable readings".into()));
+    }
+    result.readings.sort_by_key(|reading| selected_ains.iter()
+        .position(|selected| normalize_ain_for_selection(selected) == normalize_ain_for_selection(&reading.ain))
+        .unwrap_or(usize::MAX));
     Ok(result)
 }
 
 pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
+    if ain.to_ascii_uppercase().starts_with("TASMOTA:") {
+        let settings = FritzSettings::load()?;
+        let devices = crate::tasmota::discover_devices(settings.username.clone(), settings.password.clone()).await?;
+        let wanted = normalize_ain_for_selection(&ain);
+        let device = devices.into_iter()
+            .find(|device| normalize_ain_for_selection(&device.id) == wanted)
+            .ok_or_else(|| "Tasmota device is no longer discoverable on the local network".to_string())?;
+        return crate::tasmota::set_power(&device, on, &settings.username, &settings.password).await;
+    }
+
     let settings = FritzSettings::load()?;
     validate_settings(&settings, false)?;
     let (client, sid) = authenticated_client(&settings).await?;
