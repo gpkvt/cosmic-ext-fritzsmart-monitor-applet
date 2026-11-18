@@ -2287,7 +2287,9 @@ fn panel_order_move_available(
     }
 
     let groups = panel_order_groups(order, true);
-    let Some(index) = groups.iter().position(|group| group.iter().any(|member| member == item))
+    let Some(index) = groups
+        .iter()
+        .position(|group| group.iter().any(|member| member == item))
     else {
         return false;
     };
@@ -4019,7 +4021,11 @@ impl cosmic::Application for AppModel {
                             || (has_input_device && !self.settings.panel_net_power)
                     })
                     .collect();
-                for (index, item) in visible_panel_order.iter().enumerate() {
+                let visible_panel_order_ids: Vec<String> = visible_panel_order
+                    .iter()
+                    .map(|item| (*item).clone())
+                    .collect();
+                for item in &visible_panel_order {
                     let id = match item.as_str() {
                         "weather" => "weather",
                         "power-consumption" => "power-consumption",
@@ -4044,14 +4050,7 @@ impl cosmic::Application for AppModel {
                                 Message::TogglePanelItemVisibility(id, value)
                             }));
                     let show_order_controls = !self.settings.panel_multiline
-                        || panel_order_group_leader(
-                            &visible_panel_order
-                                .iter()
-                                .map(|item| item.as_str().to_string())
-                                .collect::<Vec<_>>(),
-                            id,
-                            true,
-                        );
+                        || panel_order_group_leader(&visible_panel_order_ids, id, true);
                     if show_order_controls {
                         let can_move_up = panel_order_move_available(
                             &self.settings.panel_order,
