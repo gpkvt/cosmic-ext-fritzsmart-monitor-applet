@@ -9299,10 +9299,7 @@ mod history_tests {
             average_selected_temperature_c(&readings, &selected[..1], false),
             Some(20.0)
         );
-        assert_eq!(
-            average_selected_temperature_c(&readings, &[], false),
-            None
-        );
+        assert_eq!(average_selected_temperature_c(&readings, &[], false), None);
     }
 
     #[test]
