@@ -4086,7 +4086,8 @@ impl cosmic::Application for AppModel {
                 if let Some(status) = &self.settings_status {
                     content = content.push(widget::text::caption(status.clone()));
                 }
-                content = content.push(widget::divider::horizontal::default())
+                content = content
+                    .push(widget::divider::horizontal::default())
                     .push(
                         widget::Row::new()
                             .width(cosmic::iced::Length::Fill)
