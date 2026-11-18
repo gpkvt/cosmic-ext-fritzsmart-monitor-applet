@@ -362,18 +362,14 @@ fn parse_panel_order(value: &str) -> Vec<String> {
 }
 
 fn parse_device_order(value: &str) -> Vec<String> {
-    value
-        .split(',')
-        .map(normalize_ain_for_selection)
-        .filter(|ain| !ain.is_empty())
-        .fold(Vec::new(), |mut order, ain| {
-            if !order.contains(&ain) {
-                order.push(ain);
-            }
-            order
-        })
+    unique_strings(
+        value
+            .split(',')
+            .map(normalize_ain_for_selection)
+            .filter(|ain| !ain.is_empty())
+            .collect::<Vec<_>>(),
+    )
 }
-
 fn parse_settings_section(value: &str) -> String {
     match value.trim() {
         "language" | "panel" | "graph" | "refresh" | "weather" | "connection" | "device"
@@ -412,19 +408,15 @@ fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
 }
 
 fn parse_expanded_devices(value: &str) -> Vec<String> {
-    value
-        .split(',')
-        .map(normalize_ain_for_selection)
-        .map(|ain| ain.to_ascii_uppercase())
-        .filter(|ain| !ain.is_empty())
-        .fold(Vec::new(), |mut devices, ain| {
-            if !devices.contains(&ain) {
-                devices.push(ain);
-            }
-            devices
-        })
+    unique_strings(
+        value
+            .split(',')
+            .map(normalize_ain_for_selection)
+            .map(|ain| ain.to_ascii_uppercase())
+            .filter(|ain| !ain.is_empty())
+            .collect::<Vec<_>>(),
+    )
 }
-
 fn parse_input_ains(value: &str) -> HashSet<String> {
     value
         .split(',')
