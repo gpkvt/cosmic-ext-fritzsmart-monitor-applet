@@ -108,9 +108,9 @@ for page in pages:
         hero_cards = content.count('<a class="hero-shot"')
         if hero_cards != 10:
             fail(f"index.html: expected ten screenshot cards, found {hero_cards}")
-        if '.hero-gallery .hero-shot{display:none}' in content:
-            fail("index.html: screenshot deck must not be hidden")
-        for feature in ("card-deal", "openGallery(index)", "gallery-enter", "gallery-image-enter", ".hero-shot:hover", "border-color:#8be0c4aa"):
+        if ".hero-shot:nth-of-type(n+5){display:none}" not in content:
+            fail("index.html: the hero must show a curated screenshot-card preview")
+        for feature in (".gallery-all", "View all 10 screenshots", "openGallery(", ".hero-shot:hover", "border-color:#8be0c4aa"):
             if feature not in content:
                 fail(f"index.html: screenshot gallery interaction or styling is missing {feature}")
         hover_rule = re.search(r"\.hero-shot:hover[^\{]*\{([^}]*)\}", content)
