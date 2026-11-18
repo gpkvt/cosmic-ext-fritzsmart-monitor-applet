@@ -1,0 +1,50 @@
+#!/bin/sh
+set -eu
+
+# dpkg runs maintainer scripts as root. Resolve the desktop user that
+# initiated installation when sudo or pkexec provides that information.
+resolve_desktop_user() {
+    candidate="${SUDO_USER:-}"
+    if [ -z "$candidate" ] || [ "$candidate" = root ]; then
+        candidate="${PKEXEC_UID:-}"
+    fi
+    [ -n "$candidate" ] || return 1
+
+    entry="$(getent passwd "$candidate" 2>/dev/null || true)"
+    [ -n "$entry" ] || return 1
+    uid="$(printf '%s\n' "$entry" | cut -d: -f3)"
+    home="$(printf '%s\n' "$entry" | cut -d: -f6)"
+    [ -n "$uid" ] && [ "$uid" -ge 1000 ] 2>/dev/null || return 1
+    case "$home" in
+        /*) ;;
+        *) return 1 ;;
+    esac
+    printf '%s\n' "$home"
+}
+
+link_into_profile() {
+    target=$1
+    link=$2
+    mkdir -p "$(dirname "$link")"
+    if [ -L "$link" ]; then
+        current="$(readlink "$link")"
+        if [ "$current" = "$target" ]; then
+            return 0
+        fi
+        echo "fritz-power-monitor: leaving existing symlink untouched: $link" >&2
+    elif [ -e "$link" ]; then
+        echo "fritz-power-monitor: leaving existing file untouched: $link" >&2
+    else
+        ln -s "$target" "$link"
+    fi
+}
+
+if home="$(resolve_desktop_user)"; then
+    link_into_profile /usr/bin/fritz-power-monitor "$home/.local/bin/fritz-power-monitor"
+    link_into_profile /usr/share/applications/com.gpkvt.FritzPowerMonitor.desktop "$home/.local/share/applications/com.gpkvt.FritzPowerMonitor.desktop"
+    link_into_profile /usr/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg "$home/.local/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg"
+else
+    echo "fritz-power-monitor: no installing desktop user detected; system-wide entries remain available." >&2
+fi
+
+exit 0

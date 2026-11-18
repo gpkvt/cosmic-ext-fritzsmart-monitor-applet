@@ -32,6 +32,8 @@ test -s "$WORKSPACE/LICENSE"
 test -s "$DESKTOP"
 test -s "$ICON"
 test -s "$FLATPAK_MANIFEST"
+sh -n "$WORKSPACE/packaging/deb-postinst"
+sh -n "$WORKSPACE/packaging/deb-prerm"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 TEMP_DIR="$(mktemp -d)"
@@ -60,6 +62,8 @@ install -Dm0644 "$WORKSPACE/README.md" \
     "$DEB_ROOT/usr/share/doc/fritz-power-monitor/README.md"
 install -Dm0644 "$WORKSPACE/LICENSE" \
     "$DEB_ROOT/usr/share/doc/fritz-power-monitor/copyright"
+install -Dm0755 "$WORKSPACE/packaging/deb-postinst" "$DEB_ROOT/DEBIAN/postinst"
+install -Dm0755 "$WORKSPACE/packaging/deb-prerm" "$DEB_ROOT/DEBIAN/prerm"
 
 mkdir -p "$TEMP_DIR/debian-build/debian"
 cat > "$TEMP_DIR/debian-build/debian/control" <<'CONTROL'
@@ -103,6 +107,12 @@ desktop-file-validate "$DEB_ROOT/usr/share/applications/$APP_ID.desktop"
 DEB_FILE="$OUTPUT_DIR/fritz-power-monitor_${APP_VERSION}_amd64.deb"
 dpkg-deb --build --root-owner-group "$DEB_ROOT" "$DEB_FILE"
 dpkg-deb --info "$DEB_FILE"
+dpkg-deb --control "$DEB_FILE" "$TEMP_DIR/deb-control-check"
+test -x "$TEMP_DIR/deb-control-check/postinst"
+test -x "$TEMP_DIR/deb-control-check/prerm"
+dpkg-deb --contents "$DEB_FILE" | grep -Fq "/usr/bin/fritz-power-monitor"
+dpkg-deb --contents "$DEB_FILE" | grep -Fq "/usr/share/applications/$APP_ID.desktop"
+dpkg-deb --contents "$DEB_FILE" | grep -Fq "/usr/share/icons/hicolor/scalable/apps/$APP_ID.svg"
 
 # Bundle the executable and its shared-library dependencies into an AppImage.
 curl --fail --location --retry 3 \
