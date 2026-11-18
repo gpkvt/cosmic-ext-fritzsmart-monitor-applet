@@ -242,6 +242,10 @@ fn parse_refresh_interval_seconds(value: &str) -> u32 {
     value.parse::<u32>().unwrap_or(60).clamp(30, 3600)
 }
 
+fn parse_u16_setting(value: &str, default: u16, min: u16, max: u16) -> u16 {
+    value.parse::<u16>().unwrap_or(default).clamp(min, max)
+}
+
 const MENU_ELEMENT_IDS: [&str; 6] = [
     "summary",
     "weather",
@@ -529,14 +533,18 @@ impl FritzSettings {
             weather_temperature_source_initialized: get("WEATHER_TEMPERATURE_SOURCE_INITIALIZED")
                 .eq_ignore_ascii_case("true")
                 || !get("WEATHER_TEMPERATURE_AIN").trim().is_empty(),
-            weather_refresh_interval_minutes: get("WEATHER_REFRESH_INTERVAL_MINUTES")
-                .parse::<u16>()
-                .unwrap_or(10)
-                .clamp(5, 60),
-            weather_slideshow_interval_seconds: get("WEATHER_SLIDESHOW_INTERVAL_SECONDS")
-                .parse::<u16>()
-                .unwrap_or(10)
-                .clamp(5, 300),
+            weather_refresh_interval_minutes: parse_u16_setting(
+                &get("WEATHER_REFRESH_INTERVAL_MINUTES"),
+                10,
+                5,
+                60,
+            ),
+            weather_slideshow_interval_seconds: parse_u16_setting(
+                &get("WEATHER_SLIDESHOW_INTERVAL_SECONDS"),
+                10,
+                5,
+                300,
+            ),
             menu_order: parse_menu_order(&get("MENU_ORDER")),
             hidden_menu_elements: parse_hidden_menu_elements(&get("HIDDEN_MENU_ELEMENTS")),
             hidden_panel_items: parse_hidden_panel_items(&get("HIDDEN_PANEL_ITEMS")),
