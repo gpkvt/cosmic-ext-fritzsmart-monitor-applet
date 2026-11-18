@@ -6037,8 +6037,7 @@ impl cosmic::Application for AppModel {
                             let cosmic = theme.cosmic();
                             cosmic::iced::widget::container::Style {
                                 background: Some(
-                                    cosmic::iced::Color::from(cosmic.background(false).base)
-                                        .into(),
+                                    cosmic::iced::Color::from(cosmic.background(false).base).into(),
                                 ),
                                 border: cosmic::iced::Border {
                                     radius: device_corner_radius,
@@ -6125,8 +6124,10 @@ impl cosmic::Application for AppModel {
                             let cosmic = theme.cosmic();
                             cosmic::iced::widget::container::Style {
                                 background: Some(
-                                    cosmic::iced::Color::from(cosmic.background(false).small_widget)
-                                        .into(),
+                                    cosmic::iced::Color::from(
+                                        cosmic.background(false).small_widget,
+                                    )
+                                    .into(),
                                 ),
                                 border: cosmic::iced::Border {
                                     radius: device_corner_radius,
@@ -6292,7 +6293,9 @@ impl cosmic::Application for AppModel {
                                             self.settings.panel_exclude_solar_temperature,
                                         )
                                     } else {
-                                        primary.filter(|reading| reading.temperature_c.is_finite()).map(|reading| reading.temperature_c)
+                                        primary
+                                            .filter(|reading| reading.temperature_c.is_finite())
+                                            .map(|reading| reading.temperature_c)
                                     };
                                     (
                                         format!("{value} W"),
