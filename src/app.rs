@@ -2977,26 +2977,26 @@ impl cosmic::Application for AppModel {
                 // metrics, which can collapse the value and unit into one row
                 // in the COSMIC panel.
                 let row_height = (font_size * 1.15).clamp(16.0, 22.0);
-                let column = lines.into_iter().fold(
-                    widget::Column::new().spacing(0),
-                    |column, line| {
-                        let text = self
-                            .core
-                            .applet
-                            .text(line)
-                            .size(font_size)
-                            .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.65))
-                            .width(cosmic::iced::Length::Fill)
-                            .align_x(cosmic::iced::Alignment::End);
-                        column.push(
-                            widget::container(text)
+                let column =
+                    lines
+                        .into_iter()
+                        .fold(widget::Column::new().spacing(0), |column, line| {
+                            let text = self
+                                .core
+                                .applet
+                                .text(line)
+                                .size(font_size)
+                                .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.65))
                                 .width(cosmic::iced::Length::Fill)
-                                .height(cosmic::iced::Length::Fixed(row_height))
-                                .align_x(cosmic::iced::Alignment::End)
-                                .center_y(row_height as u16),
-                        )
-                    },
-                );
+                                .align_x(cosmic::iced::Alignment::End);
+                            column.push(
+                                widget::container(text)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .height(cosmic::iced::Length::Fixed(row_height))
+                                    .align_x(cosmic::iced::Alignment::End)
+                                    .center_y(row_height as u16),
+                            )
+                        });
                 widget::container(column)
                     .width(cosmic::iced::Length::Fixed(width))
                     .align_x(cosmic::iced::Alignment::End)
