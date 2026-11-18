@@ -2857,20 +2857,15 @@ impl cosmic::Application for AppModel {
                 .unwrap_or_else(|| "-- W".to_string())
         };
         let temperature = if self.settings.panel_average_temperature {
-            Some(
-                average_temperature_c(
-                    &self.readings,
-                    self.settings.panel_exclude_solar_temperature,
-                )
-                .map(format_panel_temperature)
-                .unwrap_or_else(|| "-- °C".to_string()),
+            average_temperature_c(
+                &self.readings,
+                self.settings.panel_exclude_solar_temperature,
             )
+            .map(format_panel_temperature)
         } else {
-            Some(
-                primary_reading
-                    .map(|reading| format_panel_temperature(reading.temperature_c))
-                    .unwrap_or_else(|| "-- °C".to_string()),
-            )
+            primary_reading
+                .filter(|reading| reading.temperature_c.is_finite())
+                .map(|reading| format_panel_temperature(reading.temperature_c))
         };
         let input_power = self
             .readings
@@ -4936,10 +4931,15 @@ impl cosmic::Application for AppModel {
                                         .width(cosmic::iced::Length::Fill),
                                 )
                                 .push(widget::text::body(format!("{:.0} W", reading.power_w)))
-                                .push(widget::text::caption(format!(
-                                    "{} · {state}",
-                                    format_panel_temperature(reading.temperature_c)
-                                ))),
+                                .push(if reading.temperature_c.is_finite() {
+                                    widget::text::caption(format!(
+                                        "{} · {state}",
+                                        format_panel_temperature(reading.temperature_c)
+                                    ))
+                                    .into()
+                                } else {
+                                    widget::text::caption(state).into()
+                                }),
                         );
                     }
                 }
@@ -4999,7 +4999,7 @@ impl cosmic::Application for AppModel {
                                 "normalized_ain": ain,
                                 "current_reading_available": true,
                                 "current_power_w": reading.power_w,
-                                "current_temperature_c": reading.temperature_c,
+                                "current_temperature_c": reading.temperature_c.is_finite().then_some(reading.temperature_c),
                                 "history_entry_found": samples.is_some(),
                                 "sample_count": sample_count,
                                 "first_sample_age_seconds": first_age_seconds,
@@ -6084,68 +6084,52 @@ impl cosmic::Application for AppModel {
                                     }
                                 }),
                             )
-                            .push(
+                            .into(),
+                    );
+                    if reading.temperature_c.is_finite() {
+                        device_graphs = device_graphs.push(
+                            widget::container(
                                 widget::container(
-                                    widget::container(
-                                        widget::Column::new()
-                                            .spacing(4)
-                                            .width(cosmic::iced::Length::Fill)
-                                            .push(widget::text::caption(crate::i18n::tr(
-                                                &self.settings.language,
-                                                "TEMPERATURE (°C)",
-                                            )))
-                                            .push(interactive_graph_with_axis(
-                                                &self.settings.language,
-                                                &format!(
-                                                    "{} · {}",
-                                                    reading.name,
-                                                    crate::i18n::tr(
-                                                        &self.settings.language,
-                                                        "TEMPERATURE (°C)"
-                                                    )
-                                                ),
-                                                device_history.into_iter().flat_map(|samples| {
-                                                    samples.iter().filter_map(
-                                                        |(timestamp, _, temperature)| {
-                                                            temperature.is_finite().then_some((
-                                                                *timestamp,
-                                                                *temperature,
-                                                            ))
-                                                        },
-                                                    )
-                                                }),
-                                                &self.settings.graph_style,
-                                                "°C",
-                                                device_axis_start,
-                                            )),
-                                    )
-                                    .padding([8, 0])
-                                    .width(cosmic::iced::Length::Fill)
-                                    .style(move |theme| {
-                                        let cosmic = theme.cosmic();
-                                        cosmic::iced::widget::container::Style {
-                                            background: Some(
-                                                cosmic::iced::Color::from(
-                                                    cosmic.background(false).base,
+                                    widget::Column::new()
+                                        .spacing(4)
+                                        .width(cosmic::iced::Length::Fill)
+                                        .push(widget::text::caption(crate::i18n::tr(
+                                            &self.settings.language,
+                                            "TEMPERATURE (°C)",
+                                        )))
+                                        .push(interactive_graph_with_axis(
+                                            &self.settings.language,
+                                            &format!(
+                                                "{} · {}",
+                                                reading.name,
+                                                crate::i18n::tr(
+                                                    &self.settings.language,
+                                                    "TEMPERATURE (°C)"
                                                 )
-                                                .into(),
                                             ),
-                                            border: cosmic::iced::Border {
-                                                radius: device_corner_radius,
-                                                ..Default::default()
-                                            },
-                                            ..Default::default()
-                                        }
-                                    }),
+                                            device_history.into_iter().flat_map(|samples| {
+                                                samples.iter().filter_map(
+                                                    |(timestamp, _, temperature)| {
+                                                        temperature.is_finite().then_some((
+                                                            *timestamp,
+                                                            *temperature,
+                                                        ))
+                                                    },
+                                                )
+                                            }),
+                                            &self.settings.graph_style,
+                                            "°C",
+                                            device_axis_start,
+                                        )),
                                 )
-                                .padding(1)
+                                .padding([8, 0])
                                 .width(cosmic::iced::Length::Fill)
                                 .style(move |theme| {
                                     let cosmic = theme.cosmic();
                                     cosmic::iced::widget::container::Style {
                                         background: Some(
                                             cosmic::iced::Color::from(
-                                                cosmic.background(false).small_widget,
+                                                cosmic.background(false).base,
                                             )
                                             .into(),
                                         ),
@@ -6157,7 +6141,27 @@ impl cosmic::Application for AppModel {
                                     }
                                 }),
                             )
-                            .into(),
+                            .padding(1)
+                            .width(cosmic::iced::Length::Fill)
+                            .style(move |theme| {
+                                let cosmic = theme.cosmic();
+                                cosmic::iced::widget::container::Style {
+                                    background: Some(
+                                        cosmic::iced::Color::from(
+                                            cosmic.background(false).small_widget,
+                                        )
+                                        .into(),
+                                    ),
+                                    border: cosmic::iced::Border {
+                                        radius: device_corner_radius,
+                                        ..Default::default()
+                                    },
+                                    ..Default::default()
+                                }
+                            }),
+                        );
+                    }
+
                     );
                     let device_content = widget::Column::new()
                         .spacing(10)
@@ -6304,7 +6308,7 @@ impl cosmic::Application for AppModel {
                                             self.settings.panel_exclude_solar_temperature,
                                         )
                                     } else {
-                                        primary.map(|reading| reading.temperature_c)
+                                        primary.filter(|reading| reading.temperature_c.is_finite()).map(|reading| reading.temperature_c)
                                     };
                                     (
                                         format!("{value} W"),
