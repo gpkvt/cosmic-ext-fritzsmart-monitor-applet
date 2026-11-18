@@ -15,7 +15,6 @@ class PageParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.ids = set()
         self.references = []
-        self.gallery_images = 0
 
     def handle_starttag(self, tag, attrs):
         values = dict(attrs)
@@ -25,8 +24,6 @@ class PageParser(HTMLParser):
             value = values.get(attribute)
             if value:
                 self.references.append((attribute, value))
-        if tag == "img" and values.get("id") == "gallery-image":
-            self.gallery_images += 1
 
 
 def fail(message):
@@ -81,12 +78,8 @@ for page in pages:
         for expected in expected_downloads:
             if expected not in content:
                 fail(f"index.html: package download links are not synchronized with Cargo version {version}: {expected}")
-        required_ids = {"screenshot-dialog", "gallery-image", "gallery-previous", "gallery-next", "gallery-count"}
-        missing = required_ids - parser.ids
-        if missing:
-            fail(f"index.html: missing gallery elements: {', '.join(sorted(missing))}")
-        if parser.gallery_images != 1:
-            fail(f"index.html: expected one gallery image element, found {parser.gallery_images}")
+        if any(element in content for element in ("screenshot-dialog", "gallery-image", "data-open-gallery", "gallery-all")):
+            fail("index.html: standalone screenshot gallery must remain removed")
         safeguard_icons = re.findall(
             r'<div class="detail-icon"[^>]*>\s*<img src="icons/([a-z-]+\.svg)" alt="" width="28" height="28"></div>',
             content,
@@ -101,10 +94,6 @@ for page in pages:
         }
         if set(safeguard_icons) != expected_icons or len(safeguard_icons) != 6:
             fail("index.html: safeguard icons must use all six dedicated SVG image assets")
-        if not re.search(r"event\.key\s*===\s*['\"]ArrowLeft['\"]", content):
-            fail("index.html: left-arrow keyboard navigation is missing")
-        if not re.search(r"event\.key\s*===\s*['\"]ArrowRight['\"]", content):
-            fail("index.html: right-arrow keyboard navigation is missing")
         hero_gallery = re.search(r'<div class="hero-gallery"[^>]*>(.*?)</div>', content, re.S)
         if not hero_gallery:
             fail("index.html: screenshot card gallery is missing")
@@ -112,7 +101,7 @@ for page in pages:
         hero_images = hero_gallery.group(1).count('<img ')
         if hero_cards != 10 or hero_images != 10:
             fail(f"index.html: expected ten visible screenshot cards with images, found {hero_cards} cards and {hero_images} images")
-        for feature in (".hero-gallery{position:relative;display:block;justify-self:end;width:min(100%,230px);max-width:230px;height:270px;min-width:0;padding:0;margin:0 0 0 auto;overflow:hidden", ".hero-shot{position:absolute;top:24px;left:50%", "width:176px;height:158px", "rotate(-12deg)", "rotate(-6deg)", "rotate(0deg)", "rotate(6deg)", "rotate(12deg)", ".hero-shot:nth-of-type(n+6){display:none}", ".hero-shot img", "height:108px", "object-fit:contain", ".hero-shot:hover", ".gallery-all{position:absolute", "openGallery("):
+        for feature in (".hero-gallery{position:relative;display:block;justify-self:end;width:min(100%,230px);max-width:230px;height:270px;min-width:0;padding:0;margin:0 0 0 auto;overflow:hidden", ".hero-shot{position:absolute;top:24px;left:50%", "width:176px;height:158px", "rotate(-12deg)", "rotate(-6deg)", "rotate(0deg)", "rotate(6deg)", "rotate(12deg)", ".hero-shot:nth-of-type(n+6){display:none}", ".hero-shot img", "height:108px", "object-fit:contain", ".hero-shot:hover", ):
             if feature not in content:
                 fail(f"index.html: visible screenshot card gallery is missing {feature}")
 
