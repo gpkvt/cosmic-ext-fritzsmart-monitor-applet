@@ -1499,6 +1499,12 @@ fn rebuild_temperature_history(
     for (ain, history) in device_history {
         if input_ains.contains(ain) == include_inputs {
             for (timestamp, _, temperature) in history {
+                // Some devices (notably Tasmota) do not provide temperature.
+                // Ignore those sentinel/non-finite values instead of allowing
+                // one NaN to poison the aggregate average for that timestamp.
+                if !temperature.is_finite() {
+                    continue;
+                }
                 let entry = samples.entry(*timestamp).or_default();
                 entry.0 += *temperature;
                 entry.1 += 1;
@@ -1507,7 +1513,9 @@ fn rebuild_temperature_history(
     }
     samples
         .into_iter()
-        .map(|(timestamp, (sum, count))| (timestamp, sum / count as f64))
+        .filter_map(|(timestamp, (sum, count))| {
+            (count > 0).then_some((timestamp, sum / count as f64))
+        })
         .collect()
 }
 
@@ -2126,7 +2134,9 @@ fn total_power_overview(
         total_power,
         output_temperature_history
             .back()
-            .map(|(_, value)| format!("{value:.1} °C")),
+            .map(|(_, value)| *value)
+            .filter(|value| value.is_finite())
+            .map(|value| format!("{value:.1} °C")),
         "total-power-output",
         collapsed_sections.contains("total-power-output"),
         output_content.into(),
@@ -8514,6 +8524,38 @@ mod history_tests {
         settings.ain = "123456789012".into();
         assert!(has_persisted_device_selection(&settings));
         assert_eq!(initial_device_selection(&settings), vec!["123456789012"]);
+    }
+
+    #[test]
+    fn temperature_history_ignores_non_finite_device_temperatures() {
+        let now = Instant::now();
+        let mut device_history = HashMap::new();
+        device_history.insert(
+            "fritz".to_string(),
+            VecDeque::from([(now, 100, 21.5)]),
+        );
+        device_history.insert(
+            "tasmota".to_string(),
+            VecDeque::from([(now, 50, f64::NAN)]),
+        );
+        device_history.insert(
+            "tasmota2".to_string(),
+            VecDeque::from([(now, 25, f64::INFINITY)]),
+        );
+
+        let temperatures = rebuild_temperature_history(
+            &device_history,
+            &HashSet::new(),
+            false,
+        );
+        assert_eq!(temperatures.len(), 1);
+        assert_eq!(temperatures[0].1, 21.5);
+
+        let only_invalid = HashMap::from([(
+            "tasmota".to_string(),
+            VecDeque::from([(now, 50, f64::NAN)]),
+        )]);
+        assert!(rebuild_temperature_history(&only_invalid, &HashSet::new(), false).is_empty());
     }
 
     #[test]
