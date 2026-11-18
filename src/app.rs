@@ -2325,7 +2325,9 @@ fn move_panel_order(
     }
 
     let mut groups = panel_order_groups(order, true);
-    let Some(index) = groups.iter().position(|group| group.iter().any(|member| member == item))
+    let Some(index) = groups
+        .iter()
+        .position(|group| group.iter().any(|member| member == item))
     else {
         return false;
     };
