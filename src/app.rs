@@ -2735,6 +2735,17 @@ impl cosmic::Application for AppModel {
         let mut tasks = vec![Task::perform(fetch_fritz_data(), |result| {
             cosmic::Action::App(Message::Updated(Box::new(result)))
         })];
+        if settings.setup_completed
+            && !settings.url.trim().is_empty()
+            && !settings.username.trim().is_empty()
+            && !settings.password.is_empty()
+        {
+            let discovery_settings = settings.clone();
+            tasks.push(Task::perform(
+                discover_devices(discovery_settings),
+                |result| cosmic::Action::App(Message::DevicesLoaded(result)),
+            ));
+        }
         if restore_forecast {
             tasks.push(Task::perform(
                 fetch_weather_forecast(forecast_location, 7),
