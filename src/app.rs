@@ -910,9 +910,7 @@ fn graph_energy_wh(values: &[f64], timespan: Duration) -> f64 {
     if values.len() < 2 || timespan.is_zero() {
         return 0.0;
     }
-    let sample_interval_hours = timespan.as_secs_f64()
-        / (values.len() - 1) as f64
-        / 3600.0;
+    let sample_interval_hours = timespan.as_secs_f64() / (values.len() - 1) as f64 / 3600.0;
     values
         .windows(2)
         .map(|pair| (pair[0].abs() + pair[1].abs()) / 2.0 * sample_interval_hours)
@@ -8692,7 +8690,9 @@ mod history_tests {
     fn expanded_power_graph_energy_uses_trapezoidal_integration() {
         let one_hour = Duration::from_secs(3600);
         assert!((graph_energy_wh(&[1000.0, 1000.0], one_hour) - 1000.0).abs() < f64::EPSILON);
-        assert!((graph_energy_wh(&[1000.0, 2000.0, 1000.0], one_hour) - 1500.0).abs() < f64::EPSILON);
+        assert!(
+            (graph_energy_wh(&[1000.0, 2000.0, 1000.0], one_hour) - 1500.0).abs() < f64::EPSILON
+        );
         assert!((graph_energy_wh(&[-500.0, -500.0], one_hour) - 500.0).abs() < f64::EPSILON);
         assert_eq!(graph_energy_wh(&[500.0], one_hour), 0.0);
         assert_eq!(graph_energy_wh(&[500.0, 500.0], Duration::ZERO), 0.0);
