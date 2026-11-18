@@ -1325,7 +1325,7 @@ fn interactive_graph_with_axis(
     unit: &str,
     axis_start: String,
 ) -> cosmic::Element<'static, Message> {
-    interactive_graph_inner(language, title, values, style, unit, Some(axis_start))
+    interactive_graph_inner(_language, title, values, style, unit, Some(axis_start))
 }
 
 fn interactive_graph_card(
