@@ -814,7 +814,7 @@ fn output_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i6
 fn graph_visual(
     values: impl Iterator<Item = f64>,
     style: &str,
-    title: &str,
+    _title: &str,
     unit: &str,
     axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
@@ -3444,9 +3444,7 @@ impl cosmic::Application for AppModel {
                                 .class(cosmic::theme::Button::Text),
                         );
                     }
-                    widget::container(ranges)
-                        .width(cosmic::iced::Length::Fill)
-                        .into()
+                    widget::container(ranges).width(cosmic::iced::Length::Fill)
                 })
                 .push(
                     if let Some((secondary_values, labels)) = &self.expanded_graph_secondary {
@@ -6721,7 +6719,10 @@ impl cosmic::Application for AppModel {
                             .iter()
                             .filter(|(timestamp, _, _)| now.duration_since(*timestamp) <= window)
                             .collect();
-                        let values = visible.iter().map(|(_, power, _)| *power as f64).collect();
+                        let values: Vec<f64> = visible
+                            .iter()
+                            .map(|(_, power, _)| *power as f64)
+                            .collect();
                         let axis_start = format_graph_axis_start(
                             self.settings.graph_timespan_minutes,
                             visible.first().map(|(timestamp, _, _)| {
