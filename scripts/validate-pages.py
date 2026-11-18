@@ -108,13 +108,11 @@ for page in pages:
         hero_cards = content.count('<a class="hero-shot"')
         if hero_cards != 10:
             fail(f"index.html: expected ten screenshot cards, found {hero_cards}")
-        if ".hero-shot:nth-of-type(n+5){display:none}" not in content:
-            fail("index.html: the hero must show a curated screenshot-card preview")
-        for feature in (".gallery-all", "View all 10 screenshots", "openGallery(", ".hero-shot:hover", "border-color:#8be0c4aa"):
+        if ".hero-shot:nth-of-type(n+6){display:none}" not in content:
+            fail("index.html: the hero must show a five-card screenshot fan and keep the remaining cards in the gallery")
+        fan_rules = (".hero-shot:nth-of-type(1)", ".hero-shot:nth-of-type(2)", ".hero-shot:nth-of-type(3)", ".hero-shot:nth-of-type(4)", ".hero-shot:nth-of-type(5)", "transform-origin:50% 105%")
+        for feature in (".gallery-all", "View all 10 screenshots", "openGallery(", ".hero-shot:hover", "border-color:#8be0c4aa", *fan_rules):
             if feature not in content:
-                fail(f"index.html: screenshot gallery interaction or styling is missing {feature}")
-        hover_rule = re.search(r"\.hero-shot:hover[^\{]*\{([^}]*)\}", content)
-        if not hover_rule or re.search(r"\b(?:transform|z-index)\s*:", hover_rule.group(1)):
-            fail("index.html: screenshot hover must highlight without moving cards or changing their stacking order")
+                fail(f"index.html: screenshot gallery interaction or card-fan styling is missing {feature}")
 
 print(f"Validated {len(pages)} GitHub Pages HTML page(s) and all local references.")
