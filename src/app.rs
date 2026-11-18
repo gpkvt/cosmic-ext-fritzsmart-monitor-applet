@@ -1476,11 +1476,9 @@ fn energy_flow_overview(
 }
 
 struct LivePowerSummaryData {
-    power: String,
-    temperature: Option<String>,
     energy_flow: Option<cosmic::Element<'static, Message>>,
-    history: Vec<f64>,
-    temperature_history: Vec<f64>,
+    input_history: Vec<f64>,
+    output_history: Vec<f64>,
     graph_style: String,
     language: String,
     axis_start: String,
@@ -1489,19 +1487,16 @@ struct LivePowerSummaryData {
 
 fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Message> {
     let LivePowerSummaryData {
-        power: _,
-        temperature: _,
         energy_flow,
-        history,
-        temperature_history,
+        input_history,
+        output_history,
         graph_style,
         language,
         axis_start,
         history_collapsed,
     } = data;
 
-    // Keep the current-power card focused on energy flow and history; the
-    // live wattage and temperature values are already available in device rows.
+    // Keep the current-power card focused on energy flow and aggregate input/output history.
     let mut content = widget::Column::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill);
@@ -1537,18 +1532,18 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
                 .spacing(8)
                 .push(interactive_graph_with_axis(
                     &language,
-                    crate::i18n::tr(&language, "CURRENT POWER"),
-                    history.into_iter(),
+                    crate::i18n::tr(&language, "TOTAL POWER INPUT"),
+                    input_history.into_iter(),
                     &graph_style,
                     "W",
                     axis_start.clone(),
                 ))
                 .push(interactive_graph_with_axis(
                     &language,
-                    crate::i18n::tr(&language, "AVERAGE TEMPERATURE"),
-                    temperature_history.into_iter(),
+                    crate::i18n::tr(&language, "TOTAL POWER OUTPUT"),
+                    output_history.into_iter(),
                     &graph_style,
-                    "°C",
+                    "W",
                     axis_start,
                 )),
         );
@@ -5312,28 +5307,6 @@ impl cosmic::Application for AppModel {
             }
 
             if self.error.is_none() && !self.readings.is_empty() {
-                let primary = self
-                    .selected_ains
-                    .first()
-                    .and_then(|selected| {
-                        self.readings.iter().find(|reading| {
-                            crate::fritz::normalize_ain_for_selection(&reading.ain)
-                                == crate::fritz::normalize_ain_for_selection(selected)
-                        })
-                    })
-                    .or_else(|| self.readings.first());
-                let summary_power = displayed_power_w(&self.readings, &self.selected_ains)
-                    .map(|power| format!("{power} W"))
-                    .unwrap_or_else(|| "-- W".into());
-                let summary_temperature = if self.settings.panel_average_temperature {
-                    average_temperature_c(
-                        &self.readings,
-                        self.settings.panel_exclude_solar_temperature,
-                    )
-                    .map(|value| format!("{value:.1} °C"))
-                } else {
-                    primary.map(|reading| format!("{:.1} °C", reading.temperature_c))
-                };
                 let energy_flow = energy_flow_overview(
                     &self.readings,
                     &self.settings.input_ains,
@@ -5341,22 +5314,19 @@ impl cosmic::Application for AppModel {
                     &self.settings.language,
                 );
                 let summary_card = live_power_summary(LivePowerSummaryData {
-                    power: summary_power,
-                    temperature: summary_temperature,
                     energy_flow,
-                    history: self
+                    input_history: rebuild_input_power_history(
+                        &self.device_history,
+                        &self.settings.input_ains,
+                    )
+                    .iter()
+                    .map(|(_, value)| *value as f64)
+                    .collect(),
+                    output_history: self
                         .history
                         .iter()
                         .map(|(_, value)| *value as f64)
                         .collect(),
-                    temperature_history: rebuild_temperature_history(
-                        &self.device_history,
-                        &self.settings.input_ains,
-                        false,
-                    )
-                    .iter()
-                    .map(|(_, value)| *value)
-                    .collect(),
                     graph_style: self.settings.graph_style.clone(),
                     language: self.settings.language.clone(),
                     axis_start: format_graph_axis_start(
