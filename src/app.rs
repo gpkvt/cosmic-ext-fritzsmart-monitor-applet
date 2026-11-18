@@ -5959,7 +5959,7 @@ impl cosmic::Application for AppModel {
                         .push(device_heading_button)
                         .push(history_button)
                         .push(power_toggle);
-                    let metrics = widget::Row::new()
+                    let mut metrics = widget::Row::new()
                         .spacing(8)
                         .width(cosmic::iced::Length::Fill)
                         .push(device_metric_tile(
@@ -5967,13 +5967,15 @@ impl cosmic::Application for AppModel {
                             format!("{} W", reading.power_w),
                             "utilities-system-monitor-symbolic",
                             device_corner_radius,
-                        ))
-                        .push(device_metric_tile(
+                        ));
+                    if reading.temperature_c.is_finite() {
+                        metrics = metrics.push(device_metric_tile(
                             "",
                             format_panel_temperature(reading.temperature_c),
                             "utilities-temperature-symbolic",
                             device_corner_radius,
                         ));
+                    }
                     let device_axis_start = format_graph_axis_start(
                         self.settings.graph_timespan_minutes,
                         device_history.and_then(|samples| {
@@ -5989,7 +5991,7 @@ impl cosmic::Application for AppModel {
                     let device_graph_pair_collapsed =
                         self.collapsed_menu_sections.contains(&device_graph_pair_id);
                     let device_graphs = collapsible_graph(
-                        "POWER & TEMPERATURE HISTORY",
+                        if reading.temperature_c.is_finite() { "POWER & TEMPERATURE HISTORY" } else { "POWER HISTORY" },
                         device_graph_pair_id,
                         device_graph_pair_collapsed,
                         widget::Column::new()
@@ -6084,9 +6086,9 @@ impl cosmic::Application for AppModel {
                                                     )
                                                 ),
                                                 device_history.into_iter().flat_map(|samples| {
-                                                    samples.iter().map(
+                                                    samples.iter().filter_map(
                                                         |(timestamp, _, temperature)| {
-                                                            (*timestamp, *temperature)
+                                                            temperature.is_finite().then_some((*timestamp, *temperature))
                                                         },
                                                     )
                                                 }),
