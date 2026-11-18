@@ -4270,8 +4270,8 @@ impl cosmic::Application for AppModel {
                     .panel_order
                     .iter()
                     .filter(|item| {
-                        (item.as_str() != "solar-power"
-                            || (has_input_device && !self.settings.panel_net_power))
+                        item.as_str() != "solar-power"
+                            || (has_input_device && !self.settings.panel_net_power)
                     })
                     .collect();
                 for (index, item) in visible_panel_order.iter().enumerate() {
@@ -8370,7 +8370,11 @@ impl cosmic::Application for AppModel {
             }
             Message::PanelInternetBandwidthChanged(value) => {
                 self.settings.panel_internet_bandwidth = value;
-                set_panel_item_visibility(&mut self.settings.hidden_panel_items, "internet-bandwidth", value);
+                set_panel_item_visibility(
+                    &mut self.settings.hidden_panel_items,
+                    "internet-bandwidth",
+                    value,
+                );
                 self.persist_settings();
                 if value {
                     self.refresh_started_at = Some(Instant::now());
@@ -9284,12 +9288,20 @@ mod history_tests {
 
         // Bandwidth is off by default, and both controls use that same state.
         assert!(!panel_item_is_enabled(&settings, "internet-bandwidth"));
-        set_panel_item_visibility(&mut settings.hidden_panel_items, "internet-bandwidth", true);
+        set_panel_item_visibility(
+            &mut settings.hidden_panel_items,
+            "internet-bandwidth",
+            true,
+        );
         settings.panel_internet_bandwidth = true;
         assert!(panel_item_is_enabled(&settings, "internet-bandwidth"));
 
         // Hiding it from Panel order also disables the main Panel option.
-        set_panel_item_visibility(&mut settings.hidden_panel_items, "internet-bandwidth", false);
+        set_panel_item_visibility(
+            &mut settings.hidden_panel_items,
+            "internet-bandwidth",
+            false,
+        );
         settings.panel_internet_bandwidth = false;
         assert!(!panel_item_is_enabled(&settings, "internet-bandwidth"));
 
