@@ -93,12 +93,17 @@ fn parse_reading(device: &TasmotaDevice, value: &Value) -> Result<TasmotaReading
 }
 
 fn discover_services() -> Result<Vec<(String, u16, IpAddr)>, String> {
-    let daemon =
-        ServiceDaemon::new().map_err(|error| format!("mDNS discovery unavailable: {error}"))?;
+    let daemon = ServiceDaemon::new().map_err(|error| {
+        let message = format!("mDNS discovery unavailable: {error}");
+        record_discovery_diagnostic(message.clone());
+        message
+    })?;
     let service_type = "_http._tcp.local.";
-    let receiver = daemon
-        .browse(service_type)
-        .map_err(|error| format!("Cannot browse local HTTP services: {error}"))?;
+    let receiver = daemon.browse(service_type).map_err(|error| {
+        let message = format!("Cannot browse local HTTP services: {error}");
+        record_discovery_diagnostic(message.clone());
+        message
+    })?;
     let deadline = Instant::now() + Duration::from_secs(6);
     let mut found = HashSet::new();
     let mut resolved_services = 0usize;
