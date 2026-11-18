@@ -805,8 +805,8 @@ fn graph_visual(
         values,
         style,
         unit,
-        104.0,
-        cosmic::iced::Length::Fixed(104.0),
+        120.0,
+        cosmic::iced::Length::Fixed(120.0),
         axis_start,
     )
 }
@@ -908,11 +908,11 @@ fn graph_visual_with_dimensions(
     let plot_left = 76.0;
     let plot_right = WIDTH - 16.0;
     let plot_top = if graph_height > 200.0 { 28.0 } else { 18.0 };
-    let plot_bottom = height - if graph_height > 200.0 { 58.0 } else { 34.0 };
+    let plot_bottom = height - if graph_height > 200.0 { 58.0 } else { 38.0 };
     let plot_width = plot_right - plot_left;
     let plot_height = plot_bottom - plot_top;
     let y = |value: f64| plot_bottom - ((value - plot_minimum) / plot_range) * plot_height;
-    let font_size = if graph_height > 200.0 { 17.0 } else { 16.0 };
+    let font_size = if graph_height > 200.0 { 18.0 } else { 14.0 };
 
     let drawing = if style == "bar" {
         let slot = plot_width / COUNT as f64;
@@ -953,7 +953,7 @@ fn graph_visual_with_dimensions(
             let value = plot_maximum - fraction * plot_range;
             let y_position = plot_top + fraction * plot_height + font_size * 0.35;
             format!(
-                "<text x=\"{:.2}\" y=\"{y_position:.2}\" text-anchor=\"end\" font-size=\"{font_size:.1}\" fill=\"currentColor\">{}</text>",
+                "<text x=\"{:.2}\" y=\"{y_position:.2}\" text-anchor=\"end\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{}</text>",
                 plot_left - 12.0,
                 format_graph_y_tick(value, unit)
             )
@@ -981,7 +981,7 @@ fn graph_visual_with_dimensions(
             };
             let anchor = if column == 0 { "start" } else if column == GRID_COLUMNS { "end" } else { "middle" };
             format!(
-                "<text x=\"{x_position:.2}\" y=\"{:.2}\" text-anchor=\"{anchor}\" font-size=\"{font_size:.1}\" fill=\"currentColor\">{label}</text>",
+                "<text x=\"{x_position:.2}\" y=\"{:.2}\" text-anchor=\"{anchor}\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{label}</text>",
                 height - 10.0
             )
         })
