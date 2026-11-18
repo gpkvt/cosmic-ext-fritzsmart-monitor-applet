@@ -1797,17 +1797,20 @@ fn total_power_overview(
     );
 
     let (combined_output_values, combined_input_values) = aligned_power_series(history, &input_history);
+    let output_label = crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT");
+    let input_label = crate::i18n::tr(&settings.language, "TOTAL POWER INPUT");
+    let combined_title = format!("{output_label} & {input_label}");
     let power_graph: cosmic::Element<'static, Message> = if has_input_readings {
         interactive_combined_graph_with_axis(
             &settings.language,
-            crate::i18n::tr(&settings.language, "TOTAL POWER INPUT & OUTPUT"),
+            &combined_title,
             combined_output_values,
             combined_input_values,
             &settings.graph_style,
             "W",
             axis_start.clone(),
-            &crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-            &crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
+            &output_label,
+            &input_label,
         )
     } else {
         interactive_graph_with_axis(
@@ -6379,6 +6382,7 @@ impl cosmic::Application for AppModel {
                 if self.graph_window.is_none() {
                     let Some(main_window_id) = self.core.main_window_id() else {
                         self.expanded_graph = None;
+                        self.expanded_graph_secondary = None;
                         return Task::none();
                     };
                     let id = Id::unique();
