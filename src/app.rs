@@ -27,6 +27,7 @@ pub type GraphSamples = Vec<(Instant, f64)>;
 pub struct AppModel {
     core: cosmic::Core,
     popup: Option<Id>,
+    popup_max_height: Option<f32>,
     graph_window: Option<Id>,
     readings: Vec<FritzReading>,
     internet_bandwidth: Option<FritzInternetBandwidth>,
@@ -98,6 +99,7 @@ pub struct AppModel {
 pub enum Message {
     TogglePopup,
     PopupClosed(Id),
+    PopupMonitorSize(Id, Option<f32>),
     TooltipSurfaceAction(cosmic::surface::Action<Message>),
     Refresh,
     ClockTick,
@@ -7246,7 +7248,7 @@ impl cosmic::Application for AppModel {
                     .width(cosmic::iced::Length::Fixed(680.0))
                     .height(cosmic::iced::Length::Fill),
             )
-            .max_height(800.0)
+            .max_height(self.popup_max_height.unwrap_or(800.0))
             .into()
     }
 
@@ -9032,16 +9034,35 @@ impl cosmic::Application for AppModel {
                         self.popup = None;
                         return Task::none();
                     };
-                    let mut settings =
-                        self.core
-                            .applet
-                            .get_popup_settings(main_window_id, id, None, None, None);
-                    settings.positioner.size_limits = Limits::NONE
-                        .max_width(720.0)
-                        .min_width(720.0)
-                        .max_height(800.0);
-                    get_popup(settings)
+                    cosmic::iced::window::monitor_size(main_window_id).map(move |size| {
+                        cosmic::Action::App(Message::PopupMonitorSize(
+                            id,
+                            size.map(|size| size.height),
+                        ))
+                    })
                 };
+            }
+            Message::PopupMonitorSize(id, monitor_height) => {
+                if self.popup != Some(id) {
+                    return Task::none();
+                }
+                let Some(main_window_id) = self.core.main_window_id() else {
+                    self.popup = None;
+                    return Task::none();
+                };
+                let max_height = monitor_height
+                    .map(|height| (height * 0.85).max(1.0))
+                    .unwrap_or(800.0);
+                self.popup_max_height = Some(max_height);
+                let mut settings =
+                    self.core
+                        .applet
+                        .get_popup_settings(main_window_id, id, None, None, None);
+                settings.positioner.size_limits = Limits::NONE
+                    .max_width(720.0)
+                    .min_width(720.0)
+                    .max_height(max_height);
+                return get_popup(settings);
             }
             Message::PopupClosed(id) => {
                 if self.popup == Some(id) {
