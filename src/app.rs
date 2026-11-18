@@ -1429,6 +1429,24 @@ fn average_temperature_c(readings: &[FritzReading], exclude_solar: bool) -> Opti
     (count > 0).then(|| sum / count as f64)
 }
 
+fn average_selected_temperature_c(
+    readings: &[FritzReading],
+    selected_ains: &[String],
+    exclude_solar: bool,
+) -> Option<f64> {
+    let selected_readings: Vec<_> = readings
+        .iter()
+        .filter(|reading| {
+            selected_ains.iter().any(|selected| {
+                crate::fritz::normalize_ain_for_selection(selected)
+                    == crate::fritz::normalize_ain_for_selection(&reading.ain)
+            })
+        })
+        .cloned()
+        .collect();
+    average_temperature_c(&selected_readings, exclude_solar)
+}
+
 fn aligned_power_series(
     output_history: &VecDeque<(Instant, i64)>,
     input_history: &VecDeque<(Instant, i64)>,
@@ -2925,8 +2943,9 @@ impl cosmic::Application for AppModel {
                 .unwrap_or_else(|| "-- W".to_string())
         };
         let temperature = if self.settings.panel_average_temperature {
-            average_temperature_c(
+            average_selected_temperature_c(
                 &self.readings,
+                &self.selected_ains,
                 self.settings.panel_exclude_solar_temperature,
             )
             .map(format_panel_temperature)
@@ -6488,8 +6507,9 @@ impl cosmic::Application for AppModel {
                                         })
                                         .or_else(|| self.readings.first());
                                     let temperature = if self.settings.panel_average_temperature {
-                                        average_temperature_c(
+                                        average_selected_temperature_c(
                                             &self.readings,
+                                            &self.selected_ains,
                                             self.settings.panel_exclude_solar_temperature,
                                         )
                                     } else {
@@ -9236,6 +9256,53 @@ mod history_tests {
         assert_eq!(average_temperature_c(&readings, false), Some(22.0));
         assert_eq!(average_temperature_c(&readings, true), Some(22.0));
         assert_eq!(average_temperature_c(&[], false), None);
+    }
+
+    #[test]
+    fn average_temperature_only_uses_selected_devices() {
+        let readings = vec![
+            FritzReading {
+                ain: "111111".into(),
+                name: "Living room".into(),
+                power_w: 0,
+                temperature_c: 20.0,
+                power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
+            },
+            FritzReading {
+                ain: "222222".into(),
+                name: "Bedroom".into(),
+                power_w: 0,
+                temperature_c: 24.0,
+                power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
+            },
+            FritzReading {
+                ain: "333333".into(),
+                name: "Unselected office".into(),
+                power_w: 0,
+                temperature_c: 40.0,
+                power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
+            },
+        ];
+        let selected = vec!["11:11:11".to_string(), "222222".to_string()];
+
+        assert_eq!(
+            average_selected_temperature_c(&readings, &selected, false),
+            Some(22.0)
+        );
+        assert_eq!(
+            average_selected_temperature_c(&readings, &selected[..1], false),
+            Some(20.0)
+        );
+        assert_eq!(
+            average_selected_temperature_c(&readings, &[], false),
+            None
+        );
     }
 
     #[test]
