@@ -17,7 +17,7 @@ use cosmic::widget;
 use futures::{SinkExt, StreamExt};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::LazyLock;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
     LazyLock::new(|| widget::Id::new("fritz-power-monitor-autosize-main"));
@@ -855,6 +855,169 @@ fn output_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i6
         })
         .map(|reading| reading.power_w)
         .sum()
+}
+
+
+/// Integrate recorded per-device power samples into local calendar days.
+/// Intervals are split at midnight and long gaps are excluded.
+fn daily_energy_history(
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    input_ains: &HashSet<String>,
+    refresh_interval_seconds: u32,
+) -> Vec<(chrono::NaiveDate, Option<f64>, Option<f64>)> {
+    let now = Instant::now();
+    let wall_now = SystemTime::now();
+    let today = chrono::Local::now().date_naive();
+    let first_day = today - chrono::Duration::days(13);
+    let max_gap = Duration::from_secs(u64::from(refresh_interval_seconds.max(30)) * 3);
+    let mut totals = BTreeMap::<chrono::NaiveDate, (Option<f64>, Option<f64>)>::new();
+
+    for (ain, samples) in device_history {
+        let is_solar_input = input_ains.contains(ain);
+        for ((start, start_power, _), (end, end_power, _)) in
+            samples.iter().zip(samples.iter().skip(1))
+        {
+            let elapsed = end.saturating_duration_since(*start);
+            if elapsed.is_zero() || elapsed > max_gap {
+                continue;
+            }
+            let Some(start_wall) = wall_now.checked_sub(now.saturating_duration_since(*start))
+            else {
+                continue;
+            };
+            let Some(end_wall) = wall_now.checked_sub(now.saturating_duration_since(*end))
+            else {
+                continue;
+            };
+            let start_local: chrono::DateTime<chrono::Local> = start_wall.into();
+            let end_local: chrono::DateTime<chrono::Local> = end_wall.into();
+            let mut cursor = start_local;
+            let total_seconds = elapsed.as_secs_f64();
+            let start_w = start_power.unsigned_abs() as f64;
+            let end_w = end_power.unsigned_abs() as f64;
+
+            while cursor < end_local {
+                let Some(next_date) = cursor.date_naive().succ_opt() else {
+                    break;
+                };
+                let Some(next_midnight) = next_date
+                    .and_hms_opt(0, 0, 0)
+                    .and_then(|midnight| midnight.and_local_timezone(chrono::Local).earliest())
+                else {
+                    break;
+                };
+                let segment_end = end_local.min(next_midnight);
+                let segment_start_seconds = cursor
+                    .signed_duration_since(start_local)
+                    .num_milliseconds() as f64
+                    / 1000.0;
+                let segment_end_seconds = segment_end
+                    .signed_duration_since(start_local)
+                    .num_milliseconds() as f64
+                    / 1000.0;
+                let start_fraction = (segment_start_seconds / total_seconds).clamp(0.0, 1.0);
+                let end_fraction = (segment_end_seconds / total_seconds).clamp(0.0, 1.0);
+                let power_at_start = start_w + (end_w - start_w) * start_fraction;
+                let power_at_end = start_w + (end_w - start_w) * end_fraction;
+                let segment_hours = segment_end
+                    .signed_duration_since(cursor)
+                    .num_milliseconds() as f64
+                    / 3_600_000.0;
+                let energy_wh = (power_at_start + power_at_end) / 2.0 * segment_hours;
+                let date = cursor.date_naive();
+
+                if date >= first_day && date <= today && energy_wh.is_finite() {
+                    let entry = totals.entry(date).or_default();
+                    let total = if is_solar_input { &mut entry.0 } else { &mut entry.1 };
+                    *total = Some((*total).unwrap_or_default() + energy_wh);
+                }
+                if segment_end <= cursor {
+                    break;
+                }
+                cursor = segment_end;
+            }
+        }
+    }
+
+    (0..14)
+        .rev()
+        .map(|offset| {
+            let date = today - chrono::Duration::days(offset);
+            let (solar, grid) = totals.remove(&date).unwrap_or_default();
+            (date, solar, grid)
+        })
+        .collect()
+}
+
+fn daily_energy_history_section(
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    input_ains: &HashSet<String>,
+    refresh_interval_seconds: u32,
+    collapsed: bool,
+) -> cosmic::Element<'static, Message> {
+    let history = daily_energy_history(device_history, input_ains, refresh_interval_seconds);
+    let heading = widget::button::custom(
+        widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::text::body("DAILY ENERGY · LAST 14 DAYS"))
+            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+            .push(widget::icon::from_name(if collapsed {
+                "go-next-symbolic"
+            } else {
+                "go-down-symbolic"
+            }).size(16)),
+    )
+    .on_press(Message::ToggleMenuSection("daily-energy-history".into()))
+    .width(cosmic::iced::Length::Fill)
+    .padding([8, 12])
+    .class(cosmic::theme::Button::Text);
+
+    let mut section = widget::Column::new()
+        .spacing(0)
+        .width(cosmic::iced::Length::Fill)
+        .push(heading);
+    if !collapsed {
+        let value_width = cosmic::iced::Length::Fixed(104.0);
+        let header = widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .padding([4, 12])
+            .push(widget::text::caption("DAY").width(cosmic::iced::Length::Fill))
+            .push(widget::text::caption("SOLAR INPUT").width(value_width))
+            .push(widget::text::caption("GRID USE").width(value_width));
+        let mut rows = widget::Column::new()
+            .spacing(2)
+            .push(header)
+            .push(widget::divider::horizontal::default());
+        for (date, solar_wh, grid_wh) in history.into_iter().rev() {
+            let date_label = if date == chrono::Local::now().date_naive() {
+                "Today".to_string()
+            } else {
+                date.format("%a, %d %b").to_string()
+            };
+            let format_wh = |value: Option<f64>| {
+                value.map(|wh| format!("{wh:.0} Wh")).unwrap_or_else(|| "—".into())
+            };
+            rows = rows.push(
+                widget::Row::new()
+                    .spacing(8)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .padding([3, 12])
+                    .push(widget::text::body(date_label).width(cosmic::iced::Length::Fill))
+                    .push(widget::text::body(format_wh(solar_wh)).width(value_width))
+                    .push(widget::text::body(format_wh(grid_wh)).width(value_width)),
+            );
+        }
+        section = section.push(rows);
+        section = section.push(
+            widget::container(widget::text::caption(
+                "Calculated from recorded power samples. Long gaps are excluded.",
+            ))
+            .padding([6, 12]),
+        );
+    }
+    section.into()
 }
 
 fn graph_visual(
@@ -6567,6 +6730,15 @@ impl cosmic::Application for AppModel {
                 ) {
                     menu_cards.extend(power_sections);
                 }
+                menu_cards.push((
+                    "5-history".to_string(),
+                    daily_energy_history_section(
+                        &self.device_history,
+                        &self.settings.input_ains,
+                        self.settings.refresh_interval_seconds,
+                        self.collapsed_menu_sections.contains("daily-energy-history"),
+                    ),
+                ));
                 menu_cards.retain(|(key, _)| {
                     let element = if key == "0-summary" {
                         "summary"
@@ -6580,6 +6752,8 @@ impl cosmic::Application for AppModel {
                         "total-power-output"
                     } else if key.starts_with("4-") {
                         "total-power-input"
+                    } else if key.starts_with("5-") {
+                        "history"
                     } else {
                         "devices"
                     };
@@ -6603,6 +6777,8 @@ impl cosmic::Application for AppModel {
                         "total-power-output"
                     } else if key.starts_with("4-") {
                         "total-power-input"
+                    } else if key.starts_with("5-") {
+                        "history"
                     } else {
                         "devices"
                     };
@@ -6617,7 +6793,11 @@ impl cosmic::Application for AppModel {
                     if index > 0 {
                         device_cards = device_cards.push(widget::divider::horizontal::default());
                     }
-                    if key.starts_with("2-") || key.starts_with("3-") || key.starts_with("4-") {
+                    if key.starts_with("2-")
+                        || key.starts_with("3-")
+                        || key.starts_with("4-")
+                        || key.starts_with("5-")
+                    {
                         // Device and total-power rows already provide their own disclosure controls.
                         device_cards = device_cards.push(card);
                         continue;
