@@ -227,7 +227,7 @@ fn scan_fritzbox_ipv4_addresses(fritzbox_url: &str) -> Vec<Ipv4Addr> {
     let broadcast = network | !mask;
     let range = format!("{}/24", Ipv4Addr::from(network));
     record_discovery_diagnostic(format!(
-        "Tasmota IP scan: scanning {range} (254 usable addresses), containing FRITZ!Box {fritzbox_ip}."
+        "Tasmota IP scan: scanning {range} (253 target addresses; excluding FRITZ!Box {fritzbox_ip})."
     ));
 
     let mut addresses: Vec<_> = ((network + 1)..broadcast)
@@ -511,6 +511,21 @@ pub async fn set_power(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scans_only_the_fritzbox_slash_24() {
+        let addresses = scan_fritzbox_ipv4_addresses("https://192.168.42.1/");
+        assert_eq!(addresses.len(), 253);
+        assert!(!addresses.contains(&Ipv4Addr::new(192, 168, 42, 1)));
+        assert_eq!(addresses.first(), Some(&Ipv4Addr::new(192, 168, 42, 2)));
+        assert_eq!(addresses.last(), Some(&Ipv4Addr::new(192, 168, 42, 254)));
+        assert!(addresses.iter().all(|ip| ip.octets()[..3] == [192, 168, 42]));
+    }
+
+    #[test]
+    fn skips_ip_range_scan_when_fritzbox_url_has_no_ipv4_literal() {
+        assert!(scan_fritzbox_ipv4_addresses("https://fritz.box/").is_empty());
+    }
 
     #[test]
     fn parses_power_and_relay_without_temperature() {
