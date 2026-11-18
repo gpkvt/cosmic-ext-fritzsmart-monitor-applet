@@ -389,7 +389,25 @@ fn cpu_temperature_c() -> Option<f64> {
 }
 
 fn has_persisted_device_selection(settings: &FritzSettings) -> bool {
-    !settings.ains.is_empty() || !settings.ain.trim().is_empty()
+    !settings.ains.is_empty()
+        || !settings.ain.trim().is_empty()
+        || !settings.known_devices.is_empty()
+}
+
+fn initial_device_selection(settings: &FritzSettings) -> Vec<String> {
+    if !settings.ains.is_empty() {
+        settings.ains.clone()
+    } else if !settings.ain.trim().is_empty() {
+        vec![settings.ain.clone()]
+    } else {
+        // A saved inventory without an explicit selection is an existing setup,
+        // not a request to show the empty-device onboarding prompt.
+        settings
+            .known_devices
+            .iter()
+            .map(|device| device.ain.clone())
+            .collect()
+    }
 }
 
 fn device_matches_search(device: &FritzDevice, query: &str) -> bool {
@@ -2773,7 +2791,7 @@ impl cosmic::Application for AppModel {
         (
             Self {
                 core,
-                selected_ains: settings.ains.clone(),
+                selected_ains: initial_device_selection(&settings),
                 devices: known_devices,
                 settings,
                 settings_open: setup_assistant,
@@ -8245,7 +8263,9 @@ impl cosmic::Application for AppModel {
                         }
                         self.selected_ains = if self.settings.ains.is_empty() {
                             if self.settings.ain.trim().is_empty() {
-                                Vec::new()
+                                // First discovery on a fresh configuration: make the
+                                // discovered inventory immediately usable by default.
+                                self.devices.iter().map(|device| device.ain.clone()).collect()
                             } else {
                                 vec![self.settings.ain.clone()]
                             }
@@ -8472,12 +8492,22 @@ mod history_tests {
         let mut settings = FritzSettings::default();
         assert!(!has_persisted_device_selection(&settings));
 
+        settings.known_devices = vec![FritzDevice {
+            name: "Saved plug".into(),
+            ain: "123456789012".into(),
+        }];
+        assert!(has_persisted_device_selection(&settings));
+        assert_eq!(initial_device_selection(&settings), vec!["123456789012"]);
+
+        settings.known_devices.clear();
         settings.ains = vec!["TASMOTA:192.168.42.10".into()];
         assert!(has_persisted_device_selection(&settings));
+        assert_eq!(initial_device_selection(&settings), settings.ains);
 
         settings.ains.clear();
         settings.ain = "123456789012".into();
         assert!(has_persisted_device_selection(&settings));
+        assert_eq!(initial_device_selection(&settings), vec!["123456789012"]);
     }
 
     #[test]
