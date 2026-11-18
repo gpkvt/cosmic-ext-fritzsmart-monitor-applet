@@ -1200,8 +1200,9 @@ mod tests {
         assert_eq!(frame_sources.len(), frames.len());
         assert_eq!(frame_sources[0], vec![0]);
         assert_eq!(frame_sources[1], vec![0, 1]);
-        for frame in frames {
-            assert!(image::load_from_memory(&frame).is_ok());
+        for frame in &frames {
+            let decoded = image::load_from_memory(frame).expect("slideshow frame must decode");
+            assert_eq!(decoded.to_rgba8().get_pixel(0, 0)[3], 153);
         }
     }
 
