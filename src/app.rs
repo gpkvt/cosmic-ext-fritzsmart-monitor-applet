@@ -1352,11 +1352,7 @@ fn interactive_graph_card(
             widget::Row::new()
                 .align_y(cosmic::iced::Alignment::Center)
                 .push(widget::text::body(title.to_string()).width(cosmic::iced::Length::Fill))
-                .push(widget::icon::from_name("zoom-in-symbolic").size(16))
-                .push(widget::text::caption(crate::i18n::tr(
-                    language,
-                    "Open graph",
-                ))),
+                .push(widget::icon::from_name("zoom-in-symbolic").size(16)),
         )
         .push(visual);
     widget::button::custom(content)
