@@ -678,18 +678,20 @@ fn format_graph_timespan(minutes: u32) -> String {
     }
 }
 
+fn input_display_power_w(power_w: i64) -> i64 {
+    power_w.saturating_neg().max(0)
+}
+
 fn input_display_range(history: &VecDeque<(Instant, i64)>) -> (i64, i64) {
-    let low = history
+    let mut values = history
         .iter()
-        .map(|(_, value)| *value)
-        .max()
-        .unwrap_or_default();
-    let high = history
-        .iter()
-        .map(|(_, value)| *value)
-        .min()
-        .unwrap_or_default();
-    (low, high)
+        .map(|(_, value)| input_display_power_w(*value));
+    let Some(first) = values.next() else {
+        return (0, 0);
+    };
+    values.fold((first, first), |(low, high), value| {
+        (low.min(value), high.max(value))
+    })
 }
 
 fn input_energy_and_timespan(history: &VecDeque<(Instant, i64)>) -> Option<(f64, Duration)> {
@@ -1711,7 +1713,7 @@ fn total_power_overview(
         rebuild_temperature_history(device_history, &settings.input_ains, true);
     let (input_low, input_high) = input_display_range(&input_history);
     let total_power = output_power_w(readings, &settings.input_ains);
-    let input_power = input_power_w(readings, &settings.input_ains);
+    let input_power = input_display_power_w(input_power_w(readings, &settings.input_ains));
     let axis_start = format_graph_axis_start(
         settings.graph_timespan_minutes,
         history
@@ -1803,7 +1805,9 @@ fn total_power_overview(
                 .push(interactive_graph_with_axis(
                     &settings.language,
                     crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
-                    input_history.iter().map(|(_, value)| *value as f64),
+                    input_history
+                        .iter()
+                        .map(|(_, value)| input_display_power_w(*value) as f64),
                     &settings.graph_style,
                     "W",
                     axis_start.clone(),
@@ -8375,7 +8379,10 @@ mod history_tests {
             (start + Duration::from_secs(120), -100),
         ]);
 
-        assert_eq!(input_display_range(&history), (-100, -500));
+        assert_eq!(input_display_range(&history), (100, 500));
+        assert_eq!(input_display_power_w(-350), 350);
+        assert_eq!(input_display_power_w(0), 0);
+        assert_eq!(input_display_power_w(350), 0);
         assert_eq!(input_display_range(&VecDeque::new()), (0, 0));
     }
 
