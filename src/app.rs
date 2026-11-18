@@ -4281,7 +4281,10 @@ impl cosmic::Application for AppModel {
                             ))
                             .push(icon_action_button(
                                 "×",
-                                crate::i18n::tr(&self.settings.language, "Remove device from saved list"),
+                                crate::i18n::tr(
+                                    &self.settings.language,
+                                    "Remove device from saved list",
+                                ),
                                 Message::RemoveDevice(ain.clone()),
                             ));
                         let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
@@ -8291,15 +8294,17 @@ impl cosmic::Application for AppModel {
                 self.settings.known_devices = self.devices.clone();
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
-                self.settings.device_order.retain(|id| {
-                    crate::fritz::normalize_ain_for_selection(id) != normalized
-                });
+                self.settings
+                    .device_order
+                    .retain(|id| crate::fritz::normalize_ain_for_selection(id) != normalized);
                 self.settings.input_ains.remove(&normalized);
                 self.settings.temperature_alerts.remove(&normalized);
-                self.settings.expanded_devices.retain(|id| {
-                    crate::fritz::normalize_ain_for_selection(id) != normalized
-                });
-                if crate::fritz::normalize_ain_for_selection(&self.settings.weather_temperature_ain) == normalized {
+                self.settings
+                    .expanded_devices
+                    .retain(|id| crate::fritz::normalize_ain_for_selection(id) != normalized);
+                if crate::fritz::normalize_ain_for_selection(&self.settings.weather_temperature_ain)
+                    == normalized
+                {
                     self.settings.weather_temperature_ain.clear();
                     self.settings.weather_temperature_source_initialized = true;
                 }

@@ -208,10 +208,10 @@ fn discover_services() -> Result<Vec<(String, u16, IpAddr)>, String> {
 /// Enumerate usable hosts in the /24 containing the configured FRITZ!Box IPv4 address.
 /// This deliberately avoids scanning Docker, VPN and other unrelated local networks.
 fn scan_fritzbox_ipv4_addresses(fritzbox_url: &str) -> Vec<Ipv4Addr> {
-    let fritzbox_ip = match reqwest::Url::parse(fritzbox_url)
-        .ok()
-        .and_then(|url| url.host_str().and_then(|host| host.parse::<Ipv4Addr>().ok()))
-    {
+    let fritzbox_ip = match reqwest::Url::parse(fritzbox_url).ok().and_then(|url| {
+        url.host_str()
+            .and_then(|host| host.parse::<Ipv4Addr>().ok())
+    }) {
         Some(ip) if !ip.is_loopback() && !ip.is_unspecified() => ip,
         _ => {
             record_discovery_diagnostic(format!(
@@ -519,7 +519,11 @@ mod tests {
         assert!(!addresses.contains(&Ipv4Addr::new(192, 168, 42, 1)));
         assert_eq!(addresses.first(), Some(&Ipv4Addr::new(192, 168, 42, 2)));
         assert_eq!(addresses.last(), Some(&Ipv4Addr::new(192, 168, 42, 254)));
-        assert!(addresses.iter().all(|ip| ip.octets()[..3] == [192, 168, 42]));
+        assert!(
+            addresses
+                .iter()
+                .all(|ip| ip.octets()[..3] == [192, 168, 42])
+        );
     }
 
     #[test]
