@@ -1875,6 +1875,7 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
         match crate::tasmota::known_devices(
             settings.tasmota_username.clone(),
             settings.tasmota_password.clone(),
+            settings.url.clone(),
         )
         .await
         {
@@ -1952,6 +1953,7 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
         let devices = crate::tasmota::known_devices(
             settings.tasmota_username.clone(),
             settings.tasmota_password.clone(),
+            settings.url.clone(),
         )
         .await?;
         let wanted = normalize_ain_for_selection(&ain);
