@@ -836,7 +836,8 @@ fn save_device_inventory(devices: &[FritzDevice]) -> Result<(), String> {
         .create_new(true)
         .open(&temporary)
         .map_err(|error| error.to_string())?;
-    let result = file.write_all(&contents)
+    let result = file
+        .write_all(&contents)
         .and_then(|_| file.sync_all())
         .and_then(|_| fs::rename(&temporary, &path));
     if let Err(error) = result {
