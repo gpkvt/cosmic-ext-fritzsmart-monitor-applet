@@ -9037,8 +9037,8 @@ impl cosmic::Application for AppModel {
                             .applet
                             .get_popup_settings(main_window_id, id, None, None, None);
                     settings.positioner.size_limits = Limits::NONE
-                        .max_width(320.0)
-                        .min_width(320.0)
+                        .max_width(480.0)
+                        .min_width(480.0)
                         .max_height(800.0);
                     get_popup(settings)
                 };
