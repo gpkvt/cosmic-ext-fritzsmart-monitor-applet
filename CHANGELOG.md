@@ -1,5 +1,9 @@
 # Changelog
 
+### Fixed
+
+- Treat paired readings as single ordering units in two-line panel mode, and hide movement controls that cannot change the visible group order.
+
 ### Added
 
 - Add a per-device external-temperature source. The first device with “solar” in its name is selected by default; selecting a source automatically includes it in monitored readings, and only one device can be active.

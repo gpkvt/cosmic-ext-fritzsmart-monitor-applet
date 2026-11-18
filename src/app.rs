@@ -2236,6 +2236,117 @@ fn total_power_overview(
     Some(sections)
 }
 
+fn panel_order_group_key(id: &str, multiline: bool) -> &str {
+    if multiline {
+        match id {
+            "weather" | "temperature" => "weather-temperature",
+            "power-consumption" | "solar-power" => "power-solar",
+            _ => id,
+        }
+    } else {
+        id
+    }
+}
+
+fn panel_order_groups(order: &[String], multiline: bool) -> Vec<Vec<String>> {
+    let mut groups: Vec<Vec<String>> = Vec::new();
+    for item in order {
+        let key = panel_order_group_key(item, multiline);
+        if let Some(group) = groups
+            .iter_mut()
+            .find(|group| panel_order_group_key(&group[0], multiline) == key)
+        {
+            group.push(item.clone());
+        } else {
+            groups.push(vec![item.clone()]);
+        }
+    }
+    groups
+}
+
+fn panel_order_group_leader(order: &[String], item: &str, multiline: bool) -> bool {
+    if !multiline {
+        return true;
+    }
+    panel_order_groups(order, true)
+        .iter()
+        .any(|group| group.first().is_some_and(|first| first == item))
+}
+
+fn panel_order_move_available(
+    order: &[String],
+    item: &str,
+    move_up: bool,
+    multiline: bool,
+) -> bool {
+    if !multiline {
+        let Some(index) = order.iter().position(|existing| existing == item) else {
+            return false;
+        };
+        return if move_up { index > 0 } else { index + 1 < order.len() };
+    }
+
+    let groups = panel_order_groups(order, true);
+    let Some(index) = groups
+        .iter()
+        .position(|group| group.iter().any(|member| member == item))
+    else {
+        return false;
+    };
+    if move_up {
+        index > 0
+    } else {
+        index + 1 < groups.len()
+    }
+}
+
+fn move_panel_order(
+    order: &mut Vec<String>,
+    item: &str,
+    move_up: bool,
+    multiline: bool,
+) -> bool {
+    if !multiline {
+        let Some(index) = order.iter().position(|existing| existing == item) else {
+            return false;
+        };
+        let target = if move_up {
+            index.checked_sub(1)
+        } else if index + 1 < order.len() {
+            Some(index + 1)
+        } else {
+            None
+        };
+        if let Some(target) = target {
+            order.swap(index, target);
+            return true;
+        }
+        return false;
+    }
+
+    let mut groups = panel_order_groups(order, true);
+    let Some(index) = groups
+        .iter()
+        .position(|group| group.iter().any(|member| member == item))
+    else {
+        return false;
+    };
+    let target = if move_up {
+        index.checked_sub(1)
+    } else if index + 1 < groups.len() {
+        Some(index + 1)
+    } else {
+        None
+    };
+    let Some(target) = target else {
+        return false;
+    };
+
+    groups.swap(index, target);
+    *order = groups.into_iter().flatten().collect();
+    true
+}
+
 fn panel_item_label(id: &str) -> &'static str {
     match id {
         "weather" => "Weather",
@@ -3912,7 +4023,11 @@ impl cosmic::Application for AppModel {
                             || (has_input_device && !self.settings.panel_net_power)
                     })
                     .collect();
-                for (index, item) in visible_panel_order.iter().enumerate() {
+                let visible_panel_order_ids: Vec<String> = visible_panel_order
+                    .iter()
+                    .map(|item| (*item).clone())
+                    .collect();
+                for item in &visible_panel_order {
                     let id = match item.as_str() {
                         "weather" => "weather",
                         "power-consumption" => "power-consumption",
@@ -3936,16 +4051,36 @@ impl cosmic::Application for AppModel {
                             .push(widget::toggler(visible).on_toggle(move |value| {
                                 Message::TogglePanelItemVisibility(id, value)
                             }));
-                    row = row.push(icon_action_button(
-                        "+",
-                        crate::i18n::tr(&self.settings.language, "Move up"),
-                        Message::MovePanelItem(id, true),
-                    ));
-                    row = row.push(icon_action_button(
-                        "−",
-                        crate::i18n::tr(&self.settings.language, "Move down"),
-                        Message::MovePanelItem(id, false),
-                    ));
+                    let show_order_controls = !self.settings.panel_multiline
+                        || panel_order_group_leader(&visible_panel_order_ids, id, true);
+                    if show_order_controls {
+                        let can_move_up = panel_order_move_available(
+                            &self.settings.panel_order,
+                            id,
+                            true,
+                            self.settings.panel_multiline,
+                        );
+                        let can_move_down = panel_order_move_available(
+                            &self.settings.panel_order,
+                            id,
+                            false,
+                            self.settings.panel_multiline,
+                        );
+                        if can_move_up {
+                            row = row.push(icon_action_button(
+                                "+",
+                                crate::i18n::tr(&self.settings.language, "Move up"),
+                                Message::MovePanelItem(id, true),
+                            ));
+                        }
+                        if can_move_down {
+                            row = row.push(icon_action_button(
+                                "−",
+                                crate::i18n::tr(&self.settings.language, "Move down"),
+                                Message::MovePanelItem(id, false),
+                            ));
+                        }
+                    }
                     content = content.push(row);
 
                     // Keep options directly beneath the panel item they affect.
@@ -7827,23 +7962,12 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::MovePanelItem(item, move_up) => {
-                let Some(index) = self
-                    .settings
-                    .panel_order
-                    .iter()
-                    .position(|existing| existing == item)
-                else {
-                    return Task::none();
-                };
-                let target = if move_up {
-                    index.checked_sub(1)
-                } else if index + 1 < self.settings.panel_order.len() {
-                    Some(index + 1)
-                } else {
-                    None
-                };
-                if let Some(target) = target {
-                    self.settings.panel_order.swap(index, target);
+                if move_panel_order(
+                    &mut self.settings.panel_order,
+                    item,
+                    move_up,
+                    self.settings.panel_multiline,
+                ) {
                     self.schedule_settings_save();
                 }
             }
@@ -9728,6 +9852,68 @@ mod history_tests {
         assert_eq!(history.len(), 4);
         assert_eq!(history.front().unwrap().1, 14);
         assert_eq!(history.back().unwrap().1, 17);
+    }
+
+    #[test]
+    fn multiline_panel_order_moves_related_readings_as_one_group() {
+        let mut order = vec![
+            "weather",
+            "temperature",
+            "power-consumption",
+            "solar-power",
+            "internet-bandwidth",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+
+        assert!(!panel_order_group_leader(&order, "temperature", true));
+        assert!(!panel_order_group_leader(&order, "solar-power", true));
+        assert!(panel_order_move_available(&order, "temperature", true, true));
+        assert!(panel_order_move_available(&order, "solar-power", false, true));
+        assert!(panel_order_move_available(&order, "weather", false, true));
+        assert!(move_panel_order(&mut order, "weather", false, true));
+
+        assert_eq!(
+            order,
+            vec![
+                "power-consumption",
+                "solar-power",
+                "weather",
+                "temperature",
+                "internet-bandwidth",
+            ]
+        );
+    }
+
+    #[test]
+    fn multiline_panel_order_hides_moves_at_group_boundaries() {
+        let order = vec![
+            "weather",
+            "temperature",
+            "power-consumption",
+            "solar-power",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+
+        assert!(!panel_order_move_available(&order, "weather", true, true));
+        assert!(panel_order_move_available(&order, "weather", false, true));
+        assert!(panel_order_move_available(&order, "power-consumption", true, true));
+        assert!(!panel_order_move_available(&order, "power-consumption", false, true));
+    }
+
+    #[test]
+    fn single_line_panel_order_keeps_individual_item_movement() {
+        let mut order = vec!["weather", "temperature", "power-consumption"]
+            .into_iter()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+
+        assert!(panel_order_move_available(&order, "temperature", true, false));
+        assert!(move_panel_order(&mut order, "temperature", true, false));
+        assert_eq!(order, vec!["temperature", "weather", "power-consumption"]);
     }
 
     #[test]
