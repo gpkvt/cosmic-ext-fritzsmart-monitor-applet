@@ -74,7 +74,7 @@ def sync_package_download_version() -> None:
     version = os.environ.get("APP_RELEASE_VERSION")
     if not version:
         cargo = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
-        match = re.search(r'(?ms)^\\[package\\]\\s+.*?^version\\s*=\\s*"([^"]+)"', cargo)
+        match = re.search(r'(?ms)^\[package\]\s+.*?^version\s*=\s*"([^"]+)"', cargo)
         if not match:
             raise RuntimeError("Could not read [package].version from Cargo.toml")
         version = match.group(1)
