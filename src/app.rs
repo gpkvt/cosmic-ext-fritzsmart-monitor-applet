@@ -2283,7 +2283,11 @@ fn panel_order_move_available(
         let Some(index) = order.iter().position(|existing| existing == item) else {
             return false;
         };
-        return if move_up { index > 0 } else { index + 1 < order.len() };
+        return if move_up {
+            index > 0
+        } else {
+            index + 1 < order.len()
+        };
     }
 
     let groups = panel_order_groups(order, true);
@@ -2300,12 +2304,7 @@ fn panel_order_move_available(
     }
 }
 
-fn move_panel_order(
-    order: &mut Vec<String>,
-    item: &str,
-    move_up: bool,
-    multiline: bool,
-) -> bool {
+fn move_panel_order(order: &mut Vec<String>, item: &str, move_up: bool, multiline: bool) -> bool {
     if !multiline {
         let Some(index) = order.iter().position(|existing| existing == item) else {
             return false;
@@ -9869,8 +9868,18 @@ mod history_tests {
 
         assert!(!panel_order_group_leader(&order, "temperature", true));
         assert!(!panel_order_group_leader(&order, "solar-power", true));
-        assert!(panel_order_move_available(&order, "temperature", true, true));
-        assert!(panel_order_move_available(&order, "solar-power", false, true));
+        assert!(panel_order_move_available(
+            &order,
+            "temperature",
+            true,
+            true
+        ));
+        assert!(panel_order_move_available(
+            &order,
+            "solar-power",
+            false,
+            true
+        ));
         assert!(panel_order_move_available(&order, "weather", false, true));
         assert!(move_panel_order(&mut order, "weather", false, true));
 
@@ -9888,20 +9897,25 @@ mod history_tests {
 
     #[test]
     fn multiline_panel_order_hides_moves_at_group_boundaries() {
-        let order = vec![
-            "weather",
-            "temperature",
-            "power-consumption",
-            "solar-power",
-        ]
-        .into_iter()
-        .map(str::to_string)
-        .collect::<Vec<_>>();
+        let order = vec!["weather", "temperature", "power-consumption", "solar-power"]
+            .into_iter()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
 
         assert!(!panel_order_move_available(&order, "weather", true, true));
         assert!(panel_order_move_available(&order, "weather", false, true));
-        assert!(panel_order_move_available(&order, "power-consumption", true, true));
-        assert!(!panel_order_move_available(&order, "power-consumption", false, true));
+        assert!(panel_order_move_available(
+            &order,
+            "power-consumption",
+            true,
+            true
+        ));
+        assert!(!panel_order_move_available(
+            &order,
+            "power-consumption",
+            false,
+            true
+        ));
     }
 
     #[test]
@@ -9911,7 +9925,12 @@ mod history_tests {
             .map(str::to_string)
             .collect::<Vec<_>>();
 
-        assert!(panel_order_move_available(&order, "temperature", true, false));
+        assert!(panel_order_move_available(
+            &order,
+            "temperature",
+            true,
+            false
+        ));
         assert!(move_panel_order(&mut order, "temperature", true, false));
         assert_eq!(order, vec!["temperature", "weather", "power-consumption"]);
     }
