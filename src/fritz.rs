@@ -595,14 +595,20 @@ impl FritzSettings {
             setup_completed: !values.contains_key("SETUP_COMPLETED")
                 || get("SETUP_COMPLETED").eq_ignore_ascii_case("true"),
         };
-        // Device inventory is stored independently from general preferences so
-        // a damaged or partially-written settings file cannot hide saved devices.
-        if let Some(devices) = load_device_inventory() {
-            settings.known_devices = devices;
-        } else if !settings.known_devices.is_empty()
+        // Merge the independent inventory with the legacy copy in the
+        // preferences file. An empty (or partially populated) inventory file
+        // must never hide devices that are still present in KNOWN_DEVICES.
+        let legacy_devices = std::mem::take(&mut settings.known_devices);
+        let inventory = load_device_inventory();
+        settings.known_devices = merge_device_inventories(
+            inventory.clone().unwrap_or_default(),
+            legacy_devices,
+        );
+        if !settings.known_devices.is_empty()
+            && inventory.as_deref() != Some(settings.known_devices.as_slice())
             && let Err(error) = save_device_inventory(&settings.known_devices)
         {
-            eprintln!("Could not migrate legacy device inventory: {error}");
+            eprintln!("Could not restore merged device inventory: {error}");
         }
         Ok(settings)
     }
@@ -811,6 +817,26 @@ impl FritzSettings {
         }
         Ok(())
     }
+}
+
+fn merge_device_inventories(
+    mut preferred: Vec<FritzDevice>,
+    fallback: Vec<FritzDevice>,
+) -> Vec<FritzDevice> {
+    let mut known: HashSet<String> = preferred
+        .iter()
+        .map(|device| normalize_ain_for_selection(&device.ain))
+        .filter(|ain| !ain.is_empty())
+        .collect();
+
+    for device in fallback {
+        let ain = normalize_ain_for_selection(&device.ain);
+        if !ain.is_empty() && known.insert(ain) {
+            preferred.push(device);
+        }
+    }
+
+    preferred
 }
 
 fn device_inventory_path() -> Result<std::path::PathBuf, String> {
@@ -2077,6 +2103,48 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn startup_inventory_merge_restores_legacy_devices_without_duplicates() {
+        let inventory = vec![
+            FritzDevice {
+                name: "Saved Tasmota plug".into(),
+                ain: "TASMOTA:192.168.42.20".into(),
+            },
+        ];
+        let legacy = vec![
+            FritzDevice {
+                name: "Legacy FRITZ!DECT".into(),
+                ain: "11:22-33".into(),
+            },
+            FritzDevice {
+                name: "Duplicate Tasmota plug".into(),
+                ain: "tasmota:192.168.42.20".into(),
+            },
+        ];
+
+        let merged = merge_device_inventories(inventory, legacy);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].name, "Saved Tasmota plug");
+        assert_eq!(merged[1].name, "Legacy FRITZ!DECT");
+    }
+
+    #[test]
+    fn startup_inventory_merge_recovers_all_devices_when_new_file_is_empty() {
+        let legacy = vec![
+            FritzDevice {
+                name: "Living room".into(),
+                ain: "11:22-33".into(),
+            },
+            FritzDevice {
+                name: "Tasmota meter".into(),
+                ain: "TASMOTA:192.168.42.21".into(),
+            },
+        ];
+
+        let merged = merge_device_inventories(Vec::new(), legacy.clone());
+        assert_eq!(merged, legacy);
+    }
 
     #[test]
     fn defaults_external_temperature_to_first_solar_device_case_insensitively() {
