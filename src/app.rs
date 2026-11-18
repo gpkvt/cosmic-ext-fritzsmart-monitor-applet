@@ -6709,7 +6709,13 @@ impl cosmic::Application for AppModel {
                     let (key, name) = self.history_graph_devices[index].clone();
                     if let Some(samples) = self.device_history.get(&key) {
                         let now = Instant::now();
-                        let window = graph_history_window(self.settings.graph_timespan_minutes);
+                        let selected_minutes = self.settings.graph_timespan_minutes.max(5);
+                        let available_minutes = max_device_history_minutes(samples, now);
+                        let window = graph_history_window(selected_minutes);
+                        let full_values: Vec<f64> = samples
+                            .iter()
+                            .map(|(_, power, _)| *power as f64)
+                            .collect();
                         let visible: Vec<_> = samples
                             .iter()
                             .filter(|(timestamp, _, _)| now.duration_since(*timestamp) <= window)
@@ -6717,16 +6723,15 @@ impl cosmic::Application for AppModel {
                         let values: Vec<f64> =
                             visible.iter().map(|(_, power, _)| *power as f64).collect();
                         let axis_start = format_graph_axis_start(
-                            self.settings.graph_timespan_minutes,
+                            selected_minutes,
                             visible.first().map(|(timestamp, _, _)| {
                                 now.duration_since(*timestamp).as_secs().div_ceil(60)
                             }),
                         );
-                        self.expanded_graph_full_values = Some(values.clone());
+                        self.expanded_graph_full_values = Some(full_values);
                         self.expanded_graph_max_timespan_minutes =
-                            self.settings.graph_timespan_minutes.max(5);
-                        self.expanded_graph_view_timespan_minutes =
-                            self.expanded_graph_max_timespan_minutes;
+                            available_minutes.max(selected_minutes);
+                        self.expanded_graph_view_timespan_minutes = selected_minutes;
                         self.expanded_graph = Some((
                             format!(
                                 "{} · {}",
@@ -6803,7 +6808,13 @@ impl cosmic::Application for AppModel {
                         let (key, name) = self.history_graph_devices[next].clone();
                         if let Some(samples) = self.device_history.get(&key) {
                             let now = Instant::now();
-                            let window = graph_history_window(self.settings.graph_timespan_minutes);
+                            let selected_minutes = self.settings.graph_timespan_minutes.max(5);
+                            let available_minutes = max_device_history_minutes(samples, now);
+                            let window = graph_history_window(selected_minutes);
+                            let full_values: Vec<f64> = samples
+                                .iter()
+                                .map(|(_, power, _)| *power as f64)
+                                .collect();
                             let visible: Vec<_> = samples
                                 .iter()
                                 .filter(|(timestamp, _, _)| {
@@ -6813,17 +6824,16 @@ impl cosmic::Application for AppModel {
                             let values: Vec<f64> =
                                 visible.iter().map(|(_, power, _)| *power as f64).collect();
                             let axis_start = format_graph_axis_start(
-                                self.settings.graph_timespan_minutes,
+                                selected_minutes,
                                 visible.first().map(|(timestamp, _, _)| {
                                     now.duration_since(*timestamp).as_secs().div_ceil(60)
                                 }),
                             );
-                            self.expanded_graph_full_values = Some(values.clone());
+                            self.expanded_graph_full_values = Some(full_values);
                             self.expanded_graph_full_secondary = None;
                             self.expanded_graph_max_timespan_minutes =
-                                self.settings.graph_timespan_minutes.max(5);
-                            self.expanded_graph_view_timespan_minutes =
-                                self.expanded_graph_max_timespan_minutes;
+                                available_minutes.max(selected_minutes);
+                            self.expanded_graph_view_timespan_minutes = selected_minutes;
                             self.expanded_graph = Some((
                                 format!(
                                     "{} · {}",
