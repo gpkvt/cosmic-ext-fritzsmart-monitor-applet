@@ -1009,7 +1009,7 @@ fn graph_visual_with_dimensions(
     );
     let min_max_labels = if graph_height > 200.0 {
         format!(
-            "<text x=\\"{plot_left:.2}\\" y=\\"18\\" text-anchor=\\"start\\" font-size=\\"{font_size:.1}\\" font-weight=\\"600\\" fill=\\"#a0a0a0\\">MIN {}</text><text x=\\"{plot_right:.2}\\" y=\\"18\\" text-anchor=\\"end\\" font-size=\\"{font_size:.1}\\" font-weight=\\"600\\" fill=\\"#a0a0a0\\">MAX {}</text>",
+            r#"<text x="{plot_left:.2}" y="18" text-anchor="start" font-size="{font_size:.1}" font-weight="600" fill="#a0a0a0">MIN {}</text><text x="{plot_right:.2}" y="18" text-anchor="end" font-size="{font_size:.1}" font-weight="600" fill="#a0a0a0">MAX {}</text>"# ,
             format_graph_y_tick(minimum, unit),
             format_graph_y_tick(maximum, unit)
         )
