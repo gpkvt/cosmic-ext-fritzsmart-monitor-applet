@@ -8726,6 +8726,46 @@ mod history_tests {
     }
 
     #[test]
+    fn power_totals_include_tasmota_devices_in_output_and_input() {
+        let readings = vec![
+            FritzReading {
+                ain: "111111".into(),
+                name: "FRITZ! load".into(),
+                power_w: 400,
+                temperature_c: 20.0,
+                power_state: None,
+                power_controllable: false,
+                power_toggle_allowed: false,
+            },
+            FritzReading {
+                ain: "TASMOTA:AABBCCDDEEFF".into(),
+                name: "Tasmota load".into(),
+                power_w: 75,
+                temperature_c: f64::NAN,
+                power_state: Some(true),
+                power_controllable: true,
+                power_toggle_allowed: true,
+            },
+            FritzReading {
+                ain: "TASMOTA:FFEEDDCCBBAA".into(),
+                name: "Tasmota solar inverter".into(),
+                power_w: 125,
+                temperature_c: f64::NAN,
+                power_state: Some(true),
+                power_controllable: true,
+                power_toggle_allowed: true,
+            },
+        ];
+        let inputs = HashSet::from([
+            crate::fritz::normalize_ain_for_selection("TASMOTA:FFEEDDCCBBAA"),
+        ]);
+
+        assert_eq!(output_power_w(&readings, &inputs), 475);
+        assert_eq!(input_power_w(&readings, &inputs), -125);
+        assert_eq!(net_power_w(&readings, &inputs), 350);
+    }
+
+    #[test]
     fn energy_flow_subtracts_solar_generation_from_household_consumption() {
         let readings = vec![
             FritzReading {
