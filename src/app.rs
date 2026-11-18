@@ -2311,7 +2311,6 @@ fn settings_section_details(section: &'static str) -> (&'static str, &'static st
         "connection" => ("Connection", "FRITZ!Box address and security settings"),
         "device" => ("Devices", "Select and configure monitored devices"),
         "menu-order" => ("Menu order", "Choose the order of popup elements"),
-        "panel-order" => ("Panel order", "Arrange individual panel readings"),
         "diagnostics" => ("Diagnostics", "Connection and settings status"),
         _ => ("Settings", "Configure your power monitor"),
     }
@@ -2340,7 +2339,6 @@ fn settings_section_header<'a>(
         "connection" => ("network-server-symbolic", "FRITZ!Box access and security"),
         "device" => ("computer-symbolic", "Choose and configure devices"),
         "menu-order" => ("view-list-symbolic", "Arrange popup sections"),
-        "panel-order" => ("view-sort-ascending-symbolic", "Arrange panel readings"),
         "diagnostics" => ("dialog-information-symbolic", "Connection and save status"),
         _ => ("preferences-system-symbolic", "Applet preferences"),
     };
@@ -2825,7 +2823,7 @@ impl cosmic::Application for AppModel {
             "connection" => Some("connection"),
             "device" => Some("device"),
             "menu-order" => Some("menu-order"),
-            "panel-order" => Some("panel-order"),
+            "panel-order" => Some("panel"),
             "diagnostics" => Some("diagnostics"),
             _ => None,
         };
@@ -3794,7 +3792,7 @@ impl cosmic::Application for AppModel {
                     (
                         "Layout",
                         "Choose what appears and in which order",
-                        vec![("Menu order", "menu-order"), ("Panel order", "panel-order")],
+                        vec![("Menu order", "menu-order")],
                     ),
                     (
                         "Support",
@@ -3877,7 +3875,7 @@ impl cosmic::Application for AppModel {
                                 widget::Column::new()
                                     .spacing(3)
                                     .width(cosmic::iced::Length::Fill)
-                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Show weather (OpenWeather)")))
+                                    
                                     .push(widget::text::caption(crate::i18n::tr(
                                         &self.settings.language,
                                         "Display the current OpenWeather conditions in the panel.",
@@ -3898,7 +3896,7 @@ impl cosmic::Application for AppModel {
                                 widget::Column::new()
                                     .spacing(3)
                                     .width(cosmic::iced::Length::Fill)
-                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Show temperature (devices)")))
+                                    
                                     .push(widget::text::caption(crate::i18n::tr(
                                         &self.settings.language,
                                         "Display the temperature reported by selected devices in the panel.",
@@ -3947,7 +3945,7 @@ impl cosmic::Application for AppModel {
                                 widget::Column::new()
                                     .spacing(3)
                                     .width(cosmic::iced::Length::Fill)
-                                    .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Show internet bandwidth")))
+                                    
                                     .push(widget::text::caption(
                                         "Display the maximum download and upload link speeds reported by your FRITZ!Box connection in Mb/s.",
                                     )),
@@ -4017,6 +4015,62 @@ impl cosmic::Application for AppModel {
                                     .on_toggle(Message::PanelExcludeSolarTemperatureChanged)
                             ).padding([8, 10]))
                     );
+                }
+                content = content
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::body(crate::i18n::tr(
+                        &self.settings.language,
+                        "Panel items",
+                    )))
+                    .push(widget::text::caption(
+                        "Choose which readings appear in the panel and arrange their order. Changes are saved automatically.",
+                    ));
+                let visible_panel_order: Vec<_> = self
+                    .settings
+                    .panel_order
+                    .iter()
+                    .filter(|item| {
+                        item.as_str() != "solar-power"
+                            || (has_input_device && !self.settings.panel_net_power)
+                    })
+                    .collect();
+                for (index, item) in visible_panel_order.iter().enumerate() {
+                    let id = match item.as_str() {
+                        "weather" => "weather",
+                        "power-consumption" => "power-consumption",
+                        "solar-power" => "solar-power",
+                        "internet-bandwidth" => "internet-bandwidth",
+                        "temperature" => "temperature",
+                        _ => continue,
+                    };
+                    let visible = panel_item_is_enabled(&self.settings, id);
+                    let mut row = widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(
+                            widget::text::body(crate::i18n::tr(
+                                &self.settings.language,
+                                panel_item_label(id),
+                            ))
+                            .width(cosmic::iced::Length::Fill),
+                        )
+                        .push(widget::toggler(visible).on_toggle(move |value| {
+                            Message::TogglePanelItemVisibility(id, value)
+                        }));
+                    row = row.push(icon_action_button(
+                        "+",
+                        crate::i18n::tr(&self.settings.language, "Move up"),
+                        Message::MovePanelItem(id, true),
+                    ));
+                    row = row.push(icon_action_button(
+                        "−",
+                        crate::i18n::tr(&self.settings.language, "Move down"),
+                        Message::MovePanelItem(id, false),
+                    ));
+                    content = content.push(row);
+                    if index + 1 < visible_panel_order.len() {
+                        content = content.push(widget::divider::horizontal::default());
+                    }
                 }
                 content = content.push(widget::divider::horizontal::default());
             }
@@ -4251,65 +4305,6 @@ impl cosmic::Application for AppModel {
                     ));
                     content = content.push(row);
                     if index + 1 < self.settings.menu_order.len() {
-                        content = content.push(widget::divider::horizontal::default());
-                    }
-                }
-            }
-
-            if self.active_settings_section == Some("panel-order") {
-                content = content
-                    .push(widget::text::body(crate::i18n::tr(
-                        &self.settings.language,
-                        "Panel item order",
-                    )))
-                    .push(widget::text::caption(
-                        "Reorder readings and choose which ones appear in the panel. Changes are saved automatically.",
-                    ));
-                let visible_panel_order: Vec<_> = self
-                    .settings
-                    .panel_order
-                    .iter()
-                    .filter(|item| {
-                        item.as_str() != "solar-power"
-                            || (has_input_device && !self.settings.panel_net_power)
-                    })
-                    .collect();
-                for (index, item) in visible_panel_order.iter().enumerate() {
-                    let id = match item.as_str() {
-                        "weather" => "weather",
-                        "power-consumption" => "power-consumption",
-                        "solar-power" => "solar-power",
-                        "internet-bandwidth" => "internet-bandwidth",
-                        "temperature" => "temperature",
-                        _ => continue,
-                    };
-                    let visible = panel_item_is_enabled(&self.settings, id);
-                    let mut row =
-                        widget::Row::new()
-                            .spacing(8)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(
-                                widget::text::body(crate::i18n::tr(
-                                    &self.settings.language,
-                                    panel_item_label(id),
-                                ))
-                                .width(cosmic::iced::Length::Fill),
-                            )
-                            .push(widget::toggler(visible).on_toggle(move |value| {
-                                Message::TogglePanelItemVisibility(id, value)
-                            }));
-                    row = row.push(icon_action_button(
-                        "+",
-                        crate::i18n::tr(&self.settings.language, "Move up"),
-                        Message::MovePanelItem(id, true),
-                    ));
-                    row = row.push(icon_action_button(
-                        "−",
-                        crate::i18n::tr(&self.settings.language, "Move down"),
-                        Message::MovePanelItem(id, false),
-                    ));
-                    content = content.push(row);
-                    if index + 1 < visible_panel_order.len() {
                         content = content.push(widget::divider::horizontal::default());
                     }
                 }
