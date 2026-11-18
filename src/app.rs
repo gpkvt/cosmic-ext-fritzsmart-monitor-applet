@@ -805,8 +805,8 @@ fn graph_visual(
         values,
         style,
         unit,
-        48.0,
-        cosmic::iced::Length::Fixed(56.0),
+        120.0,
+        cosmic::iced::Length::Fixed(120.0),
         axis_start,
     )
 }
@@ -829,16 +829,48 @@ fn graph_visual_large(
     unit: &str,
     axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
-    // The enlarged graph should use a genuinely large canvas, not just a slightly taller compact card.
     graph_visual_with_dimensions(
         values,
         style,
         unit,
         480.0,
-        // A concrete SVG height avoids zero-height allocation in nested popup columns.
         cosmic::iced::Length::Fixed(480.0),
         axis_start,
     )
+}
+
+fn parse_graph_axis_minutes(label: &str) -> Option<u32> {
+    let label = label.trim().strip_suffix(" ago")?;
+    let mut total = 0u32;
+    let mut number = String::new();
+    for character in label.chars() {
+        if character.is_whitespace() {
+            continue;
+        }
+        if character.is_ascii_digit() {
+            number.push(character);
+            continue;
+        }
+        let value = number.parse::<u32>().ok()?;
+        number.clear();
+        total = total.saturating_add(match character {
+            'd' => value.saturating_mul(1440),
+            'h' => value.saturating_mul(60),
+            'm' => value,
+            _ => return None,
+        });
+    }
+    number.is_empty().then_some(total)
+}
+
+fn format_graph_y_tick(value: f64, unit: &str) -> String {
+    if unit == "°C" || unit.contains("/s") {
+        format!("{value:.1}")
+    } else if value.abs() >= 100.0 {
+        format!("{value:.0}")
+    } else {
+        format!("{value:.1}")
+    }
 }
 
 fn graph_visual_with_dimensions(
@@ -851,12 +883,11 @@ fn graph_visual_with_dimensions(
 ) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
     let current_value = values.last().copied().unwrap_or(0.0);
-    const COUNT: usize = 24;
-    // Use a wide viewBox so the plot fills the expanded window instead of
-    // rendering as a narrow chart centered in the available space.
+    const COUNT: usize = 48;
     const WIDTH: f64 = 800.0;
+    const GRID_ROWS: usize = 4;
+    const GRID_COLUMNS: usize = 4;
     let height = graph_height;
-    // Keep the graph slot identical in size before the first sample arrives.
     let values = if values.is_empty() { vec![0.0] } else { values };
     let minimum = values.iter().copied().reduce(f64::min).unwrap_or(0.0);
     let maximum = values.iter().copied().reduce(f64::max).unwrap_or(minimum);
@@ -874,105 +905,112 @@ fn graph_visual_with_dimensions(
             })
             .collect()
     };
-    let plot_top = 4.0;
-    let plot_bottom = height - 4.0;
+
+    // Reserve space inside the SVG for readable, aligned axis ticks. The same
+    // layout scales from compact menu graphs to the expanded graph window.
+    let plot_left = 76.0;
+    let plot_right = WIDTH - 16.0;
+    let plot_top = if graph_height > 200.0 { 28.0 } else { 18.0 };
+    let plot_bottom = height - if graph_height > 200.0 { 58.0 } else { 38.0 };
+    let plot_width = plot_right - plot_left;
     let plot_height = plot_bottom - plot_top;
-    let y = |v: f64| plot_bottom - ((v - plot_minimum) / plot_range) * plot_height;
+    let y = |value: f64| plot_bottom - ((value - plot_minimum) / plot_range) * plot_height;
+    let font_size = if graph_height > 200.0 { 18.0 } else { 14.0 };
+
     let drawing = if style == "bar" {
-        let slot = WIDTH / COUNT as f64;
-        samples.iter().enumerate().map(|(i,v)| {
-            let top=y(*v);
-            format!("<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"1\" fill=\"#8ab4f8\"/>",
-                i as f64*slot+1.0, top, slot-2.0, (height-4.0-top).max(1.0))
+        let slot = plot_width / COUNT as f64;
+        samples.iter().enumerate().map(|(i, value)| {
+            let top = y(*value);
+            format!(
+                "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" rx=\"2\" fill=\"#8ab4f8\"/>",
+                plot_left + i as f64 * slot + 1.0,
+                top,
+                (slot - 2.0).max(1.0),
+                (plot_bottom - top).max(1.0)
+            )
         }).collect::<String>()
     } else {
-        let points = samples
-            .iter()
-            .enumerate()
-            .map(|(i, v)| format!("{:.2},{:.2}", i as f64 * WIDTH / (COUNT - 1) as f64, y(*v)))
-            .collect::<Vec<_>>()
-            .join(" ");
-        format!(
-            "<polyline points=\"{points}\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
-        )
+        let points = samples.iter().enumerate()
+            .map(|(i, value)| format!("{:.2},{:.2}", plot_left + i as f64 * plot_width / (COUNT - 1) as f64, y(*value)))
+            .collect::<Vec<_>>().join(" ");
+        format!("<polyline points=\"{points}\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/>")
     };
-    // Draw a restrained grid first so it stays behind both graph styles.
-    const GRID_ROWS: usize = 4;
-    const GRID_COLUMNS: usize = 6;
-    let horizontal_grid = (1..GRID_ROWS)
+
+    let grid = (0..=GRID_ROWS)
         .map(|row| {
-            let y = plot_top + row as f64 * plot_height / GRID_ROWS as f64;
-            format!("M0 {y:.2}H{WIDTH}")
+            let fraction = row as f64 / GRID_ROWS as f64;
+            let y_position = plot_top + fraction * plot_height;
+            format!("M{plot_left:.2} {y_position:.2}H{plot_right:.2}")
         })
-        .collect::<Vec<_>>();
-    let vertical_grid = (1..GRID_COLUMNS)
-        .map(|column| {
-            let x = column as f64 * WIDTH / GRID_COLUMNS as f64;
-            format!("M{x:.2} {plot_top:.2}V{plot_bottom:.2}")
-        })
-        .collect::<Vec<_>>();
-    let grid = horizontal_grid
-        .into_iter()
-        .chain(vertical_grid)
+        .chain((0..=GRID_COLUMNS).map(|column| {
+            let fraction = column as f64 / GRID_COLUMNS as f64;
+            let x_position = plot_left + fraction * plot_width;
+            format!("M{x_position:.2} {plot_top:.2}V{plot_bottom:.2}")
+        }))
         .collect::<Vec<_>>()
         .join(" ");
-    let svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {height}\" preserveAspectRatio=\"none\"><title>Power over time. Maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.18\" stroke-width=\"0.6\"/><path d=\"M0 {plot_top:.2}V{plot_bottom:.2}H{WIDTH}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.45\" stroke-width=\"1\"/>{drawing}</svg>"
+
+    let y_labels = (0..=GRID_ROWS)
+        .map(|row| {
+            let fraction = row as f64 / GRID_ROWS as f64;
+            let value = plot_maximum - fraction * plot_range;
+            let y_position = plot_top + fraction * plot_height + font_size * 0.35;
+            format!(
+                "<text x=\"{:.2}\" y=\"{y_position:.2}\" text-anchor=\"end\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{}</text>",
+                plot_left - 12.0,
+                format_graph_y_tick(value, unit)
+            )
+        })
+        .collect::<String>();
+
+    let total_minutes = axis_start.as_deref().and_then(parse_graph_axis_minutes);
+    let x_labels = (0..=GRID_COLUMNS)
+        .map(|column| {
+            let fraction = column as f64 / GRID_COLUMNS as f64;
+            let x_position = plot_left + fraction * plot_width;
+            let label = if column == GRID_COLUMNS {
+                "Now".to_string()
+            } else if let Some(total) = total_minutes {
+                let remaining = (f64::from(total) * (1.0 - fraction)).round() as u32;
+                if remaining == 0 {
+                    "Now".to_string()
+                } else {
+                    format_graph_axis_start(total, Some(u64::from(remaining)))
+                }
+            } else if column == 0 {
+                axis_start.clone().unwrap_or_else(|| "Start".to_string())
+            } else {
+                format!("{}%", (fraction * 100.0).round() as u32)
+            };
+            let anchor = if column == 0 { "start" } else if column == GRID_COLUMNS { "end" } else { "middle" };
+            format!(
+                "<text x=\"{x_position:.2}\" y=\"{:.2}\" text-anchor=\"{anchor}\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{label}</text>",
+                height - 10.0
+            )
+        })
+        .collect::<String>();
+
+    let y_axis_title = format!(
+        "<text x=\"18\" y=\"{:.2}\" text-anchor=\"middle\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\" transform=\"rotate(-90 18 {:.2})\">{unit}</text>",
+        plot_top + plot_height / 2.0,
+        plot_top + plot_height / 2.0
     );
-    let graph = widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
-        svg.into_bytes(),
-    ))
-    .width(cosmic::iced::Length::Fill)
-    .height(widget_height);
-
-    let y_axis_label = if unit == "°C" || unit == "W" {
-        unit.to_string()
-    } else if unit.contains("/s") {
-        format!("BANDWIDTH ({unit})")
-    } else {
-        unit.to_string()
-    };
-    let axis_values = widget::Row::new()
-        .width(cosmic::iced::Length::Fill)
-        .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::text::caption(y_axis_label).width(cosmic::iced::Length::Fill))
-        .push(widget::text::caption(format!("MIN {minimum:.1} {unit}")))
-        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(8.0)))
-        .push(widget::text::caption(format!("MAX {maximum:.1} {unit}")))
-        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(8.0)))
-        .push(widget::text::caption(format!(
-            "CURRENT {current_value:.1} {unit}"
-        )));
-    let x_axis = widget::Row::new()
-        .width(cosmic::iced::Length::Fill)
-        .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::text::caption("TIME"))
-        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(8.0)))
-        .push(widget::text::caption(
-            axis_start.unwrap_or_else(|| "Start".to_string()),
-        ))
-        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-        .push(widget::text::caption("Now"));
-    let content = widget::Column::new()
-        .spacing(6)
-        .push(axis_values)
-        .push(graph)
-        .push(x_axis);
-    if matches!(widget_height, cosmic::iced::Length::Fill) {
-        content.height(cosmic::iced::Length::Fill).into()
-    } else {
-        content.into()
-    }
-}
-
-fn interactive_graph(
-    language: &str,
-    title: &str,
-    values: impl Iterator<Item = f64>,
-    style: &str,
-    unit: &str,
-) -> cosmic::Element<'static, Message> {
-    interactive_graph_inner(language, title, values, style, unit, None)
+    let svg = format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {height}\" preserveAspectRatio=\"none\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{y_labels}{x_labels}{y_axis_title}{drawing}</svg>"
+    );
+    widget::Column::new()
+        .spacing(2)
+        .push(
+            widget::svg(cosmic::iced::widget::svg::Handle::from_memory(svg.into_bytes()))
+                .width(cosmic::iced::Length::Fill)
+                .height(widget_height),
+        )
+        .push(
+            widget::container(widget::text::caption("TIME"))
+                .width(cosmic::iced::Length::Fill)
+                .center_x(cosmic::iced::Length::Fill),
+        )
+        .into()
 }
 
 fn interactive_graph_with_axis(
@@ -5345,6 +5383,12 @@ impl cosmic::Application for AppModel {
                 if let Some(weather_card) = weather_menu_card.take() {
                     menu_cards.push(("1-weather".to_string(), weather_card));
                 }
+                let bandwidth_axis_start = format_graph_axis_start(
+                    self.settings.graph_timespan_minutes,
+                    self.bandwidth_history.front().map(|(timestamp, _, _)| {
+                        Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)
+                    }),
+                );
                 let bandwidth_card = if let Some(bandwidth) = self.internet_bandwidth.as_ref() {
                     widget::Column::new()
                         .spacing(8)
@@ -5389,7 +5433,7 @@ impl cosmic::Application for AppModel {
                                 .contains("graph-bandwidth-pair"),
                             widget::Column::new()
                                 .spacing(8)
-                                .push(interactive_graph(
+                                .push(interactive_graph_with_axis(
                                     &self.settings.language,
                                     crate::i18n::tr(&self.settings.language, "DOWNLOAD HISTORY"),
                                     self.bandwidth_history
@@ -5397,8 +5441,9 @@ impl cosmic::Application for AppModel {
                                         .map(|(_, download, _)| *download as f64 / 1_000_000.0),
                                     &self.settings.graph_style,
                                     "Mb/s",
+                                    bandwidth_axis_start.clone(),
                                 ))
-                                .push(interactive_graph(
+                                .push(interactive_graph_with_axis(
                                     &self.settings.language,
                                     crate::i18n::tr(&self.settings.language, "UPLOAD HISTORY"),
                                     self.bandwidth_history
@@ -5406,6 +5451,7 @@ impl cosmic::Application for AppModel {
                                         .map(|(_, _, upload)| *upload as f64 / 1_000_000.0),
                                     &self.settings.graph_style,
                                     "Mb/s",
+                                    bandwidth_axis_start,
                                 ))
                                 .into(),
                         ))
@@ -5572,6 +5618,14 @@ impl cosmic::Application for AppModel {
                             "utilities-temperature-symbolic",
                             device_corner_radius,
                         ));
+                    let device_axis_start = format_graph_axis_start(
+                        self.settings.graph_timespan_minutes,
+                        device_history.and_then(|samples| {
+                            samples.front().map(|(timestamp, _, _)| {
+                                Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)
+                            })
+                        }),
+                    );
                     let device_graph_pair_id = format!("device-graph-pair-{device_key}");
                     let device_graph_pair_collapsed =
                         self.collapsed_menu_sections.contains(&device_graph_pair_id);
@@ -5592,7 +5646,7 @@ impl cosmic::Application for AppModel {
                                                 &self.settings.language,
                                                 "POWER (W)",
                                             )))
-                                            .push(interactive_graph(
+                                            .push(interactive_graph_with_axis(
                                                 &self.settings.language,
                                                 &format!(
                                                     "{} · {}",
@@ -5609,36 +5663,8 @@ impl cosmic::Application for AppModel {
                                                 }),
                                                 &self.settings.graph_style,
                                                 "W",
-                                            ))
-                                            .push(
-                                                widget::Row::new()
-                                                    .width(cosmic::iced::Length::Fill)
-                                                    .push(widget::text::caption(
-                                                        format_graph_axis_start(
-                                                            self.settings.graph_timespan_minutes,
-                                                            device_history.and_then(|samples| {
-                                                                samples.front().map(
-                                                                    |(timestamp, _, _)| {
-                                                                        Instant::now()
-                                                                            .duration_since(
-                                                                                *timestamp,
-                                                                            )
-                                                                            .as_secs()
-                                                                            .div_ceil(60)
-                                                                    },
-                                                                )
-                                                            }),
-                                                        ),
-                                                    ))
-                                                    .push(
-                                                        widget::Space::new()
-                                                            .width(cosmic::iced::Length::Fill),
-                                                    )
-                                                    .push(widget::text::caption(crate::i18n::tr(
-                                                        &self.settings.language,
-                                                        "Now",
-                                                    ))),
-                                            ),
+                                                device_axis_start.clone(),
+                                            )),
                                     )
                                     .padding([8, 0])
                                     .width(cosmic::iced::Length::Fill)
@@ -5688,7 +5714,7 @@ impl cosmic::Application for AppModel {
                                                 &self.settings.language,
                                                 "TEMPERATURE (°C)",
                                             )))
-                                            .push(interactive_graph(
+                                            .push(interactive_graph_with_axis(
                                                 &self.settings.language,
                                                 &format!(
                                                     "{} · {}",
@@ -5705,36 +5731,8 @@ impl cosmic::Application for AppModel {
                                                 }),
                                                 &self.settings.graph_style,
                                                 "°C",
-                                            ))
-                                            .push(
-                                                widget::Row::new()
-                                                    .width(cosmic::iced::Length::Fill)
-                                                    .push(widget::text::caption(
-                                                        format_graph_axis_start(
-                                                            self.settings.graph_timespan_minutes,
-                                                            device_history.and_then(|samples| {
-                                                                samples.front().map(
-                                                                    |(timestamp, _, _)| {
-                                                                        Instant::now()
-                                                                            .duration_since(
-                                                                                *timestamp,
-                                                                            )
-                                                                            .as_secs()
-                                                                            .div_ceil(60)
-                                                                    },
-                                                                )
-                                                            }),
-                                                        ),
-                                                    ))
-                                                    .push(
-                                                        widget::Space::new()
-                                                            .width(cosmic::iced::Length::Fill),
-                                                    )
-                                                    .push(widget::text::caption(crate::i18n::tr(
-                                                        &self.settings.language,
-                                                        "Now",
-                                                    ))),
-                                            ),
+                                                device_axis_start,
+                                            )),
                                     )
                                     .padding([8, 0])
                                     .width(cosmic::iced::Length::Fill)
@@ -8414,6 +8412,22 @@ mod history_tests {
         assert_eq!(format_graph_timespan(90), "1h 30m");
         assert_eq!(format_graph_timespan(1440), "1 day");
         assert_eq!(format_graph_timespan(2_102_400), "4 years");
+    }
+
+    #[test]
+    fn graph_axis_ticks_parse_compound_elapsed_times() {
+        assert_eq!(parse_graph_axis_minutes("3h ago"), Some(180));
+        assert_eq!(parse_graph_axis_minutes("1d 2h 30m ago"), Some(1590));
+        assert_eq!(parse_graph_axis_minutes("2d 2h 32m ago"), Some(3032));
+        assert_eq!(parse_graph_axis_minutes("Start"), None);
+    }
+
+    #[test]
+    fn graph_y_axis_ticks_keep_useful_precision_for_each_unit() {
+        assert_eq!(format_graph_y_tick(123.4, "W"), "123");
+        assert_eq!(format_graph_y_tick(12.34, "W"), "12.3");
+        assert_eq!(format_graph_y_tick(21.26, "°C"), "21.3");
+        assert_eq!(format_graph_y_tick(8.26, "Mb/s"), "8.3");
     }
 
     #[test]
