@@ -3115,7 +3115,10 @@ impl cosmic::Application for AppModel {
                 .unwrap_or_default() as f32
                 * font_size
                 * 0.62;
-            let width = width.max(font_size);
+            // Keep a shared minimum width for every value slot. Without
+            // this, the slot collapses to the text's natural width and
+            // right-alignment has no visible effect for short readings.
+            let width = width.max(font_size * 4.0);
 
             let lines: Vec<String> = value.lines().map(str::to_owned).collect();
             if lines.len() > 1 {
