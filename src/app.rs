@@ -2614,15 +2614,9 @@ fn is_current_or_newer_version(current: &str, latest: &str) -> bool {
     !is_newer_version(latest, current)
 }
 
-fn regular_clock_ticks() -> impl futures::Stream<Item = Message> {
-    // Idle polling only needs to notice scheduled work and deadlines; a
-    // five-second cadence avoids rebuilding the entire applet every second.
-    clock_ticks(Duration::from_secs(5))
-}
-
-fn diagnostics_clock_ticks() -> impl futures::Stream<Item = Message> {
-    // Diagnostics values change only with network refreshes or hardware polling;
-    // polling once every five seconds is sufficient and avoids needless redraws.
+fn idle_clock_ticks() -> impl futures::Stream<Item = Message> {
+    // Idle polling and diagnostics only need to notice scheduled work and
+    // hardware/network refreshes; avoid rebuilding the applet every second.
     clock_ticks(Duration::from_secs(5))
 }
 
@@ -2809,9 +2803,9 @@ impl cosmic::Application for AppModel {
             Subscription::run(countdown_clock_ticks)
         } else if self.active_settings_section == Some("diagnostics") {
             // Hardware and connection diagnostics do not need per-second redraws.
-            Subscription::run(diagnostics_clock_ticks)
+            Subscription::run(idle_clock_ticks)
         } else {
-            Subscription::run(regular_clock_ticks)
+            Subscription::run(idle_clock_ticks)
         };
 
         let mut subscriptions = vec![clock];
