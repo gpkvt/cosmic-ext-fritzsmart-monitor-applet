@@ -7448,12 +7448,8 @@ impl cosmic::Application for AppModel {
                                             self.expanded_graph_view_timespan_minutes,
                                         );
                                         self.expanded_graph_full_values = Some(full_values);
-                                        self.expanded_graph = Some((
-                                            title,
-                                            visible,
-                                            unit,
-                                            Some(axis_start),
-                                        ));
+                                        self.expanded_graph =
+                                            Some((title, visible, unit, Some(axis_start)));
                                     }
                                 } else if let Some((_, labels)) =
                                     self.expanded_graph_secondary.as_ref()
@@ -7463,7 +7459,8 @@ impl cosmic::Application for AppModel {
                                         &self.device_history,
                                         &self.settings.input_ains,
                                     );
-                                    let (output, input) = aligned_power_series(&self.history, &input);
+                                    let (output, input) =
+                                        aligned_power_series(&self.history, &input);
                                     self.expanded_graph_max_timespan_minutes =
                                         graph_max_timespan_minutes(&output)
                                             .max(graph_max_timespan_minutes(&input));
@@ -7481,9 +7478,9 @@ impl cosmic::Application for AppModel {
                                     );
                                     self.expanded_graph_full_values = Some(output);
                                     self.expanded_graph_full_secondary = Some(input);
-                                    self.expanded_graph_secondary =
-                                        Some((visible_input, labels));
-                                    if let Some((title, _, unit, _)) = self.expanded_graph.as_ref() {
+                                    self.expanded_graph_secondary = Some((visible_input, labels));
+                                    if let Some((title, _, unit, _)) = self.expanded_graph.as_ref()
+                                    {
                                         self.expanded_graph = Some((
                                             title.clone(),
                                             visible_output,
