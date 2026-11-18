@@ -755,7 +755,7 @@ fn input_display_range(history: &VecDeque<(Instant, i64)>) -> (i64, i64) {
     })
 }
 
-fn input_energy_and_timespan(history: &VecDeque<(Instant, i64)>) -> Option<(f64, Duration)> {
+fn power_energy_and_timespan(history: &VecDeque<(Instant, i64)>) -> Option<(f64, Duration)> {
     let (first_timestamp, _) = history.front()?;
     let (last_timestamp, _) = history.back()?;
     let timespan = last_timestamp.saturating_duration_since(*first_timestamp);
@@ -2064,7 +2064,7 @@ fn total_power_overview(
             .map(|(timestamp, _)| Instant::now().duration_since(*timestamp).as_secs() / 60),
     );
 
-    let output_graph = collapsible_graph(
+    let mut output_graph = widget::Column::new().spacing(8).push(collapsible_graph(
         "POWER OUTPUT & TEMPERATURE",
         "graph-total-output-pair",
         collapsed_sections.contains("graph-total-output-pair"),
@@ -2091,7 +2091,14 @@ fn total_power_overview(
                 axis_start.clone(),
             ))
             .into(),
-    );
+    ));
+    if let Some((energy_wh, timespan)) = power_energy_and_timespan(history) {
+        output_graph = output_graph.push(widget::text::caption(format!(
+            "{}: {energy_wh:.1} Wh · {}",
+            crate::i18n::tr(&settings.language, "TOTAL ENERGY"),
+            format_elapsed_timespan(timespan)
+        )));
+    }
     let output_content = widget::Column::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
@@ -2116,7 +2123,7 @@ fn total_power_overview(
                     .width(cosmic::iced::Length::Fill),
                 ),
         )
-        .push(graph_panel(output_graph));
+        .push(graph_panel(output_graph.into()));
     let output_section = total_power_section(
         "TOTAL POWER OUTPUT",
         total_power,
@@ -2133,7 +2140,7 @@ fn total_power_overview(
 
     if has_input_readings {
         let input_energy_summary =
-            input_energy_and_timespan(&input_history).map(|(energy_wh, timespan)| {
+            power_energy_and_timespan(&input_history).map(|(energy_wh, timespan)| {
                 widget::text::caption(format!(
                     "{}: {energy_wh:.1} Wh · {}",
                     crate::i18n::tr(&settings.language, "TOTAL ENERGY"),
@@ -9503,24 +9510,31 @@ mod history_tests {
     }
 
     #[test]
-    fn input_energy_uses_trapezoidal_power_integration_and_actual_timespan() {
+    fn power_energy_uses_trapezoidal_integration_for_input_and_output() {
         let start = Instant::now();
-        let history = VecDeque::from([
+        let input_history = VecDeque::from([
             (start, -1000),
             (start + Duration::from_secs(1800), -2000),
             (start + Duration::from_secs(3600), -1000),
         ]);
+        let output_history = VecDeque::from([
+            (start, 1000),
+            (start + Duration::from_secs(1800), 2000),
+            (start + Duration::from_secs(3600), 1000),
+        ]);
 
-        let (energy_wh, timespan) = input_energy_and_timespan(&history).unwrap();
-        assert!((energy_wh - 1500.0).abs() < f64::EPSILON);
-        assert_eq!(timespan, Duration::from_secs(3600));
-        assert_eq!(format_elapsed_timespan(timespan), "1 hour");
+        for history in [&input_history, &output_history] {
+            let (energy_wh, timespan) = power_energy_and_timespan(history).unwrap();
+            assert!((energy_wh - 1500.0).abs() < f64::EPSILON);
+            assert_eq!(timespan, Duration::from_secs(3600));
+            assert_eq!(format_elapsed_timespan(timespan), "1 hour");
+        }
     }
 
     #[test]
     fn input_energy_handles_a_single_sample_without_inventing_energy() {
         let history = VecDeque::from([(Instant::now(), -500)]);
-        let (energy_wh, timespan) = input_energy_and_timespan(&history).unwrap();
+        let (energy_wh, timespan) = power_energy_and_timespan(&history).unwrap();
         assert_eq!(energy_wh, 0.0);
         assert_eq!(timespan, Duration::ZERO);
     }
