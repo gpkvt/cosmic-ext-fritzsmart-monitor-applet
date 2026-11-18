@@ -142,6 +142,8 @@ pub struct FritzSettings {
     pub url: String,
     pub username: String,
     pub password: String,
+    pub tasmota_username: String,
+    pub tasmota_password: String,
     pub ain: String,
     pub ains: Vec<String>,
     pub allow_invalid_certs: bool,
@@ -188,6 +190,8 @@ impl Default for FritzSettings {
             url: String::new(),
             username: String::new(),
             password: String::new(),
+            tasmota_username: String::new(),
+            tasmota_password: String::new(),
             ain: String::new(),
             ains: Vec::new(),
             allow_invalid_certs: false,
@@ -494,6 +498,8 @@ impl FritzSettings {
             url: get("FRITZ_URL"),
             username: get("USERNAME"),
             password: get("PASSWORD"),
+            tasmota_username: get("TASMOTA_USERNAME"),
+            tasmota_password: get("TASMOTA_PASSWORD"),
             ain: get("AIN"),
             ains: {
                 let legacy_ain = get("AIN");
@@ -585,6 +591,8 @@ impl FritzSettings {
             &self.url,
             &self.username,
             &self.password,
+            &self.tasmota_username,
+            &self.tasmota_password,
             &self.ain,
             &self.ca_cert_path,
             &self.openweathermap_api_key,
@@ -638,7 +646,7 @@ impl FritzSettings {
             parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
         let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
-            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\n",
             match self.language.as_str() {
                 "de" => "de",
                 "en" => "en",
@@ -647,6 +655,8 @@ impl FritzSettings {
             self.url,
             self.username,
             self.password,
+            self.tasmota_username,
+            self.tasmota_password,
             first_ain,
             selected_ains,
             if self.allow_invalid_certs {
@@ -1045,7 +1055,7 @@ pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<FritzDevice
     // Tasmota discovery is independent of FRITZ!Box availability and uses the
     // same credentials configured for the FRITZ!Box connection.
     let tasmota_result =
-        crate::tasmota::discover_devices(settings.username.clone(), settings.password.clone())
+        crate::tasmota::discover_devices(settings.tasmota_username.clone(), settings.tasmota_password.clone())
             .await;
     let mut devices = fritz_result.unwrap_or_default();
     if let Ok(tasmota_devices) = tasmota_result {
@@ -1842,7 +1852,7 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     }
 
     if !selected_tasmota.is_empty() {
-        match crate::tasmota::known_devices(settings.username.clone(), settings.password.clone())
+        match crate::tasmota::known_devices(settings.tasmota_username.clone(), settings.tasmota_password.clone())
             .await
         {
             Ok(devices) => {
@@ -1856,8 +1866,8 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
                     .collect();
                 let (readings, errors) = crate::tasmota::fetch_readings(
                     &devices,
-                    &settings.username,
-                    &settings.password,
+                    &settings.tasmota_username,
+                    &settings.tasmota_password,
                 )
                 .await;
                 result
@@ -1926,7 +1936,7 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
             .ok_or_else(|| {
                 "Tasmota device is no longer discoverable on the local network".to_string()
             })?;
-        return crate::tasmota::set_power(&device, on, &settings.username, &settings.password)
+        return crate::tasmota::set_power(&device, on, &settings.tasmota_username, &settings.tasmota_password)
             .await;
     }
 
