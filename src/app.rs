@@ -4206,15 +4206,14 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption(
                         "Searches the FRITZ!Box and the local network for compatible Tasmota devices. Both appear in the same list below.",
                     ));
+                content = content.push(action_button(
+                    "view-refresh-symbolic",
+                    crate::i18n::tr(&self.settings.language, "Discover devices"),
+                    Message::DiscoverDevices,
+                ));
                 if self.devices_loading {
                     content = content.push(widget::text::caption(
-                        "Searching for FRITZ!Box and Tasmota devices…",
-                    ));
-                } else {
-                    content = content.push(action_button(
-                        "view-refresh-symbolic",
-                        crate::i18n::tr(&self.settings.language, "Discover devices"),
-                        Message::DiscoverDevices,
+                        "Searching FRITZ!Box and scanning the local network for Tasmota devices…",
                     ));
                 }
                 if let Some(status) = &self.settings_status {
