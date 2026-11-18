@@ -4069,25 +4069,6 @@ impl cosmic::Application for AppModel {
                         .on_input(Message::TasmotaPasswordChanged),
                     )
                     .push(widget::divider::horizontal::default())
-                    .push(widget::text::body("Device discovery"))
-                    .push(widget::text::caption(
-                        "Search the local network for Tasmota devices using mDNS. All configured Tasmota devices use the shared credentials above.",
-                    ))
-                    ;
-                if self.devices_loading {
-                    content = content.push(widget::text::caption("Searching for devices…"));
-                } else {
-                    content = content.push(action_button(
-                        "view-refresh-symbolic",
-                        "Search for Tasmota devices",
-                        Message::DiscoverDevices,
-                    ));
-                }
-                if let Some(status) = &self.settings_status {
-                    content = content.push(widget::text::caption(status.clone()));
-                }
-                content = content
-                    .push(widget::divider::horizontal::default())
                     .push(
                         widget::Row::new()
                             .width(cosmic::iced::Length::Fill)
@@ -4217,25 +4198,32 @@ impl cosmic::Application for AppModel {
             }
 
             if self.active_settings_section == Some("device") {
-                content = content.push(action_button(
-                    "view-refresh-symbolic",
-                    crate::i18n::tr(&self.settings.language, "Load devices"),
-                    Message::DiscoverDevices,
-                ));
-
+                content = content
+                    .push(widget::text::body(crate::i18n::tr(
+                        &self.settings.language,
+                        "Discover and select power-meter devices",
+                    )))
+                    .push(widget::text::caption(
+                        "Searches the FRITZ!Box and the local network for compatible Tasmota devices. Both appear in the same list below.",
+                    ));
+                if self.devices_loading {
+                    content = content.push(widget::text::caption("Searching for FRITZ!Box and Tasmota devices…"));
+                } else {
+                    content = content.push(action_button(
+                        "view-refresh-symbolic",
+                        crate::i18n::tr(&self.settings.language, "Discover devices"),
+                        Message::DiscoverDevices,
+                    ));
+                }
+                if let Some(status) = &self.settings_status {
+                    content = content.push(widget::text::caption(status.clone()));
+                }
+                content = content
+                    .push(widget::text_input(
+                        "Search devices by name or ID",
+                        &self.device_search,
+                    ).on_input(Message::DeviceSearchChanged));
                 if !self.devices.is_empty() {
-                    content = content
-                        .push(widget::text::body(crate::i18n::tr(
-                            &self.settings.language,
-                            "Select power-meter devices",
-                        )))
-                        .push(
-                            widget::text_input(
-                                "Search devices by name or AIN",
-                                &self.device_search,
-                            )
-                            .on_input(Message::DeviceSearchChanged),
-                        );
                     content = content.push(widget::text::caption(crate::i18n::tr(
                         &self.settings.language,
                         "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
@@ -4288,20 +4276,21 @@ impl cosmic::Application for AppModel {
                                 Message::MoveDevice(ain.clone(), false),
                             ));
                         let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
-                        let alert_thresholds = self
-                            .settings
-                            .temperature_alerts
-                            .get(&normalized_ain)
-                            .copied();
+                        let is_tasmota = ain.to_ascii_uppercase().starts_with("TASMOTA:");
+                        let alert_thresholds = (!is_tasmota)
+                            .then(|| self.settings.temperature_alerts.get(&normalized_ain).copied())
+                            .flatten();
                         let is_input = self.settings.input_ains.contains(&normalized_ain);
                         let is_external_temperature =
-                            !self.settings.weather_temperature_ain.is_empty()
+                            !is_tasmota
+                                && !self.settings.weather_temperature_ain.is_empty()
                                 && crate::fritz::normalize_ain_for_selection(
                                     &self.settings.weather_temperature_ain,
                                 ) == normalized_ain;
                         let mut device_row = widget::Column::new()
                             .spacing(6)
                             .push(row)
+                            .push(widget::text::caption(if is_tasmota { "Tasmota device" } else { "FRITZ!Box device" }))
                             .push(
                                 widget::Row::new()
                                     .align_y(cosmic::iced::Alignment::Center)
@@ -4316,37 +4305,40 @@ impl cosmic::Application for AppModel {
                                             Message::ToggleDeviceInput(ain.clone(), enabled)
                                         }
                                     })),
-                            )
-                            .push(
-                                widget::Row::new()
-                                    .align_y(cosmic::iced::Alignment::Center)
-                                    .push(widget::text::caption(crate::i18n::tr(
-                                        &self.settings.language,
-                                        "Outdoor temperature source",
-                                    )))
-                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                    .push(widget::toggler(is_external_temperature).on_toggle({
-                                        let ain = ain.clone();
-                                        move |enabled| {
-                                            Message::ToggleExternalTemperature(ain.clone(), enabled)
-                                        }
-                                    })),
-                            )
-                            .push(
-                                widget::Row::new()
-                                    .align_y(cosmic::iced::Alignment::Center)
-                                    .push(widget::text::caption(crate::i18n::tr(
-                                        &self.settings.language,
-                                        "Temperature alerts",
-                                    )))
-                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                    .push(widget::toggler(alert_thresholds.is_some()).on_toggle({
-                                        let ain = ain.clone();
-                                        move |enabled| {
-                                            Message::ToggleTemperatureAlert(ain.clone(), enabled)
-                                        }
-                                    })),
                             );
+                        if !is_tasmota {
+                            device_row = device_row
+                                .push(
+                                    widget::Row::new()
+                                        .align_y(cosmic::iced::Alignment::Center)
+                                        .push(widget::text::caption(crate::i18n::tr(
+                                            &self.settings.language,
+                                            "Outdoor temperature source",
+                                        )))
+                                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                        .push(widget::toggler(is_external_temperature).on_toggle({
+                                            let ain = ain.clone();
+                                            move |enabled| {
+                                                Message::ToggleExternalTemperature(ain.clone(), enabled)
+                                            }
+                                        })),
+                                )
+                                .push(
+                                    widget::Row::new()
+                                        .align_y(cosmic::iced::Alignment::Center)
+                                        .push(widget::text::caption(crate::i18n::tr(
+                                            &self.settings.language,
+                                            "Temperature alerts",
+                                        )))
+                                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                        .push(widget::toggler(alert_thresholds.is_some()).on_toggle({
+                                            let ain = ain.clone();
+                                            move |enabled| {
+                                                Message::ToggleTemperatureAlert(ain.clone(), enabled)
+                                            }
+                                        })),
+                                );
+                        }
                         if let Some(thresholds) = alert_thresholds {
                             device_row = device_row
                                 .push(widget::text::caption(format!(
@@ -4389,6 +4381,10 @@ impl cosmic::Application for AppModel {
                         }
                         content = content.push(surface_card(device_row.into(), 8));
                     }
+                } else if self.devices_loaded {
+                    content = content.push(widget::text::caption(
+                        "No compatible devices found. Check the FRITZ!Box connection and Tasmota credentials in Connection, then search again.",
+                    ));
                 }
             }
 
