@@ -6006,7 +6006,11 @@ impl cosmic::Application for AppModel {
                     let device_graph_pair_collapsed =
                         self.collapsed_menu_sections.contains(&device_graph_pair_id);
                     let device_graphs = collapsible_graph(
-                        if reading.temperature_c.is_finite() { "POWER & TEMPERATURE HISTORY" } else { "POWER HISTORY" },
+                        if reading.temperature_c.is_finite() {
+                            "POWER & TEMPERATURE HISTORY"
+                        } else {
+                            "POWER HISTORY"
+                        },
                         device_graph_pair_id,
                         device_graph_pair_collapsed,
                         widget::Column::new()
@@ -6103,7 +6107,10 @@ impl cosmic::Application for AppModel {
                                                 device_history.into_iter().flat_map(|samples| {
                                                     samples.iter().filter_map(
                                                         |(timestamp, _, temperature)| {
-                                                            temperature.is_finite().then_some((*timestamp, *temperature))
+                                                            temperature.is_finite().then_some((
+                                                                *timestamp,
+                                                                *temperature,
+                                                            ))
                                                         },
                                                     )
                                                 }),

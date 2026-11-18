@@ -1863,30 +1863,37 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
                 result
                     .readings
                     .extend(readings.into_iter().map(|reading| FritzReading {
-                    ain: reading.id,
-                    name: reading.name,
-                    power_w: reading.power_w,
-                    // NaN is an internal "not supported" sentinel. All
-                    // temperature aggregation and presentation must filter it.
-                    temperature_c: f64::NAN,
-                    power_state: reading.power_state,
-                    power_controllable: true,
-                    power_toggle_allowed: true,
-                }));
+                        ain: reading.id,
+                        name: reading.name,
+                        power_w: reading.power_w,
+                        // NaN is an internal "not supported" sentinel. All
+                        // temperature aggregation and presentation must filter it.
+                        temperature_c: f64::NAN,
+                        power_state: reading.power_state,
+                        power_controllable: true,
+                        power_toggle_allowed: true,
+                    }));
                 if !errors.is_empty() {
-                    result.missing_devices.push(("TASMOTA".into(), errors.join("; ")));
+                    result
+                        .missing_devices
+                        .push(("TASMOTA".into(), errors.join("; ")));
                 }
             }
             Err(error) => {
-                if result.readings.is_empty() { fritz_error = Some(error.clone()); }
-                else { result.missing_devices.push(("TASMOTA".into(), error)); }
+                if result.readings.is_empty() {
+                    fritz_error = Some(error.clone());
+                } else {
+                    result.missing_devices.push(("TASMOTA".into(), error));
+                }
             }
         }
     }
 
     if let Some(error) = fritz_error.as_ref() {
         if !result.readings.is_empty() && !selected_fritz.is_empty() {
-            result.missing_devices.push(("FRITZ!Box".into(), error.clone()));
+            result
+                .missing_devices
+                .push(("FRITZ!Box".into(), error.clone()));
         }
     }
 
