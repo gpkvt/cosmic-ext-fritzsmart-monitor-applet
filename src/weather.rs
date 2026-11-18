@@ -118,6 +118,18 @@ fn weather_code_description(code: u8) -> &'static str {
     }
 }
 
+fn ensure_successful_response(
+    response: reqwest::Response,
+    error_context: &str,
+) -> Result<reqwest::Response, String> {
+    let status = response.status();
+    if status.is_success() {
+        Ok(response)
+    } else {
+        Err(format!("{error_context} returned HTTP {status}"))
+    }
+}
+
 pub async fn fetch_weather_forecast(
     location: String,
     requested_days: u8,
@@ -147,12 +159,7 @@ pub async fn fetch_weather_forecast(
             .send()
             .await
             .map_err(|error| format!("Location lookup failed: {error}"))?;
-        if !response.status().is_success() {
-            return Err(format!(
-                "Location lookup returned HTTP {}",
-                response.status()
-            ));
-        }
+        let response = ensure_successful_response(response, "Location lookup")?;
         let payload: serde_json::Value = response
             .json()
             .await
@@ -186,12 +193,7 @@ pub async fn fetch_weather_forecast(
         .send()
         .await
         .map_err(|error| format!("{forecast_days}-day forecast request failed: {error}"))?;
-    if !response.status().is_success() {
-        return Err(format!(
-            "Forecast provider returned HTTP {}",
-            response.status()
-        ));
-    }
+    let response = ensure_successful_response(response, "Forecast provider")?;
     let payload: serde_json::Value = response
         .json()
         .await
