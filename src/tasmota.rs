@@ -258,6 +258,14 @@ async fn query_status(
     username: &str,
     password: &str,
 ) -> Result<Value, String> {
+    // Tasmota's default web username is "admin". Sending an empty
+    // username when a password is configured makes every protected device
+    // reject the request, even though the password itself is correct.
+    let username = if username.trim().is_empty() {
+        "admin"
+    } else {
+        username
+    };
     let response = client
         .get(format!("http://{address}/cm"))
         .query(&[
@@ -272,18 +280,23 @@ async fn query_status(
                 "Tasmota at {address} is unreachable: {}",
                 error.without_url()
             )
-        })?
-        .error_for_status()
-        .map_err(|error| {
-            format!(
-                "Tasmota at {address} rejected the status request: {}",
-                error.without_url()
-            )
         })?;
-    response.json::<Value>().await.map_err(|error| {
+    let status = response.status();
+    let body = response.text().await.map_err(|error| {
         format!(
-            "Tasmota at {address} returned invalid status JSON: {}",
+            "Tasmota at {address} status response could not be read (HTTP {status}): {}",
             error.without_url()
+        )
+    })?;
+    if !status.is_success() {
+        return Err(format!(
+            "Tasmota at {address} rejected the status request (HTTP {status}); check the Tasmota web username/password and web server settings"
+        ));
+    }
+    serde_json::from_str::<Value>(&body).map_err(|error| {
+        format!(
+            "Tasmota at {address} returned invalid status JSON: {error}; response starts with {:?}",
+            body.chars().take(160).collect::<String>()
         )
     })
 }
@@ -577,6 +590,11 @@ pub async fn set_power(
         .build()
         .map_err(|error| error.to_string())?;
     let command = if on { "Power On" } else { "Power Off" };
+    let username = if username.trim().is_empty() {
+        "admin"
+    } else {
+        username
+    };
     let response = client
         .get(format!("http://{}/cm", device.address))
         .query(&[
