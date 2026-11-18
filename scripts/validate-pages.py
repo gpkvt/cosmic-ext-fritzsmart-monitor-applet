@@ -78,8 +78,10 @@ for page in pages:
         for expected in expected_downloads:
             if expected not in content:
                 fail(f"index.html: package download links are not synchronized with Cargo version {version}: {expected}")
-        if any(element in content for element in ("screenshot-dialog", "gallery-image", "data-open-gallery", "gallery-all")):
+        if any(element in content for element in ('id="screenshot-gallery"', 'id="gallery-all"', 'class="gallery-grid"')):
             fail("index.html: standalone screenshot gallery must remain removed")
+        if 'id="hero-lightbox"' not in content or "data-hero-lightbox" not in content or "showHeroScreenshot" not in content:
+            fail("index.html: fanned hero cards must open the full-screen screenshot viewer")
         safeguard_icons = re.findall(
             r'<div class="detail-icon"[^>]*>\s*<img src="icons/([a-z-]+\.svg)" alt="" width="28" height="28"></div>',
             content,
