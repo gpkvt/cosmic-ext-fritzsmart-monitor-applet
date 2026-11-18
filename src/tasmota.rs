@@ -1,7 +1,10 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     net::{IpAddr, Ipv4Addr},
-    sync::{LazyLock, Mutex, OnceLock},
+    sync::{
+        Arc, LazyLock, Mutex, OnceLock,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -378,14 +381,23 @@ pub async fn discover_devices(
         endpoints.len()
     ));
 
+    let total_probes = endpoints.len();
+    let completed_probes = Arc::new(AtomicUsize::new(0));
     let probes = futures::stream::iter(endpoints.into_iter().map(
         |((hostname, port, ip), is_mdns)| {
             let client = client.clone();
             let username = username.clone();
             let password = password.clone();
+            let completed_probes = Arc::clone(&completed_probes);
             async move {
                 let address = format!("{ip}:{port}");
                 let result = query_status(&client, &address, &username, &password).await;
+                let completed = completed_probes.fetch_add(1, Ordering::Relaxed) + 1;
+                if completed % 16 == 0 || completed == total_probes {
+                    record_discovery_diagnostic(format!(
+                        "Tasmota scan progress: completed {completed}/{total_probes} endpoint probes."
+                    ));
+                }
                 (hostname, address, is_mdns, result)
             }
         },
