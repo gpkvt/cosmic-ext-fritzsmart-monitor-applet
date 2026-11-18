@@ -8388,7 +8388,8 @@ impl cosmic::Application for AppModel {
                                 } else {
                                     "FRITZ!Box"
                                 };
-                                newly_discovered.push(format!("{device_type}: {}", discovered.name));
+                                newly_discovered
+                                    .push(format!("{device_type}: {}", discovered.name));
                                 self.devices.push(discovered);
                                 inventory_changed = true;
                             }
@@ -8396,10 +8397,7 @@ impl cosmic::Application for AppModel {
                         if !newly_discovered.is_empty() {
                             record_diagnostic_event(
                                 &mut self.diagnostic_events,
-                                format!(
-                                    "New devices discovered: {}.",
-                                    newly_discovered.join(", ")
-                                ),
+                                format!("New devices discovered: {}.", newly_discovered.join(", ")),
                             );
                             notify_new_devices(&newly_discovered);
                         }
