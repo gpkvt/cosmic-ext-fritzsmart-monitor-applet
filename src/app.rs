@@ -146,6 +146,7 @@ pub enum Message {
     RefreshIntervalChanged(u32),
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
+    RemoveDevice(String),
     DeviceSearchChanged(String),
     ToggleDevice(String, bool),
     MoveDevice(String, bool),
@@ -2729,6 +2730,7 @@ impl cosmic::Application for AppModel {
             _ => None,
         };
         let quick_refresh_interval = settings.refresh_interval_seconds;
+        let known_devices = settings.known_devices.clone();
         let quick_graph_timespan = settings.graph_timespan_minutes;
         let restore_forecast = weather_forecast_expanded
             && settings.weather_enabled
@@ -2760,6 +2762,7 @@ impl cosmic::Application for AppModel {
             Self {
                 core,
                 selected_ains: settings.ains.clone(),
+                devices: known_devices,
                 settings,
                 settings_open: setup_assistant,
                 setup_assistant,
@@ -4275,6 +4278,11 @@ impl cosmic::Application for AppModel {
                                 "−",
                                 crate::i18n::tr(&self.settings.language, "Move device down"),
                                 Message::MoveDevice(ain.clone(), false),
+                            ))
+                            .push(icon_action_button(
+                                "×",
+                                crate::i18n::tr(&self.settings.language, "Remove device from saved list"),
+                                Message::RemoveDevice(ain.clone()),
                             ));
                         let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
                         let is_tasmota = ain.to_ascii_uppercase().starts_with("TASMOTA:");
@@ -8182,8 +8190,21 @@ impl cosmic::Application for AppModel {
                                 devices.len()
                             ),
                         );
-                        self.devices = devices;
-                        let mut settings_changed = false;
+                        // Keep the saved inventory intact across refreshes. Discovery is additive:
+                        // newly seen devices are added and known IDs may receive updated names.
+                        for discovered in devices {
+                            let key = crate::fritz::normalize_ain_for_selection(&discovered.ain);
+                            if let Some(existing) = self.devices.iter_mut().find(|device| {
+                                crate::fritz::normalize_ain_for_selection(&device.ain) == key
+                            }) {
+                                existing.name = discovered.name;
+                                existing.ain = discovered.ain;
+                            } else {
+                                self.devices.push(discovered);
+                            }
+                        }
+                        self.settings.known_devices = self.devices.clone();
+                        let mut settings_changed = true; = false;
                         if !self.settings.input_defaults_initialized {
                             self.settings
                                 .input_ains
@@ -8258,6 +8279,35 @@ impl cosmic::Application for AppModel {
                         self.settings_status = Some(format!("Connection failed: {error}"))
                     }
                 }
+            }
+            Message::RemoveDevice(ain) => {
+                let normalized = crate::fritz::normalize_ain_for_selection(&ain);
+                self.devices.retain(|device| {
+                    crate::fritz::normalize_ain_for_selection(&device.ain) != normalized
+                });
+                self.selected_ains.retain(|selected| {
+                    crate::fritz::normalize_ain_for_selection(selected) != normalized
+                });
+                self.settings.known_devices = self.devices.clone();
+                self.settings.ains = self.selected_ains.clone();
+                self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
+                self.settings.device_order.retain(|id| {
+                    crate::fritz::normalize_ain_for_selection(id) != normalized
+                });
+                self.settings.input_ains.remove(&normalized);
+                self.settings.temperature_alerts.remove(&normalized);
+                self.settings.expanded_devices.retain(|id| {
+                    crate::fritz::normalize_ain_for_selection(id) != normalized
+                });
+                if crate::fritz::normalize_ain_for_selection(&self.settings.weather_temperature_ain) == normalized {
+                    self.settings.weather_temperature_ain.clear();
+                    self.settings.weather_temperature_source_initialized = true;
+                }
+                self.persist_settings();
+                record_diagnostic_event(
+                    &mut self.diagnostic_events,
+                    format!("Device removed from saved inventory by user: {ain}."),
+                );
             }
             Message::ToggleDevice(ain, selected) => {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
