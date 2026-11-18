@@ -324,7 +324,7 @@ fn default_panel_order() -> Vec<String> {
 }
 
 fn parse_unique_known_ids(value: &str, allowed: &[&str]) -> Vec<String> {
-    value
+    let ids = value
         .split(',')
         .map(str::trim)
         .filter(|id| allowed.contains(id))
@@ -394,7 +394,7 @@ fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
         "graph-total-input-pair",
         "graph-bandwidth-pair",
     ];
-    value
+    let sections = value
         .split(',')
         .map(str::trim)
         .filter(|id| {
