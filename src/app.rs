@@ -3108,8 +3108,15 @@ impl cosmic::Application for AppModel {
             // The panel text-size setting is authoritative in every layout.
             // Multiline mode changes arrangement and line height, not font size.
             let font_size = panel_text_size;
-            let width = value
+            // Normalize each line independently. A trailing space on the
+            // second line is especially visible in the compact panel because
+            // it makes the value appear not to reach the right edge.
+            let lines: Vec<String> = value
                 .lines()
+                .map(|line| line.trim_end().to_owned())
+                .collect();
+            let width = lines
+                .iter()
                 .map(|line| line.chars().count())
                 .max()
                 .unwrap_or_default() as f32
@@ -3119,8 +3126,6 @@ impl cosmic::Application for AppModel {
             // this, the slot collapses to the text's natural width and
             // right-alignment has no visible effect for short readings.
             let width = width.max(font_size * 4.0);
-
-            let lines: Vec<String> = value.lines().map(str::to_owned).collect();
             if lines.len() > 1 {
                 // Build the two lines as separate fixed-height rows. Relying on
                 // embedded newlines lets the text renderer choose its own line
