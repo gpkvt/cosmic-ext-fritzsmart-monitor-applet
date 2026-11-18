@@ -181,7 +181,7 @@ pub fn diagnostics(window: Duration) -> Value {
         .flat_map(|devices| devices.iter())
         .map(|(ain, samples)| (ain.clone(), json!(samples.as_array().map_or(0, Vec::len))))
         .collect();
-    let (power, devices) = load_from_path(&path, window);
+    let (power, devices) = load_from_document(&document, window);
     json!({
         "available": version == Some(1),
         "path": path,
@@ -205,6 +205,13 @@ fn load_from_path(path: &Path, window: Duration) -> (PowerHistory, DeviceHistory
     let Ok(document) = serde_json::from_str::<Value>(&contents) else {
         return (PowerHistory::new(), DeviceHistory::new());
     };
+    load_from_document(&document, window)
+}
+
+fn load_from_document(
+    document: &Value,
+    window: Duration,
+) -> (PowerHistory, DeviceHistory) {
     if document.get("version").and_then(Value::as_u64) != Some(1) {
         return (PowerHistory::new(), DeviceHistory::new());
     }
@@ -348,6 +355,29 @@ mod tests {
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].1, 30);
         fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn parsed_history_document_loads_power_and_device_samples() {
+        let now_epoch = epoch_now().unwrap();
+        let document = json!({
+            "version": 1,
+            "power": [{"timestamp": now_epoch, "power_w": 125}],
+            "devices": {
+                "123456": [{
+                    "timestamp": now_epoch,
+                    "power_w": 100,
+                    "temperature_c": 21.5
+                }]
+            }
+        });
+        let (power, devices) = load_from_document(&document, Duration::from_secs(60));
+        assert_eq!(power.len(), 1);
+        assert_eq!(power[0].1, 125);
+        let device = devices.get("123456").unwrap();
+        assert_eq!(device.len(), 1);
+        assert_eq!(device[0].1, 100);
+        assert!((device[0].2 - 21.5).abs() < f64::EPSILON);
     }
 
     #[test]
