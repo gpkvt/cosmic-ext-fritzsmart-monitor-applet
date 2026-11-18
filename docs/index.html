@@ -243,22 +243,14 @@
     const heroGallery=document.querySelector('.hero-gallery');
     const heroCards=[...document.querySelectorAll('.hero-shot')];
     const seenHeroImages=new Set();
-    heroCards.forEach(card=>{
-      const image=card.querySelector('img');
-      const source=image?.getAttribute('src')?.trim();
-      if(!source||seenHeroImages.has(source)){
-        card.remove();
-        return;
-      }
-      seenHeroImages.add(source);
+    document.addEventListener('click',event=>{
+      const trigger=event.target.closest('[data-open-gallery]');
+      if(!trigger)return;
+      event.preventDefault();
+      const card=trigger.closest('.hero-shot');
+      const index=card? screenshots.findIndex(shot=>shot.src===card.querySelector('img')?.getAttribute('src')):0;
+      openGallery(index>=0?index:0);
     });
-    heroCards.forEach(card=>{
-      card.addEventListener('click',event=>{
-        event.preventDefault();
-        openGallery(screenshots.findIndex(shot=>shot.src===card.querySelector('img')?.getAttribute('src')));
-      });
-    });
-    document.querySelectorAll('[data-open-gallery]:not(.hero-shot)').forEach(el=>el.addEventListener('click',()=>openGallery(0)));
     previousButton.addEventListener('click',()=>showScreenshot(currentScreenshot-1));
     nextButton.addEventListener('click',()=>showScreenshot(currentScreenshot+1));
     document.querySelectorAll('[data-close-gallery]').forEach(el=>el.addEventListener('click',()=>screenshotDialog.close()));
