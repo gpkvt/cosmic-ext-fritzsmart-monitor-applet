@@ -22,7 +22,9 @@ use std::time::{Duration, Instant};
 static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
     LazyLock::new(|| widget::Id::new("fritz-power-monitor-autosize-main"));
 #[derive(Default)]
-pub struct AppModel {
+pub type GraphSamples = Vec<(Instant, f64)>;
+
+struct AppModel {
     core: cosmic::Core,
     popup: Option<Id>,
     graph_window: Option<Id>,
@@ -69,10 +71,10 @@ pub struct AppModel {
     collapsed_menu_sections: HashSet<String>,
     quick_refresh_interval: u32,
     quick_graph_timespan: u32,
-    expanded_graph: Option<(String, Vec<f64>, String, Option<String>)>,
-    expanded_graph_secondary: Option<(Vec<f64>, String)>,
-    expanded_graph_full_values: Option<Vec<f64>>,
-    expanded_graph_full_secondary: Option<Vec<f64>>,
+    expanded_graph: Option<(String, GraphSamples, String, Option<String>)>,
+    expanded_graph_secondary: Option<(GraphSamples, String)>,
+    expanded_graph_full_values: Option<GraphSamples>,
+    expanded_graph_full_secondary: Option<GraphSamples>,
     expanded_graph_max_timespan_minutes: u32,
     expanded_graph_view_timespan_minutes: u32,
     history_graph_devices: Vec<(String, String)>,
@@ -125,11 +127,11 @@ pub enum Message {
     PanelNetPowerChanged(bool),
     GraphTimespanChanged(u32),
     GraphStyleChanged(String),
-    ShowGraph(String, Vec<f64>, String, Option<String>),
+    ShowGraph(String, GraphSamples, String, Option<String>),
     ShowCombinedGraph(
         String,
-        Vec<f64>,
-        Vec<f64>,
+        GraphSamples,
+        GraphSamples,
         String,
         Option<String>,
         String,
@@ -1246,23 +1248,46 @@ fn graph_stats_legend(
     legend.into()
 }
 
-fn graph_values_for_timespan(
-    values: &[f64],
-    selected_minutes: u32,
-    maximum_minutes: u32,
-) -> Vec<f64> {
-    if values.is_empty() || maximum_minutes == 0 || selected_minutes >= maximum_minutes {
-        return values.to_vec();
-    }
-    let fraction = f64::from(selected_minutes) / f64::from(maximum_minutes);
-    let count = ((values.len() as f64 * fraction).ceil() as usize).clamp(1, values.len());
-    values[values.len() - count..].to_vec()
+fn graph_values_for_timespan(samples: &[(Instant, f64)], selected_minutes: u32) -> GraphSamples {
+    let cutoff = Instant::now() - Duration::from_secs(u64::from(selected_minutes) * 60);
+    samples
+        .iter()
+        .copied()
+        .filter(|(timestamp, _)| *timestamp >= cutoff)
+        .collect()
+}
+
+fn graph_max_timespan_minutes(samples: &[(Instant, f64)]) -> u32 {
+    samples
+        .first()
+        .map(|(timestamp, _)| {
+            Instant::now()
+                .saturating_duration_since(*timestamp)
+                .as_secs()
+                .div_ceil(60)
+                .clamp(5, u64::from(u32::MAX)) as u32
+        })
+        .unwrap_or(5)
+}
+
+fn graph_axis_start_for_samples(samples: &[(Instant, f64)], selected_minutes: u32) -> String {
+    let age = samples.first().map(|(timestamp, _)| {
+        Instant::now()
+            .saturating_duration_since(*timestamp)
+            .as_secs()
+            .div_ceil(60)
+    });
+    format_graph_axis_start(selected_minutes, age)
+}
+
+fn graph_values_only(samples: &[(Instant, f64)]) -> Vec<f64> {
+    samples.iter().map(|(_, value)| *value).collect()
 }
 
 fn interactive_graph_with_axis(
     language: &str,
     title: &str,
-    values: impl Iterator<Item = f64>,
+    values: impl Iterator<Item = (Instant, f64)>,
     style: &str,
     unit: &str,
     axis_start: String,
@@ -1273,8 +1298,8 @@ fn interactive_graph_with_axis(
 fn interactive_combined_graph_with_axis(
     language: &str,
     title: &str,
-    output_values: Vec<f64>,
-    input_values: Vec<f64>,
+    output_values: GraphSamples,
+    input_values: GraphSamples,
     style: &str,
     unit: &str,
     axis_start: String,
@@ -1294,14 +1319,14 @@ fn interactive_combined_graph_with_axis(
                 ))),
         )
         .push(graph_visual_with_dimensions(
-            output_values.iter().copied(),
+            graph_values_only(&output_values).into_iter(),
             style,
             title,
             unit,
             120.0,
             cosmic::iced::Length::Fixed(120.0),
             Some(axis_start.clone()),
-            Some(input_values.clone()),
+            Some(graph_values_only(&input_values)),
             Some(format!("{output_label}|{input_label}")),
         ));
     widget::button::custom(graph)
@@ -1323,12 +1348,13 @@ fn interactive_combined_graph_with_axis(
 fn interactive_graph_inner(
     language: &str,
     title: &str,
-    values: impl Iterator<Item = f64>,
+    values: impl Iterator<Item = (Instant, f64)>,
     style: &str,
     unit: &str,
     axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
-    let values: Vec<f64> = values.collect();
+    let values: GraphSamples = values.collect();
+    let display_values = graph_values_only(&values);
     let graph = widget::Column::new()
         .spacing(6)
         .push(
@@ -1342,7 +1368,7 @@ fn interactive_graph_inner(
                 ))),
         )
         .push(graph_visual(
-            values.iter().copied(),
+            display_values.iter().copied(),
             style,
             title,
             unit,
@@ -1387,14 +1413,14 @@ fn average_temperature_c(readings: &[FritzReading], exclude_solar: bool) -> Opti
 fn aligned_power_series(
     output_history: &VecDeque<(Instant, i64)>,
     input_history: &VecDeque<(Instant, i64)>,
-) -> (Vec<f64>, Vec<f64>) {
+) -> (GraphSamples, GraphSamples) {
     let input_by_time: HashMap<Instant, i64> = input_history.iter().copied().collect();
     let mut output_values = Vec::new();
     let mut input_values = Vec::new();
     for (timestamp, output) in output_history {
         if let Some(input) = input_by_time.get(timestamp) {
-            output_values.push(*output as f64);
-            input_values.push(input_display_power_w(*input) as f64);
+            output_values.push((*timestamp, *output as f64));
+            input_values.push((*timestamp, input_display_power_w(*input) as f64));
         }
     }
     (output_values, input_values)
@@ -1828,8 +1854,8 @@ fn energy_flow_overview(
 
 struct LivePowerSummaryData {
     energy_flow: Option<cosmic::Element<'static, Message>>,
-    input_history: Vec<f64>,
-    output_history: Vec<f64>,
+    input_history: GraphSamples,
+    output_history: GraphSamples,
     graph_style: String,
     language: String,
     axis_start: String,
