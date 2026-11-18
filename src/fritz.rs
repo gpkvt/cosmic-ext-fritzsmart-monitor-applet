@@ -113,7 +113,7 @@ pub struct FritzDevice {
 pub fn default_external_temperature_ain(devices: &[FritzDevice]) -> Option<String> {
     devices
         .iter()
-        .find(|device| device.name.to_lowercase().contains("solar"))
+        .find(|device| !device.ain.to_ascii_uppercase().starts_with("TASMOTA:") && device.name.to_lowercase().contains("solar"))
         .map(|device| device.ain.clone())
         .filter(|ain| !normalize_ain_for_selection(ain).is_empty())
 }
