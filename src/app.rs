@@ -8732,8 +8732,14 @@ mod history_tests {
         let output = VecDeque::from([(start, 900), (start + Duration::from_secs(60), 800)]);
         let input = VecDeque::from([(start, -250), (start + Duration::from_secs(120), -300)]);
         let (output_values, input_values) = aligned_power_series(&output, &input);
-        assert_eq!(output_values, vec![900.0]);
-        assert_eq!(input_values, vec![250.0]);
+        assert_eq!(
+            output_values.iter().map(|(_, value)| *value).collect::<Vec<_>>(),
+            vec![900.0]
+        );
+        assert_eq!(
+            input_values.iter().map(|(_, value)| *value).collect::<Vec<_>>(),
+            vec![250.0]
+        );
     }
 
     #[test]
