@@ -400,17 +400,16 @@ fn initial_device_selection(settings: &FritzSettings) -> Vec<String> {
         settings.ains.clone()
     } else if !settings.ain.trim().is_empty() {
         vec![settings.ain.clone()]
-    } else if settings.device_selection_initialized {
-        // An explicitly empty selection is intentional and must survive restarts.
-        Vec::new()
-    } else {
-        // A saved inventory without an explicit selection is an existing setup,
-        // not a request to show the empty-device onboarding prompt.
+    } else if !settings.known_devices.is_empty() {
+        // A saved inventory with no selected IDs should be usable immediately.
+        // This also repairs older configs that persisted an empty selection.
         settings
             .known_devices
             .iter()
             .map(|device| device.ain.clone())
             .collect()
+    } else {
+        Vec::new()
     }
 }
 
@@ -2745,7 +2744,12 @@ impl cosmic::Application for AppModel {
                 eprintln!("Could not persist completed setup migration: {error}");
             }
         }
-        if !settings.device_selection_initialized && !settings.known_devices.is_empty() {
+        if settings.ains.is_empty()
+            && settings.ain.trim().is_empty()
+            && !settings.known_devices.is_empty()
+        {
+            // Repair an empty selection left by older versions or first-run setup:
+            // saved devices are the source of truth until the user removes them.
             settings.ains = settings
                 .known_devices
                 .iter()
@@ -8537,6 +8541,11 @@ mod history_tests {
             ain: "123456789012".into(),
         }];
         assert!(has_persisted_device_selection(&settings));
+        assert_eq!(initial_device_selection(&settings), vec!["123456789012"]);
+
+        // An old config may say selection was initialized while AINS is empty.
+        // A non-empty saved inventory must still restore the devices.
+        settings.device_selection_initialized = true;
         assert_eq!(initial_device_selection(&settings), vec!["123456789012"]);
 
         settings.known_devices.clear();
