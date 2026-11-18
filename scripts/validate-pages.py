@@ -61,23 +61,27 @@ for page in pages:
                 fail(f"{page.name}: missing anchor in {reference}")
 
     if page.name == "index.html":
-        cargo = (ROOT.parent / "Cargo.toml").read_text(encoding="utf-8")
-        version_match = re.search(r'(?ms)^\[package\]\s+.*?^version\s*=\s*"([^"]+)"', cargo)
-        if not version_match:
-            fail("could not read package version from Cargo.toml")
-        version = version_match.group(1)
+        version = __import__("os").environ.get("APP_RELEASE_VERSION")
+        if not version:
+            cargo = (ROOT.parent / "Cargo.toml").read_text(encoding="utf-8")
+            version_match = re.search(r'(?ms)^\[package\]\s+.*?^version\s*=\s*"([^"]+)"', cargo)
+            if not version_match:
+                fail("could not read package version from Cargo.toml")
+            version = version_match.group(1)
         if "@APP_VERSION@" in content:
             fail("index.html: unresolved package download version placeholder")
-        expected_downloads = (
-            f"/releases/download/v{version}/",
-            f"fritz-power-monitor_{version}_amd64.deb",
-            f"fritz-power-monitor-{version}-x86_64.AppImage",
-            f"fritz-power-monitor-{version}.flatpak",
-            f"fritz-power-monitor-v{version}-x86_64-unknown-linux-gnu.tar.gz",
+        expected_archive = (
+            f"https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/download/v{version}/"
+            f"fritz-power-monitor-v{version}-x86_64-unknown-linux-gnu.tar.gz"
         )
-        for expected in expected_downloads:
-            if expected not in content:
-                fail(f"index.html: package download links are not synchronized with Cargo version {version}: {expected}")
+        if expected_archive not in content:
+            fail(f"index.html: portable archive link is not synchronized with release version {version}")
+        if re.search(r"releases/download/[^\"']+\.(?:deb|AppImage|flatpak)", content, re.I):
+            fail("index.html: only the portable .tar.gz release archive may be linked")
+        if any(term in content.lower() for term in ("linux packages", "download .deb", "download appimage", "download flatpak")):
+            fail("index.html: obsolete package download section remains")
+        if 'id="custom-applets"' not in content:
+            fail("index.html: COSMIC custom applet installation section is missing")
         if any(element in content for element in ('id="screenshot-gallery"', 'id="gallery-all"', 'class="gallery-grid"')):
             fail("index.html: standalone screenshot gallery must remain removed")
         if 'id="hero-lightbox"' not in content or "data-hero-lightbox" not in content or "showHeroScreenshot" not in content:
