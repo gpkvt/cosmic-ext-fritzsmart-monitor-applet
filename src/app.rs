@@ -800,12 +800,14 @@ fn output_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i6
 fn graph_visual(
     values: impl Iterator<Item = f64>,
     style: &str,
+    title: &str,
     unit: &str,
     axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     graph_visual_with_dimensions(
         values,
         style,
+        title,
         unit,
         120.0,
         cosmic::iced::Length::Fixed(120.0),
@@ -828,12 +830,14 @@ fn graph_plot_bounds(minimum: f64, maximum: f64) -> (f64, f64) {
 fn graph_visual_large(
     values: impl Iterator<Item = f64>,
     style: &str,
+    title: &str,
     unit: &str,
     axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     graph_visual_with_dimensions(
         values,
         style,
+        title,
         unit,
         480.0,
         cosmic::iced::Length::Fixed(480.0),
@@ -865,6 +869,15 @@ fn parse_graph_axis_minutes(label: &str) -> Option<u32> {
     number.is_empty().then_some(total)
 }
 
+fn escape_svg_text(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 fn format_graph_y_tick(value: f64, unit: &str) -> String {
     if unit == "°C" || unit.contains("/s") {
         format!("{value:.1}")
@@ -878,6 +891,7 @@ fn format_graph_y_tick(value: f64, unit: &str) -> String {
 fn graph_visual_with_dimensions(
     values: impl Iterator<Item = f64>,
     style: &str,
+    title: &str,
     unit: &str,
     graph_height: f64,
     widget_height: cosmic::iced::Length,
@@ -913,8 +927,8 @@ fn graph_visual_with_dimensions(
     // layout scales from compact menu graphs to the expanded graph window.
     let plot_left = if graph_height > 200.0 { 76.0 } else { 56.0 };
     let plot_right = width - if graph_height > 200.0 { 16.0 } else { 12.0 };
-    let plot_top = if graph_height > 200.0 { 28.0 } else { 18.0 };
-    let plot_bottom = height - if graph_height > 200.0 { 58.0 } else { 38.0 };
+    let plot_top = if graph_height > 200.0 { 48.0 } else { 30.0 };
+    let plot_bottom = height - if graph_height > 200.0 { 84.0 } else { 54.0 };
     let plot_width = plot_right - plot_left;
     let plot_height = plot_bottom - plot_top;
     let y = |value: f64| plot_bottom - ((value - plot_minimum) / plot_range) * plot_height;
@@ -999,7 +1013,7 @@ fn graph_visual_with_dimensions(
             let anchor = if column == 0 { "start" } else if column == GRID_COLUMNS { "end" } else { "middle" };
             format!(
                 "<text x=\"{x_position:.2}\" y=\"{:.2}\" text-anchor=\"{anchor}\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{label}</text>",
-                height - 10.0
+                height - 22.0
             )
         })
         .collect::<String>();
@@ -1008,6 +1022,20 @@ fn graph_visual_with_dimensions(
         "<text x=\"18\" y=\"{:.2}\" text-anchor=\"middle\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\" transform=\"rotate(-90 18 {:.2})\">{unit}</text>",
         plot_top + plot_height / 2.0,
         plot_top + plot_height / 2.0
+    );
+    let legend_y = if graph_height > 200.0 { 34.0 } else { 12.0 };
+    let legend_title = escape_svg_text(title);
+    let legend_unit = escape_svg_text(unit);
+    let legend = format!(
+        "<g aria-label=\"Legend\"><path d=\"M{:.2} {legend_y:.2}h18\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"3\" stroke-linecap=\"round\"/><text x=\"{:.2}\" y=\"{:.2}\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{legend_title} ({legend_unit})</text></g>",
+        plot_right - 130.0,
+        plot_right - 106.0,
+        legend_y + font_size * 0.35
+    );
+    let x_axis_title = format!(
+        "<text x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">TIME</text>",
+        plot_left + plot_width / 2.0,
+        height - 2.0
     );
     let min_max_labels = if graph_height > 200.0 {
         format!(
@@ -1019,7 +1047,7 @@ fn graph_visual_with_dimensions(
         String::new()
     };
     let svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" preserveAspectRatio=\"none\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{min_max_labels}{y_labels}{x_labels}{y_axis_title}{drawing}</svg>"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" preserveAspectRatio=\"none\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{min_max_labels}{legend}{y_labels}{x_labels}{y_axis_title}{x_axis_title}{drawing}</svg>"
     );
     widget::Column::new()
         .spacing(2)
@@ -1029,11 +1057,6 @@ fn graph_visual_with_dimensions(
             ))
             .width(cosmic::iced::Length::Fill)
             .height(widget_height),
-        )
-        .push(
-            widget::container(widget::text::caption("TIME"))
-                .width(cosmic::iced::Length::Fill)
-                .center_x(cosmic::iced::Length::Fill),
         )
         .into()
 }
@@ -1073,6 +1096,7 @@ fn interactive_graph_inner(
         .push(graph_visual(
             values.iter().copied(),
             style,
+            title,
             unit,
             axis_start.clone(),
         ));
@@ -3178,6 +3202,7 @@ impl cosmic::Application for AppModel {
                 .push(graph_visual_large(
                     values.iter().copied(),
                     &self.settings.graph_style,
+                    title,
                     unit,
                     axis_start.clone(),
                 ));
@@ -8456,6 +8481,14 @@ mod history_tests {
         assert_eq!(parse_graph_axis_minutes("1d 2h 30m ago"), Some(1590));
         assert_eq!(parse_graph_axis_minutes("2d 2h 32m ago"), Some(3032));
         assert_eq!(parse_graph_axis_minutes("Start"), None);
+    }
+
+    #[test]
+    fn svg_legend_text_escapes_xml_reserved_characters() {
+        assert_eq!(
+            escape_svg_text("Power & temperature <now>"),
+            "Power &amp; temperature &lt;now&gt;"
+        );
     }
 
     #[test]
