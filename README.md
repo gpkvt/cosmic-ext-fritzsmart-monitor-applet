@@ -53,6 +53,18 @@ install -Dm0644 share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.sv
 
 Replace `VERSION` with the version in the downloaded filename. No root access is needed. Open **COSMIC Settings → Desktop → Panel**, choose **Configure panel applets** or **Add applet**, then add **FRITZ!Power Monitor**. If it is not listed, reopen Settings or log out and back in.
 
+### Debian package
+
+The `.deb` installs the executable, desktop entry and icon in their standard system locations:
+
+- `/usr/bin/fritz-power-monitor`
+- `/usr/share/applications/com.gpkvt.FritzPowerMonitor.desktop`
+- `/usr/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg`
+
+When installed through `sudo apt install` or a graphical package installer that supplies the invoking user's identity, package setup also creates symlinks to these files in that user's `~/.local` profile. Existing files or unrelated symlinks are never overwritten. Removing the package removes only profile symlinks that still point to the package's system files.
+
+If the package manager does not expose the installing desktop user (for example, installation from a root shell), the system-wide entries remain available and no home directory is guessed or modified.
+
 ### Build and install from source
 
 **Requirements**
