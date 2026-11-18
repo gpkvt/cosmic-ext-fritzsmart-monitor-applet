@@ -884,7 +884,8 @@ fn graph_visual_with_dimensions(
     let values: Vec<f64> = values.collect();
     let current_value = values.last().copied().unwrap_or(0.0);
     const COUNT: usize = 48;
-    const WIDTH: f64 = 800.0;
+    // Match each viewBox to its rendered width so SVG text remains proportional.
+    let width: f64 = if graph_height > 200.0 { 800.0 } else { 400.0 };
     const GRID_ROWS: usize = 4;
     const GRID_COLUMNS: usize = 4;
     let height = graph_height;
@@ -908,14 +909,14 @@ fn graph_visual_with_dimensions(
 
     // Reserve space inside the SVG for readable, aligned axis ticks. The same
     // layout scales from compact menu graphs to the expanded graph window.
-    let plot_left = 76.0;
-    let plot_right = WIDTH - 16.0;
+    let plot_left = if graph_height > 200.0 { 76.0 } else { 56.0 };
+    let plot_right = width - if graph_height > 200.0 { 16.0 } else { 12.0 };
     let plot_top = if graph_height > 200.0 { 28.0 } else { 18.0 };
     let plot_bottom = height - if graph_height > 200.0 { 58.0 } else { 38.0 };
     let plot_width = plot_right - plot_left;
     let plot_height = plot_bottom - plot_top;
     let y = |value: f64| plot_bottom - ((value - plot_minimum) / plot_range) * plot_height;
-    let font_size = if graph_height > 200.0 { 18.0 } else { 14.0 };
+    let font_size = if graph_height > 200.0 { 18.0 } else { 12.0 };
 
     let drawing = if style == "bar" {
         let slot = plot_width / COUNT as f64;
@@ -1007,7 +1008,7 @@ fn graph_visual_with_dimensions(
         plot_top + plot_height / 2.0
     );
     let svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {height}\" preserveAspectRatio=\"none\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{y_labels}{x_labels}{y_axis_title}{drawing}</svg>"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" preserveAspectRatio=\"none\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{y_labels}{x_labels}{y_axis_title}{drawing}</svg>"
     );
     widget::Column::new()
         .spacing(2)
