@@ -1842,7 +1842,7 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     }
 
     if !selected_tasmota.is_empty() {
-        match crate::tasmota::discover_devices(settings.username.clone(), settings.password.clone())
+        match crate::tasmota::known_devices(settings.username.clone(), settings.password.clone())
             .await
         {
             Ok(devices) => {
@@ -1917,7 +1917,7 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
     if ain.to_ascii_uppercase().starts_with("TASMOTA:") {
         let settings = FritzSettings::load()?;
         let devices =
-            crate::tasmota::discover_devices(settings.username.clone(), settings.password.clone())
+            crate::tasmota::known_devices(settings.username.clone(), settings.password.clone())
                 .await?;
         let wanted = normalize_ain_for_selection(&ain);
         let device = devices
