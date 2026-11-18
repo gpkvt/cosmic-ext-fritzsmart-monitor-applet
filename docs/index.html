@@ -475,7 +475,7 @@ html[data-theme="dark"] .dot{background:#55cda5;box-shadow:0 0 0 4px #55cda520}
  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',()=>{if(themePicker?.value==='system')applyTheme('system')});
  const translations={
   en:{
-   'nav:1':'Features','nav:2':'Gallery','nav:3':'Guide','nav:4':'Install','nav:5':'Downloads','nav:6':'Compatibility','nav:7':'FAQ',
+   'nav:1':'Features','nav:2':'Gallery','nav:3':'Guide','nav:4':'Changelog','nav:5':'Install','nav:6':'Downloads','nav:7':'Compatibility','nav:8':'FAQ',
    'hero:kicker':'A native COSMIC desktop applet','hero:title':'Energy at a glance.<br>Right on your<br><span>COSMIC desktop.</span>',
    'hero:copy':'See your household power readings, device temperatures and optional weather directly in your desktop panel. Clear live values, useful history and no cloud account required for core monitoring.',
    'hero:install':'Install applet ↗','hero:discover':'Explore the interface ↓',
@@ -502,7 +502,7 @@ html[data-theme="dark"] .dot{background:#55cda5;box-shadow:0 0 0 4px #55cda520}
   }
  };
  const selectorMap={
-  'nav:1':'.navlinks>a:nth-child(1)','nav:2':'.navlinks>a:nth-child(2)','nav:3':'.navlinks>a:nth-child(3)','nav:4':'.navlinks>a:nth-child(4)','nav:5':'.navlinks>a:nth-child(5)','nav:6':'.navlinks>a:nth-child(6)','nav:7':'.navlinks>a:nth-child(7)',
+  'nav:1':'.navlinks>a:nth-child(1)','nav:2':'.navlinks>a:nth-child(2)','nav:3':'.navlinks>a:nth-child(3)','nav:4':'.navlinks>a:nth-child(4)','nav:5':'.navlinks>a:nth-child(5)','nav:6':'.navlinks>a:nth-child(6)','nav:7':'.navlinks>a:nth-child(7)','nav:8':'.navlinks>a:nth-child(8)',
   'hero:kicker':'.hero .eyebrow','hero:title':'.hero h1','hero:copy':'.hero-copy','hero:install':'.hero .actions .btn:first-child','hero:discover':'.hero .actions .btn.secondary',
   'features:kicker':'#features .section-head .eyebrow','features:title':'#features .section-head h2','features:copy':'#features .section-head p',
   'tour:kicker':'#tour .section-head .eyebrow','tour:title':'#tour .section-head h2','tour:copy':'#tour .section-head p','tour:button':'#tour [data-open-gallery]',
