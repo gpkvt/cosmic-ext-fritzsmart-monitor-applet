@@ -113,6 +113,25 @@ fn discover_services() -> Result<Vec<(String, u16, IpAddr)>, String> {
         };
         if let ServiceEvent::ServiceResolved(info) = event {
             resolved_services += 1;
+            if resolved_services <= 20 {
+                let txt: Vec<String> = [
+                    "devicetype", "app", "type", "device", "vendor",
+                    "manufacturer", "fn", "md", "id",
+                ]
+                .iter()
+                .filter_map(|key| {
+                    info.get_property_val_str(key)
+                        .map(|value| format!("{key}={value}"))
+                })
+                .collect();
+                record_discovery_diagnostic(format!(
+                    "mDNS HTTP service observed: service={}, host={}, port={}, TXT=[{}].",
+                    info.get_fullname(),
+                    info.get_hostname(),
+                    info.get_port(),
+                    if txt.is_empty() { "no recognized TXT fields".into() } else { txt.join("; ") }
+                ));
+            }
             if !is_tasmota_service(&info) {
                 continue;
             }
@@ -217,13 +236,18 @@ pub async fn discover_devices(
         "Tasmota authentication: username configured={}, password configured={}.",
         !username.trim().is_empty(), !password.is_empty()
     ));
-    let services = tokio::task::spawn_blocking(discover_services)
-        .await
-        .map_err(|error| {
+    let services = match tokio::task::spawn_blocking(discover_services).await {
+        Ok(Ok(services)) => services,
+        Ok(Err(error)) => {
+            record_discovery_diagnostic(format!("Tasmota mDNS scan failed: {error}"));
+            return Err(error);
+        }
+        Err(error) => {
             let message = format!("Tasmota discovery task failed: {error}");
             record_discovery_diagnostic(message.clone());
-            message
-        })??;
+            return Err(message);
+        }
+    };
     let client = Client::builder()
         .timeout(Duration::from_secs(5))
         .build()
