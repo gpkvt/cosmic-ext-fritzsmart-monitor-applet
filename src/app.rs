@@ -7582,20 +7582,53 @@ impl cosmic::Application for AppModel {
                     if let Some(index) = self.history_graph_index
                         && let Some((key, name)) = self.history_graph_devices.get(index).cloned()
                     {
-                        let graph = rebuild_device_history_graph(
+                        let (title, full_values, unit, _) = rebuild_device_history_graph(
+
                             &self.device_history,
+
                             &key,
+
                             &name,
+
                             &self.settings.language,
+
                             self.settings.graph_timespan_minutes,
+
                         );
-                        self.expanded_graph_full_values = Some(graph.1.clone());
-                        self.expanded_graph_full_secondary = None;
+
                         self.expanded_graph_max_timespan_minutes =
-                            graph_max_timespan_minutes(&graph.1);
-                        self.expanded_graph_view_timespan_minutes =
-                            self.expanded_graph_max_timespan_minutes;
-                        self.expanded_graph = Some(graph);
+
+                            graph_max_timespan_minutes(&full_values);
+
+                        self.expanded_graph_view_timespan_minutes = self
+
+                            .settings
+
+                            .graph_timespan_minutes
+
+                            .clamp(5, self.expanded_graph_max_timespan_minutes.max(5));
+
+                        let visible = graph_values_for_timespan(
+
+                            &full_values,
+
+                            self.expanded_graph_view_timespan_minutes,
+
+                        );
+
+                        let axis_start = graph_axis_start_for_samples(
+
+                            &visible,
+
+                            self.expanded_graph_view_timespan_minutes,
+
+                        );
+
+                        self.expanded_graph_full_values = Some(full_values);
+
+                        self.expanded_graph_full_secondary = None;
+
+                        self.expanded_graph = Some((title, visible, unit, Some(axis_start)));
                     }
                     self.persist_settings();
                 }
@@ -7994,20 +8027,53 @@ impl cosmic::Application for AppModel {
                 if let Some(index) = self.history_graph_index
                     && let Some((key, name)) = self.history_graph_devices.get(index).cloned()
                 {
-                    let graph = rebuild_device_history_graph(
+                    let (title, full_values, unit, _) = rebuild_device_history_graph(
+
                         &self.device_history,
+
                         &key,
+
                         &name,
+
                         &self.settings.language,
+
                         self.settings.graph_timespan_minutes,
+
                     );
-                    self.expanded_graph_full_values = Some(graph.1.clone());
-                    self.expanded_graph_full_secondary = None;
+
                     self.expanded_graph_max_timespan_minutes =
-                        graph_max_timespan_minutes(&graph.1);
-                    self.expanded_graph_view_timespan_minutes =
-                        self.expanded_graph_max_timespan_minutes;
-                    self.expanded_graph = Some(graph);
+
+                        graph_max_timespan_minutes(&full_values);
+
+                    self.expanded_graph_view_timespan_minutes = self
+
+                        .settings
+
+                        .graph_timespan_minutes
+
+                        .clamp(5, self.expanded_graph_max_timespan_minutes.max(5));
+
+                    let visible = graph_values_for_timespan(
+
+                        &full_values,
+
+                        self.expanded_graph_view_timespan_minutes,
+
+                    );
+
+                    let axis_start = graph_axis_start_for_samples(
+
+                        &visible,
+
+                        self.expanded_graph_view_timespan_minutes,
+
+                    );
+
+                    self.expanded_graph_full_values = Some(full_values);
+
+                    self.expanded_graph_full_secondary = None;
+
+                    self.expanded_graph = Some((title, visible, unit, Some(axis_start)));
                 }
                 self.persist_settings();
             }
