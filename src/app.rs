@@ -388,6 +388,10 @@ fn cpu_temperature_c() -> Option<f64> {
     None
 }
 
+fn has_persisted_device_selection(settings: &FritzSettings) -> bool {
+    !settings.ains.is_empty() || !settings.ain.trim().is_empty()
+}
+
 fn device_matches_search(device: &FritzDevice, query: &str) -> bool {
     let query = query.trim();
     query.is_empty()
@@ -2701,6 +2705,14 @@ impl cosmic::Application for AppModel {
         _flags: Self::Flags,
     ) -> (Self, Task<cosmic::Action<Self::Message>>) {
         let mut settings = FritzSettings::load().unwrap_or_default();
+        // An interrupted first-run assistant must not discard an already saved
+        // device selection or ask the user to select the same devices again.
+        if !settings.setup_completed && has_persisted_device_selection(&settings) {
+            settings.setup_completed = true;
+            if let Err(error) = settings.save() {
+                eprintln!("Could not persist completed setup migration: {error}");
+            }
+        }
         let setup_assistant = !settings.setup_completed;
         if setup_assistant && settings.url.trim().is_empty() {
             settings.url = "http://fritz.box".into();
@@ -8449,6 +8461,19 @@ impl cosmic::Application for AppModel {
 #[cfg(test)]
 mod history_tests {
     use super::*;
+
+    #[test]
+    fn persisted_device_selection_counts_as_completed_setup() {
+        let mut settings = FritzSettings::default();
+        assert!(!has_persisted_device_selection(&settings));
+
+        settings.ains = vec!["TASMOTA:192.168.42.10".into()];
+        assert!(has_persisted_device_selection(&settings));
+
+        settings.ains.clear();
+        settings.ain = "123456789012".into();
+        assert!(has_persisted_device_selection(&settings));
+    }
 
     #[test]
     fn power_history_aggregation_keeps_input_and_output_semantics() {
