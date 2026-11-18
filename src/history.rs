@@ -114,42 +114,6 @@ fn parse_device_history(
     histories
 }
 
-fn parse_device_history(
-    value: Option<&Value>,
-    now_epoch: i64,
-    now: Instant,
-    window: Duration,
-) -> DeviceHistory {
-    let mut histories = HashMap::new();
-    let Some(devices) = value.and_then(Value::as_object) else {
-        return histories;
-    };
-    for (ain, values) in devices {
-        let Some(samples) = values.as_array() else {
-            continue;
-        };
-        let mut history = VecDeque::new();
-        for sample in samples {
-            let (Some(timestamp), Some(power), Some(temperature)) = (
-                sample.get("timestamp").and_then(Value::as_i64),
-                sample.get("power_w").and_then(Value::as_i64),
-                sample.get("temperature_c").and_then(Value::as_f64),
-            ) else {
-                continue;
-            };
-            if !temperature.is_finite() {
-                continue;
-            }
-            if let Some(instant) = instant_from_epoch(timestamp, now_epoch, now, window) {
-                history.push_back((instant, power, temperature));
-            }
-        }
-        if !history.is_empty() {
-            histories.insert(ain.clone(), history);
-        }
-    }
-    histories
-}
 
 pub fn load(window: Duration) -> (PowerHistory, DeviceHistory) {
     let Ok(path) = history_path() else {
