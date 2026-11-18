@@ -4936,9 +4936,8 @@ impl cosmic::Application for AppModel {
                                         "{} · {state}",
                                         format_panel_temperature(reading.temperature_c)
                                     ))
-                                    .into()
                                 } else {
-                                    widget::text::caption(state).into()
+                                    widget::text::caption(state)
                                 }),
                         );
                     }
