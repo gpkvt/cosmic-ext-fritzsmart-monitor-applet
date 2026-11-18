@@ -226,24 +226,31 @@ impl Default for FritzSettings {
     }
 }
 
+fn parse_clamped<T>(value: &str, default: T, min: T, max: T) -> T
+where
+    T: std::str::FromStr + Ord + Copy,
+{
+    value.parse::<T>().unwrap_or(default).clamp(min, max)
+}
+
 fn parse_panel_text_size(value: &str) -> u8 {
-    value.parse::<u8>().unwrap_or(14).clamp(10, 24)
+    parse_clamped(value, 14, 10, 24)
 }
 
 fn parse_panel_item_spacing(value: &str) -> u8 {
-    value.parse::<u8>().unwrap_or(3).clamp(0, 16)
+    parse_clamped(value, 3, 0, 16)
 }
 
 fn parse_graph_timespan_minutes(value: &str) -> u32 {
-    value.parse::<u32>().unwrap_or(15).clamp(5, 2_102_400)
+    parse_clamped(value, 15, 5, 2_102_400)
 }
 
 fn parse_refresh_interval_seconds(value: &str) -> u32 {
-    value.parse::<u32>().unwrap_or(60).clamp(30, 3600)
+    parse_clamped(value, 60, 30, 3600)
 }
 
 fn parse_u16_setting(value: &str, default: u16, min: u16, max: u16) -> u16 {
-    value.parse::<u16>().unwrap_or(default).clamp(min, max)
+    parse_clamped(value, default, min, max)
 }
 
 const MENU_ELEMENT_IDS: [&str; 6] = [
