@@ -957,7 +957,7 @@ fn graph_visual_with_dimensions(
     widget_height: cosmic::iced::Length,
     axis_start: Option<String>,
     secondary_values: Option<Vec<f64>>,
-    secondary_labels: Option<String>,
+    _secondary_labels: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = values.collect();
     let current_value = values.last().copied().unwrap_or(0.0);
@@ -1109,7 +1109,6 @@ fn graph_visual_with_dimensions(
         plot_top + plot_height / 2.0,
         plot_top + plot_height / 2.0
     );
-    let legend = String::new();
     let x_axis_title = format!(
         "<text x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">TIME</text>",
         plot_left + plot_width / 2.0,
@@ -1149,7 +1148,7 @@ fn graph_visual_with_dimensions(
         String::new()
     };
     let svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" preserveAspectRatio=\"none\" font-family=\"Inter, sans-serif\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{min_max_labels}{energy_label}{legend}{y_labels}{x_labels}{y_axis_title}{x_axis_title}{drawing}</svg>"
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" preserveAspectRatio=\"none\" font-family=\"Inter, sans-serif\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{min_max_labels}{energy_label}{y_labels}{x_labels}{y_axis_title}{x_axis_title}{drawing}</svg>"
     );
     widget::Column::new()
         .spacing(2)
@@ -3337,9 +3336,8 @@ impl cosmic::Application for AppModel {
                 .padding(8)
                 .width(cosmic::iced::Length::Fill)
                 .height(cosmic::iced::Length::Fill)
-                // Keep the expanded graph's information hierarchy consistent
-                // with compact graphs: title first, then MIN/MAX/CURRENT,
-                // the plot, and finally the time axis. Only the plot size differs.
+                // Expanded graphs share a Grafana-style time-range control,
+                // full-size plot, and bottom statistics legend.
                 .push({
                     let mut header = widget::Row::new()
                         .spacing(8)
@@ -8179,6 +8177,24 @@ impl cosmic::Application for AppModel {
 #[cfg(test)]
 mod history_tests {
     use super::*;
+
+    #[test]
+    fn expanded_graph_timespan_keeps_the_most_recent_samples() {
+        let values = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        assert_eq!(graph_values_for_timespan(&values, 30, 60), vec![5.0, 6.0, 7.0, 8.0]);
+        assert_eq!(graph_values_for_timespan(&values, 60, 60), values);
+        assert_eq!(graph_values_for_timespan(&values, 5, 60), vec![8.0]);
+        assert_eq!(graph_values_for_timespan(&[], 15, 60), Vec::<f64>::new());
+    }
+
+    #[test]
+    fn expanded_graph_legend_statistics_use_selected_series_values() {
+        let values = vec![10.0, 20.0, 30.0];
+        assert_eq!(graph_stat_value(&values, "W", "MIN"), "10 W");
+        assert_eq!(graph_stat_value(&values, "W", "MAX"), "30 W");
+        assert_eq!(graph_stat_value(&values, "W", "AVG"), "20 W");
+        assert_eq!(graph_stat_value(&[], "W", "AVG"), "—");
+    }
 
     #[test]
     fn router_uptime_is_formatted_without_losing_days() {
