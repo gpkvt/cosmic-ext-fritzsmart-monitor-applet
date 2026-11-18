@@ -1667,7 +1667,7 @@ pub async fn collect_fritzbox_debug_dump(settings: FritzSettings) -> serde_json:
                     Ok(response_body) => {
                         if let Some(wan_info) = parse_wan_link_info(&response_body) {
                             system_info
-                                .get_or_insert_with(|| FritzBoxSystemInfo {
+                                .get_or_insert(FritzBoxSystemInfo {
                                     manufacturer: None,
                                     model: None,
                                     product_class: None,
