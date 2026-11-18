@@ -2402,18 +2402,12 @@ fn diagnostic_section_heading(
     )
 }
 
-fn diagnostic_status_row(
+fn diagnostic_row(
     label: &'static str,
     status: impl ToString,
-    success: Option<bool>,
+    color: cosmic::iced::Color,
 ) -> cosmic::Element<'static, Message> {
-    let (symbol, color) = match success {
-        Some(true) => ("●", cosmic::iced::Color::from_rgb(0.20, 0.68, 0.40)),
-        Some(false) => ("●", cosmic::iced::Color::from_rgb(0.86, 0.27, 0.27)),
-        None => ("●", cosmic::iced::Color::from_rgb(0.82, 0.60, 0.20)),
-    };
-    let status = status.to_string();
-    let indicator = widget::container(widget::text(symbol).size(18))
+    let indicator = widget::container(widget::text("●").size(18))
         .width(cosmic::iced::Length::Fixed(24.0))
         .center_x(24)
         .style(move |_| cosmic::iced::widget::container::Style {
@@ -2431,41 +2425,31 @@ fn diagnostic_status_row(
                     .spacing(4)
                     .width(cosmic::iced::Length::Fill)
                     .push(widget::text::body(label))
-                    .push(widget::text::caption(status)),
+                    .push(widget::text::caption(status.to_string())),
             )
             .into(),
         10,
     )
 }
 
+fn diagnostic_status_row(
+    label: &'static str,
+    status: impl ToString,
+    success: Option<bool>,
+) -> cosmic::Element<'static, Message> {
+    let color = match success {
+        Some(true) => cosmic::iced::Color::from_rgb(0.20, 0.68, 0.40),
+        Some(false) => cosmic::iced::Color::from_rgb(0.86, 0.27, 0.27),
+        None => cosmic::iced::Color::from_rgb(0.82, 0.60, 0.20),
+    };
+    diagnostic_row(label, status, color)
+}
+
 fn diagnostic_info_row(
     label: &'static str,
     status: impl ToString,
 ) -> cosmic::Element<'static, Message> {
-    let status = status.to_string();
-    let indicator = widget::container(widget::text("●").size(18))
-        .width(cosmic::iced::Length::Fixed(24.0))
-        .center_x(24)
-        .style(|_| cosmic::iced::widget::container::Style {
-            text_color: Some(cosmic::iced::Color::WHITE),
-            ..Default::default()
-        });
-    surface_card(
-        widget::Row::new()
-            .spacing(12)
-            .align_y(cosmic::iced::Alignment::Center)
-            .width(cosmic::iced::Length::Fill)
-            .push(indicator)
-            .push(
-                widget::Column::new()
-                    .spacing(4)
-                    .width(cosmic::iced::Length::Fill)
-                    .push(widget::text::body(label))
-                    .push(widget::text::caption(status)),
-            )
-            .into(),
-        10,
-    )
+    diagnostic_row(label, status, cosmic::iced::Color::WHITE)
 }
 
 fn is_error_status(status: &str) -> bool {
