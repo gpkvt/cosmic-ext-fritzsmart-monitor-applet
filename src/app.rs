@@ -1236,7 +1236,10 @@ fn graph_values_for_timespan(samples: &[(Instant, f64)], selected_minutes: u32) 
     samples
         .iter()
         .copied()
-        .filter(|(timestamp, _)| *timestamp >= cutoff)
+        // Keep the selected window bounded at both ends. The upper bound
+        // also prevents clock-skewed or malformed future samples from
+        // stretching the graph beyond the requested range.
+        .filter(|(timestamp, _)| *timestamp >= cutoff && *timestamp <= now)
         .collect()
 }
 
@@ -8276,6 +8279,7 @@ mod history_tests {
             (now - Duration::from_secs(110), 2.0),
             (now - Duration::from_secs(50), 3.0),
             (now - Duration::from_secs(10), 4.0),
+            (now + Duration::from_secs(30), 5.0),
         ];
         let one_minute = graph_values_for_timespan(&samples, 1);
         assert_eq!(
@@ -8283,7 +8287,8 @@ mod history_tests {
                 .iter()
                 .map(|(_, value)| *value)
                 .collect::<Vec<_>>(),
-            vec![3.0, 4.0]
+            vec![3.0, 4.0],
+            "the range must include samples after the cutoff and exclude future samples"
         );
         let three_minutes = graph_values_for_timespan(&samples, 3);
         assert_eq!(three_minutes.len(), 4);
