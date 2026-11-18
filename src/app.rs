@@ -679,7 +679,7 @@ fn format_graph_timespan(minutes: u32) -> String {
 }
 
 fn input_display_power_w(power_w: i64) -> i64 {
-    power_w.saturating_neg().max(0)
+    power_w.saturating_abs()
 }
 
 fn input_display_range(history: &VecDeque<(Instant, i64)>) -> (i64, i64) {
@@ -8382,7 +8382,7 @@ mod history_tests {
         assert_eq!(input_display_range(&history), (100, 500));
         assert_eq!(input_display_power_w(-350), 350);
         assert_eq!(input_display_power_w(0), 0);
-        assert_eq!(input_display_power_w(350), 0);
+        assert_eq!(input_display_power_w(350), 350);
         assert_eq!(input_display_range(&VecDeque::new()), (0, 0));
     }
 
