@@ -298,8 +298,20 @@ pub async fn known_devices(
             return Ok(devices.clone());
         }
     }
-    // Startup refreshes must not run the expensive /24 scan. mDNS is the fast
-    // path here; the full subnet scan remains available from explicit discovery.
+    // Reuse confirmed IP addresses immediately after process restart. The
+    // reading request validates reachability; manual discovery refreshes DHCP changes.
+    let persisted = load_persisted_devices();
+    if !persisted.is_empty() {
+        *device_cache().lock().unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Some((Instant::now(), persisted.clone()));
+        record_discovery_diagnostic(format!(
+            "Restored {} Tasmota device address(es) from the local discovery cache.",
+            persisted.len()
+        ));
+        return Ok(persisted);
+    }
+    // Startup refreshes must not run the expensive /24 scan. The mDNS
+    // path is fast; the full subnet scan remains available from explicit discovery.
     discover_devices_with_options(
         username,
         password,
@@ -471,6 +483,7 @@ async fn discover_devices_with_options(
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner) =
         Some((Instant::now(), devices.clone()));
+    persist_devices(&devices);
     Ok(devices)
 }
 
