@@ -1086,34 +1086,49 @@ fn graph_visual_with_dimensions(
         plot_top + plot_height / 2.0,
         plot_top + plot_height / 2.0
     );
-    // Compact menu graphs rely on their surrounding metric labels; a legend
-    // would consume valuable plotting space without adding useful context.
-    // The expanded view gets a centered series key on its own header row.
+    // Compact menu graphs rely on their surrounding metric labels. In the
+    // expanded view, place a centered legend below the time ticks so it never
+    // competes with the plot header or the axis labels.
     let legend = if is_expanded {
-        let legend_y = 34.0;
-        if let Some(labels) = secondary_labels.as_deref() {
+        let entries: Vec<(&str, &str)> = if let Some(labels) = secondary_labels.as_deref() {
             let mut parts = labels.splitn(2, '|');
-            let primary_label = escape_svg_text(parts.next().unwrap_or(title));
-            let secondary_label = escape_svg_text(parts.next().unwrap_or("Input"));
-            format!(
-                "<g aria-label=\"Legend\"><path d=\"M{:.2} {legend_y:.2}h18\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"3\"/><text x=\"{:.2}\" y=\"{:.2}\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{primary_label}</text><path d=\"M{:.2} {legend_y:.2}h18\" fill=\"none\" stroke=\"#81c995\" stroke-width=\"3\"/><text x=\"{:.2}\" y=\"{:.2}\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{secondary_label}</text></g>",
-                plot_left + plot_width / 2.0 - 150.0,
-                plot_left + plot_width / 2.0 - 126.0,
-                legend_y + font_size * 0.35,
-                plot_left + plot_width / 2.0 + 20.0,
-                plot_left + plot_width / 2.0 + 44.0,
-                legend_y + font_size * 0.35
-            )
+            vec![
+                (parts.next().unwrap_or(title), "#8ab4f8"),
+                (parts.next().unwrap_or("Input"), "#81c995"),
+            ]
         } else {
-            let legend_title = escape_svg_text(title);
-            let legend_unit = escape_svg_text(unit);
-            format!(
-                "<g aria-label=\"Legend\"><path d=\"M{:.2} {legend_y:.2}h18\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"3\" stroke-linecap=\"round\"/><text x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{legend_title} ({legend_unit})</text></g>",
-                plot_left + plot_width / 2.0 - 62.0,
-                plot_left + plot_width / 2.0 + 8.0,
+            vec![(title, "#8ab4f8")]
+        };
+        let labels: Vec<String> = entries
+            .iter()
+            .map(|(label, _)| {
+                if secondary_labels.is_some() {
+                    escape_svg_text(label)
+                } else {
+                    format!("{} ({})", escape_svg_text(label), escape_svg_text(unit))
+                }
+            })
+            .collect();
+        let entry_widths: Vec<f64> = labels
+            .iter()
+            .map(|label| 18.0 + 10.0 + label.chars().count() as f64 * font_size * 0.56)
+            .collect();
+        let gap = 28.0;
+        let total_width = entry_widths.iter().sum::<f64>()
+            + gap * entries.len().saturating_sub(1) as f64;
+        let mut x = (plot_left + plot_right - total_width) / 2.0;
+        let legend_y = height - 55.0;
+        let mut markup = String::from("<g aria-label=\\"Legend\\">");
+        for ((_, color), label, entry_width) in entries.iter().zip(labels.iter()).zip(entry_widths) {
+            markup.push_str(&format!(
+                "<path d=\\"M{x:.2} {legend_y:.2}h18\\" fill=\\"none\\" stroke=\\"{color}\\" stroke-width=\\"3\\" stroke-linecap=\\"round\\"/><text x=\\"{:.2}\\" y=\\"{:.2}\\" font-size=\\"{font_size:.1}\\" fill=\\"#a0a0a0\\">{label}</text>",
+                x + 26.0,
                 legend_y + font_size * 0.35
-            )
+            ));
+            x += entry_width + gap;
         }
+        markup.push_str("</g>");
+        markup
     } else {
         String::new()
     };
