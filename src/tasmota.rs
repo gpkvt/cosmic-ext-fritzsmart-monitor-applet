@@ -103,7 +103,7 @@ fn parse_reading(device: &TasmotaDevice, value: &Value) -> Result<TasmotaReading
     })
 }
 
-fn discover_services() -> Result<Vec<(String, u16, IpAddr)>, String> {
+fn discover_services(scan_duration: Duration) -> Result<Vec<(String, u16, IpAddr)>, String> {
     let daemon = ServiceDaemon::new().map_err(|error| {
         let message = format!("mDNS discovery unavailable: {error}");
         record_discovery_diagnostic(message.clone());
@@ -115,7 +115,7 @@ fn discover_services() -> Result<Vec<(String, u16, IpAddr)>, String> {
         record_discovery_diagnostic(message.clone());
         message
     })?;
-    let deadline = Instant::now() + Duration::from_secs(6);
+    let deadline = Instant::now() + scan_duration;
     let mut found = HashSet::new();
     let mut resolved_services = 0usize;
     let mut matching_services = 0usize;
@@ -298,7 +298,16 @@ pub async fn known_devices(
             return Ok(devices.clone());
         }
     }
-    discover_devices(username, password, fritzbox_url).await
+    // Startup refreshes must not run the expensive /24 scan. mDNS is the fast
+    // path here; the full subnet scan remains available from explicit discovery.
+    discover_devices_with_options(
+        username,
+        password,
+        fritzbox_url,
+        false,
+        Duration::from_secs(2),
+    )
+    .await
 }
 
 pub async fn discover_devices(
@@ -306,15 +315,35 @@ pub async fn discover_devices(
     password: String,
     fritzbox_url: String,
 ) -> Result<Vec<TasmotaDevice>, String> {
+    discover_devices_with_options(
+        username,
+        password,
+        fritzbox_url,
+        true,
+        Duration::from_secs(6),
+    )
+    .await
+}
+
+async fn discover_devices_with_options(
+    username: String,
+    password: String,
+    fritzbox_url: String,
+    scan_subnet: bool,
+    mdns_duration: Duration,
+) -> Result<Vec<TasmotaDevice>, String> {
     record_discovery_diagnostic(
-        "Starting Tasmota discovery: browsing _http._tcp.local. for six seconds.",
+        format!(
+            "Starting Tasmota discovery: browsing _http._tcp.local. for {} seconds.",
+            mdns_duration.as_secs()
+        ),
     );
     record_discovery_diagnostic(format!(
         "Tasmota authentication: username configured={}, password configured={}.",
         !username.trim().is_empty(),
         !password.is_empty()
     ));
-    let services = match tokio::task::spawn_blocking(discover_services).await {
+    let services = match tokio::task::spawn_blocking(move || discover_services(mdns_duration)).await {
         Ok(Ok(services)) => services,
         Ok(Err(error)) => {
             record_discovery_diagnostic(format!("Tasmota mDNS scan failed: {error}"));
@@ -340,10 +369,12 @@ pub async fn discover_devices(
     for (hostname, port, ip) in services {
         endpoints.insert((hostname, port, ip), true);
     }
-    for ip in scan_fritzbox_ipv4_addresses(&fritzbox_url) {
-        endpoints
-            .entry((ip.to_string(), 80, IpAddr::V4(ip)))
-            .or_insert(false);
+    if scan_subnet {
+        for ip in scan_fritzbox_ipv4_addresses(&fritzbox_url) {
+            endpoints
+                .entry((ip.to_string(), 80, IpAddr::V4(ip)))
+                .or_insert(false);
+        }
     }
     record_discovery_diagnostic(format!(
         "Tasmota discovery probing {} unique endpoint(s) (mDNS plus FRITZ!Box /24 scan), with up to 32 requests in parallel.",
