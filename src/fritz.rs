@@ -1054,9 +1054,11 @@ pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<FritzDevice
 
     // Tasmota discovery is independent of FRITZ!Box availability and uses the
     // same credentials configured for the FRITZ!Box connection.
-    let tasmota_result =
-        crate::tasmota::discover_devices(settings.tasmota_username.clone(), settings.tasmota_password.clone())
-            .await;
+    let tasmota_result = crate::tasmota::discover_devices(
+        settings.tasmota_username.clone(),
+        settings.tasmota_password.clone(),
+    )
+    .await;
     let mut devices = fritz_result.unwrap_or_default();
     if let Ok(tasmota_devices) = tasmota_result {
         devices.extend(tasmota_devices.into_iter().map(|device| FritzDevice {
@@ -1862,8 +1864,11 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
     }
 
     if !selected_tasmota.is_empty() {
-        match crate::tasmota::known_devices(settings.tasmota_username.clone(), settings.tasmota_password.clone())
-            .await
+        match crate::tasmota::known_devices(
+            settings.tasmota_username.clone(),
+            settings.tasmota_password.clone(),
+        )
+        .await
         {
             Ok(devices) => {
                 let wanted: HashSet<String> = selected_tasmota
@@ -1946,8 +1951,13 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
             .ok_or_else(|| {
                 "Tasmota device is no longer discoverable on the local network".to_string()
             })?;
-        return crate::tasmota::set_power(&device, on, &settings.tasmota_username, &settings.tasmota_password)
-            .await;
+        return crate::tasmota::set_power(
+            &device,
+            on,
+            &settings.tasmota_username,
+            &settings.tasmota_password,
+        )
+        .await;
     }
 
     let settings = FritzSettings::load()?;
