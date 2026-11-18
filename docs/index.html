@@ -18,28 +18,17 @@
     .topbar{position:sticky;top:0;z-index:20;border-bottom:1px solid #ffffff12;background:#0b0e14d9;backdrop-filter:blur(18px)}.nav{height:76px;display:flex;align-items:center;justify-content:space-between;gap:24px}.brand{display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:-.04em}.brand img{width:36px;height:36px}.navlinks{display:flex;align-items:center;gap:25px;color:var(--muted);font-size:13px;font-weight:700}.navlinks a:hover{color:var(--text)}.nav-cta{padding:10px 16px;border:1px solid #8be0c466;border-radius:999px;color:var(--mint)}
     .hero{min-height:560px;display:grid;grid-template-columns:1.02fr .98fr;gap:48px;align-items:center;padding:78px 0 88px}.hero>.legal-notice{margin-top:22px;padding-top:18px;border-top:1px solid var(--line);color:var(--soft);font-size:11px;line-height:1.65}.legal-notice a{color:var(--muted);text-decoration:underline;text-underline-offset:3px}.legal-notice a:hover{color:var(--mint)}
     .reveal{max-width:780px}.hero h1{font-size:clamp(52px,7vw,88px);line-height:.99;letter-spacing:-.075em;margin:22px 0 25px;max-width:720px}.hero h1 span{color:var(--mint)}.hero-copy{font-size:19px;color:var(--muted);max-width:610px}.actions{display:flex;gap:13px;flex-wrap:wrap;margin-top:34px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:14px 20px;border-radius:999px;background:var(--mint);color:#0c211b;font-size:14px;font-weight:800;transition:transform .2s,box-shadow .2s}.btn:hover{color:#0c211b;transform:translateY(-2px);box-shadow:0 12px 34px #8be0c433}.btn.secondary{background:#ffffff08;border:1px solid var(--line);color:var(--text)}.btn.secondary:hover{color:var(--mint);border-color:#8be0c466}.hero-meta{display:flex;gap:24px;flex-wrap:wrap;margin-top:38px;color:var(--soft);font:12px "DM Mono",monospace}.hero-meta span{display:flex;align-items:center;gap:8px}.dot{width:6px;height:6px;border-radius:50%;background:var(--mint);box-shadow:0 0 12px var(--mint)}
-    .hero-gallery{position:relative;display:block;min-height:510px;padding:0;isolation:isolate}
-    .hero-shot{position:absolute;display:flex;flex-direction:column;min-width:0;overflow:visible;width:39%;height:66%;bottom:19%;padding:7px;border:1px solid #ffffff35;border-radius:12px;background:#111722;text-align:left;transform-origin:50% 100%}
-    .hero-shot:before{display:none}
-    .hero-shot img{display:block;width:100%;height:74%;min-height:0;object-fit:contain;border-radius:0;background:transparent;border:0}
-    .hero-card-title{display:block;padding:8px 0 1px;color:var(--text);font-size:10px;line-height:1.25;font-weight:800;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .hero-card-type{display:block;padding:2px 0;color:var(--muted);font:8px "DM Mono",monospace;letter-spacing:.04em}
-    .hero-card-description{display:-webkit-box;margin-top:3px;color:#c2ccda;font-size:8px;line-height:1.3;white-space:normal;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:3}
-    .hero-shot img{height:62%}
-    .hero-shot:nth-of-type(1){left:-1%;z-index:1;transform:rotate(-25deg) translateY(18px)}
-    .hero-shot:nth-of-type(2){left:7%;z-index:2;transform:rotate(-19deg) translateY(8px)}
-    .hero-shot:nth-of-type(3){left:15%;z-index:3;transform:rotate(-13deg) translateY(1px)}
-    .hero-shot:nth-of-type(4){left:23%;z-index:4;transform:rotate(-6deg) translateY(-5px)}
-    .hero-shot:nth-of-type(5){left:31%;z-index:5;transform:rotate(2deg) translateY(-8px)}
-    .hero-shot:nth-of-type(6){left:39%;z-index:6;transform:rotate(10deg) translateY(-4px)}
-    .hero-shot:nth-of-type(7){left:47%;z-index:7;transform:rotate(18deg) translateY(5px)}
-    .hero-shot:nth-of-type(8){left:55%;z-index:8;transform:rotate(25deg) translateY(15px)}
-    .hero-shot:nth-of-type(9){left:51%;z-index:9;transform:rotate(29deg) translateY(20px)}
-    .hero-shot:nth-of-type(10){left:55%;z-index:10;transform:rotate(33deg) translateY(25px)}
-    .hero-shot{transition:border-color .2s ease,box-shadow .2s ease,filter .2s ease}
-    .hero-shot:hover,.hero-shot:focus-visible{border-color:#8be0c4aa;box-shadow:0 10px 28px #0008;filter:brightness(1.08)}
-    .hero-shot:focus-visible{outline:2px solid var(--mint);outline-offset:5px}
-
+    .hero-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-content:center;min-height:0;padding:12px 0}
+    .hero-shot{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;width:auto;height:auto;bottom:auto;left:auto!important;z-index:auto!important;padding:10px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(145deg,#192231,#111722);text-align:left;transform:none!important;cursor:pointer;overflow:hidden;transition:border-color .2s,background .2s,box-shadow .2s}
+    .hero-shot:nth-of-type(n+5){display:none}
+    .hero-shot img{display:block;width:100%;height:112px;min-height:0;object-fit:contain;border-radius:8px;background:#090d13;border:1px solid #ffffff12}
+    .hero-card-title{display:block;padding:9px 0 1px;color:var(--text);font-size:12px;line-height:1.3;font-weight:800;letter-spacing:.01em}
+    .hero-card-type{display:block;padding:2px 0;color:var(--muted);font:9px "DM Mono",monospace;letter-spacing:.04em}
+    .hero-card-description{display:block;margin-top:4px;color:#c2ccda;font-size:10px;line-height:1.4}
+    .hero-shot:hover,.hero-shot:focus-visible{border-color:#8be0c4aa;background:#1b2934;box-shadow:0 10px 28px #0005}
+    .hero-shot:focus-visible{outline:2px solid var(--mint);outline-offset:3px}
+    .gallery-all{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 14px;border:1px solid #8be0c455;border-radius:999px;color:var(--mint);font-size:12px;font-weight:800;cursor:pointer;background:#8be0c40b}
+    .gallery-all:hover{background:#8be0c41a;border-color:var(--mint)}
     .hero-visual{position:relative;padding:25px 0 25px 20px}.glow{position:absolute;inset:12% 0 0 10%;background:radial-gradient(ellipse,#5ed5b522,transparent 65%);filter:blur(15px)}.screen{position:relative;border:1px solid #ffffff20;border-radius:25px;background:linear-gradient(145deg,#202a39,#111722);padding:13px;box-shadow:0 35px 100px #0009;transform:rotate(1.2deg)}.desktop-bar{height:40px;border-radius:13px;background:#090d14;display:flex;align-items:center;justify-content:space-between;padding:0 14px;color:#dbe3ee;font:12px "DM Mono",monospace}.desktop-icons{display:flex;gap:10px;align-items:center}.mini-icon{width:7px;height:7px;border-radius:50%;background:#8be0c4}.applet{width:min(100%,380px);margin:18px 10px 10px auto;padding:17px;border:1px solid #ffffff16;border-radius:19px;background:#151d29;box-shadow:0 15px 45px #0006}.applet-head{display:flex;align-items:center;justify-content:space-between;color:#a8b5c7;font-size:11px;font-weight:700;letter-spacing:.1em}.live-pill{padding:4px 8px;border-radius:20px;background:#8be0c41a;color:var(--mint);font:10px "DM Mono",monospace}.big-watts{font-size:52px;letter-spacing:-.07em;font-weight:800;line-height:1.2;margin:9px 0 0}.big-watts small{font-size:18px;color:var(--muted);letter-spacing:0}.substats{display:flex;gap:8px;margin:12px 0 16px}.stat{flex:1;padding:9px 11px;background:#ffffff08;border:1px solid #ffffff0c;border-radius:11px}.stat label{display:block;color:#8997aa;font-size:9px;letter-spacing:.09em}.stat strong{font:14px "DM Mono",monospace}.device-row{display:flex;align-items:center;justify-content:space-between;border-top:1px solid #ffffff12;padding:11px 2px;font-size:12px}.device-row b{font:12px "DM Mono",monospace;color:var(--mint)}.device-name{display:flex;align-items:center;gap:9px}.device-dot{width:8px;height:8px;border-radius:3px;background:var(--blue)}.device-row:nth-of-type(2) .device-dot{background:var(--amber)}.device-row:nth-of-type(3) .device-dot{background:var(--violet)}.float-tag{position:absolute;bottom:3px;left:-3px;padding:12px 15px;border:1px solid #ffffff1c;border-radius:14px;background:#192231;color:#d8e4ef;box-shadow:0 12px 40px #0008;font-size:11px}.float-tag strong{color:var(--mint);font:14px "DM Mono",monospace}
     .trustline{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:22px 0}.trust-inner{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;color:var(--soft);font:11px "DM Mono",monospace;letter-spacing:.08em;text-transform:uppercase}.trust-inner span{display:flex;align-items:center;gap:9px}
     section{padding:112px 0;border-bottom:1px solid var(--line)}.section-head{max-width:720px;margin-bottom:45px}.section-head h2{font-size:clamp(34px,5vw,58px);line-height:1.06;letter-spacing:-.065em;margin:17px 0}.section-head p{font-size:17px;color:var(--muted);margin:0}.section-kicker{color:var(--soft);font:12px "DM Mono",monospace;letter-spacing:.12em;text-transform:uppercase}
@@ -75,38 +64,9 @@
     @media(max-width:850px){.hero{grid-template-columns:1fr;padding:70px 0;gap:28px}.hero-gallery{max-width:680px;width:100%;margin:auto;min-height:470px}.hero-shot:nth-child(3){display:block}.hero-visual{max-width:600px;margin:auto;width:100%}.feature-grid{grid-template-columns:repeat(2,1fr)}.showcase,.showcase:nth-of-type(even){grid-template-columns:1fr;gap:30px}.showcase:nth-of-type(even) .showcase-copy{order:0}.install-band{grid-template-columns:1fr}.navlinks{gap:14px}.navlinks a:not(.nav-cta){display:none}}
     @media(max-width:560px){.wrap{width:calc(100% - 32px)}.hero-gallery{min-height:370px}.hero-shot{width:40%;height:64%;padding:5px}.hero-card-title{font-size:8px;padding-top:5px}.hero-card-type{font-size:7px}.hero-card-description{font-size:7px;line-height:1.25;-webkit-line-clamp:3}.hero-shot{padding:4px;border-radius:10px}.hero-shot img{border-radius:4px}.nav{height:66px}.brand{font-size:14px}.brand img{width:30px}.hero h1{font-size:53px}.hero-copy{font-size:16px}.hero-visual{padding:10px 0}.applet{margin-right:0;width:100%}.float-tag{left:-5px;bottom:-5px}.feature-grid,.steps,.details-grid{grid-template-columns:1fr}.feature{min-height:0}.section-head{margin-bottom:30px}section{padding:78px 0}.showcase{margin:58px 0}.install-band{padding:25px}.settings-shot{grid-template-columns:92px 1fr}.settings-menu span{font-size:8px;padding:7px 5px}.metric b{font-size:18px}.trust-inner{gap:12px}.footer-inner{align-items:flex-start;flex-direction:column}}
     @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.reveal{opacity:1;transform:none;transition:none}*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
-    /* Screenshot cards are dealt into a fan and use a restrained, non-moving hover highlight. */
-    .hero-gallery{perspective:1500px;overflow:visible}
-    .hero-shot{opacity:0;cursor:pointer}
-    .hero-gallery.cards-dealt .hero-shot{animation:card-deal .72s cubic-bezier(.2,.75,.25,1) both;animation-delay:calc(var(--card-index,0)*85ms)}
-    .hero-shot:nth-of-type(1){--card-index:0;--card-transform:rotate(-25deg) translateY(18px)}
-    .hero-shot:nth-of-type(2){--card-index:1;--card-transform:rotate(-19deg) translateY(8px)}
-    .hero-shot:nth-of-type(3){--card-index:2;--card-transform:rotate(-13deg) translateY(1px)}
-    .hero-shot:nth-of-type(4){--card-index:3;--card-transform:rotate(-6deg) translateY(-5px)}
-    .hero-shot:nth-of-type(5){--card-index:4;--card-transform:rotate(2deg) translateY(-8px)}
-    .hero-shot:nth-of-type(6){--card-index:5;--card-transform:rotate(10deg) translateY(-4px)}
-    .hero-shot:nth-of-type(7){--card-index:6;--card-transform:rotate(18deg) translateY(5px)}
-    .hero-shot:nth-of-type(8){--card-index:7;--card-transform:rotate(25deg) translateY(15px)}
-    .hero-shot:nth-of-type(9){--card-index:8;--card-transform:rotate(29deg) translateY(20px)}
-    .hero-shot:nth-of-type(10){--card-index:9;--card-transform:rotate(33deg) translateY(25px)}
-    @keyframes card-deal{from{opacity:0;transform:translateY(115px) scale(.78)}to{opacity:1;transform:var(--card-transform)}}
-    .screenshot-dialog[open]{animation:gallery-enter .32s cubic-bezier(.2,.8,.2,1) both}
-    .screenshot-dialog[open] .gallery-stage img{animation:gallery-image-enter .42s cubic-bezier(.2,.8,.2,1) both}
-    @keyframes gallery-enter{from{opacity:0;transform:scale(.94) translateY(18px)}to{opacity:1;transform:scale(1) translateY(0)}}
-    @keyframes gallery-image-enter{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
-    @media(prefers-reduced-motion:reduce){.screenshot-dialog[open],.screenshot-dialog[open] .gallery-stage img{animation:none}}
-    /* Keep hero-card captions legible without changing the layered gallery layout. */
-    .hero-card-title{font-size:11px;padding-top:9px}
-    .hero-card-type{font-size:9px}
-    .hero-card-description{font-size:9.5px;line-height:1.4;-webkit-line-clamp:4;color:#d2dbe7}
-    .hero-shot:hover,.hero-shot:focus-visible{z-index:30!important;transform:rotate(0deg) translateY(-8px) scale(1.12)!important}
-    @media(max-width:560px){
-      .hero-card-title{font-size:9px;padding-top:6px}
-      .hero-card-type{font-size:8px}
-      .hero-card-description{font-size:8.5px;line-height:1.3;-webkit-line-clamp:4}
-      .hero-shot:hover,.hero-shot:focus-visible{transform:rotate(0deg) translateY(-5px) scale(1.06)!important}
-    }
-
+    /* The first four screenshots are preview cards; the modal contains the full ten-shot gallery. */
+    @media(max-width:850px){.hero-gallery{max-width:680px;width:100%;margin:auto}.hero-shot img{height:150px}}
+    @media(max-width:560px){.hero-gallery{gap:9px}.hero-shot{padding:7px}.hero-shot img{height:105px}.hero-card-title{font-size:10px}.hero-card-type{font-size:8px}.hero-card-description{font-size:9px}}
     /* Keep page copy readable even when enhancement scripts do not run. */
     .reveal,.reveal.visible{opacity:1!important;transform:none!important;visibility:visible!important}
   </style>
@@ -137,6 +97,7 @@
         <a class="hero-shot" href="Screenshot_2026-11-16_18-19-20.png" data-open-gallery aria-label="Open connection settings screenshot in gallery"><img src="Screenshot_2026-11-16_18-19-20.png" alt="FRITZ!Box connection settings for router address, credentials and trusted TLS certificate" loading="lazy"><span class="hero-card-title">Connection settings</span><span class="hero-card-type">Router · TLS</span><span class="hero-card-description">Set the router address, credentials and trusted TLS certificate.</span></a>
         <a class="hero-shot" href="Screenshot_2026-11-16_18-20-15.png" data-open-gallery aria-label="Open power graph screenshot in gallery"><img src="Screenshot_2026-11-16_18-20-15.png" alt="Detailed power graph showing changes in household consumption over time" loading="lazy"><span class="hero-card-title">Power graph</span><span class="hero-card-type">Monitoring · Graphs</span><span class="hero-card-description">Follow household consumption changes in a detailed graph view.</span></a>
         <a class="hero-shot" href="Screenshot_2026-11-16_18-20-43.png" data-open-gallery aria-label="Open device details screenshot in gallery"><img src="Screenshot_2026-11-16_18-20-43.png" alt="Device details with individual power and temperature monitoring information" loading="lazy"><span class="hero-card-title">Device details</span><span class="hero-card-type">Devices · Details</span><span class="hero-card-description">Review individual device readings and monitoring details.</span></a>
+        <button class="gallery-all" type="button" data-open-gallery>View all 10 screenshots <span aria-hidden="true">→</span></button>
       </div>
     </div>
     <div class="trustline"><div class="wrap trust-inner"><span>⌁ Live FRITZ!Box readings</span><span>◌ Device-level history</span><span>⌂ Native COSMIC panel</span><span>↗ No cloud account required for core monitoring</span></div></div>
@@ -291,19 +252,12 @@
       }
       seenHeroImages.add(source);
     });
-    heroCards.forEach((card,index)=>{
+    heroCards.forEach(card=>{
       card.addEventListener('click',event=>{
         event.preventDefault();
-        openGallery(index);
-      });
-      card.addEventListener('animationend',event=>{
-        if(event.animationName==='card-deal'){
-          card.style.animation='none';
-          card.style.opacity='1';
-        }
+        openGallery(screenshots.findIndex(shot=>shot.src===card.querySelector('img')?.getAttribute('src')));
       });
     });
-    requestAnimationFrame(()=>heroGallery?.classList.add('cards-dealt'));
     document.querySelectorAll('[data-open-gallery]:not(.hero-shot)').forEach(el=>el.addEventListener('click',()=>openGallery(0)));
     previousButton.addEventListener('click',()=>showScreenshot(currentScreenshot-1));
     nextButton.addEventListener('click',()=>showScreenshot(currentScreenshot+1));
