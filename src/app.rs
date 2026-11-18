@@ -6815,10 +6815,8 @@ impl cosmic::Application for AppModel {
                                     now.duration_since(*timestamp) <= window
                                 })
                                 .collect();
-                            let values: Vec<f64> = visible
-                                .iter()
-                                .map(|(_, power, _)| *power as f64)
-                                .collect();
+                            let values: Vec<f64> =
+                                visible.iter().map(|(_, power, _)| *power as f64).collect();
                             let axis_start = format_graph_axis_start(
                                 self.settings.graph_timespan_minutes,
                                 visible.first().map(|(timestamp, _, _)| {
