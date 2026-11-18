@@ -21,9 +21,9 @@ use std::time::{Duration, Instant};
 
 static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
     LazyLock::new(|| widget::Id::new("fritz-power-monitor-autosize-main"));
-#[derive(Default)]
-pub type GraphSamples = Vec<(Instant, f64)>;
+type GraphSamples = Vec<(Instant, f64)>;
 
+#[derive(Default)]
 struct AppModel {
     core: cosmic::Core,
     popup: Option<Id>,
@@ -3501,15 +3501,16 @@ impl cosmic::Application for AppModel {
                 )
                 .push({
                     let primary_stats = graph_values_only(values);
-                    let secondary =
-                        self.expanded_graph_secondary
-                            .as_ref()
-                            .map(|(series, labels)| {
-                                let mut parts = labels.splitn(2, '|');
-                                let _primary = parts.next();
-                                let secondary_label = parts.next().unwrap_or("Input");
-                                (series.as_slice(), secondary_label)
-                            });
+                    let secondary_stats = self
+                        .expanded_graph_secondary
+                        .as_ref()
+                        .map(|(series, labels)| {
+                            let secondary_label = labels.split('|').nth(1).unwrap_or("Input");
+                            (graph_values_only(series), secondary_label.to_string())
+                        });
+                    let secondary = secondary_stats
+                        .as_ref()
+                        .map(|(series, label)| (series.as_slice(), label.as_str()));
                     let primary_label = self
                         .expanded_graph_secondary
                         .as_ref()
@@ -8197,15 +8198,20 @@ mod history_tests {
     use super::*;
 
     #[test]
-    fn expanded_graph_timespan_keeps_the_most_recent_samples() {
-        let values = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
-        assert_eq!(
-            graph_values_for_timespan(&values, 30, 60),
-            vec![5.0, 6.0, 7.0, 8.0]
-        );
-        assert_eq!(graph_values_for_timespan(&values, 60, 60), values);
-        assert_eq!(graph_values_for_timespan(&values, 5, 60), vec![8.0]);
-        assert_eq!(graph_values_for_timespan(&[], 15, 60), Vec::<f64>::new());
+    fn expanded_graph_timespan_filters_by_sample_timestamps() {
+        let now = Instant::now();
+        let samples = vec![
+            (now - Duration::from_secs(180), 1.0),
+            (now - Duration::from_secs(120), 2.0),
+            (now - Duration::from_secs(60), 3.0),
+            (now - Duration::from_secs(10), 4.0),
+        ];
+        let one_minute = graph_values_for_timespan(&samples, 1);
+        assert_eq!(one_minute.iter().map(|(_, value)| *value).collect::<Vec<_>>(), vec![3.0, 4.0]);
+        let three_minutes = graph_values_for_timespan(&samples, 3);
+        assert_eq!(three_minutes.len(), 4);
+        assert!(graph_max_timespan_minutes(&samples) >= 3);
+        assert!(graph_values_for_timespan(&[], 15).is_empty());
     }
 
     #[test]
