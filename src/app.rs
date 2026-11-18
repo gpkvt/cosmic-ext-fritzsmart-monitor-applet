@@ -1114,8 +1114,8 @@ fn graph_visual_with_dimensions(
             .map(|label| 18.0 + 10.0 + label.chars().count() as f64 * font_size * 0.56)
             .collect();
         let gap = 28.0;
-        let total_width = entry_widths.iter().sum::<f64>()
-            + gap * entries.len().saturating_sub(1) as f64;
+        let total_width =
+            entry_widths.iter().sum::<f64>() + gap * entries.len().saturating_sub(1) as f64;
         let mut x = (plot_left + plot_right - total_width) / 2.0;
         let legend_y = height - 55.0;
         let mut markup = String::from("<g aria-label=\"Legend\">");
