@@ -855,8 +855,8 @@ fn graph_visual_large(
         style,
         title,
         unit,
-        480.0,
-        cosmic::iced::Length::Fixed(480.0),
+        390.0,
+        cosmic::iced::Length::Fixed(390.0),
         axis_start,
         None,
         None,
@@ -1187,6 +1187,11 @@ fn graph_stats_row(
             text_color: Some(color),
             ..Default::default()
         });
+    let axis_label = if label.contains(unit) {
+        label
+    } else {
+        format!("{label} ({unit})")
+    };
     widget::Row::new()
         .spacing(8)
         .align_y(cosmic::iced::Alignment::Center)
@@ -1196,7 +1201,7 @@ fn graph_stats_row(
                 .align_y(cosmic::iced::Alignment::Center)
                 .push(marker)
                 .push(
-                    widget::text::body(format!("{label} ({unit})"))
+                    widget::text::body(axis_label)
                         .width(cosmic::iced::Length::Fill),
                 )
                 .width(cosmic::iced::Length::Fill),
@@ -1244,7 +1249,11 @@ fn graph_stats_legend(
     legend.into()
 }
 
-fn graph_values_for_timespan(values: &[f64], selected_minutes: u32, maximum_minutes: u32) -> Vec<f64> {
+fn graph_values_for_timespan(
+    values: &[f64],
+    selected_minutes: u32,
+    maximum_minutes: u32,
+) -> Vec<f64> {
     if values.is_empty() || maximum_minutes == 0 || selected_minutes >= maximum_minutes {
         return values.to_vec();
     }
