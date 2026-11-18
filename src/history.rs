@@ -114,7 +114,6 @@ fn parse_device_history(
     histories
 }
 
-
 pub fn load(window: Duration) -> (PowerHistory, DeviceHistory) {
     let Ok(path) = history_path() else {
         return (PowerHistory::new(), DeviceHistory::new());

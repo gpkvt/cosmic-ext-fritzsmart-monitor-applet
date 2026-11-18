@@ -625,9 +625,7 @@ fn commons_title_matches_condition(icon_code: &str, title: &str) -> bool {
                 || has(&["clear"]) && normalized.contains("clear sky"))
                 && clear_conditions()
         }
-        "02" | "03" | "04" => {
-            has(&clouds) && clear_conditions()
-        }
+        "02" | "03" | "04" => has(&clouds) && clear_conditions(),
         "09" | "10" => has(&rain) && !has(&storm) && !has(&snow),
         "11" => has(&storm),
         "13" => has(&snow),
