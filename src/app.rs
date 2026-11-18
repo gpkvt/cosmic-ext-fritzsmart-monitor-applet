@@ -3981,19 +3981,20 @@ impl cosmic::Application for AppModel {
                         _ => continue,
                     };
                     let visible = panel_item_is_enabled(&self.settings, id);
-                    let mut row = widget::Row::new()
-                        .spacing(8)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(
-                            widget::text::body(crate::i18n::tr(
-                                &self.settings.language,
-                                panel_item_label(id),
-                            ))
-                            .width(cosmic::iced::Length::Fill),
-                        )
-                        .push(widget::toggler(visible).on_toggle(move |value| {
-                            Message::TogglePanelItemVisibility(id, value)
-                        }));
+                    let mut row =
+                        widget::Row::new()
+                            .spacing(8)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::text::body(crate::i18n::tr(
+                                    &self.settings.language,
+                                    panel_item_label(id),
+                                ))
+                                .width(cosmic::iced::Length::Fill),
+                            )
+                            .push(widget::toggler(visible).on_toggle(move |value| {
+                                Message::TogglePanelItemVisibility(id, value)
+                            }));
                     row = row.push(icon_action_button(
                         "+",
                         crate::i18n::tr(&self.settings.language, "Move up"),
