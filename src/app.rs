@@ -987,12 +987,26 @@ fn graph_visual_with_dimensions(
         })
         .collect::<String>();
 
-    let svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {height}\" preserveAspectRatio=\"none\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{y_labels}{x_labels}{drawing}</svg>"
+    let y_axis_title = format!(
+        "<text x=\"18\" y=\"{:.2}\" text-anchor=\"middle\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\" transform=\"rotate(-90 18 {:.2})\">{unit}</text>",
+        plot_top + plot_height / 2.0,
+        plot_top + plot_height / 2.0
     );
-    widget::svg(cosmic::iced::widget::svg::Handle::from_memory(svg.into_bytes()))
-        .width(cosmic::iced::Length::Fill)
-        .height(widget_height)
+    let svg = format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {WIDTH} {height}\" preserveAspectRatio=\"none\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{y_labels}{x_labels}{y_axis_title}{drawing}</svg>"
+    );
+    widget::Column::new()
+        .spacing(2)
+        .push(
+            widget::svg(cosmic::iced::widget::svg::Handle::from_memory(svg.into_bytes()))
+                .width(cosmic::iced::Length::Fill)
+                .height(widget_height),
+        )
+        .push(
+            widget::container(widget::text::caption("TIME"))
+                .width(cosmic::iced::Length::Fill)
+                .center_x(cosmic::iced::Length::Fill),
+        )
         .into()
 }
 
@@ -5376,6 +5390,12 @@ impl cosmic::Application for AppModel {
                 if let Some(weather_card) = weather_menu_card.take() {
                     menu_cards.push(("1-weather".to_string(), weather_card));
                 }
+                let bandwidth_axis_start = format_graph_axis_start(
+                    self.settings.graph_timespan_minutes,
+                    self.bandwidth_history.front().map(|(timestamp, _, _)| {
+                        Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)
+                    }),
+                );
                 let bandwidth_card = if let Some(bandwidth) = self.internet_bandwidth.as_ref() {
                     widget::Column::new()
                         .spacing(8)
@@ -5420,7 +5440,7 @@ impl cosmic::Application for AppModel {
                                 .contains("graph-bandwidth-pair"),
                             widget::Column::new()
                                 .spacing(8)
-                                .push(interactive_graph(
+                                .push(interactive_graph_with_axis(
                                     &self.settings.language,
                                     crate::i18n::tr(&self.settings.language, "DOWNLOAD HISTORY"),
                                     self.bandwidth_history
@@ -5428,8 +5448,9 @@ impl cosmic::Application for AppModel {
                                         .map(|(_, download, _)| *download as f64 / 1_000_000.0),
                                     &self.settings.graph_style,
                                     "Mb/s",
+                                    bandwidth_axis_start.clone(),
                                 ))
-                                .push(interactive_graph(
+                                .push(interactive_graph_with_axis(
                                     &self.settings.language,
                                     crate::i18n::tr(&self.settings.language, "UPLOAD HISTORY"),
                                     self.bandwidth_history
@@ -5437,6 +5458,7 @@ impl cosmic::Application for AppModel {
                                         .map(|(_, _, upload)| *upload as f64 / 1_000_000.0),
                                     &self.settings.graph_style,
                                     "Mb/s",
+                                    bandwidth_axis_start,
                                 ))
                                 .into(),
                         ))
@@ -5603,6 +5625,14 @@ impl cosmic::Application for AppModel {
                             "utilities-temperature-symbolic",
                             device_corner_radius,
                         ));
+                    let device_axis_start = format_graph_axis_start(
+                        self.settings.graph_timespan_minutes,
+                        device_history.and_then(|samples| {
+                            samples.front().map(|(timestamp, _, _)| {
+                                Instant::now().duration_since(*timestamp).as_secs().div_ceil(60)
+                            })
+                        }),
+                    );
                     let device_graph_pair_id = format!("device-graph-pair-{device_key}");
                     let device_graph_pair_collapsed =
                         self.collapsed_menu_sections.contains(&device_graph_pair_id);
@@ -5623,7 +5653,7 @@ impl cosmic::Application for AppModel {
                                                 &self.settings.language,
                                                 "POWER (W)",
                                             )))
-                                            .push(interactive_graph(
+                                            .push(interactive_graph_with_axis(
                                                 &self.settings.language,
                                                 &format!(
                                                     "{} · {}",
@@ -5640,36 +5670,8 @@ impl cosmic::Application for AppModel {
                                                 }),
                                                 &self.settings.graph_style,
                                                 "W",
-                                            ))
-                                            .push(
-                                                widget::Row::new()
-                                                    .width(cosmic::iced::Length::Fill)
-                                                    .push(widget::text::caption(
-                                                        format_graph_axis_start(
-                                                            self.settings.graph_timespan_minutes,
-                                                            device_history.and_then(|samples| {
-                                                                samples.front().map(
-                                                                    |(timestamp, _, _)| {
-                                                                        Instant::now()
-                                                                            .duration_since(
-                                                                                *timestamp,
-                                                                            )
-                                                                            .as_secs()
-                                                                            .div_ceil(60)
-                                                                    },
-                                                                )
-                                                            }),
-                                                        ),
-                                                    ))
-                                                    .push(
-                                                        widget::Space::new()
-                                                            .width(cosmic::iced::Length::Fill),
-                                                    )
-                                                    .push(widget::text::caption(crate::i18n::tr(
-                                                        &self.settings.language,
-                                                        "Now",
-                                                    ))),
-                                            ),
+                                                device_axis_start.clone(),
+                                            )),
                                     )
                                     .padding([8, 0])
                                     .width(cosmic::iced::Length::Fill)
@@ -5736,36 +5738,8 @@ impl cosmic::Application for AppModel {
                                                 }),
                                                 &self.settings.graph_style,
                                                 "°C",
-                                            ))
-                                            .push(
-                                                widget::Row::new()
-                                                    .width(cosmic::iced::Length::Fill)
-                                                    .push(widget::text::caption(
-                                                        format_graph_axis_start(
-                                                            self.settings.graph_timespan_minutes,
-                                                            device_history.and_then(|samples| {
-                                                                samples.front().map(
-                                                                    |(timestamp, _, _)| {
-                                                                        Instant::now()
-                                                                            .duration_since(
-                                                                                *timestamp,
-                                                                            )
-                                                                            .as_secs()
-                                                                            .div_ceil(60)
-                                                                    },
-                                                                )
-                                                            }),
-                                                        ),
-                                                    ))
-                                                    .push(
-                                                        widget::Space::new()
-                                                            .width(cosmic::iced::Length::Fill),
-                                                    )
-                                                    .push(widget::text::caption(crate::i18n::tr(
-                                                        &self.settings.language,
-                                                        "Now",
-                                                    ))),
-                                            ),
+                                                device_axis_start,
+                                            )),
                                     )
                                     .padding([8, 0])
                                     .width(cosmic::iced::Length::Fill)
