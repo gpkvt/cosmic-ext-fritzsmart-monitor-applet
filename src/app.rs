@@ -541,22 +541,17 @@ fn rebuild_device_history_graph(
     name: &str,
     language: &str,
     minutes: u32,
-) -> (String, Vec<f64>, String, Option<String>) {
+) -> (String, GraphSamples, String, Option<String>) {
     let now = Instant::now();
     let window = graph_history_window(minutes);
-    let visible: Vec<_> = device_history
+    let values: GraphSamples = device_history
         .get(ain)
         .into_iter()
         .flat_map(|samples| samples.iter())
         .filter(|(timestamp, _, _)| now.duration_since(*timestamp) <= window)
+        .map(|(timestamp, power, _)| (*timestamp, *power as f64))
         .collect();
-    let values = visible.iter().map(|(_, power, _)| *power as f64).collect();
-    let axis_start = format_graph_axis_start(
-        minutes,
-        visible
-            .first()
-            .map(|(timestamp, _, _)| now.duration_since(*timestamp).as_secs().div_ceil(60)),
-    );
+    let axis_start = graph_axis_start_for_samples(&values, minutes);
     (
         format!("{} · {}", name, crate::i18n::tr(language, "POWER (W)")),
         values,
@@ -7529,13 +7524,31 @@ impl cosmic::Application for AppModel {
                     if let Some(index) = self.history_graph_index
                         && let Some((key, name)) = self.history_graph_devices.get(index).cloned()
                     {
-                        self.expanded_graph = Some(rebuild_device_history_graph(
+                        let graph = rebuild_device_history_graph(
+
                             &self.device_history,
+
                             &key,
+
                             &name,
+
                             &self.settings.language,
+
                             self.settings.graph_timespan_minutes,
-                        ));
+
+                        );
+
+                        self.expanded_graph_full_values = Some(graph.1.clone());
+
+                        self.expanded_graph_full_secondary = None;
+
+                        self.expanded_graph_max_timespan_minutes = graph_max_timespan_minutes(&graph.1);
+
+                        self.expanded_graph_view_timespan_minutes =
+
+                            self.expanded_graph_max_timespan_minutes;
+
+                        self.expanded_graph = Some(graph);
                     }
                     self.persist_settings();
                 }
@@ -7934,13 +7947,31 @@ impl cosmic::Application for AppModel {
                 if let Some(index) = self.history_graph_index
                     && let Some((key, name)) = self.history_graph_devices.get(index).cloned()
                 {
-                    self.expanded_graph = Some(rebuild_device_history_graph(
+                    let graph = rebuild_device_history_graph(
+
                         &self.device_history,
+
                         &key,
+
                         &name,
+
                         &self.settings.language,
+
                         self.settings.graph_timespan_minutes,
-                    ));
+
+                    );
+
+                    self.expanded_graph_full_values = Some(graph.1.clone());
+
+                    self.expanded_graph_full_secondary = None;
+
+                    self.expanded_graph_max_timespan_minutes = graph_max_timespan_minutes(&graph.1);
+
+                    self.expanded_graph_view_timespan_minutes =
+
+                        self.expanded_graph_max_timespan_minutes;
+
+                    self.expanded_graph = Some(graph);
                 }
                 self.persist_settings();
             }
