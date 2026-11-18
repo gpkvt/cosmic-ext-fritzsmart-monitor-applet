@@ -6509,10 +6509,32 @@ impl cosmic::Application for AppModel {
                         }
                     });
                 content = content.push(device_list);
+            } else if self.devices.is_empty() {
+                if self.devices_loading || self.refresh_started_at.is_some() {
+                    content = content.push(widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::icon::from_name("view-refresh-symbolic").size(16))
+                        .push(widget::text::body(crate::i18n::tr(
+                            &self.settings.language,
+                            "Loading saved devices…",
+                        ))));
+                } else {
+                    content = content
+                        .push(widget::text::body(crate::i18n::tr(
+                            &self.settings.language,
+                            "No devices found yet.",
+                        )))
+                        .push(action_button(
+                            "view-refresh-symbolic",
+                            crate::i18n::tr(&self.settings.language, "Discover devices"),
+                            Message::DiscoverDevices,
+                        ));
+                }
             } else {
                 content = content.push(widget::text::body(crate::i18n::tr(
                     &self.settings.language,
-                    "Select one or more devices in Settings",
+                    "No devices selected. Select devices in Settings.",
                 )));
             }
 
