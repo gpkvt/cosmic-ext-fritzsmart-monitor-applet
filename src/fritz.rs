@@ -2502,7 +2502,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn bounded_u16_settings_use_defaults_and_clamp_values() {
         assert_eq!(parse_u16_setting("", 10, 5, 60), 10);
