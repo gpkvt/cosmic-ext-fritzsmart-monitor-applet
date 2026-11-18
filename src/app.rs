@@ -241,8 +241,8 @@ fn build_debug_report(app: &AppModel, fritzbox_dump: &str) -> String {
                     "redacted".into()
                 };
                 format!(
-                    "- {} (AIN {masked_ain}): {} W, {:.1} °C, power state {:?}",
-                    reading.name, reading.power_w, reading.temperature_c, reading.power_state
+                    "- {} (AIN {masked_ain}): {} W, {}, power state {:?}",
+                    reading.name, reading.power_w, format_panel_temperature(reading.temperature_c), reading.power_state
                 )
             })
             .collect::<Vec<_>>()
@@ -642,11 +642,16 @@ fn selected_weather_temperature(
         .iter()
         .find(|reading| crate::fritz::normalize_ain_for_selection(&reading.ain) == selected)
         .map(|reading| reading.temperature_c)
+        .filter(|temperature| temperature.is_finite())
         .unwrap_or(fallback_c)
 }
 
 fn format_panel_temperature(temperature_c: f64) -> String {
-    format!("{} °C", format_compact_decimal(temperature_c))
+    if temperature_c.is_finite() {
+        format!("{} °C", format_compact_decimal(temperature_c))
+    } else {
+        "-- °C".into()
+    }
 }
 
 fn format_countdown(seconds: u64) -> String {
@@ -1394,6 +1399,7 @@ fn net_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
 fn average_temperature_c(readings: &[FritzReading], exclude_solar: bool) -> Option<f64> {
     let temperatures = readings
         .iter()
+        .filter(|reading| reading.temperature_c.is_finite())
         .filter(|reading| !exclude_solar || !reading.name.to_lowercase().contains("solar"));
     let (sum, count) = temperatures.fold((0.0, 0usize), |(sum, count), reading| {
         (sum + reading.temperature_c, count + 1)
@@ -4917,8 +4923,8 @@ impl cosmic::Application for AppModel {
                                 )
                                 .push(widget::text::body(format!("{:.0} W", reading.power_w)))
                                 .push(widget::text::caption(format!(
-                                    "{:.1} °C · {state}",
-                                    reading.temperature_c
+                                    "{} · {state}",
+                                    format_panel_temperature(reading.temperature_c)
                                 ))),
                         );
                     }
@@ -5904,8 +5910,8 @@ impl cosmic::Application for AppModel {
                                         )
                                     } else {
                                         format!(
-                                            "{} W · {:.1} °C",
-                                            reading.power_w, reading.temperature_c
+                                            "{} W · {}",
+                                            reading.power_w, format_panel_temperature(reading.temperature_c)
                                         )
                                     })),
                             )
@@ -5964,7 +5970,7 @@ impl cosmic::Application for AppModel {
                         ))
                         .push(device_metric_tile(
                             "",
-                            format!("{:.1} °C", reading.temperature_c),
+                            format_panel_temperature(reading.temperature_c),
                             "utilities-temperature-symbolic",
                             device_corner_radius,
                         ));
@@ -7096,6 +7102,9 @@ impl cosmic::Application for AppModel {
                                 if let Some(thresholds) =
                                     self.settings.temperature_alerts.get(&key).copied()
                                 {
+                                    if !reading.temperature_c.is_finite() {
+                                        continue;
+                                    }
                                     let outside_limits = temperature_outside_limits(
                                         reading.temperature_c,
                                         thresholds,
