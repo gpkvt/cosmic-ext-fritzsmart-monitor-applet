@@ -9054,16 +9054,13 @@ impl cosmic::Application for AppModel {
                     .map(|height| (height * 0.85).max(1.0))
                     .unwrap_or(800.0);
                 self.popup_max_height = Some(max_height);
-                let mut settings =
-                    self.core
-                        .applet
-                        .get_popup_settings(
-                            main_window_id,
-                            id,
-                            Some((720, max_height.ceil().clamp(1.0, u32::MAX as f32) as u32)),
-                            None,
-                            None,
-                        );
+                let mut settings = self.core.applet.get_popup_settings(
+                    main_window_id,
+                    id,
+                    Some((720, max_height.ceil().clamp(1.0, u32::MAX as f32) as u32)),
+                    None,
+                    None,
+                );
                 settings.positioner.size_limits = Limits::NONE
                     .max_width(720.0)
                     .min_width(720.0)
