@@ -1,10 +1,12 @@
 use std::{
-    collections::{HashSet, VecDeque},
-    net::IpAddr,
+    collections::{HashMap, HashSet, VecDeque},
+    net::{IpAddr, Ipv4Addr},
     sync::{LazyLock, Mutex, OnceLock},
     time::{Duration, Instant},
 };
 
+use futures::StreamExt;
+use if_addrs::IfAddr;
 use mdns_sd::{ServiceDaemon, ServiceEvent};
 use reqwest::Client;
 use serde_json::Value;
@@ -201,6 +203,78 @@ fn discover_services() -> Result<Vec<(String, u16, IpAddr)>, String> {
     Ok(found.into_iter().collect())
 }
 
+/// Enumerate usable hosts on the IPv4 subnets assigned to this machine.
+/// Subnets larger than 4094 hosts are skipped to keep discovery bounded.
+fn scan_local_ipv4_addresses() -> Vec<Ipv4Addr> {
+    let interfaces = match if_addrs::get_if_addrs() {
+        Ok(interfaces) => interfaces,
+        Err(error) => {
+            record_discovery_diagnostic(format!(
+                "Tasmota IP scan could not enumerate network interfaces: {error}"
+            ));
+            return Vec::new();
+        }
+    };
+    let mut addresses = HashSet::new();
+    let mut ranges = HashSet::new();
+
+    for interface in interfaces {
+        let IfAddr::V4(interface) = interface.addr else {
+            continue;
+        };
+        let ip = interface.ip;
+        let mask = u32::from(interface.netmask);
+        if ip.is_loopback() || ip.is_unspecified() || mask == 0 {
+            continue;
+        }
+        let prefix = mask.count_ones();
+        let expected_mask = u32::MAX.checked_shl(32 - prefix).unwrap_or(0);
+        if mask != expected_mask || prefix > 30 {
+            continue;
+        }
+
+        let ip_number = u32::from(ip);
+        let network = ip_number & mask;
+        let broadcast = network | !mask;
+        let host_count = broadcast.saturating_sub(network).saturating_sub(1);
+        if host_count == 0 || host_count > 4094 {
+            record_discovery_diagnostic(format!(
+                "Tasmota IP scan skipped {}/{}: subnet contains {host_count} usable hosts (limit 4094).",
+                ip, prefix
+            ));
+            continue;
+        }
+
+        let range = format!(
+            "{}/{}",
+            Ipv4Addr::from(network),
+            prefix
+        );
+        if ranges.insert(range.clone()) {
+            record_discovery_diagnostic(format!(
+                "Tasmota IP scan: scanning {range} ({host_count} usable addresses) on interface {}.",
+                ip
+            ));
+        }
+
+        for host in (network + 1)..broadcast {
+            let address = Ipv4Addr::from(host);
+            if address != ip {
+                addresses.insert(address);
+            }
+        }
+    }
+
+    let mut addresses: Vec<_> = addresses.into_iter().collect();
+    addresses.sort_unstable();
+    record_discovery_diagnostic(format!(
+        "Tasmota IP scan prepared {} unique IPv4 address(es) across {} local subnet(s).",
+        addresses.len(),
+        ranges.len()
+    ));
+    addresses
+}
+
 async fn query_status(
     client: &Client,
     address: &str,
@@ -292,15 +366,47 @@ pub async fn discover_devices(
             record_discovery_diagnostic(message.clone());
             message
         })?;
+    // Keep mDNS as the fast path, then supplement it with a bounded scan of
+    // every local IPv4 subnet. The HTTP status response is the final identity check.
+    let mut endpoints: HashMap<(String, u16, IpAddr), bool> = HashMap::new();
+    for (hostname, port, ip) in services {
+        endpoints.insert((hostname, port, ip), true);
+    }
+    for ip in scan_local_ipv4_addresses() {
+        endpoints.entry((ip.to_string(), 80, IpAddr::V4(ip))).or_insert(false);
+    }
+    record_discovery_diagnostic(format!(
+        "Tasmota discovery probing {} unique endpoint(s) (mDNS plus local IP scan), with up to 32 requests in parallel.",
+        endpoints.len()
+    ));
+
+    let probes = futures::stream::iter(endpoints.into_iter().map(
+        |((hostname, port, ip), is_mdns)| {
+            let client = client.clone();
+            let username = username.clone();
+            let password = password.clone();
+            async move {
+                let address = format!("{ip}:{port}");
+                let result = query_status(&client, &address, &username, &password).await;
+                (hostname, address, is_mdns, result)
+            }
+        },
+    ))
+    .buffer_unordered(32)
+    .collect::<Vec<_>>()
+    .await;
+
     let mut devices = Vec::new();
     let mut rejected = 0usize;
+    let mut ip_scan_responses = 0usize;
 
-    for (hostname, port, ip) in services {
-        let address = format!("{ip}:{port}");
-        match query_status(&client, &address, &username, &password).await {
+    for (hostname, address, is_mdns, result) in probes {
+        match result {
             Ok(status) => {
+                ip_scan_responses += usize::from(!is_mdns);
                 record_discovery_diagnostic(format!(
-                    "Tasmota status probe succeeded: {hostname} at {address}."
+                    "Tasmota status probe succeeded: {hostname} at {address} ({}).",
+                    if is_mdns { "mDNS" } else { "IP range scan" }
                 ));
                 let mac = json_string(&status, &["StatusNET", "Mac"])
                     .map(|value| {
@@ -316,6 +422,7 @@ pub async fn discover_devices(
                             .to_ascii_uppercase()
                             .replace(".LOCAL", "")
                             .replace('-', "")
+                            .replace('.', "")
                     });
                 let name = json_string(&status, &["Status", "DeviceName"])
                     .filter(|value| !value.trim().is_empty())
@@ -332,16 +439,18 @@ pub async fn discover_devices(
             }
             Err(error) => {
                 rejected += 1;
-                record_discovery_diagnostic(format!(
-                    "Tasmota candidate rejected at {address}: {error}"
-                ));
+                if is_mdns {
+                    record_discovery_diagnostic(format!(
+                        "Tasmota mDNS candidate rejected at {address}: {error}"
+                    ));
+                }
             }
         }
     }
     devices.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     devices.dedup_by(|a, b| a.id == b.id);
     record_discovery_diagnostic(format!(
-        "Tasmota discovery complete: {} device(s) accepted, {rejected} candidate(s) rejected.",
+        "Tasmota discovery complete: {} device(s) accepted, {rejected} endpoint(s) rejected, {ip_scan_responses} device response(s) found by IP scan.",
         devices.len()
     ));
     *device_cache()
