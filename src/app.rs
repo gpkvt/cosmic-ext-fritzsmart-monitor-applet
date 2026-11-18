@@ -14,7 +14,7 @@ use cosmic::iced::{
 };
 use cosmic::prelude::*;
 use cosmic::widget;
-use futures::SinkExt;
+use futures::{SinkExt, StreamExt};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::LazyLock;
 use std::time::{Duration, Instant};
