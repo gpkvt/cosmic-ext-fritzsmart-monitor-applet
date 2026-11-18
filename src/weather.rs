@@ -605,6 +605,7 @@ fn commons_title_matches_condition(icon_code: &str, title: &str) -> bool {
     let clouds = [
         "cloud", "clouds", "cloudy", "overcast", "cumulus", "stratus",
     ];
+    let clear_conditions = || !has(&rain) && !has(&storm) && !has(&snow) && !has(&fog);
 
     match icon_code.get(..2).unwrap_or("") {
         "01" if icon_code.ends_with('n') => {
@@ -616,22 +617,16 @@ fn commons_title_matches_condition(icon_code: &str, title: &str) -> bool {
                 "moon",
                 "moonlight",
                 "milky",
-            ]) && !has(&rain)
-                && !has(&storm)
-                && !has(&snow)
-                && !has(&fog)
+            ]) && clear_conditions()
         }
         "01" => {
             (has(&["sun", "sunny", "sunshine", "sunlight", "cloudless"])
                 || has(&["blue", "sky"]) && normalized.contains("blue sky")
                 || has(&["clear"]) && normalized.contains("clear sky"))
-                && !has(&rain)
-                && !has(&storm)
-                && !has(&snow)
-                && !has(&fog)
+                && clear_conditions()
         }
         "02" | "03" | "04" => {
-            has(&clouds) && !has(&rain) && !has(&storm) && !has(&snow) && !has(&fog)
+            has(&clouds) && clear_conditions()
         }
         "09" | "10" => has(&rain) && !has(&storm) && !has(&snow),
         "11" => has(&storm),
