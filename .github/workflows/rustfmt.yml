@@ -55,7 +55,22 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- '*.rs' Cargo.lock
           git commit -m "style(rustfmt): format Rust sources"
-          git push origin HEAD:main
+
+          # Other main-branch updates can land while rustfmt is running.
+          # Rebase our formatting commit onto the newest main and retry a
+          # rejected push rather than failing on a harmless race.
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then
+              break
+            fi
+            if [[ "$attempt" == 5 ]]; then
+              echo "Could not push rustfmt commit after five attempts." >&2
+              exit 1
+            fi
+            sleep 2
+          done
 
           # GITHUB_TOKEN pushes do not trigger push workflows. Explicitly run
           # the quality suite against the newly formatted main commit.
