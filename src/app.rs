@@ -8154,7 +8154,9 @@ impl cosmic::Application for AppModel {
                     Ok(devices) => {
                         let tasmota_count = devices
                             .iter()
-                            .filter(|device| device.ain.to_ascii_uppercase().starts_with("TASMOTA:"))
+                            .filter(|device| {
+                                device.ain.to_ascii_uppercase().starts_with("TASMOTA:")
+                            })
                             .count();
                         let fritz_count = devices.len().saturating_sub(tasmota_count);
                         record_diagnostic_event(
