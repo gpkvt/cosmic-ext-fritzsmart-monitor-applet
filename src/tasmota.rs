@@ -300,7 +300,9 @@ fn persisted_devices_path() -> Option<std::path::PathBuf> {
 }
 
 fn load_persisted_devices() -> Vec<TasmotaDevice> {
-    let Some(path) = persisted_devices_path() else { return Vec::new() };
+    let Some(path) = persisted_devices_path() else {
+        return Vec::new();
+    };
     std::fs::read_to_string(path)
         .ok()
         .and_then(|contents| serde_json::from_str::<Vec<TasmotaDevice>>(&contents).ok())
@@ -311,10 +313,16 @@ fn load_persisted_devices() -> Vec<TasmotaDevice> {
 }
 
 fn persist_devices(devices: &[TasmotaDevice]) {
-    let Some(path) = persisted_devices_path() else { return };
+    let Some(path) = persisted_devices_path() else {
+        return;
+    };
     let Some(parent) = path.parent() else { return };
-    if std::fs::create_dir_all(parent).is_err() { return; }
-    let Ok(contents) = serde_json::to_vec_pretty(devices) else { return };
+    if std::fs::create_dir_all(parent).is_err() {
+        return;
+    }
+    let Ok(contents) = serde_json::to_vec_pretty(devices) else {
+        return;
+    };
     let temporary = parent.join(format!(".fritz_solar_tasmota.{}.tmp", std::process::id()));
     if std::fs::write(&temporary, contents).is_ok() {
         if std::fs::rename(&temporary, &path).is_err() {
@@ -343,7 +351,9 @@ pub async fn known_devices(
     // reading request validates reachability; manual discovery refreshes DHCP changes.
     let persisted = load_persisted_devices();
     if !persisted.is_empty() {
-        *device_cache().lock().unwrap_or_else(std::sync::PoisonError::into_inner) =
+        *device_cache()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
             Some((Instant::now(), persisted.clone()));
         record_discovery_diagnostic(format!(
             "Restored {} Tasmota device address(es) from the local discovery cache.",
