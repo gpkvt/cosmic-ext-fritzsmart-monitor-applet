@@ -60,6 +60,8 @@ install -Dm0644 "$WORKSPACE/README.md" \
     "$DEB_ROOT/usr/share/doc/fritz-power-monitor/README.md"
 install -Dm0644 "$WORKSPACE/LICENSE" \
     "$DEB_ROOT/usr/share/doc/fritz-power-monitor/copyright"
+install -Dm0755 "$WORKSPACE/packaging/deb-postinst" "$DEB_ROOT/DEBIAN/postinst"
+install -Dm0755 "$WORKSPACE/packaging/deb-prerm" "$DEB_ROOT/DEBIAN/prerm"
 
 mkdir -p "$TEMP_DIR/debian-build/debian"
 cat > "$TEMP_DIR/debian-build/debian/control" <<'CONTROL'
