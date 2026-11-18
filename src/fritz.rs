@@ -1942,7 +1942,10 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
     if ain.to_ascii_uppercase().starts_with("TASMOTA:") {
         let settings = FritzSettings::load()?;
         let devices =
-            crate::tasmota::known_devices(settings.username.clone(), settings.password.clone())
+            crate::tasmota::known_devices(
+                settings.tasmota_username.clone(),
+                settings.tasmota_password.clone(),
+            )
                 .await?;
         let wanted = normalize_ain_for_selection(&ain);
         let device = devices
