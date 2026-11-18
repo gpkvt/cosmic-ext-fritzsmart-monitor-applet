@@ -2,6 +2,7 @@
 """Render repository Markdown documents as styled, static GitHub Pages HTML."""
 
 from html import escape
+import os
 from pathlib import Path
 import re
 import shutil
@@ -69,25 +70,29 @@ def render(source: Path, destination: Path, title: str) -> None:
 
 
 def sync_package_download_version() -> None:
-    """Keep website package links aligned with the Cargo package version."""
-    cargo = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
-    match = re.search(r'(?ms)^\[package\]\s+.*?^version\s*=\s*"([^"]+)"', cargo)
-    if not match:
-        raise RuntimeError("Could not read [package].version from Cargo.toml")
+    """Keep the single portable-archive link aligned with the latest release."""
+    version = os.environ.get("APP_RELEASE_VERSION")
+    if not version:
+        cargo = (ROOT / "Cargo.toml").read_text(encoding="utf-8")
+        match = re.search(r'(?ms)^\\[package\\]\\s+.*?^version\\s*=\\s*"([^"]+)"', cargo)
+        if not match:
+            raise RuntimeError("Could not read [package].version from Cargo.toml")
+        version = match.group(1)
+    if not re.fullmatch(r"[0-9]+\\.[0-9]+\\.[0-9]+(?:[-.][0-9A-Za-z.-]+)?", version):
+        raise RuntimeError(f"Invalid release version: {version}")
     index = DOCS / "index.html"
     content = index.read_text(encoding="utf-8")
-    version = match.group(1)
     if "@APP_VERSION@" in content:
         content = content.replace("@APP_VERSION@", version)
         index.write_text(content, encoding="utf-8")
-        print(f"Updated package download links for fritz-power-monitor {version}")
+        print(f"Updated portable archive link for fritz-power-monitor {version}")
         return
-    if f"releases/download/v{version}/" in content:
-        print(f"Package download links already match fritz-power-monitor {version}")
+    if f"releases/download/v{version}/fritz-power-monitor-v{version}-x86_64-unknown-linux-gnu.tar.gz" in content:
+        print(f"Portable archive link already matches release {version}")
         return
     raise RuntimeError(
-        "docs/index.html has neither version placeholders nor links matching "
-        f"Cargo.toml version {version}; restore the source template before building"
+        "docs/index.html has neither the release-version placeholder nor a "
+        f"portable archive link matching release {version}"
     )
 
 def main() -> None:
