@@ -495,7 +495,7 @@ impl FritzSettings {
             );
         }
         let get = |key: &str| values.get(key).cloned().unwrap_or_default();
-        let mut settings = Self {
+        let settings = Self {
             language: match get("LANGUAGE").as_str() {
                 "de" => "de".into(),
                 "en" => "en".into(),
