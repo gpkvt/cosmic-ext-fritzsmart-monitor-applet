@@ -74,15 +74,24 @@ fn release_asset_url(tag: &str, name: &str) -> String {
     format!("https://github.com/{REPOSITORY}/releases/download/{tag}/{name}")
 }
 
-async fn download_verified_asset(tag: &str, name: &str) -> Result<Vec<u8>, String> {
-    let client = client()?;
-    let checksums = client
-        .get(release_asset_url(tag, "SHA256SUMS"))
+async fn release_asset_response(
+    client: &Client,
+    tag: &str,
+    name: &str,
+) -> Result<reqwest::Response, String> {
+    client
+        .get(release_asset_url(tag, name))
         .send()
         .await
         .map_err(|error| error.to_string())?
         .error_for_status()
-        .map_err(|error| error.to_string())?
+        .map_err(|error| error.to_string())
+}
+
+async fn download_verified_asset(tag: &str, name: &str) -> Result<Vec<u8>, String> {
+    let client = client()?;
+    let checksums = release_asset_response(&client, tag, "SHA256SUMS")
+        .await?
         .text()
         .await
         .map_err(|error| error.to_string())?;
@@ -90,13 +99,8 @@ async fn download_verified_asset(tag: &str, name: &str) -> Result<Vec<u8>, Strin
         .map(str::to_ascii_lowercase)
         .ok_or_else(|| format!("The release checksum does not list {name}"))?;
 
-    let bytes = client
-        .get(release_asset_url(tag, name))
-        .send()
-        .await
-        .map_err(|error| error.to_string())?
-        .error_for_status()
-        .map_err(|error| error.to_string())?
+    let bytes = release_asset_response(&client, tag, name)
+        .await?
         .bytes()
         .await
         .map_err(|error| error.to_string())?;
