@@ -2266,7 +2266,8 @@ fn panel_item_is_enabled(settings: &FritzSettings, id: &str) -> bool {
         "solar-power" => !settings.panel_net_power,
         "internet-bandwidth" => settings.panel_internet_bandwidth,
         _ => true,
-    } && panel_item_is_visible(&settings.hidden_panel_items, id)
+    }
+    &&panel_item_is_visible(&settings.hidden_panel_items, id)
 }
 
 fn format_compact_decimal(value: f64) -> String {
@@ -3236,8 +3237,7 @@ impl cosmic::Application for AppModel {
                 ));
             }
 
-            if panel_item_is_enabled(&self.settings, "internet-bandwidth")
-            {
+            if panel_item_is_enabled(&self.settings, "internet-bandwidth") {
                 let (download, upload) = self
                     .internet_bandwidth
                     .as_ref()
@@ -9288,11 +9288,7 @@ mod history_tests {
 
         // Bandwidth is off by default, and both controls use that same state.
         assert!(!panel_item_is_enabled(&settings, "internet-bandwidth"));
-        set_panel_item_visibility(
-            &mut settings.hidden_panel_items,
-            "internet-bandwidth",
-            true,
-        );
+        set_panel_item_visibility(&mut settings.hidden_panel_items, "internet-bandwidth", true);
         settings.panel_internet_bandwidth = true;
         assert!(panel_item_is_enabled(&settings, "internet-bandwidth"));
 
