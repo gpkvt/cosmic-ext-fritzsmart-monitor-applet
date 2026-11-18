@@ -141,7 +141,7 @@
     </div></section>
 
     <section id="install"><div class="wrap">
-      <div class="install-band reveal"><div><div class="eyebrow">Get started</div><h2>Install FRITZ!Power Monitor</h2><p class="muted">You can install it for your user without root privileges.</p><div class="actions"><a class="btn" href="#downloads">Download the applet ↓</a><a class="btn secondary" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/blob/main/README.md">Full README ↗</a></div></div>
+      <div class="install-band reveal"><div><div class="eyebrow">Get started</div><h2>Install FRITZ!Power Monitor</h2><p class="muted">Build and install for your user without root privileges, or use the Debian package below for a system-wide installation.</p><div class="actions"><a class="btn" href="#downloads">Download the applet ↓</a><a class="btn secondary" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/blob/main/README.md">Full README ↗</a></div></div>
         <div class="terminal"><div class="terminal-head">TERMINAL — USER INSTALL</div><pre><span class="prompt">$</span> git clone https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet.git
 <span class="prompt">$</span> cd cosmic-ext-fritzsmart-monitor-applet
 <span class="prompt">$</span> make install
@@ -158,16 +158,16 @@
     </div></section>
 
     <section id="downloads"><div class="wrap">
-      <div class="section-head reveal"><div class="eyebrow">Latest release</div><h2>Download the applet</h2><p>One portable archive for x86_64 Linux. It includes the applet executable, COSMIC desktop entry, icon, README and license.</p></div>
+      <div class="section-head reveal"><div class="eyebrow">Latest release</div><h2>Download the applet</h2><p>Choose the Debian package for a system-wide installation, or the portable archive to install into your own user profile. Both target x86_64 Linux.</p></div>
       <div class="install-band reveal">
-        <div><div class="eyebrow">FRITZ!Power Monitor · v@APP_VERSION@</div><h2>Get the latest build.</h2><p class="muted">Download the archive, extract it and install the included files into your user profile. No package manager or root access is needed.</p><div class="actions"><a class="btn" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/download/v@APP_VERSION@/fritz-power-monitor-v@APP_VERSION@-x86_64-unknown-linux-gnu.tar.gz">Download .tar.gz ↗</a></div></div>
+        <div><div class="eyebrow">FRITZ!Power Monitor · v@APP_VERSION@</div><h2>Get the latest build.</h2><p class="muted">Download the archive, extract it and install the included files into your user profile. No package manager or root access is needed.</p><div class="actions"><a class="btn" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/download/v@APP_VERSION@/fritz-power-monitor_@APP_VERSION@_amd64.deb">Download .deb ↗</a><a class="btn secondary" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/download/v@APP_VERSION@/fritz-power-monitor-v@APP_VERSION@-x86_64-unknown-linux-gnu.tar.gz">Download .tar.gz ↗</a></div></div>
         <div class="terminal"><div class="terminal-head">TERMINAL — USER INSTALL</div><pre><span class="prompt">$</span> tar -xzf fritz-power-monitor-v@APP_VERSION@-x86_64-unknown-linux-gnu.tar.gz
 <span class="prompt">$</span> cd fritz-power-monitor-v@APP_VERSION@-x86_64-unknown-linux-gnu
 <span class="prompt">$</span> install -Dm755 bin/fritz-power-monitor ~/.local/bin/fritz-power-monitor
 <span class="prompt">$</span> install -Dm644 share/applications/com.gpkvt.FritzPowerMonitor.desktop ~/.local/share/applications/com.gpkvt.FritzPowerMonitor.desktop
 <span class="prompt">$</span> install -Dm644 share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg ~/.local/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg</pre></div>
       </div>
-      <p class="muted" style="margin-top:20px;font-size:13px">The archive link always targets the latest published release. See the <a href="guide.html#custom-applets">COSMIC custom applet guide</a> for adding it to your panel.</p>
+      <p class="muted" style="margin-top:20px;font-size:13px">The Debian package installs the application under <code>/usr</code> and creates symlinks in the installing user’s <code>~/.local</code> profile when the package manager provides that user identity. The portable archive link always targets the latest published release. See the <a href="guide.html#custom-applets">COSMIC custom applet guide</a> for adding it to your panel.</p>
     </div></section>
 
     <section id="custom-applets"><div class="wrap">
