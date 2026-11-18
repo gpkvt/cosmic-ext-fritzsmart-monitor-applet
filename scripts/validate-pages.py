@@ -16,7 +16,6 @@ class PageParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.ids = set()
         self.references = []
-        self.gallery_images = 0
         self.text_parts = []
         self.suppressed = []
         self.duplicate_ids = set()
@@ -33,8 +32,6 @@ class PageParser(HTMLParser):
             value = values.get(attribute)
             if value:
                 self.references.append((attribute, value))
-        if tag == "img" and values.get("id") == "gallery-image":
-            self.gallery_images += 1
 
     def handle_endtag(self, tag):
         if tag in self.suppressed:
@@ -117,12 +114,21 @@ for page in pages:
         for expected in expected_downloads:
             if expected not in content:
                 fail(f"index.html: package download links are not synchronized with Cargo version {version}: {expected}")
-        required_ids = {"screenshot-dialog", "gallery-image", "gallery-previous", "gallery-next", "gallery-count", "release-assets"}
+        required_ids = {"release-assets"}
         missing = required_ids - parser.ids
         if missing:
             fail(f"index.html: missing required elements: {', '.join(sorted(missing))}")
-        if parser.gallery_images != 1:
-            fail(f"index.html: expected one gallery image element, found {parser.gallery_images}")
+        inline_screenshots = re.findall(
+            r'<img\\b[^>]*\\bsrc="[^"]*Screenshot_[^"]+"',
+            content,
+        )
+        if len(inline_screenshots) != 10:
+            fail(
+                "index.html: expected ten contextual inline screenshots, "
+                f"found {len(inline_screenshots)}"
+            )
+        if content.count("<figcaption>") < 10:
+            fail("index.html: every contextual screenshot must have a caption")
         safeguard_icons = re.findall(
             r'<div class="detail-icon"[^>]*>\s*<img src="icons/([a-z-]+\.svg)" alt="" width="28" height="28"></div>',
             content,
