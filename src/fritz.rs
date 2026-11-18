@@ -284,7 +284,7 @@ fn parse_menu_order(value: &str) -> Vec<String> {
         return default_menu_order();
     }
 
-    let mut order: Vec<String> = value
+    let order: Vec<String> = value
         .split(',')
         .map(str::trim)
         .filter(|id| !id.is_empty())
@@ -353,7 +353,7 @@ fn parse_hidden_panel_items(value: &str) -> Vec<String> {
 }
 
 fn parse_panel_order(value: &str) -> Vec<String> {
-    let mut order: Vec<String> = value
+    let order: Vec<String> = value
         .split(',')
         .map(str::trim)
         .map(|id| match id {
