@@ -1318,7 +1318,7 @@ fn graph_values_only(samples: &[(Instant, f64)]) -> Vec<f64> {
 }
 
 fn interactive_graph_with_axis(
-    language: &str,
+    _language: &str,
     title: &str,
     values: impl Iterator<Item = (Instant, f64)>,
     style: &str,
@@ -1357,8 +1357,7 @@ fn interactive_combined_graph_with_axis(
     style: &str,
     unit: &str,
     axis_start: String,
-    output_label: &str,
-    input_label: &str,
+    labels: (&str, &str),
 ) -> cosmic::Element<'static, Message> {
     let visual = graph_visual_with_dimensions(
         graph_values_only(&output_values).into_iter(),
@@ -1378,14 +1377,14 @@ fn interactive_combined_graph_with_axis(
             input_values,
             unit.to_string(),
             Some(axis_start),
-            output_label.to_string(),
-            input_label.to_string(),
+            labels.0.to_string(),
+            labels.1.to_string(),
         ),
     )
 }
 
 fn interactive_graph_inner(
-    language: &str,
+    _language: &str,
     title: &str,
     values: impl Iterator<Item = (Instant, f64)>,
     style: &str,
@@ -1947,8 +1946,7 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
             &graph_style,
             "W",
             axis_start,
-            output_label,
-            input_label,
+            (&output_label, &input_label),
         ));
     }
     surface_card(content.into(), 14)
