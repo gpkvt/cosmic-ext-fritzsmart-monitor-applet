@@ -1341,7 +1341,7 @@ fn interactive_graph_with_axis(
 }
 
 fn interactive_graph_card(
-    language: &str,
+    _language: &str,
     title: &str,
     visual: cosmic::Element<'static, Message>,
     message: Message,
