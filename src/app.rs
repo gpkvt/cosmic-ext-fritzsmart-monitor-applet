@@ -1289,6 +1289,33 @@ fn interactive_graph_with_axis(
     interactive_graph_inner(language, title, values, style, unit, Some(axis_start))
 }
 
+fn interactive_graph_card(
+    language: &str,
+    title: &str,
+    visual: cosmic::Element<'static, Message>,
+    message: Message,
+) -> cosmic::Element<'static, Message> {
+    let content = widget::Column::new()
+        .spacing(6)
+        .push(
+            widget::Row::new()
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(widget::text::body(title.to_string()).width(cosmic::iced::Length::Fill))
+                .push(widget::icon::from_name("zoom-in-symbolic").size(16))
+                .push(widget::text::caption(crate::i18n::tr(
+                    language,
+                    "Open graph",
+                ))),
+        )
+        .push(visual);
+    widget::button::custom(content)
+        .on_press(message)
+        .padding(0)
+        .width(cosmic::iced::Length::Fill)
+        .class(cosmic::theme::Button::Text)
+        .into()
+}
+
 fn interactive_combined_graph_with_axis(
     language: &str,
     title: &str,
@@ -1300,31 +1327,22 @@ fn interactive_combined_graph_with_axis(
     output_label: &str,
     input_label: &str,
 ) -> cosmic::Element<'static, Message> {
-    let graph = widget::Column::new()
-        .spacing(6)
-        .push(
-            widget::Row::new()
-                .align_y(cosmic::iced::Alignment::Center)
-                .push(widget::text::body(title.to_string()).width(cosmic::iced::Length::Fill))
-                .push(widget::icon::from_name("zoom-in-symbolic").size(16))
-                .push(widget::text::caption(crate::i18n::tr(
-                    language,
-                    "Open graph",
-                ))),
-        )
-        .push(graph_visual_with_dimensions(
-            graph_values_only(&output_values).into_iter(),
-            style,
-            title,
-            unit,
-            120.0,
-            cosmic::iced::Length::Fixed(120.0),
-            Some(axis_start.clone()),
-            Some(graph_values_only(&input_values)),
-            Some(format!("{output_label}|{input_label}")),
-        ));
-    widget::button::custom(graph)
-        .on_press(Message::ShowCombinedGraph(
+    let visual = graph_visual_with_dimensions(
+        graph_values_only(&output_values).into_iter(),
+        style,
+        title,
+        unit,
+        120.0,
+        cosmic::iced::Length::Fixed(120.0),
+        Some(axis_start.clone()),
+        Some(graph_values_only(&input_values)),
+        Some(format!("{output_label}|{input_label}")),
+    );
+    interactive_graph_card(
+        language,
+        title,
+        visual,
+        Message::ShowCombinedGraph(
             title.to_string(),
             output_values,
             input_values,
@@ -1332,11 +1350,8 @@ fn interactive_combined_graph_with_axis(
             Some(axis_start),
             output_label.to_string(),
             input_label.to_string(),
-        ))
-        .padding(0)
-        .width(cosmic::iced::Length::Fill)
-        .class(cosmic::theme::Button::Text)
-        .into()
+        ),
+    )
 }
 
 fn interactive_graph_inner(
@@ -1348,37 +1363,19 @@ fn interactive_graph_inner(
     axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
     let values: GraphSamples = values.collect();
-    let display_values = graph_values_only(&values);
-    let graph = widget::Column::new()
-        .spacing(6)
-        .push(
-            widget::Row::new()
-                .align_y(cosmic::iced::Alignment::Center)
-                .push(widget::text::body(title.to_string()).width(cosmic::iced::Length::Fill))
-                .push(widget::icon::from_name("zoom-in-symbolic").size(16))
-                .push(widget::text::caption(crate::i18n::tr(
-                    language,
-                    "Open graph",
-                ))),
-        )
-        .push(graph_visual(
-            display_values.iter().copied(),
-            style,
-            title,
-            unit,
-            axis_start.clone(),
-        ));
-    widget::button::custom(graph)
-        .on_press(Message::ShowGraph(
-            title.to_string(),
-            values,
-            unit.to_string(),
-            axis_start,
-        ))
-        .padding(0)
-        .width(cosmic::iced::Length::Fill)
-        .class(cosmic::theme::Button::Text)
-        .into()
+    let visual = graph_visual(
+        graph_values_only(&values).into_iter(),
+        style,
+        title,
+        unit,
+        axis_start.clone(),
+    );
+    interactive_graph_card(
+        language,
+        title,
+        visual,
+        Message::ShowGraph(title.to_string(), values, unit.to_string(), axis_start),
+    )
 }
 fn input_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
     readings
