@@ -3895,7 +3895,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::container(
                             widget::toggler(self.settings.panel_refresh_button)
                                 .on_toggle(Message::PanelRefreshButtonChanged)
-                        ).padding([8, 10]));
+                        ).padding([8, 10])));
                 if has_input_device {
                     content = content.push(
                         widget::Row::new()
