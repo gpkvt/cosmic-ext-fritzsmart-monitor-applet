@@ -317,32 +317,26 @@ fn default_panel_order() -> Vec<String> {
     PANEL_ITEM_IDS.iter().map(|id| (*id).to_string()).collect()
 }
 
-fn parse_hidden_menu_elements(value: &str) -> Vec<String> {
+fn parse_unique_known_ids(value: &str, allowed: &[&str]) -> Vec<String> {
     value
         .split(',')
         .map(str::trim)
-        .filter(|id| MENU_ELEMENT_IDS.contains(id))
+        .filter(|id| allowed.contains(id))
         .map(str::to_string)
-        .fold(Vec::new(), |mut hidden, id| {
-            if !hidden.contains(&id) {
-                hidden.push(id);
+        .fold(Vec::new(), |mut ids, id| {
+            if !ids.contains(&id) {
+                ids.push(id);
             }
-            hidden
+            ids
         })
 }
 
+fn parse_hidden_menu_elements(value: &str) -> Vec<String> {
+    parse_unique_known_ids(value, &MENU_ELEMENT_IDS)
+}
+
 fn parse_hidden_panel_items(value: &str) -> Vec<String> {
-    value
-        .split(',')
-        .map(str::trim)
-        .filter(|id| PANEL_ITEM_IDS.contains(id))
-        .map(str::to_string)
-        .fold(Vec::new(), |mut hidden, id| {
-            if !hidden.contains(&id) {
-                hidden.push(id);
-            }
-            hidden
-        })
+    parse_unique_known_ids(value, &PANEL_ITEM_IDS)
 }
 
 fn parse_panel_order(value: &str) -> Vec<String> {
