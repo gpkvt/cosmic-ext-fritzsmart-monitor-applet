@@ -2800,7 +2800,8 @@ impl cosmic::Application for AppModel {
             })
             || self.next_weather_refresh_at.is_some_and(|deadline| {
                 deadline.saturating_duration_since(now) <= Duration::from_secs(15)
-            });
+            })
+            || self.devices_loading;
         let clock = if self.refresh_started_at.is_some() {
             Subscription::run(animation_ticks)
         } else if needs_second_precision {
@@ -7018,6 +7019,22 @@ impl cosmic::Application for AppModel {
                 self.flow_animation_frame = (self.flow_animation_frame + 1) % 4;
             }
             Message::ClockTick => {
+                if self.devices_loading {
+                    for diagnostic in crate::tasmota::take_discovery_diagnostics() {
+                        let progress = diagnostic.contains("IP scan: scanning ")
+                            || diagnostic.contains("IP scan prepared ")
+                            || diagnostic.contains("probing ")
+                            || diagnostic.contains("scan progress: completed ")
+                            || diagnostic.contains("discovery complete:");
+                        if progress {
+                            self.settings_status = Some(diagnostic.clone());
+                        }
+                        record_diagnostic_event(
+                            &mut self.diagnostic_events,
+                            format!("Tasmota discovery: {diagnostic}"),
+                        );
+                    }
+                }
                 if self
                     .settings_save_at
                     .is_some_and(|deadline| Instant::now() >= deadline)
