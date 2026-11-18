@@ -21,8 +21,10 @@ use std::time::{Duration, Instant};
 
 static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
     LazyLock::new(|| widget::Id::new("fritz-power-monitor-autosize-main"));
+pub type GraphSamples = Vec<(Instant, f64)>;
+
 #[derive(Default)]
-pub struct AppModel {
+struct AppModel {
     core: cosmic::Core,
     popup: Option<Id>,
     graph_window: Option<Id>,
@@ -69,10 +71,10 @@ pub struct AppModel {
     collapsed_menu_sections: HashSet<String>,
     quick_refresh_interval: u32,
     quick_graph_timespan: u32,
-    expanded_graph: Option<(String, Vec<f64>, String, Option<String>)>,
-    expanded_graph_secondary: Option<(Vec<f64>, String)>,
-    expanded_graph_full_values: Option<Vec<f64>>,
-    expanded_graph_full_secondary: Option<Vec<f64>>,
+    expanded_graph: Option<(String, GraphSamples, String, Option<String>)>,
+    expanded_graph_secondary: Option<(GraphSamples, String)>,
+    expanded_graph_full_values: Option<GraphSamples>,
+    expanded_graph_full_secondary: Option<GraphSamples>,
     expanded_graph_max_timespan_minutes: u32,
     expanded_graph_view_timespan_minutes: u32,
     history_graph_devices: Vec<(String, String)>,
@@ -125,11 +127,11 @@ pub enum Message {
     PanelNetPowerChanged(bool),
     GraphTimespanChanged(u32),
     GraphStyleChanged(String),
-    ShowGraph(String, Vec<f64>, String, Option<String>),
+    ShowGraph(String, GraphSamples, String, Option<String>),
     ShowCombinedGraph(
         String,
-        Vec<f64>,
-        Vec<f64>,
+        GraphSamples,
+        GraphSamples,
         String,
         Option<String>,
         String,
@@ -539,22 +541,15 @@ fn rebuild_device_history_graph(
     name: &str,
     language: &str,
     minutes: u32,
-) -> (String, Vec<f64>, String, Option<String>) {
-    let now = Instant::now();
-    let window = graph_history_window(minutes);
-    let visible: Vec<_> = device_history
+) -> (String, GraphSamples, String, Option<String>) {
+    let values: GraphSamples = device_history
         .get(ain)
         .into_iter()
         .flat_map(|samples| samples.iter())
-        .filter(|(timestamp, _, _)| now.duration_since(*timestamp) <= window)
+        .map(|(timestamp, power, _)| (*timestamp, *power as f64))
         .collect();
-    let values = visible.iter().map(|(_, power, _)| *power as f64).collect();
-    let axis_start = format_graph_axis_start(
-        minutes,
-        visible
-            .first()
-            .map(|(timestamp, _, _)| now.duration_since(*timestamp).as_secs().div_ceil(60)),
-    );
+    let visible = graph_values_for_timespan(&values, minutes);
+    let axis_start = graph_axis_start_for_samples(&visible, minutes);
     (
         format!("{} · {}", name, crate::i18n::tr(language, "POWER (W)")),
         values,
@@ -1234,22 +1229,61 @@ fn graph_stats_legend(
 }
 
 fn graph_values_for_timespan(
-    values: &[f64],
+    samples: &[(Instant, f64)],
     selected_minutes: u32,
-    maximum_minutes: u32,
-) -> Vec<f64> {
-    if values.is_empty() || maximum_minutes == 0 || selected_minutes >= maximum_minutes {
-        return values.to_vec();
+) -> GraphSamples {
+    let now = Instant::now();
+    let cutoff = now
+        .checked_sub(Duration::from_secs(u64::from(selected_minutes) * 60))
+        .unwrap_or(now);
+    samples
+        .iter()
+        .copied()
+        .filter(|(timestamp, _)| *timestamp >= cutoff)
+        .collect()
+}
+
+fn graph_max_timespan_minutes(samples: &[(Instant, f64)]) -> u32 {
+    samples
+        .first()
+        .map(|(timestamp, _)| {
+            Instant::now()
+                .saturating_duration_since(*timestamp)
+                .as_secs()
+                .div_ceil(60)
+                .clamp(5, 2_102_400) as u32
+        })
+        .unwrap_or(5)
+}
+
+fn graph_axis_start_for_samples(
+    samples: &[(Instant, f64)],
+    selected_minutes: u32,
+) -> String {
+    let age = samples.first().map(|(timestamp, _)| {
+        Instant::now()
+            .saturating_duration_since(*timestamp)
+            .as_secs()
+            .div_ceil(60)
+    });
+    format_graph_axis_start(selected_minutes, age)
+}
+
+fn graph_samples_duration(samples: &[(Instant, f64)]) -> Duration {
+    match (samples.first(), samples.last()) {
+        (Some((start, _)), Some((end, _))) => end.saturating_duration_since(*start),
+        _ => Duration::ZERO,
     }
-    let fraction = f64::from(selected_minutes) / f64::from(maximum_minutes);
-    let count = ((values.len() as f64 * fraction).ceil() as usize).clamp(1, values.len());
-    values[values.len() - count..].to_vec()
+}
+
+fn graph_values_only(samples: &[(Instant, f64)]) -> Vec<f64> {
+    samples.iter().map(|(_, value)| *value).collect()
 }
 
 fn interactive_graph_with_axis(
     language: &str,
     title: &str,
-    values: impl Iterator<Item = f64>,
+    values: impl Iterator<Item = (Instant, f64)>,
     style: &str,
     unit: &str,
     axis_start: String,
@@ -1260,8 +1294,8 @@ fn interactive_graph_with_axis(
 fn interactive_combined_graph_with_axis(
     language: &str,
     title: &str,
-    output_values: Vec<f64>,
-    input_values: Vec<f64>,
+    output_values: GraphSamples,
+    input_values: GraphSamples,
     style: &str,
     unit: &str,
     axis_start: String,
@@ -1281,14 +1315,14 @@ fn interactive_combined_graph_with_axis(
                 ))),
         )
         .push(graph_visual_with_dimensions(
-            output_values.iter().copied(),
+            graph_values_only(&output_values).into_iter(),
             style,
             title,
             unit,
             120.0,
             cosmic::iced::Length::Fixed(120.0),
             Some(axis_start.clone()),
-            Some(input_values.clone()),
+            Some(graph_values_only(&input_values)),
             Some(format!("{output_label}|{input_label}")),
         ));
     widget::button::custom(graph)
@@ -1310,12 +1344,13 @@ fn interactive_combined_graph_with_axis(
 fn interactive_graph_inner(
     language: &str,
     title: &str,
-    values: impl Iterator<Item = f64>,
+    values: impl Iterator<Item = (Instant, f64)>,
     style: &str,
     unit: &str,
     axis_start: Option<String>,
 ) -> cosmic::Element<'static, Message> {
-    let values: Vec<f64> = values.collect();
+    let values: GraphSamples = values.collect();
+    let display_values = graph_values_only(&values);
     let graph = widget::Column::new()
         .spacing(6)
         .push(
@@ -1329,7 +1364,7 @@ fn interactive_graph_inner(
                 ))),
         )
         .push(graph_visual(
-            values.iter().copied(),
+            display_values.iter().copied(),
             style,
             title,
             unit,
@@ -1374,14 +1409,14 @@ fn average_temperature_c(readings: &[FritzReading], exclude_solar: bool) -> Opti
 fn aligned_power_series(
     output_history: &VecDeque<(Instant, i64)>,
     input_history: &VecDeque<(Instant, i64)>,
-) -> (Vec<f64>, Vec<f64>) {
+) -> (GraphSamples, GraphSamples) {
     let input_by_time: HashMap<Instant, i64> = input_history.iter().copied().collect();
     let mut output_values = Vec::new();
     let mut input_values = Vec::new();
     for (timestamp, output) in output_history {
         if let Some(input) = input_by_time.get(timestamp) {
-            output_values.push(*output as f64);
-            input_values.push(input_display_power_w(*input) as f64);
+            output_values.push((*timestamp, *output as f64));
+            input_values.push((*timestamp, input_display_power_w(*input) as f64));
         }
     }
     (output_values, input_values)
@@ -1815,8 +1850,8 @@ fn energy_flow_overview(
 
 struct LivePowerSummaryData {
     energy_flow: Option<cosmic::Element<'static, Message>>,
-    input_history: Vec<f64>,
-    output_history: Vec<f64>,
+    input_history: GraphSamples,
+    output_history: GraphSamples,
     graph_style: String,
     language: String,
     axis_start: String,
@@ -2004,7 +2039,9 @@ fn total_power_overview(
             .push(interactive_graph_with_axis(
                 &settings.language,
                 crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-                history.iter().map(|(_, value)| *value as f64),
+                history
+                    .iter()
+                    .map(|(timestamp, value)| (*timestamp, *value as f64)),
                 &settings.graph_style,
                 "W",
                 axis_start.clone(),
@@ -2012,7 +2049,9 @@ fn total_power_overview(
             .push(interactive_graph_with_axis(
                 &settings.language,
                 crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
-                output_temperature_history.iter().map(|(_, value)| *value),
+                output_temperature_history
+                    .iter()
+                    .map(|(timestamp, value)| (*timestamp, *value)),
                 &settings.graph_style,
                 "°C",
                 axis_start.clone(),
@@ -2076,7 +2115,9 @@ fn total_power_overview(
                     crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
                     input_history
                         .iter()
-                        .map(|(_, value)| input_display_power_w(*value) as f64),
+                        .map(|(timestamp, value)| {
+                            (*timestamp, input_display_power_w(*value) as f64)
+                        }),
                     &settings.graph_style,
                     "W",
                     axis_start.clone(),
@@ -2084,7 +2125,9 @@ fn total_power_overview(
                 .push(interactive_graph_with_axis(
                     &settings.language,
                     crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
-                    input_temperature_history.iter().map(|(_, value)| *value),
+                    input_temperature_history
+                        .iter()
+                        .map(|(timestamp, value)| (*timestamp, *value)),
                     &settings.graph_style,
                     "°C",
                     axis_start.clone(),
@@ -3439,8 +3482,8 @@ impl cosmic::Application for AppModel {
                         let primary_label = parts.next().unwrap_or(title);
                         let secondary_label = parts.next().unwrap_or("Input");
                         graph_visual_large_multi(
-                            values.iter().copied(),
-                            secondary_values.iter().copied(),
+                            graph_values_only(values).into_iter(),
+                            graph_values_only(secondary_values).into_iter(),
                             &self.settings.graph_style,
                             title,
                             unit,
@@ -3450,7 +3493,7 @@ impl cosmic::Application for AppModel {
                         )
                     } else {
                         graph_visual_large(
-                            values.iter().copied(),
+                            graph_values_only(values).into_iter(),
                             &self.settings.graph_style,
                             title,
                             unit,
@@ -3459,27 +3502,28 @@ impl cosmic::Application for AppModel {
                     },
                 )
                 .push({
-                    let secondary =
-                        self.expanded_graph_secondary
-                            .as_ref()
-                            .map(|(series, labels)| {
-                                let mut parts = labels.splitn(2, '|');
-                                let _primary = parts.next();
-                                let secondary_label = parts.next().unwrap_or("Input");
-                                (series.as_slice(), secondary_label)
-                            });
+                    let primary_stats = graph_values_only(values);
+                    let secondary_stats = self
+                        .expanded_graph_secondary
+                        .as_ref()
+                        .map(|(series, labels)| {
+                            let secondary_label = labels.split('|').nth(1).unwrap_or("Input");
+                            (graph_values_only(series), secondary_label.to_string())
+                        });
+                    let secondary = secondary_stats
+                        .as_ref()
+                        .map(|(series, label)| (series.as_slice(), label.as_str()));
                     let primary_label = self
                         .expanded_graph_secondary
                         .as_ref()
                         .and_then(|(_, labels)| labels.split('|').next())
                         .unwrap_or(title);
+                    let timespan = graph_samples_duration(values);
                     graph_stats_legend(
                         primary_label,
-                        values,
+                        &primary_stats,
                         unit,
-                        Duration::from_secs(
-                            u64::from(self.expanded_graph_view_timespan_minutes.max(5)) * 60,
-                        ),
+                        timespan,
                         secondary,
                     )
                 });
@@ -5772,7 +5816,9 @@ impl cosmic::Application for AppModel {
                                     crate::i18n::tr(&self.settings.language, "DOWNLOAD HISTORY"),
                                     self.bandwidth_history
                                         .iter()
-                                        .map(|(_, download, _)| *download as f64 / 1_000_000.0),
+                                        .map(|(timestamp, download, _)| {
+                                            (*timestamp, *download as f64 / 1_000_000.0)
+                                        }),
                                     &self.settings.graph_style,
                                     "Mb/s",
                                     bandwidth_axis_start.clone(),
@@ -5782,7 +5828,9 @@ impl cosmic::Application for AppModel {
                                     crate::i18n::tr(&self.settings.language, "UPLOAD HISTORY"),
                                     self.bandwidth_history
                                         .iter()
-                                        .map(|(_, _, upload)| *upload as f64 / 1_000_000.0),
+                                        .map(|(timestamp, _, upload)| {
+                                            (*timestamp, *upload as f64 / 1_000_000.0)
+                                        }),
                                     &self.settings.graph_style,
                                     "Mb/s",
                                     bandwidth_axis_start,
@@ -5996,7 +6044,9 @@ impl cosmic::Application for AppModel {
                                                 device_history.into_iter().flat_map(|samples| {
                                                     samples
                                                         .iter()
-                                                        .map(|(_, power, _)| *power as f64)
+                                                        .map(|(timestamp, power, _)| {
+                                                            (*timestamp, *power as f64)
+                                                        })
                                                 }),
                                                 &self.settings.graph_style,
                                                 "W",
@@ -6064,7 +6114,9 @@ impl cosmic::Application for AppModel {
                                                 device_history.into_iter().flat_map(|samples| {
                                                     samples
                                                         .iter()
-                                                        .map(|(_, _, temperature)| *temperature)
+                                                        .map(|(timestamp, _, temperature)| {
+                                                            (*timestamp, *temperature)
+                                                        })
                                                 }),
                                                 &self.settings.graph_style,
                                                 "°C",
@@ -6597,17 +6649,26 @@ impl cosmic::Application for AppModel {
             Message::TooltipSurfaceAction(action) => {
                 return Task::done(cosmic::Action::Surface(action));
             }
-            Message::ShowGraph(title, values, unit, axis_start) => {
+            Message::ShowGraph(title, values, unit, _axis_start) => {
                 self.history_graph_devices.clear();
                 self.history_graph_index = None;
                 self.expanded_graph_secondary = None;
                 self.expanded_graph_full_values = Some(values.clone());
                 self.expanded_graph_full_secondary = None;
-                self.expanded_graph_max_timespan_minutes =
-                    self.settings.graph_timespan_minutes.max(5);
-                self.expanded_graph_view_timespan_minutes =
-                    self.expanded_graph_max_timespan_minutes;
-                self.expanded_graph = Some((title, values, unit, axis_start));
+                self.expanded_graph_max_timespan_minutes = graph_max_timespan_minutes(&values);
+                self.expanded_graph_view_timespan_minutes = self
+                    .settings
+                    .graph_timespan_minutes
+                    .clamp(5, self.expanded_graph_max_timespan_minutes.max(5));
+                let visible = graph_values_for_timespan(
+                    &values,
+                    self.expanded_graph_view_timespan_minutes,
+                );
+                let axis_start = graph_axis_start_for_samples(
+                    &visible,
+                    self.expanded_graph_view_timespan_minutes,
+                );
+                self.expanded_graph = Some((title, visible, unit, Some(axis_start)));
                 if self.graph_window.is_none() {
                     let Some(main_window_id) = self.core.main_window_id() else {
                         self.expanded_graph = None;
@@ -6636,7 +6697,7 @@ impl cosmic::Application for AppModel {
                 output_values,
                 input_values,
                 unit,
-                axis_start,
+                _axis_start,
                 output_label,
                 input_label,
             ) => {
@@ -6645,12 +6706,29 @@ impl cosmic::Application for AppModel {
                 self.expanded_graph_full_values = Some(output_values.clone());
                 self.expanded_graph_full_secondary = Some(input_values.clone());
                 self.expanded_graph_max_timespan_minutes =
-                    self.settings.graph_timespan_minutes.max(5);
-                self.expanded_graph_view_timespan_minutes =
-                    self.expanded_graph_max_timespan_minutes;
-                self.expanded_graph_secondary =
-                    Some((input_values, format!("{output_label}|{input_label}")));
-                self.expanded_graph = Some((title, output_values, unit, axis_start));
+                    graph_max_timespan_minutes(&output_values)
+                        .max(graph_max_timespan_minutes(&input_values));
+                self.expanded_graph_view_timespan_minutes = self
+                    .settings
+                    .graph_timespan_minutes
+                    .clamp(5, self.expanded_graph_max_timespan_minutes.max(5));
+                let visible_output = graph_values_for_timespan(
+                    &output_values,
+                    self.expanded_graph_view_timespan_minutes,
+                );
+                let visible_input = graph_values_for_timespan(
+                    &input_values,
+                    self.expanded_graph_view_timespan_minutes,
+                );
+                let axis_start = graph_axis_start_for_samples(
+                    &visible_output,
+                    self.expanded_graph_view_timespan_minutes,
+                );
+                self.expanded_graph_secondary = Some((
+                    visible_input,
+                    format!("{output_label}|{input_label}"),
+                ));
+                self.expanded_graph = Some((title, visible_output, unit, Some(axis_start)));
                 if self.graph_window.is_none() {
                     // Applets must create secondary surfaces through the
                     // applet popup API. window::open() creates a local window
@@ -6708,37 +6786,32 @@ impl cosmic::Application for AppModel {
                 if let Some(index) = self.history_graph_index {
                     let (key, name) = self.history_graph_devices[index].clone();
                     if let Some(samples) = self.device_history.get(&key) {
-                        let now = Instant::now();
-                        let selected_minutes = self.settings.graph_timespan_minutes.max(5);
-                        let available_minutes = max_device_history_minutes(samples, now);
-                        let window = graph_history_window(selected_minutes);
-                        let full_values: Vec<f64> = samples
+                        let values: GraphSamples = samples
                             .iter()
-                            .map(|(_, power, _)| *power as f64)
+                            .map(|(timestamp, power, _)| (*timestamp, *power as f64))
                             .collect();
-                        let visible: Vec<_> = samples
-                            .iter()
-                            .filter(|(timestamp, _, _)| now.duration_since(*timestamp) <= window)
-                            .collect();
-                        let values: Vec<f64> =
-                            visible.iter().map(|(_, power, _)| *power as f64).collect();
-                        let axis_start = format_graph_axis_start(
-                            selected_minutes,
-                            visible.first().map(|(timestamp, _, _)| {
-                                now.duration_since(*timestamp).as_secs().div_ceil(60)
-                            }),
-                        );
-                        self.expanded_graph_full_values = Some(full_values);
                         self.expanded_graph_max_timespan_minutes =
-                            available_minutes.max(selected_minutes);
-                        self.expanded_graph_view_timespan_minutes = selected_minutes;
+                            max_device_history_minutes(samples, Instant::now());
+                        self.expanded_graph_view_timespan_minutes = self
+                            .settings
+                            .graph_timespan_minutes
+                            .clamp(5, self.expanded_graph_max_timespan_minutes.max(5));
+                        let visible = graph_values_for_timespan(
+                            &values,
+                            self.expanded_graph_view_timespan_minutes,
+                        );
+                        let axis_start = graph_axis_start_for_samples(
+                            &visible,
+                            self.expanded_graph_view_timespan_minutes,
+                        );
+                        self.expanded_graph_full_values = Some(values);
                         self.expanded_graph = Some((
                             format!(
                                 "{} · {}",
                                 name,
                                 crate::i18n::tr(&self.settings.language, "POWER (W)")
                             ),
-                            values,
+                            visible,
                             "W".into(),
                             Some(axis_start),
                         ));
@@ -6773,22 +6846,19 @@ impl cosmic::Application for AppModel {
                 if self.expanded_graph_view_timespan_minutes != minutes {
                     self.expanded_graph_view_timespan_minutes = minutes;
                     if let Some(full_values) = self.expanded_graph_full_values.as_ref() {
-                        let values = graph_values_for_timespan(
-                            full_values,
-                            minutes,
-                            self.expanded_graph_max_timespan_minutes,
-                        );
-                        let secondary = self.expanded_graph_full_secondary.as_ref().map(|series| {
-                            graph_values_for_timespan(
-                                series,
-                                minutes,
-                                self.expanded_graph_max_timespan_minutes,
-                            )
-                        });
+                        let values = graph_values_for_timespan(full_values, minutes);
+                        let secondary = self
+                            .expanded_graph_full_secondary
+                            .as_ref()
+                            .map(|series| graph_values_for_timespan(series, minutes));
                         if let Some((title, _, unit, _)) = self.expanded_graph.as_ref() {
-                            let axis_start = format_graph_axis_start(minutes, None);
-                            self.expanded_graph =
-                                Some((title.clone(), values, unit.clone(), Some(axis_start)));
+                            let axis_start = graph_axis_start_for_samples(&values, minutes);
+                            self.expanded_graph = Some((
+                                title.clone(),
+                                values,
+                                unit.clone(),
+                                Some(axis_start),
+                            ));
                             if let (Some(series), Some((_, labels))) =
                                 (secondary, self.expanded_graph_secondary.as_ref())
                             {
@@ -6807,40 +6877,33 @@ impl cosmic::Application for AppModel {
                         self.history_graph_index = Some(next);
                         let (key, name) = self.history_graph_devices[next].clone();
                         if let Some(samples) = self.device_history.get(&key) {
-                            let now = Instant::now();
-                            let selected_minutes = self.settings.graph_timespan_minutes.max(5);
-                            let available_minutes = max_device_history_minutes(samples, now);
-                            let window = graph_history_window(selected_minutes);
-                            let full_values: Vec<f64> = samples
+                            let values: GraphSamples = samples
                                 .iter()
-                                .map(|(_, power, _)| *power as f64)
+                                .map(|(timestamp, power, _)| (*timestamp, *power as f64))
                                 .collect();
-                            let visible: Vec<_> = samples
-                                .iter()
-                                .filter(|(timestamp, _, _)| {
-                                    now.duration_since(*timestamp) <= window
-                                })
-                                .collect();
-                            let values: Vec<f64> =
-                                visible.iter().map(|(_, power, _)| *power as f64).collect();
-                            let axis_start = format_graph_axis_start(
-                                selected_minutes,
-                                visible.first().map(|(timestamp, _, _)| {
-                                    now.duration_since(*timestamp).as_secs().div_ceil(60)
-                                }),
-                            );
-                            self.expanded_graph_full_values = Some(full_values);
+                            self.expanded_graph_full_values = Some(values.clone());
                             self.expanded_graph_full_secondary = None;
                             self.expanded_graph_max_timespan_minutes =
-                                available_minutes.max(selected_minutes);
-                            self.expanded_graph_view_timespan_minutes = selected_minutes;
+                                max_device_history_minutes(samples, Instant::now());
+                            self.expanded_graph_view_timespan_minutes = self
+                                .settings
+                                .graph_timespan_minutes
+                                .clamp(5, self.expanded_graph_max_timespan_minutes.max(5));
+                            let visible = graph_values_for_timespan(
+                                &values,
+                                self.expanded_graph_view_timespan_minutes,
+                            );
+                            let axis_start = graph_axis_start_for_samples(
+                                &visible,
+                                self.expanded_graph_view_timespan_minutes,
+                            );
                             self.expanded_graph = Some((
                                 format!(
                                     "{} · {}",
                                     name,
                                     crate::i18n::tr(&self.settings.language, "POWER (W)")
                                 ),
-                                values,
+                                visible,
                                 "W".into(),
                                 Some(axis_start),
                             ));
@@ -7519,13 +7582,53 @@ impl cosmic::Application for AppModel {
                     if let Some(index) = self.history_graph_index
                         && let Some((key, name)) = self.history_graph_devices.get(index).cloned()
                     {
-                        self.expanded_graph = Some(rebuild_device_history_graph(
+                        let (title, full_values, unit, _) = rebuild_device_history_graph(
+
                             &self.device_history,
+
                             &key,
+
                             &name,
+
                             &self.settings.language,
+
                             self.settings.graph_timespan_minutes,
-                        ));
+
+                        );
+
+                        self.expanded_graph_max_timespan_minutes =
+
+                            graph_max_timespan_minutes(&full_values);
+
+                        self.expanded_graph_view_timespan_minutes = self
+
+                            .settings
+
+                            .graph_timespan_minutes
+
+                            .clamp(5, self.expanded_graph_max_timespan_minutes.max(5));
+
+                        let visible = graph_values_for_timespan(
+
+                            &full_values,
+
+                            self.expanded_graph_view_timespan_minutes,
+
+                        );
+
+                        let axis_start = graph_axis_start_for_samples(
+
+                            &visible,
+
+                            self.expanded_graph_view_timespan_minutes,
+
+                        );
+
+                        self.expanded_graph_full_values = Some(full_values);
+
+                        self.expanded_graph_full_secondary = None;
+
+                        self.expanded_graph = Some((title, visible, unit, Some(axis_start)));
                     }
                     self.persist_settings();
                 }
@@ -7924,13 +8027,53 @@ impl cosmic::Application for AppModel {
                 if let Some(index) = self.history_graph_index
                     && let Some((key, name)) = self.history_graph_devices.get(index).cloned()
                 {
-                    self.expanded_graph = Some(rebuild_device_history_graph(
+                    let (title, full_values, unit, _) = rebuild_device_history_graph(
+
                         &self.device_history,
+
                         &key,
+
                         &name,
+
                         &self.settings.language,
+
                         self.settings.graph_timespan_minutes,
-                    ));
+
+                    );
+
+                    self.expanded_graph_max_timespan_minutes =
+
+                        graph_max_timespan_minutes(&full_values);
+
+                    self.expanded_graph_view_timespan_minutes = self
+
+                        .settings
+
+                        .graph_timespan_minutes
+
+                        .clamp(5, self.expanded_graph_max_timespan_minutes.max(5));
+
+                    let visible = graph_values_for_timespan(
+
+                        &full_values,
+
+                        self.expanded_graph_view_timespan_minutes,
+
+                    );
+
+                    let axis_start = graph_axis_start_for_samples(
+
+                        &visible,
+
+                        self.expanded_graph_view_timespan_minutes,
+
+                    );
+
+                    self.expanded_graph_full_values = Some(full_values);
+
+                    self.expanded_graph_full_secondary = None;
+
+                    self.expanded_graph = Some((title, visible, unit, Some(axis_start)));
                 }
                 self.persist_settings();
             }
@@ -8191,15 +8334,23 @@ mod history_tests {
     use super::*;
 
     #[test]
-    fn expanded_graph_timespan_keeps_the_most_recent_samples() {
-        let values = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+    fn expanded_graph_timespan_filters_by_sample_timestamps() {
+        let now = Instant::now();
+        let samples = vec![
+            (now - Duration::from_secs(180), 1.0),
+            (now - Duration::from_secs(110), 2.0),
+            (now - Duration::from_secs(50), 3.0),
+            (now - Duration::from_secs(10), 4.0),
+        ];
+        let one_minute = graph_values_for_timespan(&samples, 1);
         assert_eq!(
-            graph_values_for_timespan(&values, 30, 60),
-            vec![5.0, 6.0, 7.0, 8.0]
+            one_minute.iter().map(|(_, value)| *value).collect::<Vec<_>>(),
+            vec![3.0, 4.0]
         );
-        assert_eq!(graph_values_for_timespan(&values, 60, 60), values);
-        assert_eq!(graph_values_for_timespan(&values, 5, 60), vec![8.0]);
-        assert_eq!(graph_values_for_timespan(&[], 15, 60), Vec::<f64>::new());
+        let three_minutes = graph_values_for_timespan(&samples, 3);
+        assert_eq!(three_minutes.len(), 4);
+        assert!(graph_max_timespan_minutes(&samples) >= 3);
+        assert!(graph_values_for_timespan(&[], 15).is_empty());
     }
 
     #[test]
