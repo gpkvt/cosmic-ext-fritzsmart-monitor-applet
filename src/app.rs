@@ -1781,6 +1781,7 @@ fn total_power_overview(
     let output_low = history.iter().map(|(_, value)| *value).min()?;
     let output_high = history.iter().map(|(_, value)| *value).max()?;
     let input_history = rebuild_input_power_history(device_history, &settings.input_ains);
+    let has_input_readings = readings.iter().any(|reading| settings.input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain)));
     let output_temperature_history =
         rebuild_temperature_history(device_history, &settings.input_ains, false);
     let input_temperature_history =
@@ -1796,23 +1797,35 @@ fn total_power_overview(
     );
 
     let (combined_output_values, combined_input_values) = aligned_power_series(history, &input_history);
+    let power_graph: cosmic::Element<'static, Message> = if has_input_readings {
+        interactive_combined_graph_with_axis(
+            &settings.language,
+            crate::i18n::tr(&settings.language, "TOTAL POWER INPUT & OUTPUT"),
+            combined_output_values,
+            combined_input_values,
+            &settings.graph_style,
+            "W",
+            axis_start.clone(),
+            &crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
+            &crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
+        )
+    } else {
+        interactive_graph_with_axis(
+            &settings.language,
+            crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
+            history.iter().map(|(_, value)| *value as f64),
+            &settings.graph_style,
+            "W",
+            axis_start.clone(),
+        )
+    };
     let output_graph = collapsible_graph(
         "TOTAL POWER INPUT & OUTPUT",
         "graph-total-power-pair",
-        collapsed_sections.contains("graph-total-output-pair"),
+        collapsed_sections.contains("graph-total-power-pair"),
         widget::Column::new()
             .spacing(8)
-            .push(interactive_combined_graph_with_axis(
-                &settings.language,
-                crate::i18n::tr(&settings.language, "TOTAL POWER INPUT & OUTPUT"),
-                combined_output_values,
-                combined_input_values,
-                &settings.graph_style,
-                "W",
-                axis_start.clone(),
-                &crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-                &crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
-            ))
+            .push(power_graph)
             .push(interactive_graph_with_axis(
                 &settings.language,
                 crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
@@ -1860,11 +1873,6 @@ fn total_power_overview(
     );
     let mut sections = vec![("3-total-power-output".to_string(), output_section)];
 
-    let has_input_readings = readings.iter().any(|reading| {
-        settings
-            .input_ains
-            .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
-    });
     if has_input_readings {
         let input_energy_summary =
             input_energy_and_timespan(&input_history).map(|(energy_wh, timespan)| {
@@ -6401,6 +6409,7 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::ShowDeviceHistoryGraph(ain) => {
+                self.expanded_graph_secondary = None;
                 let mut ordered: Vec<_> = self.readings.iter().collect();
                 ordered.sort_by_key(|reading| {
                     self.settings
@@ -6510,6 +6519,7 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::NavigateDeviceHistory(delta) => {
+                self.expanded_graph_secondary = None;
                 if let Some(current) = self.history_graph_index {
                     let next = current as isize + delta;
                     if next >= 0 && (next as usize) < self.history_graph_devices.len() {
@@ -8275,6 +8285,16 @@ mod history_tests {
         assert_eq!(average_temperature_c(&readings, false), Some(110.0 / 3.0));
         assert_eq!(average_temperature_c(&readings, true), Some(20.0));
         assert_eq!(average_temperature_c(&readings[1..], true), None);
+    }
+
+    #[test]
+    fn combined_power_series_aligns_output_and_input_by_timestamp() {
+        let start = Instant::now();
+        let output = VecDeque::from([(start, 900), (start + Duration::from_secs(60), 800)]);
+        let input = VecDeque::from([(start, -250), (start + Duration::from_secs(120), -300)]);
+        let (output_values, input_values) = aligned_power_series(&output, &input);
+        assert_eq!(output_values, vec![900.0]);
+        assert_eq!(input_values, vec![250.0]);
     }
 
     #[test]
