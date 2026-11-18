@@ -20,7 +20,7 @@ FRITZ!Power Monitor verbindet sich direkt mit deiner FRITZ!Box. Es zeigt Haushal
 
 ## Bildschirmfotos
 
-Die Bildschirmfotos zeigen das Applet auf dem COSMIC-Desktop. Öffne die [Galerie](index.html#tour), um alle Ansichten zu sehen.
+Die Bildschirmfotos zeigen das Applet direkt in den jeweiligen Funktionsabschnitten der [Projektübersicht](index.html#screenshots).
 
 ## Installation
 
