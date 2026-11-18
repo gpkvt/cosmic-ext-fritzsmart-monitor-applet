@@ -924,6 +924,7 @@ fn format_graph_energy(energy_wh: f64) -> String {
     }
 }
 
+#[cfg(test)]
 fn escape_svg_text(value: &str) -> String {
     value
         .replace('&', "&amp;")
