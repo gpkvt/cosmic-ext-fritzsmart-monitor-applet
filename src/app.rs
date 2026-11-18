@@ -1243,7 +1243,10 @@ fn graph_stats_legend(
     legend.into()
 }
 
-fn graph_values_for_timespan(samples: &[(Instant, f64)], selected_minutes: u32) -> GraphSamples {
+fn graph_values_for_timespan(
+    samples: &[(Instant, f64)],
+    selected_minutes: u32,
+) -> GraphSamples {
     let now = Instant::now();
     let cutoff = now
         .checked_sub(Duration::from_secs(u64::from(selected_minutes) * 60))
@@ -1263,7 +1266,7 @@ fn graph_max_timespan_minutes(samples: &[(Instant, f64)]) -> u32 {
                 .saturating_duration_since(*timestamp)
                 .as_secs()
                 .div_ceil(60)
-                .clamp(5, u64::from(u32::MAX)) as u32
+                .clamp(5, 2_102_400) as u32
         })
         .unwrap_or(5)
 }
@@ -6630,7 +6633,7 @@ impl cosmic::Application for AppModel {
             Message::TooltipSurfaceAction(action) => {
                 return Task::done(cosmic::Action::Surface(action));
             }
-            Message::ShowGraph(title, values, unit, axis_start) => {
+            Message::ShowGraph(title, values, unit, _axis_start) => {
                 self.history_graph_devices.clear();
                 self.history_graph_index = None;
                 self.expanded_graph_secondary = None;
@@ -6639,7 +6642,11 @@ impl cosmic::Application for AppModel {
                 self.expanded_graph_max_timespan_minutes = graph_max_timespan_minutes(&values);
                 self.expanded_graph_view_timespan_minutes =
                     self.expanded_graph_max_timespan_minutes;
-                self.expanded_graph = Some((title, values, unit, axis_start));
+                let axis_start = graph_axis_start_for_samples(
+                    &values,
+                    self.expanded_graph_view_timespan_minutes,
+                );
+                self.expanded_graph = Some((title, values, unit, Some(axis_start)));
                 if self.graph_window.is_none() {
                     let Some(main_window_id) = self.core.main_window_id() else {
                         self.expanded_graph = None;
@@ -6668,7 +6675,7 @@ impl cosmic::Application for AppModel {
                 output_values,
                 input_values,
                 unit,
-                axis_start,
+                _axis_start,
                 output_label,
                 input_label,
             ) => {
@@ -6680,9 +6687,13 @@ impl cosmic::Application for AppModel {
                     .max(graph_max_timespan_minutes(&input_values));
                 self.expanded_graph_view_timespan_minutes =
                     self.expanded_graph_max_timespan_minutes;
+                let axis_start = graph_axis_start_for_samples(
+                    &output_values,
+                    self.expanded_graph_view_timespan_minutes,
+                );
                 self.expanded_graph_secondary =
                     Some((input_values, format!("{output_label}|{input_label}")));
-                self.expanded_graph = Some((title, output_values, unit, axis_start));
+                self.expanded_graph = Some((title, output_values, unit, Some(axis_start)));
                 if self.graph_window.is_none() {
                     // Applets must create secondary surfaces through the
                     // applet popup API. window::open() creates a local window
@@ -7542,7 +7553,9 @@ impl cosmic::Application for AppModel {
 
                         self.expanded_graph_full_secondary = None;
 
-                        self.expanded_graph_max_timespan_minutes = graph_max_timespan_minutes(&graph.1);
+                        self.expanded_graph_max_timespan_minutes =
+
+                            graph_max_timespan_minutes(&graph.1);
 
                         self.expanded_graph_view_timespan_minutes =
 
@@ -7965,7 +7978,9 @@ impl cosmic::Application for AppModel {
 
                     self.expanded_graph_full_secondary = None;
 
-                    self.expanded_graph_max_timespan_minutes = graph_max_timespan_minutes(&graph.1);
+                    self.expanded_graph_max_timespan_minutes =
+
+                        graph_max_timespan_minutes(&graph.1);
 
                     self.expanded_graph_view_timespan_minutes =
 
