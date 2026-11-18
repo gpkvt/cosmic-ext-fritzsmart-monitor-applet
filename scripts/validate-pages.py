@@ -82,7 +82,7 @@ for page in pages:
         )
         if expected_deb not in content:
             fail(f"index.html: Debian package link is not synchronized with release version {version}")
-        if re.search(r"releases/download/[^\\"']+\\.(?:AppImage|flatpak)", content, re.I):
+        if any(ext in content for ext in (".AppImage", ".flatpak")) and "releases/download/" in content:
             fail("index.html: AppImage and Flatpak packages must not be linked as direct downloads")
         if any(term in content.lower() for term in ("linux packages", "download appimage", "download flatpak")):
             fail("index.html: obsolete package download section remains")
