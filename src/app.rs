@@ -242,7 +242,10 @@ fn build_debug_report(app: &AppModel, fritzbox_dump: &str) -> String {
                 };
                 format!(
                     "- {} (AIN {masked_ain}): {} W, {}, power state {:?}",
-                    reading.name, reading.power_w, format_panel_temperature(reading.temperature_c), reading.power_state
+                    reading.name,
+                    reading.power_w,
+                    format_panel_temperature(reading.temperature_c),
+                    reading.power_state
                 )
             })
             .collect::<Vec<_>>()
@@ -5911,7 +5914,8 @@ impl cosmic::Application for AppModel {
                                     } else {
                                         format!(
                                             "{} W · {}",
-                                            reading.power_w, format_panel_temperature(reading.temperature_c)
+                                            reading.power_w,
+                                            format_panel_temperature(reading.temperature_c)
                                         )
                                     })),
                             )
