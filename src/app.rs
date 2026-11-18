@@ -101,6 +101,7 @@ pub enum Message {
     TooltipSurfaceAction(cosmic::surface::Action<Message>),
     Refresh,
     ClockTick,
+    GraphRefreshTick,
     FlowAnimationTick,
     Updated(Box<Result<FritzFetchResult, String>>),
     SetDevicePower(String, bool),
@@ -2648,6 +2649,10 @@ fn animation_ticks() -> impl futures::Stream<Item = Message> {
     clock_ticks(Duration::from_secs(1))
 }
 
+fn graph_refresh_ticks() -> impl futures::Stream<Item = Message> {
+    clock_ticks(Duration::from_secs(30)).map(|_| Message::GraphRefreshTick)
+}
+
 fn flow_animation_ticks() -> impl futures::Stream<Item = Message> {
     cosmic::iced::stream::channel(
         2,
@@ -2865,6 +2870,9 @@ impl cosmic::Application for AppModel {
         };
 
         let mut subscriptions = vec![clock];
+        if self.graph_window.is_some() {
+            subscriptions.push(Subscription::run(graph_refresh_ticks));
+        }
         if self.popup.is_some() {
             if energy_flow_values(&self.readings, &self.settings.input_ains).is_some() {
                 subscriptions.push(Subscription::run(flow_animation_ticks));
@@ -7187,6 +7195,20 @@ impl cosmic::Application for AppModel {
                 }
                 return Task::batch(tasks);
             }
+            Message::GraphRefreshTick => {
+                // Keep the expanded graph current without changing the configured
+                // refresh cadence used by the panel and compact popup.
+                if self.graph_window.is_some() && self.refresh_started_at.is_none() {
+                    self.refresh_started_at = Some(Instant::now());
+                    record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        "Expanded graph refresh started (30-second graph cadence).",
+                    );
+                    return Task::perform(fetch_fritz_data(), |result| {
+                        cosmic::Action::App(Message::Updated(Box::new(result)))
+                    });
+                }
+            }
             Message::FlowAnimationTick => {
                 self.flow_animation_frame = (self.flow_animation_frame + 1) % 4;
             }
@@ -7398,6 +7420,80 @@ impl cosmic::Application for AppModel {
                                 }
                             }
                             self.readings = readings;
+
+                            // Rebuild the open large graph from the newly recorded
+                            // samples. Device history and the combined input/output
+                            // graph are the two multi-series/live graph views.
+                            if self.graph_window.is_some() {
+                                if let Some(index) = self.history_graph_index {
+                                    if let Some((key, name)) =
+                                        self.history_graph_devices.get(index).cloned()
+                                    {
+                                        let (title, full_values, unit, _) =
+                                            rebuild_device_history_graph(
+                                                &self.device_history,
+                                                &key,
+                                                &name,
+                                                &self.settings.language,
+                                                self.settings.graph_timespan_minutes,
+                                            );
+                                        self.expanded_graph_max_timespan_minutes =
+                                            graph_max_timespan_minutes(&full_values);
+                                        let visible = graph_values_for_timespan(
+                                            &full_values,
+                                            self.expanded_graph_view_timespan_minutes,
+                                        );
+                                        let axis_start = graph_axis_start_for_samples(
+                                            &visible,
+                                            self.expanded_graph_view_timespan_minutes,
+                                        );
+                                        self.expanded_graph_full_values = Some(full_values);
+                                        self.expanded_graph = Some((
+                                            title,
+                                            visible,
+                                            unit,
+                                            Some(axis_start),
+                                        ));
+                                    }
+                                } else if let Some((_, labels)) =
+                                    self.expanded_graph_secondary.as_ref()
+                                {
+                                    let labels = labels.clone();
+                                    let input = rebuild_input_power_history(
+                                        &self.device_history,
+                                        &self.settings.input_ains,
+                                    );
+                                    let (output, input) = aligned_power_series(&self.history, &input);
+                                    self.expanded_graph_max_timespan_minutes =
+                                        graph_max_timespan_minutes(&output)
+                                            .max(graph_max_timespan_minutes(&input));
+                                    let visible_output = graph_values_for_timespan(
+                                        &output,
+                                        self.expanded_graph_view_timespan_minutes,
+                                    );
+                                    let visible_input = graph_values_for_timespan(
+                                        &input,
+                                        self.expanded_graph_view_timespan_minutes,
+                                    );
+                                    let axis_start = graph_axis_start_for_samples(
+                                        &visible_output,
+                                        self.expanded_graph_view_timespan_minutes,
+                                    );
+                                    self.expanded_graph_full_values = Some(output);
+                                    self.expanded_graph_full_secondary = Some(input);
+                                    self.expanded_graph_secondary =
+                                        Some((visible_input, labels));
+                                    if let Some((title, _, unit, _)) = self.expanded_graph.as_ref() {
+                                        self.expanded_graph = Some((
+                                            title.clone(),
+                                            visible_output,
+                                            unit.clone(),
+                                            Some(axis_start),
+                                        ));
+                                    }
+                                }
+                            }
+
                             if let Err(error) =
                                 crate::history::save(&self.history, &self.device_history)
                             {
