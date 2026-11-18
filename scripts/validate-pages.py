@@ -105,14 +105,15 @@ for page in pages:
             fail("index.html: left-arrow keyboard navigation is missing")
         if not re.search(r"event\.key\s*===\s*['\"]ArrowRight['\"]", content):
             fail("index.html: right-arrow keyboard navigation is missing")
-        hero_cards = content.count('<a class="hero-shot"')
-        if hero_cards != 10:
-            fail(f"index.html: expected ten screenshot cards, found {hero_cards}")
-        if ".hero-shot:nth-of-type(n+6){display:none}" not in content:
-            fail("index.html: the hero must show a five-card screenshot fan and keep the remaining cards in the gallery")
-        fan_rules = (".hero-shot:nth-of-type(1)", ".hero-shot:nth-of-type(2)", ".hero-shot:nth-of-type(3)", ".hero-shot:nth-of-type(4)", ".hero-shot:nth-of-type(5)", "transform-origin:50% 105%")
-        for feature in (".gallery-all", "View all 10 screenshots", "openGallery(", ".hero-shot:hover", "border-color:#8be0c4aa", *fan_rules):
+        hero_gallery = re.search(r'<div class="hero-gallery"[^>]*>(.*?)</div>', content, re.S)
+        if not hero_gallery:
+            fail("index.html: screenshot card gallery is missing")
+        hero_cards = hero_gallery.group(1).count('<a class="hero-shot"')
+        hero_images = hero_gallery.group(1).count('<img ')
+        if hero_cards != 10 or hero_images != 10:
+            fail(f"index.html: expected ten visible screenshot cards with images, found {hero_cards} cards and {hero_images} images")
+        for feature in (".hero-gallery{display:grid", "grid-template-columns:repeat(5,minmax(0,1fr))", ".hero-gallery .hero-shot:nth-of-type(n)", "display:flex!important", ".hero-gallery .hero-shot img", "object-fit:contain", ".hero-gallery .hero-shot:hover", "openGallery("):
             if feature not in content:
-                fail(f"index.html: screenshot gallery interaction or card-fan styling is missing {feature}")
+                fail(f"index.html: visible screenshot card gallery is missing {feature}")
 
 print(f"Validated {len(pages)} GitHub Pages HTML page(s) and all local references.")
