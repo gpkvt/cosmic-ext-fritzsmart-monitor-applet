@@ -104,7 +104,7 @@ pub struct FritzFetchResult {
     pub system_info: Option<FritzBoxSystemInfo>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FritzDevice {
     pub name: String,
     pub ain: String,
@@ -146,6 +146,8 @@ pub struct FritzSettings {
     pub tasmota_password: String,
     pub ain: String,
     pub ains: Vec<String>,
+    /// Persisted inventory; discovery only adds/updates entries and never prunes them.
+    pub known_devices: Vec<FritzDevice>,
     pub allow_invalid_certs: bool,
     pub ca_cert_path: String,
     pub panel_text_size: u8,
@@ -194,6 +196,7 @@ impl Default for FritzSettings {
             tasmota_password: String::new(),
             ain: String::new(),
             ains: Vec::new(),
+            known_devices: Vec::new(),
             allow_invalid_certs: false,
             ca_cert_path: String::new(),
             panel_text_size: 14,
@@ -515,6 +518,7 @@ impl FritzSettings {
                     selected
                 }
             },
+            known_devices: serde_json::from_str(&get("KNOWN_DEVICES")).unwrap_or_default(),
             allow_invalid_certs: get("ALLOW_INVALID_CERTS").eq_ignore_ascii_case("true"),
             ca_cert_path: get("CA_CERT_PATH"),
             panel_text_size: parse_panel_text_size(&get("PANEL_TEXT_SIZE")),
@@ -607,6 +611,8 @@ impl FritzSettings {
         let parent = path.parent().ok_or("Invalid configuration path")?;
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         let temporary = parent.join(format!(".fritz_solar.cfg.{}.tmp", std::process::id()));
+        let known_devices = serde_json::to_string(&self.known_devices)
+            .map_err(|error| format!("Cannot serialize saved device inventory: {error}"))?;
         let selected_ains = if self.ains.is_empty() {
             self.ain.clone()
         } else {
@@ -646,7 +652,7 @@ impl FritzSettings {
             parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
         let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
-            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nAIN={}\nAINS={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\n",
             match self.language.as_str() {
                 "de" => "de",
                 "en" => "en",
@@ -659,6 +665,7 @@ impl FritzSettings {
             self.tasmota_password,
             first_ain,
             selected_ains,
+            known_devices,
             if self.allow_invalid_certs {
                 "true"
             } else {
