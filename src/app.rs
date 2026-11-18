@@ -10106,12 +10106,7 @@ mod history_tests {
             true,
             true
         ));
-        assert!(!panel_order_move_available(
-            &order,
-            "weather",
-            true,
-            true
-        ));
+        assert!(!panel_order_move_available(&order, "weather", true, true));
         assert!(panel_order_move_available(
             &order,
             "solar-power",
