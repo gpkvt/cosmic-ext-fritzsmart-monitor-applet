@@ -35,7 +35,7 @@ jobs:
           components: rustfmt
 
       - name: Synchronize Cargo.lock
-        run: cargo generate-lockfile
+        run: cargo update --workspace
 
       - name: Format Rust sources
         run: cargo fmt --all
