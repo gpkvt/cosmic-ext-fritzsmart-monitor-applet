@@ -115,6 +115,8 @@ pub enum Message {
     UrlChanged(String),
     UsernameChanged(String),
     PasswordChanged(String),
+    TasmotaUsernameChanged(String),
+    TasmotaPasswordChanged(String),
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
@@ -2736,9 +2738,11 @@ impl cosmic::Application for AppModel {
             cosmic::Action::App(Message::Updated(Box::new(result)))
         })];
         if settings.setup_completed
-            && !settings.url.trim().is_empty()
-            && !settings.username.trim().is_empty()
-            && !settings.password.is_empty()
+            && ((!settings.url.trim().is_empty()
+                && !settings.username.trim().is_empty()
+                && !settings.password.is_empty())
+                || !settings.tasmota_username.trim().is_empty()
+                || !settings.tasmota_password.is_empty())
         {
             let discovery_settings = settings.clone();
             tasks.push(Task::perform(
@@ -4041,6 +4045,29 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption(
                         "Leave empty to use the system certificate store",
                     ))
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3("Tasmota devices"))
+                    .push(widget::text::caption(
+                        "Shared credentials used by all Tasmota devices. These are independent of your FRITZ!Box login.",
+                    ))
+                    .push(widget::text::body("Tasmota username"))
+                    .push(
+                        widget::text_input(
+                            "Tasmota username",
+                            &self.settings.tasmota_username,
+                        )
+                        .on_input(Message::TasmotaUsernameChanged),
+                    )
+                    .push(widget::text::body("Tasmota password"))
+                    .push(
+                        widget::secure_input(
+                            "Tasmota password",
+                            &self.settings.tasmota_password,
+                            None,
+                            true,
+                        )
+                        .on_input(Message::TasmotaPasswordChanged),
+                    )
                     .push(
                         widget::Row::new()
                             .width(cosmic::iced::Length::Fill)
@@ -7922,6 +7949,14 @@ impl cosmic::Application for AppModel {
             }
             Message::PasswordChanged(value) => {
                 self.settings.password = value;
+                self.persist_settings();
+            }
+            Message::TasmotaUsernameChanged(value) => {
+                self.settings.tasmota_username = value;
+                self.persist_settings();
+            }
+            Message::TasmotaPasswordChanged(value) => {
+                self.settings.tasmota_password = value;
                 self.persist_settings();
             }
             Message::AllowInvalidCertsChanged(value) => {
