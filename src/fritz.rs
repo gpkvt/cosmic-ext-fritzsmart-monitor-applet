@@ -619,7 +619,6 @@ impl FritzSettings {
                 return Err("Configuration values must not contain newlines".into());
             }
         }
-        save_device_inventory(&self.known_devices)?;
         let path = config_path()?;
         let parent = path.parent().ok_or("Invalid configuration path")?;
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -806,34 +805,6 @@ impl FritzSettings {
         }
         Ok(())
     }
-}
-
-fn device_inventory_path() -> Result<std::path::PathBuf, String> {
-    let home = env::var("HOME").map_err(|_| "HOME is not set".to_string())?;
-    Ok(std::path::PathBuf::from(home).join(".config/fritz_solar_devices.json"))
-}
-
-fn save_device_inventory(devices: &[FritzDevice]) -> Result<(), String> {
-    let path = device_inventory_path()?;
-    let parent = path.parent().ok_or("Invalid device inventory path")?;
-    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
-    let contents = serde_json::to_vec_pretty(devices)
-        .map_err(|error| format!("Cannot serialize device inventory: {error}"))?;
-    let temporary = parent.join(format!(".fritz_solar_devices.{}.tmp", std::process::id()));
-    let mut file = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&temporary)
-        .map_err(|error| error.to_string())?;
-    let result = file
-        .write_all(&contents)
-        .and_then(|_| file.sync_all())
-        .and_then(|_| fs::rename(&temporary, &path));
-    if let Err(error) = result {
-        let _ = fs::remove_file(&temporary);
-        return Err(error.to_string());
-    }
-    Ok(())
 }
 
 fn config_path() -> Result<std::path::PathBuf, String> {
