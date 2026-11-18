@@ -110,9 +110,9 @@ dpkg-deb --info "$DEB_FILE"
 dpkg-deb --control "$DEB_FILE" "$TEMP_DIR/deb-control-check"
 test -x "$TEMP_DIR/deb-control-check/postinst"
 test -x "$TEMP_DIR/deb-control-check/prerm"
-dpkg-deb --contents "$DEB_FILE" | grep -Fq "/usr/bin/fritz-power-monitor"
-dpkg-deb --contents "$DEB_FILE" | grep -Fq "/usr/share/applications/$APP_ID.desktop"
-dpkg-deb --contents "$DEB_FILE" | grep -Fq "/usr/share/icons/hicolor/scalable/apps/$APP_ID.svg"
+dpkg-deb --contents "$DEB_FILE" | grep -F "/usr/bin/fritz-power-monitor" >/dev/null
+dpkg-deb --contents "$DEB_FILE" | grep -F "/usr/share/applications/$APP_ID.desktop" >/dev/null
+dpkg-deb --contents "$DEB_FILE" | grep -F "/usr/share/icons/hicolor/scalable/apps/$APP_ID.svg" >/dev/null
 
 # Bundle the executable and its shared-library dependencies into an AppImage.
 curl --fail --location --retry 3 \
