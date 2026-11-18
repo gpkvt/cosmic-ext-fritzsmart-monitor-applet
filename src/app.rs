@@ -6376,6 +6376,21 @@ impl cosmic::Application for AppModel {
                 self.history_graph_index = None;
                 self.expanded_graph_secondary = None;
                 self.expanded_graph = Some((title, values, unit, axis_start));
+                if self.graph_window.is_none() {
+                    let Some(main_window_id) = self.core.main_window_id() else {
+                        self.expanded_graph = None;
+                        return Task::none();
+                    };
+                    let id = Id::unique();
+                    self.graph_window = Some(id);
+                    let mut settings = self.core.applet.get_popup_settings(
+                        main_window_id, id, Some((800, 600)), None, None,
+                    );
+                    settings.positioner.size_limits = Limits::NONE
+                        .min_width(640.0).min_height(480.0)
+                        .max_width(800.0).max_height(600.0);
+                    return get_popup(settings);
+                }
             }
             Message::ShowCombinedGraph(title, output_values, input_values, unit, axis_start, output_label, input_label) => {
                 self.history_graph_devices.clear();
