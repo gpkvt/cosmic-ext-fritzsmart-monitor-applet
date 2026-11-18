@@ -1200,10 +1200,7 @@ fn graph_stats_row(
                 .spacing(6)
                 .align_y(cosmic::iced::Alignment::Center)
                 .push(marker)
-                .push(
-                    widget::text::body(axis_label)
-                        .width(cosmic::iced::Length::Fill),
-                )
+                .push(widget::text::body(axis_label).width(cosmic::iced::Length::Fill))
                 .width(cosmic::iced::Length::Fill),
         )
         .push(widget::text::body(graph_stat_value(values, unit, "MIN")).width(metric_width))
@@ -3428,12 +3425,18 @@ impl cosmic::Application for AppModel {
                     let mut ranges = widget::Row::new()
                         .spacing(6)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::caption("TIME RANGE").width(cosmic::iced::Length::Fill));
+                        .push(
+                            widget::text::caption("TIME RANGE").width(cosmic::iced::Length::Fill),
+                        );
                     for (label, minutes) in presets {
                         let is_selected = self.expanded_graph_view_timespan_minutes == minutes
                             || (minutes == max_minutes
                                 && self.expanded_graph_view_timespan_minutes >= max_minutes);
-                        let caption = if is_selected { format!("✓ {label}") } else { label };
+                        let caption = if is_selected {
+                            format!("✓ {label}")
+                        } else {
+                            label
+                        };
                         ranges = ranges.push(
                             widget::button::custom(widget::text::caption(caption))
                                 .on_press(Message::GraphHistoryTimespanChanged(minutes))
@@ -3471,25 +3474,21 @@ impl cosmic::Application for AppModel {
                     },
                 )
                 .push({
-                    let secondary = self.expanded_graph_secondary.as_ref().map(
-                        |(series, labels)| {
-                            let mut parts = labels.splitn(2, '|');
-                            let _primary = parts.next();
-                            let secondary_label = parts.next().unwrap_or("Input");
-                            (series.as_slice(), secondary_label)
-                        },
-                    );
+                    let secondary =
+                        self.expanded_graph_secondary
+                            .as_ref()
+                            .map(|(series, labels)| {
+                                let mut parts = labels.splitn(2, '|');
+                                let _primary = parts.next();
+                                let secondary_label = parts.next().unwrap_or("Input");
+                                (series.as_slice(), secondary_label)
+                            });
                     let primary_label = self
                         .expanded_graph_secondary
                         .as_ref()
                         .and_then(|(_, labels)| labels.split('|').next())
                         .unwrap_or(title);
-                    graph_stats_legend(
-                        primary_label,
-                        values,
-                        unit,
-                        secondary,
-                    )
+                    graph_stats_legend(primary_label, values, unit, secondary)
                 });
             // Applet popup surfaces do not receive the normal desktop
             // window background automatically. Apply COSMIC's window
@@ -6611,8 +6610,10 @@ impl cosmic::Application for AppModel {
                 self.expanded_graph_secondary = None;
                 self.expanded_graph_full_values = Some(values.clone());
                 self.expanded_graph_full_secondary = None;
-                self.expanded_graph_max_timespan_minutes = self.settings.graph_timespan_minutes.max(5);
-                self.expanded_graph_view_timespan_minutes = self.expanded_graph_max_timespan_minutes;
+                self.expanded_graph_max_timespan_minutes =
+                    self.settings.graph_timespan_minutes.max(5);
+                self.expanded_graph_view_timespan_minutes =
+                    self.expanded_graph_max_timespan_minutes;
                 self.expanded_graph = Some((title, values, unit, axis_start));
                 if self.graph_window.is_none() {
                     let Some(main_window_id) = self.core.main_window_id() else {
@@ -6650,8 +6651,10 @@ impl cosmic::Application for AppModel {
                 self.history_graph_index = None;
                 self.expanded_graph_full_values = Some(output_values.clone());
                 self.expanded_graph_full_secondary = Some(input_values.clone());
-                self.expanded_graph_max_timespan_minutes = self.settings.graph_timespan_minutes.max(5);
-                self.expanded_graph_view_timespan_minutes = self.expanded_graph_max_timespan_minutes;
+                self.expanded_graph_max_timespan_minutes =
+                    self.settings.graph_timespan_minutes.max(5);
+                self.expanded_graph_view_timespan_minutes =
+                    self.expanded_graph_max_timespan_minutes;
                 self.expanded_graph_secondary =
                     Some((input_values, format!("{output_label}|{input_label}")));
                 self.expanded_graph = Some((title, output_values, unit, axis_start));
@@ -6785,17 +6788,12 @@ impl cosmic::Application for AppModel {
                         });
                         if let Some((title, _, unit, _)) = self.expanded_graph.as_ref() {
                             let axis_start = format_graph_axis_start(minutes, None);
-                            self.expanded_graph = Some((
-                                title.clone(),
-                                values,
-                                unit.clone(),
-                                Some(axis_start),
-                            ));
+                            self.expanded_graph =
+                                Some((title.clone(), values, unit.clone(), Some(axis_start)));
                             if let (Some(series), Some((_, labels))) =
                                 (secondary, self.expanded_graph_secondary.as_ref())
                             {
-                                self.expanded_graph_secondary =
-                                    Some((series, labels.clone()));
+                                self.expanded_graph_secondary = Some((series, labels.clone()));
                             }
                         }
                     }
@@ -8191,7 +8189,10 @@ mod history_tests {
     #[test]
     fn expanded_graph_timespan_keeps_the_most_recent_samples() {
         let values = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
-        assert_eq!(graph_values_for_timespan(&values, 30, 60), vec![5.0, 6.0, 7.0, 8.0]);
+        assert_eq!(
+            graph_values_for_timespan(&values, 30, 60),
+            vec![5.0, 6.0, 7.0, 8.0]
+        );
         assert_eq!(graph_values_for_timespan(&values, 60, 60), values);
         assert_eq!(graph_values_for_timespan(&values, 5, 60), vec![8.0]);
         assert_eq!(graph_values_for_timespan(&[], 15, 60), Vec::<f64>::new());
