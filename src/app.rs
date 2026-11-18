@@ -2976,7 +2976,10 @@ impl cosmic::Application for AppModel {
                 .applet
                 .text(value)
                 .size(font_size)
-                .line_height(if multiline {
+                // Use the same line-height in every multiline-panel item.
+                // This keeps the first and second baselines aligned when a
+                // two-line Watt value sits beside two stacked single-line items.
+                .line_height(if self.settings.panel_multiline {
                     cosmic::iced::widget::text::LineHeight::Relative(1.0)
                 } else {
                     cosmic::iced::widget::text::LineHeight::Relative(0.65)
@@ -2996,14 +2999,12 @@ impl cosmic::Application for AppModel {
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>,
                           icon_at_top: bool| {
-            let item_height = if icon_at_top {
-                // The unpaired two-line item gets a deliberately prominent icon.
-                // Reserve enough height for the full 28 px glyph instead of clipping it.
-                32.0
-            } else if self.settings.panel_multiline {
-                // Paired readings are stacked as separate panel_item rows.
-                // Do not give each compact line the full single-line height.
-                (panel_text_size * 1.15).clamp(16.0, 22.0)
+            let multiline_row_height = (panel_text_size * 1.15).clamp(16.0, 22.0);
+            let item_height = if self.settings.panel_multiline {
+                // A two-line value occupies exactly two standard panel rows.
+                // Its value baselines therefore line up with the two separate
+                // rows used by paired readings (for example weather/temperature).
+                multiline_row_height * if icon_at_top { 2.0 } else { 1.0 }
             } else {
                 24.0
             };
