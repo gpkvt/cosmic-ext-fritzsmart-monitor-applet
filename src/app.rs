@@ -399,6 +399,9 @@ fn initial_device_selection(settings: &FritzSettings) -> Vec<String> {
         settings.ains.clone()
     } else if !settings.ain.trim().is_empty() {
         vec![settings.ain.clone()]
+    } else if settings.device_selection_initialized {
+        // An explicitly empty selection is intentional and must survive restarts.
+        Vec::new()
     } else {
         // A saved inventory without an explicit selection is an existing setup,
         // not a request to show the empty-device onboarding prompt.
