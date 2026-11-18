@@ -1489,8 +1489,8 @@ struct LivePowerSummaryData {
 
 fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Message> {
     let LivePowerSummaryData {
-        power,
-        temperature,
+        power: _,
+        temperature: _,
         energy_flow,
         history,
         temperature_history,
@@ -1499,33 +1499,12 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
         axis_start,
         history_collapsed,
     } = data;
-    // The section already identifies these readings; avoid repeating a
-    // separate "Current power" heading above the values.
-    let mut values = widget::Row::new()
-        .spacing(12)
-        .width(cosmic::iced::Length::Fill)
-        .align_y(cosmic::iced::Alignment::Start)
-        .push(
-            widget::Column::new()
-                .width(cosmic::iced::Length::Fill)
-                .push(widget::text::title2(keep_value_unit_together(power))),
-        );
-    if let Some(temp) = temperature {
-        let temperature_metric = widget::Column::new()
-            .width(cosmic::iced::Length::Fill)
-            .align_x(cosmic::iced::Alignment::End)
-            .push(widget::text::title2(keep_value_unit_together(temp)));
-        values = values.push(temperature_metric);
-    }
 
-    let metrics = widget::Column::new()
-        .width(cosmic::iced::Length::Fill)
-        .push(values);
-
+    // Keep the current-power card focused on energy flow and history; the
+    // live wattage and temperature values are already available in device rows.
     let mut content = widget::Column::new()
         .spacing(8)
-        .width(cosmic::iced::Length::Fill)
-        .push(metrics);
+        .width(cosmic::iced::Length::Fill);
     if let Some(energy_flow) = energy_flow {
         content = content.push(energy_flow);
     }
