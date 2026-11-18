@@ -948,7 +948,7 @@ fn format_graph_y_tick(value: f64, unit: &str) -> String {
 fn graph_visual_with_dimensions(
     values: impl Iterator<Item = f64>,
     style: &str,
-    title: &str,
+    _title: &str,
     unit: &str,
     graph_height: f64,
     widget_height: cosmic::iced::Length,
@@ -3482,9 +3482,7 @@ impl cosmic::Application for AppModel {
                                 .class(cosmic::theme::Button::Text),
                         );
                     }
-                    widget::container(ranges)
-                        .width(cosmic::iced::Length::Fill)
-                        .into()
+                    widget::container(ranges).width(cosmic::iced::Length::Fill)
                 })
                 .push(
                     if let Some((secondary_values, labels)) = &self.expanded_graph_secondary {
