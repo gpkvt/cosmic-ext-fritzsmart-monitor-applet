@@ -869,6 +869,15 @@ fn parse_graph_axis_minutes(label: &str) -> Option<u32> {
     number.is_empty().then_some(total)
 }
 
+fn escape_svg_text(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 fn format_graph_y_tick(value: f64, unit: &str) -> String {
     if unit == "°C" || unit.contains("/s") {
         format!("{value:.1}")
@@ -1015,8 +1024,10 @@ fn graph_visual_with_dimensions(
         plot_top + plot_height / 2.0
     );
     let legend_y = if graph_height > 200.0 { 34.0 } else { 12.0 };
+    let legend_title = escape_svg_text(title);
+    let legend_unit = escape_svg_text(unit);
     let legend = format!(
-        "<g aria-label=\"Legend\"><path d=\"M{:.2} {legend_y:.2}h18\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"3\" stroke-linecap=\"round\"/><text x=\"{:.2}\" y=\"{:.2}\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{title} ({unit})</text></g>",
+        "<g aria-label=\"Legend\"><path d=\"M{:.2} {legend_y:.2}h18\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"3\" stroke-linecap=\"round\"/><text x=\"{:.2}\" y=\"{:.2}\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{legend_title} ({legend_unit})</text></g>",
         plot_right - 130.0,
         plot_right - 106.0,
         legend_y + font_size * 0.35
@@ -8470,6 +8481,14 @@ mod history_tests {
         assert_eq!(parse_graph_axis_minutes("1d 2h 30m ago"), Some(1590));
         assert_eq!(parse_graph_axis_minutes("2d 2h 32m ago"), Some(3032));
         assert_eq!(parse_graph_axis_minutes("Start"), None);
+    }
+
+    #[test]
+    fn svg_legend_text_escapes_xml_reserved_characters() {
+        assert_eq!(
+            escape_svg_text("Power & temperature <now>"),
+            "Power &amp; temperature &lt;now&gt;"
+        );
     }
 
     #[test]
