@@ -8134,10 +8134,36 @@ impl cosmic::Application for AppModel {
                 self.device_search = value;
             }
             Message::DevicesLoaded(result) => {
+                let tasmota_diagnostics = crate::tasmota::take_discovery_diagnostics();
+                if tasmota_diagnostics.is_empty() {
+                    record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        "Tasmota discovery returned no diagnostic details; check whether the discovery routine was reached.",
+                    );
+                } else {
+                    for diagnostic in tasmota_diagnostics {
+                        record_diagnostic_event(
+                            &mut self.diagnostic_events,
+                            format!("Tasmota discovery: {diagnostic}"),
+                        );
+                    }
+                }
                 self.devices_loading = false;
                 self.devices_loaded = result.is_ok();
                 match result {
                     Ok(devices) => {
+                        let tasmota_count = devices
+                            .iter()
+                            .filter(|device| device.ain.to_ascii_uppercase().starts_with("TASMOTA:"))
+                            .count();
+                        let fritz_count = devices.len().saturating_sub(tasmota_count);
+                        record_diagnostic_event(
+                            &mut self.diagnostic_events,
+                            format!(
+                                "Combined inventory: {fritz_count} FRITZ!Box device(s), {tasmota_count} Tasmota device(s), {} total.",
+                                devices.len()
+                            ),
+                        );
                         self.devices = devices;
                         let mut settings_changed = false;
                         if !self.settings.input_defaults_initialized {
