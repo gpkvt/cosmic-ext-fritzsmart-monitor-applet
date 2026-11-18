@@ -43,6 +43,7 @@ pub struct AppModel {
     devices: Vec<FritzDevice>,
     devices_loaded: bool,
     devices_loading: bool,
+    startup_readings_pending: bool,
     device_search: String,
     selected_ains: Vec<String>,
     settings_status: Option<String>,
@@ -2781,21 +2782,26 @@ impl cosmic::Application for AppModel {
             && settings.weather_enabled
             && !settings.weather_location.trim().is_empty();
         let forecast_location = settings.weather_location.clone();
-        let mut tasks = vec![Task::perform(fetch_fritz_data(), |result| {
-            cosmic::Action::App(Message::Updated(Box::new(result)))
-        })];
-        if settings.setup_completed
+        // Load the saved/discovered device inventory before requesting live
+        // readings. This guarantees the selected device IDs are reconciled first,
+        // so startup cannot briefly show the empty-selection prompt.
+        let startup_discovery = settings.setup_completed
             && ((!settings.url.trim().is_empty()
                 && !settings.username.trim().is_empty()
                 && !settings.password.is_empty())
                 || !settings.tasmota_username.trim().is_empty()
-                || !settings.tasmota_password.is_empty())
-        {
+                || !settings.tasmota_password.is_empty());
+        let mut tasks = Vec::new();
+        if startup_discovery {
             let discovery_settings = settings.clone();
             tasks.push(Task::perform(
                 discover_devices(discovery_settings),
                 |result| cosmic::Action::App(Message::DevicesLoaded(result)),
             ));
+        } else {
+            tasks.push(Task::perform(fetch_fritz_data(), |result| {
+                cosmic::Action::App(Message::Updated(Box::new(result)))
+            }));
         }
         if restore_forecast {
             tasks.push(Task::perform(
@@ -2830,6 +2836,7 @@ impl cosmic::Application for AppModel {
                 weather_forecast_days: restore_forecast.then_some(7),
                 weather_forecast_loading: restore_forecast,
                 refresh_started_at: Some(Instant::now()),
+                startup_readings_pending: startup_discovery,
                 ..Default::default()
             },
             Task::batch(tasks),
@@ -8344,6 +8351,16 @@ impl cosmic::Application for AppModel {
                         );
                         self.settings_status = Some(format!("Connection failed: {error}"))
                     }
+                }
+                if self.startup_readings_pending {
+                    self.startup_readings_pending = false;
+                    record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        "Startup device inventory load finished; requesting live readings.",
+                    );
+                    return Task::perform(fetch_fritz_data(), |result| {
+                        cosmic::Action::App(Message::Updated(Box::new(result)))
+                    });
                 }
             }
             Message::RemoveDevice(ain) => {
