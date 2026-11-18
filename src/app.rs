@@ -24,7 +24,7 @@ static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
 pub type GraphSamples = Vec<(Instant, f64)>;
 
 #[derive(Default)]
-struct AppModel {
+pub struct AppModel {
     core: cosmic::Core,
     popup: Option<Id>,
     graph_window: Option<Id>,
