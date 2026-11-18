@@ -119,7 +119,7 @@ for page in pages:
         if missing:
             fail(f"index.html: missing required elements: {', '.join(sorted(missing))}")
         inline_screenshots = re.findall(
-            r'<img\\b[^>]*\\bsrc="[^"]*Screenshot_[^"]+"',
+            r'<img\b[^>]*\bsrc="[^"]*Screenshot_[^"]+"',
             content,
         )
         if len(inline_screenshots) != 10:
