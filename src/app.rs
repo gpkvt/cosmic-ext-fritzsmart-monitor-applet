@@ -1175,6 +1175,39 @@ fn graph_stat_value(values: &[f64], unit: &str, statistic: &str) -> String {
     format!("{} {unit}", format_graph_y_tick(value, unit))
 }
 
+fn graph_stats_row(
+    label: String,
+    values: &[f64],
+    unit: &str,
+    color: cosmic::iced::Color,
+) -> cosmic::Element<'static, Message> {
+    let metric_width = cosmic::iced::Length::Fixed(88.0);
+    let marker = widget::container(widget::text("●").size(14))
+        .width(cosmic::iced::Length::Fixed(18.0))
+        .style(move |_| cosmic::iced::widget::container::Style {
+            text_color: Some(color),
+            ..Default::default()
+        });
+    widget::Row::new()
+        .spacing(8)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(
+            widget::Row::new()
+                .spacing(6)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(marker)
+                .push(
+                    widget::text::body(format!("{label} ({unit})"))
+                        .width(cosmic::iced::Length::Fill),
+                )
+                .width(cosmic::iced::Length::Fill),
+        )
+        .push(widget::text::body(graph_stat_value(values, unit, "MIN")).width(metric_width))
+        .push(widget::text::body(graph_stat_value(values, unit, "MAX")).width(metric_width))
+        .push(widget::text::body(graph_stat_value(values, unit, "AVG")).width(metric_width))
+        .into()
+}
+
 fn graph_stats_legend(
     title: &str,
     values: &[f64],
@@ -1185,7 +1218,7 @@ fn graph_stats_legend(
     let heading = widget::Row::new()
         .spacing(8)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::text::caption("SERIES").width(cosmic::iced::Length::Fill))
+        .push(widget::text::caption("AXIS / SERIES").width(cosmic::iced::Length::Fill))
         .push(widget::text::caption("MIN").width(metric_width))
         .push(widget::text::caption("MAX").width(metric_width))
         .push(widget::text::caption("AVG").width(metric_width));
@@ -1194,47 +1227,20 @@ fn graph_stats_legend(
         .padding([8, 10])
         .width(cosmic::iced::Length::Fill)
         .push(widget::divider::horizontal::default())
-        .push(heading);
-    let mut add_series = |legend: widget::Column<'static, Message>,
-                          label: String,
-                          series: Vec<f64>,
-                          color: cosmic::iced::Color| {
-        let marker = widget::container(widget::text("●").size(14))
-            .width(cosmic::iced::Length::Fixed(18.0))
-            .style(move |_| cosmic::iced::widget::container::Style {
-                text_color: Some(color),
-                ..Default::default()
-            });
-        legend.push(
-            widget::Row::new()
-                .spacing(8)
-                .align_y(cosmic::iced::Alignment::Center)
-                .push(
-                    widget::Row::new()
-                        .spacing(6)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(marker)
-                        .push(widget::text::body(label).width(cosmic::iced::Length::Fill))
-                        .width(cosmic::iced::Length::Fill),
-                )
-                .push(widget::text::body(graph_stat_value(&series, unit, "MIN")).width(metric_width))
-                .push(widget::text::body(graph_stat_value(&series, unit, "MAX")).width(metric_width))
-                .push(widget::text::body(graph_stat_value(&series, unit, "AVG")).width(metric_width)),
-        )
-    };
-    legend = add_series(
-        legend,
-        title.to_string(),
-        values.to_vec(),
-        cosmic::iced::Color::from_rgb(0.54, 0.71, 0.97),
-    );
+        .push(heading)
+        .push(graph_stats_row(
+            title.to_string(),
+            values,
+            unit,
+            cosmic::iced::Color::from_rgb(0.54, 0.71, 0.97),
+        ));
     if let Some((secondary_values, secondary_label)) = secondary {
-        legend = add_series(
-            legend,
+        legend = legend.push(graph_stats_row(
             secondary_label.to_string(),
-            secondary_values.to_vec(),
+            secondary_values,
+            unit,
             cosmic::iced::Color::from_rgb(0.51, 0.79, 0.58),
-        );
+        ));
     }
     legend.into()
 }
@@ -3466,8 +3472,13 @@ impl cosmic::Application for AppModel {
                             (series.as_slice(), secondary_label)
                         },
                     );
+                    let primary_label = self
+                        .expanded_graph_secondary
+                        .as_ref()
+                        .and_then(|(_, labels)| labels.split('|').next())
+                        .unwrap_or(title);
                     graph_stats_legend(
-                        title,
+                        primary_label,
                         values,
                         unit,
                         secondary,
@@ -6808,6 +6819,12 @@ impl cosmic::Application for AppModel {
                                     now.duration_since(*timestamp).as_secs().div_ceil(60)
                                 }),
                             );
+                            self.expanded_graph_full_values = Some(values.clone());
+                            self.expanded_graph_full_secondary = None;
+                            self.expanded_graph_max_timespan_minutes =
+                                self.settings.graph_timespan_minutes.max(5);
+                            self.expanded_graph_view_timespan_minutes =
+                                self.expanded_graph_max_timespan_minutes;
                             self.expanded_graph = Some((
                                 format!(
                                     "{} · {}",
