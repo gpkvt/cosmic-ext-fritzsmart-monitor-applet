@@ -927,8 +927,9 @@ fn graph_visual_with_dimensions(
     // layout scales from compact menu graphs to the expanded graph window.
     let plot_left = if graph_height > 200.0 { 76.0 } else { 56.0 };
     let plot_right = width - if graph_height > 200.0 { 16.0 } else { 12.0 };
-    let plot_top = if graph_height > 200.0 { 48.0 } else { 30.0 };
-    let plot_bottom = height - if graph_height > 200.0 { 84.0 } else { 54.0 };
+    let is_expanded = graph_height > 200.0;
+    let plot_top = if is_expanded { 48.0 } else { 18.0 };
+    let plot_bottom = height - if is_expanded { 84.0 } else { 38.0 };
     let plot_width = plot_right - plot_left;
     let plot_height = plot_bottom - plot_top;
     let y = |value: f64| plot_bottom - ((value - plot_minimum) / plot_range) * plot_height;
@@ -1023,15 +1024,22 @@ fn graph_visual_with_dimensions(
         plot_top + plot_height / 2.0,
         plot_top + plot_height / 2.0
     );
-    let legend_y = if graph_height > 200.0 { 34.0 } else { 12.0 };
-    let legend_title = escape_svg_text(title);
-    let legend_unit = escape_svg_text(unit);
-    let legend = format!(
-        "<g aria-label=\"Legend\"><path d=\"M{:.2} {legend_y:.2}h18\" fill=\"none\" stroke=\"#8ab4f8\" stroke-width=\"3\" stroke-linecap=\"round\"/><text x=\"{:.2}\" y=\"{:.2}\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{legend_title} ({legend_unit})</text></g>",
-        plot_right - 130.0,
-        plot_right - 106.0,
-        legend_y + font_size * 0.35
-    );
+    // Compact menu graphs rely on their surrounding metric labels; a legend
+    // would consume valuable plotting space without adding useful context.
+    // The expanded view gets a centered series key on its own header row.
+    let legend = if is_expanded {
+        let legend_y = 34.0;
+        let legend_title = escape_svg_text(title);
+        let legend_unit = escape_svg_text(unit);
+        format!(
+            "<g aria-label=\\"Legend\\"><path d=\\"M{:.2} {legend_y:.2}h20\\" fill=\\"none\\" stroke=\\"#8ab4f8\\" stroke-width=\\"3\\" stroke-linecap=\\"round\\"/><text x=\\"{:.2}\\" y=\\"{:.2}\\" font-size=\\"{font_size:.1}\\" fill=\\"#a0a0a0\\">{legend_title} ({legend_unit})</text></g>",
+            plot_left + plot_width / 2.0 - 72.0,
+            plot_left + plot_width / 2.0 - 46.0,
+            legend_y + font_size * 0.35
+        )
+    } else {
+        String::new()
+    };
     let x_axis_title = format!(
         "<text x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">TIME</text>",
         plot_left + plot_width / 2.0,
