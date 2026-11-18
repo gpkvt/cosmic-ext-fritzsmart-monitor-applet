@@ -1118,10 +1118,11 @@ fn graph_visual_with_dimensions(
             + gap * entries.len().saturating_sub(1) as f64;
         let mut x = (plot_left + plot_right - total_width) / 2.0;
         let legend_y = height - 55.0;
-        let mut markup = String::from("<g aria-label=\\"Legend\\">");
-        for ((_, color), label, entry_width) in entries.iter().zip(labels.iter()).zip(entry_widths) {
+        let mut markup = String::from("<g aria-label=\"Legend\">");
+        for ((entry, label), entry_width) in entries.iter().zip(labels.iter()).zip(entry_widths) {
+            let color = entry.1;
             markup.push_str(&format!(
-                "<path d=\\"M{x:.2} {legend_y:.2}h18\\" fill=\\"none\\" stroke=\\"{color}\\" stroke-width=\\"3\\" stroke-linecap=\\"round\\"/><text x=\\"{:.2}\\" y=\\"{:.2}\\" font-size=\\"{font_size:.1}\\" fill=\\"#a0a0a0\\">{label}</text>",
+                "<path d=\"M{x:.2} {legend_y:.2}h18\" fill=\"none\" stroke=\"{color}\" stroke-width=\"3\" stroke-linecap=\"round\"/><text x=\"{:.2}\" y=\"{:.2}\" font-size=\"{font_size:.1}\" fill=\"#a0a0a0\">{label}</text>",
                 x + 26.0,
                 legend_y + font_size * 0.35
             ));
