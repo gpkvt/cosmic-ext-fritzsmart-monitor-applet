@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 
 static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
     LazyLock::new(|| widget::Id::new("fritz-power-monitor-autosize-main"));
-type GraphSamples = Vec<(Instant, f64)>;
+pub type GraphSamples = Vec<(Instant, f64)>;
 
 #[derive(Default)]
 struct AppModel {
@@ -1249,7 +1249,10 @@ fn graph_stats_legend(
 }
 
 fn graph_values_for_timespan(samples: &[(Instant, f64)], selected_minutes: u32) -> GraphSamples {
-    let cutoff = Instant::now() - Duration::from_secs(u64::from(selected_minutes) * 60);
+    let now = Instant::now();
+    let cutoff = now
+        .checked_sub(Duration::from_secs(u64::from(selected_minutes) * 60))
+        .unwrap_or(now);
     samples
         .iter()
         .copied()
@@ -8202,8 +8205,8 @@ mod history_tests {
         let now = Instant::now();
         let samples = vec![
             (now - Duration::from_secs(180), 1.0),
-            (now - Duration::from_secs(120), 2.0),
-            (now - Duration::from_secs(60), 3.0),
+            (now - Duration::from_secs(110), 2.0),
+            (now - Duration::from_secs(50), 3.0),
             (now - Duration::from_secs(10), 4.0),
         ];
         let one_minute = graph_values_for_timespan(&samples, 1);
