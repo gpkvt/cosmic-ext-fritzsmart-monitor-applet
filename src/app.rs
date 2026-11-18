@@ -7854,6 +7854,13 @@ impl cosmic::Application for AppModel {
                     self.settings.panel_internet_bandwidth = visible;
                 }
                 self.persist_settings();
+                if item == "internet-bandwidth" && visible {
+                    self.refresh_started_at = Some(Instant::now());
+                    self.next_refresh_at = None;
+                    return Task::perform(fetch_fritz_data(), |result| {
+                        cosmic::Action::App(Message::Updated(Box::new(result)))
+                    });
+                }
             }
             Message::MovePanelItem(item, move_up) => {
                 let Some(index) = self
@@ -9269,6 +9276,27 @@ mod history_tests {
 
         set_panel_item_visibility(&mut hidden, "temperature", false);
         assert!(!panel_item_is_visible(&hidden, "temperature"));
+    }
+
+    #[test]
+    fn panel_order_toggles_follow_effective_bandwidth_and_solar_availability() {
+        let mut settings = FritzSettings::default();
+
+        // Bandwidth is off by default, and both controls use that same state.
+        assert!(!panel_item_is_enabled(&settings, "internet-bandwidth"));
+        set_panel_item_visibility(&mut settings.hidden_panel_items, "internet-bandwidth", true);
+        settings.panel_internet_bandwidth = true;
+        assert!(panel_item_is_enabled(&settings, "internet-bandwidth"));
+
+        // Hiding it from Panel order also disables the main Panel option.
+        set_panel_item_visibility(&mut settings.hidden_panel_items, "internet-bandwidth", false);
+        settings.panel_internet_bandwidth = false;
+        assert!(!panel_item_is_enabled(&settings, "internet-bandwidth"));
+
+        // Solar is available independently, but never while net power is active.
+        assert!(panel_item_is_enabled(&settings, "solar-power"));
+        settings.panel_net_power = true;
+        assert!(!panel_item_is_enabled(&settings, "solar-power"));
     }
 
     #[test]
