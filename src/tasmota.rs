@@ -245,11 +245,7 @@ fn scan_local_ipv4_addresses() -> Vec<Ipv4Addr> {
             continue;
         }
 
-        let range = format!(
-            "{}/{}",
-            Ipv4Addr::from(network),
-            prefix
-        );
+        let range = format!("{}/{}", Ipv4Addr::from(network), prefix);
         if ranges.insert(range.clone()) {
             record_discovery_diagnostic(format!(
                 "Tasmota IP scan: scanning {range} ({host_count} usable addresses) on interface {}.",
@@ -373,7 +369,9 @@ pub async fn discover_devices(
         endpoints.insert((hostname, port, ip), true);
     }
     for ip in scan_local_ipv4_addresses() {
-        endpoints.entry((ip.to_string(), 80, IpAddr::V4(ip))).or_insert(false);
+        endpoints
+            .entry((ip.to_string(), 80, IpAddr::V4(ip)))
+            .or_insert(false);
     }
     record_discovery_diagnostic(format!(
         "Tasmota discovery probing {} unique endpoint(s) (mDNS plus local IP scan), with up to 32 requests in parallel.",
