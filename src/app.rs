@@ -9183,7 +9183,7 @@ mod history_tests {
     fn expanded_graph_timespan_filters_by_sample_timestamps() {
         let now = Instant::now();
         let samples = vec![
-            (now - Duration::from_secs(180), 1.0),
+            (now - Duration::from_secs(179), 1.0),
             (now - Duration::from_secs(110), 2.0),
             (now - Duration::from_secs(50), 3.0),
             (now - Duration::from_secs(10), 4.0),
@@ -10100,9 +10100,15 @@ mod history_tests {
 
         assert!(!panel_order_group_leader(&order, "temperature", true));
         assert!(!panel_order_group_leader(&order, "solar-power", true));
-        assert!(panel_order_move_available(
+        assert!(!panel_order_move_available(
             &order,
             "temperature",
+            true,
+            true
+        ));
+        assert!(!panel_order_move_available(
+            &order,
+            "weather",
             true,
             true
         ));
