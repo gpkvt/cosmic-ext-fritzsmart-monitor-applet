@@ -78,7 +78,7 @@ def sync_package_download_version() -> None:
         if not match:
             raise RuntimeError("Could not read [package].version from Cargo.toml")
         version = match.group(1)
-    if not re.fullmatch(r"[0-9]+\\.[0-9]+\\.[0-9]+(?:[-.][0-9A-Za-z.-]+)?", version):
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z.-]+)?", version):
         raise RuntimeError(f"Invalid release version: {version}")
     index = DOCS / "index.html"
     content = index.read_text(encoding="utf-8")
