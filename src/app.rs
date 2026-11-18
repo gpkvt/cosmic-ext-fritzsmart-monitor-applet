@@ -2264,6 +2264,15 @@ fn panel_order_groups(order: &[String], multiline: bool) -> Vec<Vec<String>> {
     groups
 }
 
+fn panel_order_group_leader(order: &[String], item: &str, multiline: bool) -> bool {
+    if !multiline {
+        return true;
+    }
+    panel_order_groups(order, true)
+        .iter()
+        .any(|group| group.first().is_some_and(|first| first == item))
+}
+
 fn panel_order_move_available(
     order: &[String],
     item: &str,
@@ -2278,9 +2287,7 @@ fn panel_order_move_available(
     }
 
     let groups = panel_order_groups(order, true);
-    let Some(index) = groups
-        .iter()
-        .position(|group| group.first().is_some_and(|first| first == item))
+    let Some(index) = groups.iter().position(|group| group.iter().any(|member| member == item))
     else {
         return false;
     };
@@ -2316,9 +2323,7 @@ fn move_panel_order(
     }
 
     let mut groups = panel_order_groups(order, true);
-    let Some(index) = groups
-        .iter()
-        .position(|group| group.first().is_some_and(|first| first == item))
+    let Some(index) = groups.iter().position(|group| group.iter().any(|member| member == item))
     else {
         return false;
     };
@@ -4038,31 +4043,42 @@ impl cosmic::Application for AppModel {
                             .push(widget::toggler(visible).on_toggle(move |value| {
                                 Message::TogglePanelItemVisibility(id, value)
                             }));
-                    let can_move_up = panel_order_move_available(
-                        &self.settings.panel_order,
-                        id,
-                        true,
-                        self.settings.panel_multiline,
-                    );
-                    let can_move_down = panel_order_move_available(
-                        &self.settings.panel_order,
-                        id,
-                        false,
-                        self.settings.panel_multiline,
-                    );
-                    if can_move_up {
-                        row = row.push(icon_action_button(
-                            "+",
-                            crate::i18n::tr(&self.settings.language, "Move up"),
-                            Message::MovePanelItem(id, true),
-                        ));
-                    }
-                    if can_move_down {
-                        row = row.push(icon_action_button(
-                            "−",
-                            crate::i18n::tr(&self.settings.language, "Move down"),
-                            Message::MovePanelItem(id, false),
-                        ));
+                    let show_order_controls = !self.settings.panel_multiline
+                        || panel_order_group_leader(
+                            &visible_panel_order
+                                .iter()
+                                .map(|item| item.as_str().to_string())
+                                .collect::<Vec<_>>(),
+                            id,
+                            true,
+                        );
+                    if show_order_controls {
+                        let can_move_up = panel_order_move_available(
+                            &self.settings.panel_order,
+                            id,
+                            true,
+                            self.settings.panel_multiline,
+                        );
+                        let can_move_down = panel_order_move_available(
+                            &self.settings.panel_order,
+                            id,
+                            false,
+                            self.settings.panel_multiline,
+                        );
+                        if can_move_up {
+                            row = row.push(icon_action_button(
+                                "+",
+                                crate::i18n::tr(&self.settings.language, "Move up"),
+                                Message::MovePanelItem(id, true),
+                            ));
+                        }
+                        if can_move_down {
+                            row = row.push(icon_action_button(
+                                "−",
+                                crate::i18n::tr(&self.settings.language, "Move down"),
+                                Message::MovePanelItem(id, false),
+                            ));
+                        }
                     }
                     content = content.push(row);
 
@@ -9850,10 +9866,10 @@ mod history_tests {
         .map(str::to_string)
         .collect::<Vec<_>>();
 
-        assert!(!panel_order_move_available(&order, "temperature", true, true));
-        assert!(!panel_order_move_available(&order, "temperature", false, true));
-        assert!(!panel_order_move_available(&order, "solar-power", true, true));
-        assert!(!panel_order_move_available(&order, "solar-power", false, true));
+        assert!(!panel_order_group_leader(&order, "temperature", true));
+        assert!(!panel_order_group_leader(&order, "solar-power", true));
+        assert!(panel_order_move_available(&order, "temperature", true, true));
+        assert!(panel_order_move_available(&order, "solar-power", false, true));
         assert!(panel_order_move_available(&order, "weather", false, true));
         assert!(move_panel_order(&mut order, "weather", false, true));
 
