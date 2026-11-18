@@ -76,9 +76,15 @@ for page in pages:
         )
         if expected_archive not in content:
             fail(f"index.html: portable archive link is not synchronized with release version {version}")
-        if re.search(r"releases/download/[^\"']+\.(?:deb|AppImage|flatpak)", content, re.I):
-            fail("index.html: only the portable .tar.gz release archive may be linked")
-        if any(term in content.lower() for term in ("linux packages", "download .deb", "download appimage", "download flatpak")):
+        expected_deb = (
+            f"https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/download/v{version}/"
+            f"fritz-power-monitor_{version}_amd64.deb"
+        )
+        if expected_deb not in content:
+            fail(f"index.html: Debian package link is not synchronized with release version {version}")
+        if re.search(r"releases/download/[^\\"']+\\.(?:AppImage|flatpak)", content, re.I):
+            fail("index.html: AppImage and Flatpak packages must not be linked as direct downloads")
+        if any(term in content.lower() for term in ("linux packages", "download appimage", "download flatpak")):
             fail("index.html: obsolete package download section remains")
         if 'id="custom-applets"' not in content:
             fail("index.html: COSMIC custom applet installation section is missing")
