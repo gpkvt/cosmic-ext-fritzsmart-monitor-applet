@@ -878,8 +878,8 @@ fn graph_visual_large_multi(
         style,
         title,
         unit,
-        480.0,
-        cosmic::iced::Length::Fixed(480.0),
+        390.0,
+        cosmic::iced::Length::Fixed(390.0),
         axis_start,
         Some(secondary_values.collect()),
         Some(format!("{primary_label}|{secondary_label}")),
@@ -8164,6 +8164,7 @@ impl cosmic::Application for AppModel {
                 if self.graph_window == Some(id) {
                     self.graph_window = None;
                     self.expanded_graph = None;
+                    self.expanded_graph_secondary = None;
                     self.expanded_graph_full_values = None;
                     self.expanded_graph_full_secondary = None;
                     self.history_graph_devices.clear();
@@ -8199,9 +8200,9 @@ mod history_tests {
     #[test]
     fn expanded_graph_legend_statistics_use_selected_series_values() {
         let values = vec![10.0, 20.0, 30.0];
-        assert_eq!(graph_stat_value(&values, "W", "MIN"), "10 W");
-        assert_eq!(graph_stat_value(&values, "W", "MAX"), "30 W");
-        assert_eq!(graph_stat_value(&values, "W", "AVG"), "20 W");
+        assert_eq!(graph_stat_value(&values, "W", "MIN"), "10.0 W");
+        assert_eq!(graph_stat_value(&values, "W", "MAX"), "30.0 W");
+        assert_eq!(graph_stat_value(&values, "W", "AVG"), "20.0 W");
         assert_eq!(graph_stat_value(&[], "W", "AVG"), "—");
     }
 
