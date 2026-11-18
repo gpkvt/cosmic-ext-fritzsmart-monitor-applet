@@ -181,7 +181,7 @@ pub fn diagnostics(window: Duration) -> Value {
         .flat_map(|devices| devices.iter())
         .map(|(ain, samples)| (ain.clone(), json!(samples.as_array().map_or(0, Vec::len))))
         .collect();
-    let (power, devices) = load_from_path(&path, window);
+    let (power, devices) = load_from_document(&document, window);
     json!({
         "available": version == Some(1),
         "path": path,
@@ -205,6 +205,13 @@ fn load_from_path(path: &Path, window: Duration) -> (PowerHistory, DeviceHistory
     let Ok(document) = serde_json::from_str::<Value>(&contents) else {
         return (PowerHistory::new(), DeviceHistory::new());
     };
+    load_from_document(&document, window)
+}
+
+fn load_from_document(
+    document: &Value,
+    window: Duration,
+) -> (PowerHistory, DeviceHistory) {
     if document.get("version").and_then(Value::as_u64) != Some(1) {
         return (PowerHistory::new(), DeviceHistory::new());
     }
