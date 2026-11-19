@@ -68,6 +68,7 @@ pub struct AppModel {
     copy_feedback: Option<CopyFeedback>,
     history: VecDeque<(Instant, i64)>,
     device_history: HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    hue_sensor_history: crate::history::HueSensorHistory,
     temperature_alert_state: HashMap<String, bool>,
     missing_device_ains: HashSet<String>,
     next_refresh_at: Option<Instant>,
@@ -2141,6 +2142,69 @@ fn record_device_sample(
     }
 }
 
+/// Collect only measurements the Hue Bridge actually reported. A temporary
+/// connection failure never creates a fake 0 °C / 0 lux data point.
+fn record_hue_sensor_sample(
+    history: &mut crate::history::HueSensorHistory,
+    sensor: &HueSensor,
+    now: Instant,
+    window: Duration,
+) {
+    if !sensor.reachable || !crate::hue::valid_sensor_id(&sensor.id) {
+        return;
+    }
+    let temperature = sensor.temperature_c.filter(|value| value.is_finite());
+    let lux = sensor
+        .illuminance_lux
+        .filter(|value| value.is_finite() && *value >= 0.0);
+    if temperature.is_none() && lux.is_none() {
+        return;
+    }
+    let samples = history.entry(sensor.id.clone()).or_default();
+    let interval = graph_sample_interval(window);
+    if let Some((timestamp, recorded_temperature, recorded_lux)) = samples.back_mut()
+        && now.saturating_duration_since(*timestamp) < interval
+    {
+        *recorded_temperature = temperature;
+        *recorded_lux = lux;
+    } else {
+        samples.push_back((now, temperature, lux));
+    }
+    while samples
+        .front()
+        .is_some_and(|(time, _, _)| now.saturating_duration_since(*time) > window)
+    {
+        samples.pop_front();
+    }
+    while samples.len() > max_history_samples(window) {
+        samples.pop_front();
+    }
+}
+
+/// Build a sensor-only metric trace without implying readings when the service
+/// is offline or missing. A Celsius recording is converted for °F display.
+fn hue_sensor_graph_samples(
+    history: &crate::history::HueSensorHistory,
+    sensor_id: &str,
+    temperature: bool,
+    fahrenheit: bool,
+) -> GraphSamples {
+    history
+        .get(sensor_id)
+        .into_iter()
+        .flat_map(|samples| samples.iter())
+        .filter_map(|(timestamp, celsius, lux)| {
+            let value = if temperature {
+                celsius.map(|value| if fahrenheit { value * 9.0 / 5.0 + 32.0 } else { value })
+            } else {
+                *lux
+            };
+            value.filter(|number| number.is_finite() && (temperature || *number >= 0.0))
+                .map(|number| (*timestamp, number))
+        })
+        .collect()
+}
+
 fn surface_card<'a>(
     content: cosmic::Element<'a, Message>,
     padding: u16,
@@ -3056,6 +3120,7 @@ fn hue_settings_card(
     details: String,
     language: &str,
     light_control: Option<cosmic::Element<'static, Message>>,
+    additional_controls: Option<cosmic::Element<'static, Message>>,
 ) -> cosmic::Element<'static, Message> {
     let selection_id = id.clone();
     let header = widget::Row::new()
@@ -3093,6 +3158,9 @@ fn hue_settings_card(
                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                 .push(control),
         );
+    }
+    if let Some(controls) = additional_controls {
+        content = content.push(controls);
     }
     surface_card(content.into(), 8)
 }
@@ -5846,6 +5914,7 @@ impl cosmic::Application for AppModel {
                                     format!("Hue Bridge · Light · {status} · No measured W"),
                                     &self.settings.language,
                                     Some(light_control),
+                                    None,
                                 ));
                             }
                             SettingsDeviceEntry::HueSensor(sensor) => {
@@ -5879,14 +5948,24 @@ impl cosmic::Application for AppModel {
                                         None => "Motion unavailable",
                                     }
                                 };
+                                let alert_key =
+                                    crate::fritz::normalize_ain_for_selection(&id);
+                                let thresholds =
+                                    self.settings.temperature_alerts.get(&alert_key).copied();
                                 content = content.push(hue_settings_card(
-                                id,
-                                sensor.name.clone(),
-                                visible,
-                                format!("Hue Bridge · Sensor · {temperature} · {lux} · {motion} · No measured W"),
-                                &self.settings.language,
-                                None,
-                            ));
+                                    id.clone(),
+                                    sensor.name.clone(),
+                                    visible,
+                                    format!("Hue Bridge · Sensor · {temperature} · {lux} · {motion} · No measured W"),
+                                    &self.settings.language,
+                                    None,
+                                    Some(temperature_alert_controls(
+                                        id,
+                                        thresholds,
+                                        &self.settings.language,
+                                        &self.settings.temperature_unit,
+                                    )),
+                                ));
                             }
                         }
                     }
