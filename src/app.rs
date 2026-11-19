@@ -3364,7 +3364,7 @@ impl cosmic::Application for AppModel {
                 24.0
             };
             // Paired multiline rows share their group's available width so
-            // their value columns end at the same left edge. Standalone
+            // their value columns start at the same left edge. Standalone
             // readings retain their natural width to avoid pushing later items
             // out of the panel.
             let align_value_column = self.settings.panel_multiline && !icon_at_top;
