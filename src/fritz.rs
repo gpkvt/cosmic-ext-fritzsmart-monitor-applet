@@ -178,6 +178,7 @@ pub struct FritzSettings {
     pub panel_order: Vec<String>,
     pub device_order: Vec<String>,
     pub collapsed_menu_sections: Vec<String>,
+    pub daily_energy_history_default_applied: bool,
     pub expanded_devices: Vec<String>,
     pub quick_options_expanded: bool,
     pub weather_forecast_expanded: bool,
@@ -228,7 +229,8 @@ impl Default for FritzSettings {
             hidden_panel_items: Vec::new(),
             panel_order: default_panel_order(),
             device_order: Vec::new(),
-            collapsed_menu_sections: vec!["internet-bandwidth".into()],
+            collapsed_menu_sections: vec!["internet-bandwidth".into(), "daily-energy-history".into()],
+            daily_energy_history_default_applied: true,
             expanded_devices: Vec::new(),
             quick_options_expanded: false,
             weather_forecast_expanded: false,
@@ -582,11 +584,20 @@ impl FritzSettings {
             hidden_panel_items: parse_hidden_panel_items(&get("HIDDEN_PANEL_ITEMS")),
             panel_order: parse_panel_order(&get("PANEL_ORDER")),
             device_order: parse_device_order(&get("DEVICE_ORDER")),
-            collapsed_menu_sections: if values.contains_key("COLLAPSED_MENU_SECTIONS") {
-                parse_collapsed_menu_sections(&get("COLLAPSED_MENU_SECTIONS"))
-            } else {
-                vec!["internet-bandwidth".into()]
+            collapsed_menu_sections: {
+                let mut sections = if values.contains_key("COLLAPSED_MENU_SECTIONS") {
+                    parse_collapsed_menu_sections(&get("COLLAPSED_MENU_SECTIONS"))
+                } else {
+                    vec!["internet-bandwidth".into()]
+                };
+                let default_applied = get("DAILY_ENERGY_HISTORY_DEFAULT_APPLIED")
+                    .eq_ignore_ascii_case("true");
+                if !default_applied && !sections.iter().any(|section| section == "daily-energy-history") {
+                    sections.push("daily-energy-history".into());
+                }
+                sections
             },
+            daily_energy_history_default_applied: true,
             expanded_devices: parse_expanded_devices(&get("EXPANDED_DEVICES")),
             quick_options_expanded: get("QUICK_OPTIONS_EXPANDED").eq_ignore_ascii_case("true"),
             weather_forecast_expanded: get("WEATHER_FORECAST_EXPANDED")
@@ -668,7 +679,7 @@ impl FritzSettings {
             parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
         let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
-            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nDAILY_ENERGY_HISTORY_DEFAULT_APPLIED={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
             match self.language.as_str() {
                 "de" => "de",
                 "en" => "en",
@@ -760,6 +771,7 @@ impl FritzSettings {
             panel_order,
             device_order,
             collapsed_menu_sections,
+            if self.daily_energy_history_default_applied { "true" } else { "false" },
             expanded_devices,
             if self.quick_options_expanded {
                 "true"
