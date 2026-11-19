@@ -1016,6 +1016,21 @@ fn menu_energy_summary(
     // Fill here consumed the entire row and pushed the values out of view.
     .width(cosmic::iced::Length::FillPortion(3))
     .into();
+    let values = menu_energy_values(current_power_w, yesterday_wh, today_wh);
+    widget::Row::new()
+        .spacing(10)
+        .align_y(cosmic::iced::Alignment::Center)
+        .width(cosmic::iced::Length::Fill)
+        .push(graph)
+        .push(values)
+        .into()
+}
+
+fn menu_energy_values(
+    current_power_w: Option<f64>,
+    yesterday_wh: Option<f64>,
+    today_wh: Option<f64>,
+) -> cosmic::Element<'static, Message> {
     let value_row = |label: &'static str, value: Option<f64>, unit: &'static str| {
         let display = value
             .filter(|value| value.is_finite())
@@ -1031,18 +1046,12 @@ fn menu_energy_summary(
                     .align_x(cosmic::iced::Alignment::End),
             )
     };
-    let values = widget::Column::new()
-        .spacing(2)
-        .width(cosmic::iced::Length::FillPortion(2))
+    widget::Column::new()
+        .spacing(4)
+        .width(cosmic::iced::Length::Fill)
         .push(value_row("CURRENT", current_power_w, "W"))
         .push(value_row("Y'DAY", yesterday_wh, "Wh"))
-        .push(value_row("TODAY", today_wh, "Wh"));
-    widget::Row::new()
-        .spacing(10)
-        .align_y(cosmic::iced::Alignment::Center)
-        .width(cosmic::iced::Length::Fill)
-        .push(graph)
-        .push(values)
+        .push(value_row("TODAY", today_wh, "Wh"))
         .into()
 }
 
@@ -6749,23 +6758,6 @@ impl cosmic::Application for AppModel {
                         .push(device_heading_button)
                         .push(history_button)
                         .push(power_toggle);
-                    let mut metrics = widget::Row::new()
-                        .spacing(8)
-                        .width(cosmic::iced::Length::Fill)
-                        .push(device_metric_tile(
-                            "POWER",
-                            format!("{} W", reading.power_w),
-                            "utilities-system-monitor-symbolic",
-                            device_corner_radius,
-                        ));
-                    if reading.temperature_c.is_finite() {
-                        metrics = metrics.push(device_metric_tile(
-                            "",
-                            format_panel_temperature(reading.temperature_c),
-                            "utilities-temperature-symbolic",
-                            device_corner_radius,
-                        ));
-                    }
                     let device_axis_start = format_graph_axis_start(
                         self.settings.graph_timespan_minutes,
                         device_history.and_then(|samples| {
@@ -6780,6 +6772,15 @@ impl cosmic::Application for AppModel {
                     let device_graph_pair_id = format!("device-graph-pair-{device_key}");
                     let device_graph_pair_collapsed =
                         self.collapsed_menu_sections.contains(&device_graph_pair_id);
+                    let device_ains = HashSet::from([device_key.clone()]);
+                    let (device_yesterday_wh, device_today_wh) =
+                        yesterday_and_today_energy_wh_for_ains(
+                            &self.device_history,
+                            &device_ains,
+                            &self.settings.input_ains,
+                            self.settings.refresh_interval_seconds,
+                            self.settings.input_ains.contains(&device_key),
+                        );
                     let power_graph = widget::container(
                         widget::container(
                             widget::Column::new()
@@ -6913,6 +6914,34 @@ impl cosmic::Application for AppModel {
                         });
                         device_graph_content = device_graph_content.push(temperature_graph);
                     }
+                    let current_temperature = reading.temperature_c.is_finite().then_some(reading.temperature_c);
+                    let mut graph_side_info = widget::Column::new()
+                        .spacing(10)
+                        .width(cosmic::iced::Length::FillPortion(2));
+                    if let Some(temperature) = current_temperature {
+                        graph_side_info = graph_side_info.push(device_metric_tile(
+                            "TEMPERATURE",
+                            format!("{temperature:.1} °C"),
+                            "utilities-temperature-symbolic",
+                            device_corner_radius,
+                        ));
+                    }
+                    graph_side_info = graph_side_info.push(menu_energy_values(
+                        device_history
+                            .and_then(|samples| samples.back())
+                            .map(|(_, power, _)| *power as f64),
+                        device_yesterday_wh,
+                        device_today_wh,
+                    ));
+                    let graph_columns = widget::Row::new()
+                        .spacing(12)
+                        .align_y(cosmic::iced::Alignment::Start)
+                        .width(cosmic::iced::Length::Fill)
+                        .push(
+                            widget::container(device_graph_content)
+                                .width(cosmic::iced::Length::FillPortion(3)),
+                        )
+                        .push(graph_side_info);
                     let device_graphs = collapsible_graph(
                         if reading.temperature_c.is_finite() {
                             "POWER & TEMPERATURE HISTORY"
@@ -6921,43 +6950,21 @@ impl cosmic::Application for AppModel {
                         },
                         device_graph_pair_id,
                         device_graph_pair_collapsed,
-                        device_graph_content.into(),
+                        graph_columns.into(),
                     );
                     let device_content = widget::Column::new()
                         .spacing(10)
                         .width(cosmic::iced::Length::Fill)
-                        // Keep the metric tiles inset, but let graph panels use
-                        // the full menu content width.
-                        .push(widget::container(metrics).padding([0, 12]))
                         .push(device_graphs);
                     // Use COSMIC's list-column disclosure pattern so the
                     // header, separator, and expanded content share native list spacing.
-                    let device_ains = HashSet::from([device_key.clone()]);
-                    let (device_yesterday_wh, device_today_wh) =
-                        yesterday_and_today_energy_wh_for_ains(
-                            &self.device_history,
-                            &device_ains,
-                            &self.settings.input_ains,
-                            self.settings.refresh_interval_seconds,
-                            self.settings.input_ains.contains(&device_key),
-                        );
-                    let device_summary = menu_energy_summary(
-                        device_history
-                            .into_iter()
-                            .flat_map(|samples| samples.iter().map(|(_, power, _)| *power as f64)),
-                        device_history
-                            .and_then(|samples| samples.back())
-                            .map(|(_, power, _)| *power as f64),
-                        device_yesterday_wh,
-                        device_today_wh,
-                    );
+                    
                     let mut card_column = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
                         .list_item_padding([0, 0])
                         .add(device_heading);
                     if is_expanded {
                         card_column = card_column
-                            .add(widget::container(device_summary).padding([0, 12]))
                             .add(
                                 widget::container(device_content)
                                     .padding([12, 0])
