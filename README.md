@@ -29,16 +29,16 @@ FRITZ!Power Monitor connects directly to your router. It brings household power 
 
 The applet supports Philips Hue Bridges on the local network through the **CLIP v2 API**. This integration is independent of the FRITZ!Box and Tasmota connections.
 
-1. Find the Hue Bridge's **local IP address** in the Hue app or router device list.
-2. Open **Settings → Connection → Philips Hue Bridge** and enter the IP address, without a scheme or port.
-3. Press the physical link button on the Hue Bridge, then select **Pair Hue Bridge** in the applet. Alternatively, paste an existing Hue application key into the secure field.
+1. Open **Settings → Connection → Philips Hue Bridge**. The applet looks for local bridges via mDNS and fills in the IP automatically if it finds exactly one. Use **Find Hue Bridge automatically** to rescan, or choose a bridge if several are found.
+2. If mDNS cannot find the bridge, enter its **local IP address** from the Hue app or your router, without a scheme or port. Discovery stays on the local network; no Hue cloud lookup is used.
+3. Select **Pair Hue Bridge**, then press the physical link button on the bridge (or press the button first). Pairing retries for about 30 seconds while waiting for button authorization. A clear error appears directly below the pairing controls if authorization fails. Alternatively, paste an existing Hue application key into the secure field.
 4. Open the **Philips Hue** section in the popup. Lights are listed with their current on/off state and a switch; use **Refresh Hue lights** to reload them.
 
 Hue state refreshes independently once per minute, as well as on manual refresh and after switching a light. When a bridge is unreachable, the applet clears stale light states and shows an error without affecting power monitoring. Only private/local bridge IP addresses are accepted.
 
 **Measurements:** Hue lights typically provide switching state, not measured electricity usage. The applet **does not** invent watts or add Hue lights to consumption graphs or energy totals. This release controls individual Hue light resources; Hue scenes, brightness, rooms, sensors and groups are not yet supported.
 
-**Security:** Hue's bridge certificate is signed by the Hue-specific CA and uses the bridge ID as its hostname rather than the configured IP. The Hue-only HTTPS client currently bypasses certificate-chain and hostname validation, so connect only on a trusted local network. The FRITZ!Box and other HTTPS clients retain their existing certificate validation. The Hue application key is saved in the existing owner-only configuration file and must be treated as a secret.
+**Security:** Hue's bridge certificate is signed by the Hue-specific CA and uses the bridge ID as its hostname rather than the configured IP. The Hue-only HTTPS client currently bypasses certificate-chain and hostname validation. On older bridges that do not support HTTPS pairing, the registration request can fall back to HTTP; it transmits only the application name and receives the new key without TLS protection. Connect only on a trusted local network. The FRITZ!Box and other HTTPS clients retain their existing certificate validation. The Hue application key is saved in the existing owner-only configuration file and must be treated as a secret.
 
 ## Screenshots
 
