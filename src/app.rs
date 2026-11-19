@@ -1764,6 +1764,7 @@ fn input_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64
         .sum()
 }
 
+#[cfg(test)]
 fn net_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
     output_power_w(readings, input_ains) + input_power_w(readings, input_ains)
 }
