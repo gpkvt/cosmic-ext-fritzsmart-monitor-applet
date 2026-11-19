@@ -208,6 +208,33 @@ cargo build --release
 
 GitHub Actions runs the project checks and validates release artifacts.
 
+## Repository maintenance
+
+The repository includes a small command-line helper for common development and
+publishing tasks. Run it from the checkout; GitHub operations require the
+[GitHub CLI](https://cli.github.com/) and an authenticated session
+(`gh auth login`).
+
+| Command | Action |
+| --- | --- |
+| `make update` | Fast-forward the current branch from its configured upstream (`git pull --ff-only`). |
+| `make check` | Run Rust formatting, compilation, Clippy and tests locally. |
+| `make publish-pages` | Dispatch the Pages workflow to rebuild, validate and publish `docs/` to `gh-pages`. |
+| `make publish-release` | Start a patch release (version bump, Linux packages, GitHub release and Pages publication). |
+| `make publish-release BUMP=minor` | Start a minor or major release; accepted values are `patch`, `minor` and `major`. |
+| `make build-release` | Build Debian, AppImage and Flatpak packages from `main` as workflow artifacts without publishing a release. |
+| `make build-release REF=v2.0.0` | Build packages from a specific branch, tag or commit. |
+| `make workflows` | List configured GitHub Actions workflows. |
+| `make workflow-runs` | List recent workflow runs. Use `WORKFLOW=release.yml` to filter. |
+| `make workflow-watch RUN_ID=123456789` | Follow a workflow run and return a failing exit status if it fails. |
+
+The same operations are available directly through `bash scripts/repo.sh help`.
+The release workflow creates an immutable version tag and publishes the
+portable archive, Debian package, AppImage, Flatpak and checksums. Package-only
+builds are retained as GitHub Actions artifacts for 14 days. Pages publication
+is also triggered automatically after a successful release, so the website's
+download links follow the latest published version.
+
 ## Data, security and privacy
 
 - Core monitoring communicates directly with the configured FRITZ!Box on your network.
