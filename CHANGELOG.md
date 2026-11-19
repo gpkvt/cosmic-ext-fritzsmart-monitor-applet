@@ -1,5 +1,7 @@
 # Changelog
 
+- Add optional Philips Hue Bridge (CLIP v2) integration with local IP setup, physical link-button pairing, secure application-key storage, independently refreshed light discovery, reachability awareness and individual on/off switches. Keep Hue states separate from power/temperature totals; document the Hue-only TLS trust limitation.
+
 - Hide redundant dividers between device rows when the Devices section is collapsed, retaining separators around the section and all row dividers when expanded.
 
 - Align the collapsed Total Power Input & Output heading with other popup sections, using the same title, summary, disclosure icon, padding and copy-button placement.

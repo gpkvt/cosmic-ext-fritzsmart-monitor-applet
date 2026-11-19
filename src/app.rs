@@ -1,3 +1,4 @@
+use crate::hue::HueLight;
 use crate::fritz::{
     FritzBoxSystemInfo, FritzDevice, FritzFetchResult, FritzInternetBandwidth, FritzReading,
     FritzSettings, TemperatureAlertThresholds, collect_fritzbox_debug_dump, discover_devices,
@@ -32,6 +33,12 @@ pub struct AppModel {
     popup_max_height: Option<f32>,
     graph_window: Option<Id>,
     readings: Vec<FritzReading>,
+    hue_lights: Vec<HueLight>,
+    hue_error: Option<String>,
+    hue_loading: bool,
+    hue_pairing: bool,
+    hue_pending: HashSet<String>,
+    hue_next_refresh_at: Option<Instant>,
     internet_bandwidth: Option<FritzInternetBandwidth>,
     fritzbox_system_info: Option<FritzBoxSystemInfo>,
     bandwidth_history: VecDeque<(Instant, u64, u64)>,
@@ -126,6 +133,14 @@ pub enum Message {
     TasmotaUsernameChanged(String),
     TasmotaPasswordChanged(String),
     TasmotaSubnetScanChanged(bool),
+    HueBridgeIpChanged(String),
+    HueApplicationKeyChanged(String),
+    PairHueBridge,
+    HueBridgePaired(Result<String, String>),
+    RefreshHueLights,
+    HueLightsLoaded(Result<Vec<HueLight>, String>),
+    SetHueLightPower(String, bool),
+    HueLightPowerFinished(String, Result<(), String>),
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
@@ -3559,6 +3574,17 @@ impl cosmic::Application for AppModel {
         let mut tasks = vec![Task::perform(fetch_fritz_data(), |result| {
             cosmic::Action::App(Message::Updated(Box::new(result)))
         })];
+        let hue_configured = !settings.hue_bridge_ip.trim().is_empty()
+            && !settings.hue_application_key.trim().is_empty();
+        if hue_configured {
+            tasks.push(Task::perform(
+                crate::hue::fetch_lights(
+                    settings.hue_bridge_ip.clone(),
+                    settings.hue_application_key.clone(),
+                ),
+                |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+            ));
+        }
         if restore_forecast {
             tasks.push(Task::perform(
                 fetch_weather_forecast(forecast_location, 7),
@@ -3570,6 +3596,7 @@ impl cosmic::Application for AppModel {
                 core,
                 selected_ains: initial_device_selection(&settings),
                 devices: known_devices,
+                hue_loading: hue_configured,
                 devices_loaded: saved_devices_loaded,
                 devices_loading: false,
                 settings,
@@ -3615,7 +3642,12 @@ impl cosmic::Application for AppModel {
             || self.next_weather_refresh_at.is_some_and(|deadline| {
                 deadline.saturating_duration_since(now) <= Duration::from_secs(15)
             })
-            || self.devices_loading;
+            || self.devices_loading
+            || self.hue_loading
+            || self.hue_pairing
+            || self.hue_next_refresh_at.is_some_and(|deadline| {
+                deadline.saturating_duration_since(now) <= Duration::from_secs(15)
+            });
         let clock = if self.refresh_started_at.is_some() {
             Subscription::run(animation_ticks)
         } else if needs_second_precision {
@@ -4991,6 +5023,46 @@ impl cosmic::Application for AppModel {
                         .on_input(Message::TasmotaPasswordChanged),
                     )
                     .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3("Philips Hue Bridge"))
+                    .push(widget::text::caption(
+                        "Local Hue Bridge (CLIP v2). Pair by pressing its physical link button, then choose Pair. Hue lights provide on/off state, not measured W or temperature.",
+                    ))
+                    .push(widget::text::body("Bridge IP address"))
+                    .push(
+                        widget::text_input("192.168.1.2", &self.settings.hue_bridge_ip)
+                            .on_input(Message::HueBridgeIpChanged),
+                    )
+                    .push(widget::text::body("Hue application key"))
+                    .push(
+                        widget::secure_input(
+                            "Hue application key",
+                            &self.settings.hue_application_key,
+                            None,
+                            true,
+                        )
+                        .on_input(Message::HueApplicationKeyChanged),
+                    )
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::button::text(if self.hue_pairing {
+                                    "Pairing…"
+                                } else {
+                                    "Pair Hue Bridge"
+                                })
+                                .on_press(Message::PairHueBridge),
+                            )
+                            .push(
+                                widget::button::text("Refresh Hue lights")
+                                    .on_press(Message::RefreshHueLights),
+                            ),
+                    )
+                    .push(widget::text::caption(
+                        "Hue's bridge certificate uses a bridge ID instead of its IP, so only this Hue LAN connection skips TLS certificate verification. Use a trusted local network.",
+                    ))
+                    .push(widget::divider::horizontal::default())
                     .push(
                         widget::Row::new().width(cosmic::iced::Length::Fill)
                             .width(cosmic::iced::Length::Fill)
@@ -5008,6 +5080,22 @@ impl cosmic::Application for AppModel {
                             ),
                     )
                     .push(widget::divider::horizontal::default())
+            }
+            if self.active_settings_section == Some("connection") {
+                if let Some(error) = &self.hue_error {
+                    content = content.push(widget::text::caption(format!(
+                        "Hue Bridge: {error}"
+                    )));
+                } else if self.hue_pairing {
+                    content = content.push(widget::text::caption(
+                        "Waiting for the Hue Bridge to authorize pairing…",
+                    ));
+                } else if !self.hue_lights.is_empty() {
+                    content = content.push(widget::text::caption(format!(
+                        "Hue Bridge connected · {} light(s) found",
+                        self.hue_lights.len()
+                    )));
+                }
             }
 
             if self.active_settings_section == Some("menu-order") {
@@ -7794,6 +7882,118 @@ impl cosmic::Application for AppModel {
                 content = content.push(weather_card);
             }
 
+            // Hue is a separate light-control section: it must not contribute
+            // fictitious wattage, temperature or historical energy samples.
+            if !self.settings.hue_bridge_ip.trim().is_empty() {
+                let collapsed = self.collapsed_menu_sections.contains("hue-lights");
+                let heading = widget::button::custom(
+                    widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::body("PHILIPS HUE"))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(widget::text::caption(self.hue_lights.len().to_string()))
+                        .push(
+                            widget::icon::from_name(if collapsed {
+                                "go-next-symbolic"
+                            } else {
+                                "go-down-symbolic"
+                            })
+                            .size(16),
+                        ),
+                )
+                .on_press(Message::ToggleMenuSection("hue-lights".into()))
+                .width(cosmic::iced::Length::Fill)
+                .padding([8, 12])
+                .class(cosmic::theme::Button::Text);
+                let mut hue_section = widget::Column::new()
+                    .spacing(0)
+                    .width(cosmic::iced::Length::Fill)
+                    .push(
+                        widget::Row::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(heading)
+                            .push(copy_menu_title_button(
+                                "PHILIPS HUE".to_string(),
+                                self.copy_feedback.as_ref(),
+                            )),
+                    );
+                if !collapsed {
+                    hue_section = hue_section.push(
+                        widget::container(widget::text::caption(
+                            "Lights and switches · on/off state only · no measured W",
+                        ))
+                        .padding([4, 12]),
+                    );
+                    if self.hue_loading {
+                        hue_section = hue_section.push(
+                            widget::container(widget::text::caption("Refreshing Hue lights…"))
+                                .padding([4, 12]),
+                        );
+                    }
+                    if let Some(error) = &self.hue_error {
+                        hue_section = hue_section.push(
+                            widget::container(widget::text::caption(format!(
+                                "Hue Bridge: {error}"
+                            )))
+                            .padding([4, 12]),
+                        );
+                    }
+                    if self.hue_lights.is_empty() && !self.hue_loading && self.hue_error.is_none() {
+                        hue_section = hue_section.push(
+                            widget::container(widget::text::caption(
+                                "No Hue lights found. Pair and refresh from Connection settings.",
+                            ))
+                            .padding([4, 12]),
+                        );
+                    }
+                    for light in &self.hue_lights {
+                        let state: cosmic::Element<'_, Message> = if light.reachable
+                            && light.on.is_some()
+                            && !self.hue_pending.contains(&light.id)
+                        {
+                            let id = light.id.clone();
+                            widget::toggler(light.on.unwrap_or(false))
+                                .on_toggle(move |enabled| Message::SetHueLightPower(id.clone(), enabled))
+                                .into()
+                        } else {
+                            widget::toggler(light.on.unwrap_or(false)).into()
+                        };
+                        hue_section = hue_section
+                            .push(widget::divider::horizontal::default())
+                            .push(
+                                widget::Row::new()
+                                    .spacing(8)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .padding([6, 12])
+                                    .push(
+                                        widget::Column::new()
+                                            .spacing(2)
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::text::body(light.name.clone()))
+                                            .push(widget::text::caption(if light.on.is_none() {
+                                                "Unavailable"
+                                            } else if light.on == Some(true) {
+                                                "On"
+                                            } else {
+                                                "Off"
+                                            })),
+                                    )
+                                    .push(copy_menu_title_button(
+                                        light.name.clone(),
+                                        self.copy_feedback.as_ref(),
+                                    ))
+                                    .push(state),
+                            );
+                    }
+                }
+                content = content
+                    .push(widget::divider::horizontal::default())
+                    .push(hue_section);
+            }
+
             content = content.push(
                 widget::Row::new()
                     .spacing(8)
@@ -8328,6 +8528,21 @@ impl cosmic::Application for AppModel {
                     cosmic::Action::App(Message::Updated(Box::new(result)))
                 })];
 
+                if !self.settings.hue_bridge_ip.trim().is_empty()
+                    && !self.settings.hue_application_key.trim().is_empty()
+                    && !self.hue_loading
+                {
+                    self.hue_loading = true;
+                    self.hue_next_refresh_at = None;
+                    tasks.push(Task::perform(
+                        crate::hue::fetch_lights(
+                            self.settings.hue_bridge_ip.clone(),
+                            self.settings.hue_application_key.clone(),
+                        ),
+                        |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                    ));
+                }
+
                 // Device discovery is deliberately separate from normal refreshes
                 // and is available only through the explicit action in Settings → Devices.
 
@@ -8402,6 +8617,21 @@ impl cosmic::Application for AppModel {
                     .is_some_and(|deadline| Instant::now() >= deadline)
                 {
                     self.settings_saved_until = None;
+                }
+                if !self.hue_loading
+                    && !self.settings.hue_application_key.trim().is_empty()
+                    && !self.settings.hue_bridge_ip.trim().is_empty()
+                    && self.hue_next_refresh_at.is_some_and(|deadline| Instant::now() >= deadline)
+                {
+                    self.hue_loading = true;
+                    self.hue_next_refresh_at = None;
+                    return Task::perform(
+                        crate::hue::fetch_lights(
+                            self.settings.hue_bridge_ip.clone(),
+                            self.settings.hue_application_key.clone(),
+                        ),
+                        |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                    );
                 }
                 if self.settings.weather_enabled
                     && self.next_weather_refresh_at.is_none()
@@ -8698,7 +8928,14 @@ impl cosmic::Application for AppModel {
                             &mut self.diagnostic_events,
                             format!("FRITZ!Box refresh failed: {error}"),
                         );
-                        self.error = Some(error);
+                        self.error = if self.selected_ains.is_empty()
+                            && !self.settings.hue_application_key.is_empty()
+                            && !self.settings.hue_bridge_ip.is_empty()
+                        {
+                            None
+                        } else {
+                            Some(error)
+                        };
                     }
                 }
                 self.next_refresh_at = Some(
@@ -9426,6 +9663,124 @@ impl cosmic::Application for AppModel {
             Message::PasswordChanged(value) => {
                 self.settings.password = value;
                 self.persist_settings();
+            }
+            Message::HueBridgeIpChanged(value) => {
+                self.settings.hue_bridge_ip = value;
+                self.hue_lights.clear();
+                self.hue_error = None;
+                self.hue_next_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::HueApplicationKeyChanged(value) => {
+                self.settings.hue_application_key = value;
+                self.hue_lights.clear();
+                self.hue_error = None;
+                self.hue_next_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::PairHueBridge => {
+                if self.hue_pairing {
+                    return Task::none();
+                }
+                self.hue_pairing = true;
+                self.hue_error = None;
+                return Task::perform(
+                    crate::hue::pair(self.settings.hue_bridge_ip.clone()),
+                    |result| cosmic::Action::App(Message::HueBridgePaired(result)),
+                );
+            }
+            Message::HueBridgePaired(result) => {
+                self.hue_pairing = false;
+                match result {
+                    Ok(key) => {
+                        // Never put the secret in status messages or diagnostics.
+                        self.settings.hue_application_key = key;
+                        self.persist_settings();
+                        self.hue_loading = true;
+                        self.hue_next_refresh_at = None;
+                        self.hue_error = None;
+                        return Task::perform(
+                            crate::hue::fetch_lights(
+                                self.settings.hue_bridge_ip.clone(),
+                                self.settings.hue_application_key.clone(),
+                            ),
+                            |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                        );
+                    }
+                    Err(error) => self.hue_error = Some(error),
+                }
+            }
+            Message::RefreshHueLights => {
+                if self.hue_loading {
+                    return Task::none();
+                }
+                if self.settings.hue_bridge_ip.trim().is_empty()
+                    || self.settings.hue_application_key.trim().is_empty()
+                {
+                    self.hue_error = Some("Configure the bridge IP and pair it first".into());
+                    return Task::none();
+                }
+                self.hue_loading = true;
+                self.hue_next_refresh_at = None;
+                return Task::perform(
+                    crate::hue::fetch_lights(
+                        self.settings.hue_bridge_ip.clone(),
+                        self.settings.hue_application_key.clone(),
+                    ),
+                    |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                );
+            }
+            Message::HueLightsLoaded(result) => {
+                self.hue_loading = false;
+                self.hue_next_refresh_at = Some(Instant::now() + Duration::from_secs(60));
+                match result {
+                    Ok(lights) => {
+                        self.hue_lights = lights;
+                        self.hue_error = None;
+                    }
+                    Err(error) => {
+                        // A bridge outage never leaves stale light states on-screen
+                        // and cannot invalidate FRITZ!/Tasmota power readings.
+                        self.hue_lights.clear();
+                        self.hue_error = Some(error);
+                    }
+                }
+            }
+            Message::SetHueLightPower(id, on) => {
+                if self.hue_pending.contains(&id)
+                    || !self.hue_lights.iter().any(|light| {
+                        light.id == id && light.reachable && light.on.is_some()
+                    })
+                {
+                    return Task::none();
+                }
+                self.hue_pending.insert(id.clone());
+                return Task::perform(
+                    crate::hue::set_light_power(
+                        self.settings.hue_bridge_ip.clone(),
+                        self.settings.hue_application_key.clone(),
+                        id.clone(),
+                        on,
+                    ),
+                    move |result| cosmic::Action::App(Message::HueLightPowerFinished(id, result)),
+                );
+            }
+            Message::HueLightPowerFinished(id, result) => {
+                self.hue_pending.remove(&id);
+                match result {
+                    Ok(()) => {
+                        self.hue_loading = true;
+                        self.hue_next_refresh_at = None;
+                        return Task::perform(
+                            crate::hue::fetch_lights(
+                                self.settings.hue_bridge_ip.clone(),
+                                self.settings.hue_application_key.clone(),
+                            ),
+                            |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                        );
+                    }
+                    Err(error) => self.hue_error = Some(error),
+                }
             }
             Message::TasmotaUsernameChanged(value) => {
                 self.settings.tasmota_username = value;
