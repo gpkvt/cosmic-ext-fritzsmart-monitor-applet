@@ -107,6 +107,8 @@ make install
 
 The panel menu opens on **click**, not hover, and closes when clicked outside or toggled from the panel entry. No separate close button is required.
 
+**Outdoor temperature source:** In **Settings → Devices**, enable **Outdoor temperature source** on a Netatmo outdoor module (NAModule1) or a supported FRITZ!Box temperature device. Only one source can be active. The selected live value replaces the OpenWeatherMap temperature in the panel and Weather heading. If the source becomes unavailable, the OpenWeatherMap reading is used instead.
+
 [Detailed first-time setup](https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/guide.html#first-launch)
 
 ## Privacy and security
@@ -114,7 +116,7 @@ The panel menu opens on **click**, not hover, and closes when clicked outside or
 **Local by default for power monitoring.** FRITZ!Box, Tasmota and Hue operate on the local network. Netatmo, OpenWeatherMap and Wikimedia Commons require external requests only when their respective integrations are enabled.
 
 - Settings and secrets are kept in the user's configuration (`~/.config/fritz_solar.cfg`); graph samples are stored under `~/.local/share/fritz-power-monitor/`.
-- FRITZ!Box HTTPS validates certificates by default; a trusted custom CA can be configured. Avoid disabling verification.
+- FRITZ!Box HTTPS validates certificates by default. **Allow invalid TLS certificates (FRITZ!Box only)** appears beside the trusted CA certificate field in **Settings → Connection**. It affects only the FRITZ!Box client; prefer adding a trusted CA to disabling verification.
 - **Hue TLS caveat:** The Hue-specific HTTPS client does not currently validate the Bridge's certificate chain or hostname, and some older bridges may use HTTP for pairing. Pair only on a trusted LAN.
 - Netatmo requires a developer client ID, client secret and refresh token with `read_station` permission. Refresh tokens may rotate automatically. Treat credentials as private.
 - Never paste configuration files, tokens, router passwords or unredacted diagnostics into a public issue.
