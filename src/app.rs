@@ -1998,20 +1998,31 @@ fn average_temperature_with_hue_c(
     if sensors.is_empty() {
         return average_selected_temperature_c(readings, selected_ains, exclude_solar);
     }
-    let selected_metered = readings.iter().filter(|reading| {
-        reading.temperature_c.is_finite()
-            && selected_ains.iter().any(|ain| {
-                crate::fritz::canonical_device_key(ain)
-                    == crate::fritz::canonical_device_key(&reading.ain)
-            })
-            && (!exclude_solar || !reading.name.to_lowercase().contains("solar"))
-    }).map(|reading| reading.temperature_c);
-    let selected_hue = sensors.iter().filter(|sensor| {
-        sensor.reachable
-            && hue_device_is_visible(hidden_hue_devices, &hue_device_id("sensor", &sensor.id))
-            && (!exclude_solar || !sensor.name.to_lowercase().contains("solar"))
-    }).filter_map(|sensor| sensor.temperature_c.filter(|temperature| temperature.is_finite()));
-    let (sum, count) = selected_metered.chain(selected_hue)
+    let selected_metered = readings
+        .iter()
+        .filter(|reading| {
+            reading.temperature_c.is_finite()
+                && selected_ains.iter().any(|ain| {
+                    crate::fritz::canonical_device_key(ain)
+                        == crate::fritz::canonical_device_key(&reading.ain)
+                })
+                && (!exclude_solar || !reading.name.to_lowercase().contains("solar"))
+        })
+        .map(|reading| reading.temperature_c);
+    let selected_hue = sensors
+        .iter()
+        .filter(|sensor| {
+            sensor.reachable
+                && hue_device_is_visible(hidden_hue_devices, &hue_device_id("sensor", &sensor.id))
+                && (!exclude_solar || !sensor.name.to_lowercase().contains("solar"))
+        })
+        .filter_map(|sensor| {
+            sensor
+                .temperature_c
+                .filter(|temperature| temperature.is_finite())
+        });
+    let (sum, count) = selected_metered
+        .chain(selected_hue)
         .fold((0.0_f64, 0_usize), |(sum, count), temperature| {
             (sum + temperature, count + 1)
         });
@@ -2591,9 +2602,10 @@ fn daily_power_metric_trends(
     let daily = daily_energy_history(device_history, input_ains, refresh_interval_seconds);
     let input: Vec<f64> = daily.iter().filter_map(|(_, input, _)| *input).collect();
     let output: Vec<f64> = daily.iter().filter_map(|(_, _, output)| *output).collect();
-    let ratio: Vec<f64> = daily.iter().filter_map(|(_, input, output)| {
-        energy_input_output_ratio_percent(*input, *output)
-    }).collect();
+    let ratio: Vec<f64> = daily
+        .iter()
+        .filter_map(|(_, input, output)| energy_input_output_ratio_percent(*input, *output))
+        .collect();
     widget::Column::new()
         .spacing(12)
         .width(cosmic::iced::Length::Fill)
@@ -2700,7 +2712,10 @@ fn total_power_overview(
             format_graph_axis_start(
                 settings.graph_timespan_minutes,
                 history.front().map(|(timestamp, _)| {
-                    Instant::now().saturating_duration_since(*timestamp).as_secs().div_ceil(60)
+                    Instant::now()
+                        .saturating_duration_since(*timestamp)
+                        .as_secs()
+                        .div_ceil(60)
                 }),
             ),
         ))
@@ -2710,15 +2725,18 @@ fn total_power_overview(
             interactive_graph_with_axis(
                 &settings.language,
                 "INPUT POWER HISTORY",
-                input_history.iter().map(|(time, watts)| {
-                    (*time, input_display_power_w(*watts) as f64)
-                }),
+                input_history
+                    .iter()
+                    .map(|(time, watts)| (*time, input_display_power_w(*watts) as f64)),
                 &settings.graph_style,
                 "W",
                 format_graph_axis_start(
                     settings.graph_timespan_minutes,
                     input_history.front().map(|(timestamp, _)| {
-                        Instant::now().saturating_duration_since(*timestamp).as_secs().div_ceil(60)
+                        Instant::now()
+                            .saturating_duration_since(*timestamp)
+                            .as_secs()
+                            .div_ceil(60)
                     }),
                 ),
             )
@@ -5508,230 +5526,244 @@ impl cosmic::Application for AppModel {
                     }
                     for entry in ordered_devices {
                         match entry {
-                        SettingsDeviceEntry::Metered(device) => {
-                        let selected = self.selected_ains.iter().any(|selected_ain| {
-                            crate::fritz::normalize_ain_for_selection(selected_ain)
-                                == crate::fritz::normalize_ain_for_selection(&device.ain)
-                        });
-                        let ain = device.ain.clone();
-                        let row = widget::Row::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .spacing(6)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(
-                                widget::checkbox(selected)
-                                    .label(device.name.clone())
-                                    .on_toggle({
-                                        let ain = ain.clone();
-                                        move |checked| Message::ToggleDevice(ain.clone(), checked)
-                                    }),
-                            )
-                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                            .push(icon_action_button(
-                                "+",
-                                crate::i18n::tr(&self.settings.language, "Move device up"),
-                                Message::MoveDevice(ain.clone(), true),
-                            ))
-                            .push(icon_action_button(
-                                "−",
-                                crate::i18n::tr(&self.settings.language, "Move device down"),
-                                Message::MoveDevice(ain.clone(), false),
-                            ))
-                            .push(icon_action_button(
-                                "×",
-                                crate::i18n::tr(
-                                    &self.settings.language,
-                                    "Remove device from saved list",
-                                ),
-                                Message::RemoveDevice(ain.clone()),
-                            ));
-                        let normalized_ain = crate::fritz::normalize_ain_for_selection(&ain);
-                        let is_tasmota = ain.to_ascii_uppercase().starts_with("TASMOTA:");
-                        let alert_thresholds = (!is_tasmota)
-                            .then(|| {
-                                self.settings
-                                    .temperature_alerts
-                                    .get(&normalized_ain)
-                                    .copied()
-                            })
-                            .flatten();
-                        let is_input = self.settings.input_ains.contains(&normalized_ain);
-                        let is_external_temperature = !is_tasmota
-                            && !self.settings.weather_temperature_ain.is_empty()
-                            && crate::fritz::normalize_ain_for_selection(
-                                &self.settings.weather_temperature_ain,
-                            ) == normalized_ain;
-                        let mut device_row = widget::Column::new()
-                            .spacing(6)
-                            .push(row)
-                            .push(widget::text::caption(if is_tasmota {
-                                "Tasmota device"
-                            } else {
-                                "FRITZ!Box device"
-                            }))
-                            .push(
-                                widget::Row::new()
+                            SettingsDeviceEntry::Metered(device) => {
+                                let selected = self.selected_ains.iter().any(|selected_ain| {
+                                    crate::fritz::normalize_ain_for_selection(selected_ain)
+                                        == crate::fritz::normalize_ain_for_selection(&device.ain)
+                                });
+                                let ain = device.ain.clone();
+                                let row = widget::Row::new()
                                     .width(cosmic::iced::Length::Fill)
+                                    .spacing(6)
                                     .align_y(cosmic::iced::Alignment::Center)
-                                    .push(widget::text::caption(crate::i18n::tr(
-                                        &self.settings.language,
-                                        "Input device (separate total)",
-                                    )))
+                                    .push(
+                                        widget::checkbox(selected)
+                                            .label(device.name.clone())
+                                            .on_toggle({
+                                                let ain = ain.clone();
+                                                move |checked| {
+                                                    Message::ToggleDevice(ain.clone(), checked)
+                                                }
+                                            }),
+                                    )
                                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                    .push(widget::toggler(is_input).on_toggle({
-                                        let ain = ain.clone();
-                                        move |enabled| {
-                                            Message::ToggleDeviceInput(ain.clone(), enabled)
-                                        }
-                                    })),
-                            );
-                        if !is_tasmota {
-                            device_row = device_row
-                                .push(
-                                    widget::Row::new()
-                                        .width(cosmic::iced::Length::Fill)
-                                        .align_y(cosmic::iced::Alignment::Center)
-                                        .push(widget::text::caption(crate::i18n::tr(
+                                    .push(icon_action_button(
+                                        "+",
+                                        crate::i18n::tr(&self.settings.language, "Move device up"),
+                                        Message::MoveDevice(ain.clone(), true),
+                                    ))
+                                    .push(icon_action_button(
+                                        "−",
+                                        crate::i18n::tr(
                                             &self.settings.language,
-                                            "Outdoor temperature source",
-                                        )))
-                                        .push(
-                                            widget::Space::new().width(cosmic::iced::Length::Fill),
-                                        )
-                                        .push(widget::toggler(is_external_temperature).on_toggle(
-                                            {
+                                            "Move device down",
+                                        ),
+                                        Message::MoveDevice(ain.clone(), false),
+                                    ))
+                                    .push(icon_action_button(
+                                        "×",
+                                        crate::i18n::tr(
+                                            &self.settings.language,
+                                            "Remove device from saved list",
+                                        ),
+                                        Message::RemoveDevice(ain.clone()),
+                                    ));
+                                let normalized_ain =
+                                    crate::fritz::normalize_ain_for_selection(&ain);
+                                let is_tasmota = ain.to_ascii_uppercase().starts_with("TASMOTA:");
+                                let alert_thresholds = (!is_tasmota)
+                                    .then(|| {
+                                        self.settings
+                                            .temperature_alerts
+                                            .get(&normalized_ain)
+                                            .copied()
+                                    })
+                                    .flatten();
+                                let is_input = self.settings.input_ains.contains(&normalized_ain);
+                                let is_external_temperature = !is_tasmota
+                                    && !self.settings.weather_temperature_ain.is_empty()
+                                    && crate::fritz::normalize_ain_for_selection(
+                                        &self.settings.weather_temperature_ain,
+                                    ) == normalized_ain;
+                                let mut device_row = widget::Column::new()
+                                    .spacing(6)
+                                    .push(row)
+                                    .push(widget::text::caption(if is_tasmota {
+                                        "Tasmota device"
+                                    } else {
+                                        "FRITZ!Box device"
+                                    }))
+                                    .push(
+                                        widget::Row::new()
+                                            .width(cosmic::iced::Length::Fill)
+                                            .align_y(cosmic::iced::Alignment::Center)
+                                            .push(widget::text::caption(crate::i18n::tr(
+                                                &self.settings.language,
+                                                "Input device (separate total)",
+                                            )))
+                                            .push(
+                                                widget::Space::new()
+                                                    .width(cosmic::iced::Length::Fill),
+                                            )
+                                            .push(widget::toggler(is_input).on_toggle({
                                                 let ain = ain.clone();
                                                 move |enabled| {
-                                                    Message::ToggleExternalTemperature(
-                                                        ain.clone(),
-                                                        enabled,
-                                                    )
+                                                    Message::ToggleDeviceInput(ain.clone(), enabled)
                                                 }
-                                            },
-                                        )),
-                                )
-                                .push(
-                                    widget::Row::new()
-                                        .width(cosmic::iced::Length::Fill)
-                                        .align_y(cosmic::iced::Alignment::Center)
-                                        .push(widget::text::caption(crate::i18n::tr(
-                                            &self.settings.language,
-                                            "Temperature alerts",
-                                        )))
+                                            })),
+                                    );
+                                if !is_tasmota {
+                                    device_row = device_row
                                         .push(
-                                            widget::Space::new().width(cosmic::iced::Length::Fill),
+                                            widget::Row::new()
+                                                .width(cosmic::iced::Length::Fill)
+                                                .align_y(cosmic::iced::Alignment::Center)
+                                                .push(widget::text::caption(crate::i18n::tr(
+                                                    &self.settings.language,
+                                                    "Outdoor temperature source",
+                                                )))
+                                                .push(
+                                                    widget::Space::new()
+                                                        .width(cosmic::iced::Length::Fill),
+                                                )
+                                                .push(
+                                                    widget::toggler(is_external_temperature)
+                                                        .on_toggle({
+                                                            let ain = ain.clone();
+                                                            move |enabled| {
+                                                                Message::ToggleExternalTemperature(
+                                                                    ain.clone(),
+                                                                    enabled,
+                                                                )
+                                                            }
+                                                        }),
+                                                ),
                                         )
                                         .push(
-                                            widget::toggler(alert_thresholds.is_some()).on_toggle(
+                                            widget::Row::new()
+                                                .width(cosmic::iced::Length::Fill)
+                                                .align_y(cosmic::iced::Alignment::Center)
+                                                .push(widget::text::caption(crate::i18n::tr(
+                                                    &self.settings.language,
+                                                    "Temperature alerts",
+                                                )))
+                                                .push(
+                                                    widget::Space::new()
+                                                        .width(cosmic::iced::Length::Fill),
+                                                )
+                                                .push(
+                                                    widget::toggler(alert_thresholds.is_some())
+                                                        .on_toggle({
+                                                            let ain = ain.clone();
+                                                            move |enabled| {
+                                                                Message::ToggleTemperatureAlert(
+                                                                    ain.clone(),
+                                                                    enabled,
+                                                                )
+                                                            }
+                                                        }),
+                                                ),
+                                        );
+                                }
+                                if let Some(thresholds) = alert_thresholds {
+                                    device_row = device_row
+                                        .push(widget::text::caption(format!(
+                                            "{}: {}",
+                                            crate::i18n::tr(&self.settings.language, "Upper limit"),
+                                            format_temperature(
+                                                f64::from(thresholds.high_c),
+                                                &self.settings.temperature_unit
+                                            )
+                                        )))
+                                        .push(
+                                            widget::slider(
+                                                if self.settings.temperature_unit == "F" {
+                                                    32.0..=104.0
+                                                } else {
+                                                    0.0..=40.0
+                                                },
+                                                temperature_in_unit(
+                                                    f64::from(thresholds.high_c),
+                                                    &self.settings.temperature_unit,
+                                                )
+                                                    as f32,
                                                 {
                                                     let ain = ain.clone();
-                                                    move |enabled| {
-                                                        Message::ToggleTemperatureAlert(
+                                                    let unit =
+                                                        self.settings.temperature_unit.clone();
+                                                    move |value| {
+                                                        let celsius = if unit == "F" {
+                                                            (f64::from(value) - 32.0) * 5.0 / 9.0
+                                                        } else {
+                                                            f64::from(value)
+                                                        };
+                                                        Message::TemperatureAlertHighChanged(
                                                             ain.clone(),
-                                                            enabled,
+                                                            celsius.round() as i16,
                                                         )
                                                     }
                                                 },
-                                            ),
-                                        ),
-                                );
-                        }
-                        if let Some(thresholds) = alert_thresholds {
-                            device_row = device_row
-                                .push(widget::text::caption(format!(
-                                    "{}: {}",
-                                    crate::i18n::tr(&self.settings.language, "Upper limit"),
-                                    format_temperature(
-                                        f64::from(thresholds.high_c),
-                                        &self.settings.temperature_unit
-                                    )
-                                )))
-                                .push(
-                                    widget::slider(
-                                        if self.settings.temperature_unit == "F" {
-                                            32.0..=104.0
-                                        } else {
-                                            0.0..=40.0
-                                        },
-                                        temperature_in_unit(
-                                            f64::from(thresholds.high_c),
-                                            &self.settings.temperature_unit,
-                                        ) as f32,
-                                        {
-                                            let ain = ain.clone();
-                                            let unit = self.settings.temperature_unit.clone();
-                                            move |value| {
-                                                let celsius = if unit == "F" {
-                                                    (f64::from(value) - 32.0) * 5.0 / 9.0
+                                            )
+                                            .step(1.0_f32),
+                                        )
+                                        .push(widget::text::caption(format!(
+                                            "{}: {}",
+                                            crate::i18n::tr(&self.settings.language, "Lower limit"),
+                                            format_temperature(
+                                                f64::from(thresholds.low_c),
+                                                &self.settings.temperature_unit
+                                            )
+                                        )))
+                                        .push(
+                                            widget::slider(
+                                                if self.settings.temperature_unit == "F" {
+                                                    14.0..=32.0
                                                 } else {
-                                                    f64::from(value)
-                                                };
-                                                Message::TemperatureAlertHighChanged(
-                                                    ain.clone(),
-                                                    celsius.round() as i16,
+                                                    -10.0..=0.0
+                                                },
+                                                temperature_in_unit(
+                                                    f64::from(thresholds.low_c),
+                                                    &self.settings.temperature_unit,
                                                 )
-                                            }
-                                        },
-                                    )
-                                    .step(1.0_f32),
-                                )
-                                .push(widget::text::caption(format!(
-                                    "{}: {}",
-                                    crate::i18n::tr(&self.settings.language, "Lower limit"),
-                                    format_temperature(
-                                        f64::from(thresholds.low_c),
-                                        &self.settings.temperature_unit
-                                    )
-                                )))
-                                .push(
-                                    widget::slider(
-                                        if self.settings.temperature_unit == "F" {
-                                            14.0..=32.0
-                                        } else {
-                                            -10.0..=0.0
-                                        },
-                                        temperature_in_unit(
-                                            f64::from(thresholds.low_c),
-                                            &self.settings.temperature_unit,
-                                        ) as f32,
-                                        {
-                                            let ain = ain.clone();
-                                            let unit = self.settings.temperature_unit.clone();
-                                            move |value| {
-                                                let celsius = if unit == "F" {
-                                                    (f64::from(value) - 32.0) * 5.0 / 9.0
-                                                } else {
-                                                    f64::from(value)
-                                                };
-                                                Message::TemperatureAlertLowChanged(
-                                                    ain.clone(),
-                                                    celsius.round() as i16,
-                                                )
-                                            }
-                                        },
-                                    )
-                                    .step(1.0_f32),
-                                )
-                                .push(widget::text::caption(
-                                    "Notify above the upper limit or below the lower limit",
-                                ));
-                        }
-                        content = content.push(surface_card(device_row.into(), 8));
-                        }
-                        SettingsDeviceEntry::HueLight(light) => {
-                            let id = hue_device_id("light", &light.id);
-                            let visible = hue_device_is_visible(
-                                &self.settings.hidden_hue_devices, &id
-                            );
-                            let status = if !light.reachable || light.on.is_none() {
-                                "Unavailable"
-                            } else if light.on == Some(true) {
-                                "On"
-                            } else {
-                                "Off"
-                            };
-                            let light_control: cosmic::Element<'static, Message> =
-                                if light.reachable
+                                                    as f32,
+                                                {
+                                                    let ain = ain.clone();
+                                                    let unit =
+                                                        self.settings.temperature_unit.clone();
+                                                    move |value| {
+                                                        let celsius = if unit == "F" {
+                                                            (f64::from(value) - 32.0) * 5.0 / 9.0
+                                                        } else {
+                                                            f64::from(value)
+                                                        };
+                                                        Message::TemperatureAlertLowChanged(
+                                                            ain.clone(),
+                                                            celsius.round() as i16,
+                                                        )
+                                                    }
+                                                },
+                                            )
+                                            .step(1.0_f32),
+                                        )
+                                        .push(widget::text::caption(
+                                            "Notify above the upper limit or below the lower limit",
+                                        ));
+                                }
+                                content = content.push(surface_card(device_row.into(), 8));
+                            }
+                            SettingsDeviceEntry::HueLight(light) => {
+                                let id = hue_device_id("light", &light.id);
+                                let visible =
+                                    hue_device_is_visible(&self.settings.hidden_hue_devices, &id);
+                                let status = if !light.reachable || light.on.is_none() {
+                                    "Unavailable"
+                                } else if light.on == Some(true) {
+                                    "On"
+                                } else {
+                                    "Off"
+                                };
+                                let light_control: cosmic::Element<'static, Message> = if light
+                                    .reachable
                                     && light.on.is_some()
                                     && !self.hue_pending.contains(&light.id)
                                 {
@@ -5744,42 +5776,47 @@ impl cosmic::Application for AppModel {
                                 } else {
                                     widget::toggler(light.on.unwrap_or(false)).into()
                                 };
-                            content = content.push(hue_settings_card(
-                                id,
-                                light.name.clone(),
-                                visible,
-                                format!("Hue Bridge · Light · {status} · No measured W"),
-                                &self.settings.language,
-                                Some(light_control),
-                            ));
-                        }
-                        SettingsDeviceEntry::HueSensor(sensor) => {
-                            let id = hue_device_id("sensor", &sensor.id);
-                            let visible = hue_device_is_visible(
-                                &self.settings.hidden_hue_devices, &id
-                            );
-                            let temperature = sensor.temperature_c
-                                .filter(|_| sensor.reachable)
-                                .map(|value| format_temperature(value, &self.settings.temperature_unit))
-                                .unwrap_or_else(|| "—".to_string());
-                            let lux = sensor.illuminance_lux
-                                .filter(|_| sensor.reachable)
-                                .map(|value| if value >= 100.0 {
-                                    format!("{value:.0} lx")
+                                content = content.push(hue_settings_card(
+                                    id,
+                                    light.name.clone(),
+                                    visible,
+                                    format!("Hue Bridge · Light · {status} · No measured W"),
+                                    &self.settings.language,
+                                    Some(light_control),
+                                ));
+                            }
+                            SettingsDeviceEntry::HueSensor(sensor) => {
+                                let id = hue_device_id("sensor", &sensor.id);
+                                let visible =
+                                    hue_device_is_visible(&self.settings.hidden_hue_devices, &id);
+                                let temperature = sensor
+                                    .temperature_c
+                                    .filter(|_| sensor.reachable)
+                                    .map(|value| {
+                                        format_temperature(value, &self.settings.temperature_unit)
+                                    })
+                                    .unwrap_or_else(|| "—".to_string());
+                                let lux = sensor
+                                    .illuminance_lux
+                                    .filter(|_| sensor.reachable)
+                                    .map(|value| {
+                                        if value >= 100.0 {
+                                            format!("{value:.0} lx")
+                                        } else {
+                                            format!("{value:.1} lx")
+                                        }
+                                    })
+                                    .unwrap_or_else(|| "—".to_string());
+                                let motion = if !sensor.reachable {
+                                    "Unavailable"
                                 } else {
-                                    format!("{value:.1} lx")
-                                })
-                                .unwrap_or_else(|| "—".to_string());
-                            let motion = if !sensor.reachable {
-                                "Unavailable"
-                            } else {
-                                match sensor.motion {
-                                    Some(true) => "Motion detected",
-                                    Some(false) => "No motion",
-                                    None => "Motion unavailable",
-                                }
-                            };
-                            content = content.push(hue_settings_card(
+                                    match sensor.motion {
+                                        Some(true) => "Motion detected",
+                                        Some(false) => "No motion",
+                                        None => "Motion unavailable",
+                                    }
+                                };
+                                content = content.push(hue_settings_card(
                                 id,
                                 sensor.name.clone(),
                                 visible,
@@ -5787,7 +5824,7 @@ impl cosmic::Application for AppModel {
                                 &self.settings.language,
                                 None,
                             ));
-                        }
+                            }
                         }
                     }
                 } else if self.devices_loaded {
@@ -5798,9 +5835,8 @@ impl cosmic::Application for AppModel {
                 if !self.settings.hue_bridge_ip.trim().is_empty() {
                     content = content.push(widget::divider::horizontal::default());
                     if let Some(error) = &self.hue_error {
-                        content = content.push(widget::text::caption(format!(
-                            "Hue Bridge: {error}"
-                        )));
+                        content =
+                            content.push(widget::text::caption(format!("Hue Bridge: {error}")));
                     } else if self.hue_lights.is_empty() && self.hue_sensors.is_empty() {
                         content = content.push(widget::text::caption(
                             if self.hue_loading {
@@ -8802,9 +8838,7 @@ impl cosmic::Application for AppModel {
                                 &self.settings.language,
                                 "FRITZ!Power Monitor",
                             )))
-                            .push(widget::text::caption(format!(
-                                "v{}", env!("APP_VERSION")
-                            ))),
+                            .push(widget::text::caption(format!("v{}", env!("APP_VERSION")))),
                     )
                     .push(if self.refresh_started_at.is_some() {
                         icon_action_button(
@@ -9856,8 +9890,16 @@ impl cosmic::Application for AppModel {
                     .devices
                     .iter()
                     .map(|device| device.ain.clone())
-                    .chain(self.hue_lights.iter().map(|light| hue_device_id("light", &light.id)))
-                    .chain(self.hue_sensors.iter().map(|sensor| hue_device_id("sensor", &sensor.id)))
+                    .chain(
+                        self.hue_lights
+                            .iter()
+                            .map(|light| hue_device_id("light", &light.id)),
+                    )
+                    .chain(
+                        self.hue_sensors
+                            .iter()
+                            .map(|sensor| hue_device_id("sensor", &sensor.id)),
+                    )
                     .collect();
                 order.sort_by_key(|device_ain| {
                     device_order_position(&self.settings.device_order, device_ain)
@@ -10902,11 +10944,14 @@ impl cosmic::Application for AppModel {
                 );
             }
             Message::ToggleHueDeviceVisible(id, visible) => {
-                let known = self.hue_lights.iter().any(|light| {
-                    hue_device_id("light", &light.id) == id
-                }) || self.hue_sensors.iter().any(|sensor| {
-                    hue_device_id("sensor", &sensor.id) == id
-                });
+                let known = self
+                    .hue_lights
+                    .iter()
+                    .any(|light| hue_device_id("light", &light.id) == id)
+                    || self
+                        .hue_sensors
+                        .iter()
+                        .any(|sensor| hue_device_id("sensor", &sensor.id) == id);
                 if !known {
                     return Task::none();
                 }
@@ -11233,8 +11278,10 @@ mod history_tests {
         assert!(!hue_device_is_visible(&hidden, &light));
         assert!(hue_device_is_visible(&hidden, &sensor));
         assert!(hue_device_is_visible(&[], &light));
-        assert_eq!(hue_device_list_key("light", "00112233-4455-6677-8899-aabbccddeeff"),
-            format!("2-{light}"));
+        assert_eq!(
+            hue_device_list_key("light", "00112233-4455-6677-8899-aabbccddeeff"),
+            format!("2-{light}")
+        );
     }
 
     #[test]
@@ -11796,25 +11843,39 @@ mod history_tests {
         };
         let selected = vec!["111111".into()];
         let sensors = vec![sensor.clone()];
-        assert_eq!(average_temperature_with_hue_c(
-            &[reading.clone()], &selected, &sensors, &[], false,
-        ), Some(22.0));
+        assert_eq!(
+            average_temperature_with_hue_c(&[reading.clone()], &selected, &sensors, &[], false,),
+            Some(22.0)
+        );
         let hidden = vec![hue_device_id("sensor", &sensor.id)];
-        assert_eq!(average_temperature_with_hue_c(
-            &[reading.clone()], &selected, &sensors, &hidden, false,
-        ), Some(20.0));
-        let offline = HueSensor { reachable: false, ..sensor.clone() };
-        assert_eq!(average_temperature_with_hue_c(
-            &[reading], &selected, &[offline], &[], false,
-        ), Some(20.0));
-        let invalid = HueSensor { temperature_c: Some(f64::NAN), ..sensor.clone() };
-        assert_eq!(average_temperature_with_hue_c(
-            &[], &[], &[invalid], &[], false,
-        ), None);
-        let solar = HueSensor { name: "Solar roof".into(), ..sensor };
-        assert_eq!(average_temperature_with_hue_c(
-            &[], &[], &[solar], &[], true,
-        ), None);
+        assert_eq!(
+            average_temperature_with_hue_c(&[reading.clone()], &selected, &sensors, &hidden, false,),
+            Some(20.0)
+        );
+        let offline = HueSensor {
+            reachable: false,
+            ..sensor.clone()
+        };
+        assert_eq!(
+            average_temperature_with_hue_c(&[reading], &selected, &[offline], &[], false,),
+            Some(20.0)
+        );
+        let invalid = HueSensor {
+            temperature_c: Some(f64::NAN),
+            ..sensor.clone()
+        };
+        assert_eq!(
+            average_temperature_with_hue_c(&[], &[], &[invalid], &[], false,),
+            None
+        );
+        let solar = HueSensor {
+            name: "Solar roof".into(),
+            ..sensor
+        };
+        assert_eq!(
+            average_temperature_with_hue_c(&[], &[], &[solar], &[], true,),
+            None
+        );
     }
 
     #[test]
