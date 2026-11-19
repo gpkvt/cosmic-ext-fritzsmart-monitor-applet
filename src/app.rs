@@ -1016,21 +1016,6 @@ fn menu_energy_summary(
     // Fill here consumed the entire row and pushed the values out of view.
     .width(cosmic::iced::Length::FillPortion(3))
     .into();
-    let value_row = |label: &'static str, value: Option<f64>, unit: &'static str| {
-        let display = value
-            .filter(|value| value.is_finite())
-            .map(|value| format!("{value:.0} {unit}"))
-            .unwrap_or_else(|| format!("— {unit}"));
-        widget::Row::new()
-            .spacing(8)
-            .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::text::caption(label).width(cosmic::iced::Length::Fill))
-            .push(
-                widget::text::title3(keep_value_unit_together(display))
-                    .width(cosmic::iced::Length::Fixed(92.0))
-                    .align_x(cosmic::iced::Alignment::End),
-            )
-    };
     let values = menu_energy_values(current_power_w, yesterday_wh, today_wh);
     widget::Row::new()
         .spacing(10)
@@ -6980,7 +6965,6 @@ impl cosmic::Application for AppModel {
                         .add(device_heading);
                     if is_expanded {
                         card_column = card_column
-                            .add(widget::container(device_summary).padding([0, 12]))
                             .add(
                                 widget::container(device_content)
                                     .padding([12, 0])
