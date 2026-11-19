@@ -523,6 +523,7 @@ pub async fn fetch_snapshot(address: String, key: String) -> Result<HueSnapshot,
     }
     let origin = bridge_origin(&address)?;
     let client = client()?;
+    crate::diagnostics::debug("Hue Bridge resource requests started");
     let (lights, devices, connectivity, temperature, level, motion) = tokio::join!(
         fetch_resource(&client, &origin, &key, "light"),
         fetch_resource(&client, &origin, &key, "device"),
@@ -531,6 +532,15 @@ pub async fn fetch_snapshot(address: String, key: String) -> Result<HueSnapshot,
         fetch_resource(&client, &origin, &key, "light_level"),
         fetch_resource(&client, &origin, &key, "motion"),
     );
+    crate::diagnostics::debug(format!(
+        "Hue Bridge resource requests finished (light: {}, device: {}, connectivity: {}, temperature: {}, light level: {}, motion: {})",
+        lights.is_ok(),
+        devices.is_ok(),
+        connectivity.is_ok(),
+        temperature.is_ok(),
+        level.is_ok(),
+        motion.is_ok()
+    ));
     let devices = devices?;
     let connectivity = connectivity.ok();
     let lights = parse_lights(&lights?, &devices, connectivity.as_ref())?;
@@ -565,6 +575,12 @@ pub async fn fetch_snapshot(address: String, key: String) -> Result<HueSnapshot,
         &devices,
         connectivity.as_ref(),
     );
+    crate::diagnostics::debug(format!(
+        "Hue Bridge resources parsed (lights: {}, sensors: {}, unsupported sensor services: {})",
+        lights.len(),
+        sensors.len(),
+        warnings.len()
+    ));
     Ok(HueSnapshot {
         lights,
         sensors,

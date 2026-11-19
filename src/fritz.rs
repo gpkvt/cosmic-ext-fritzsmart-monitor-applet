@@ -28,11 +28,29 @@ pub fn http_request_diagnostics() -> Vec<HttpRequestDiagnostic> {
         .unwrap_or_default()
 }
 
+/// Keep journal labels constant: even a malformed configured URL cannot
+/// leak query parameters, session IDs or other private network details.
+fn syslog_fritz_endpoint(path: &str) -> &'static str {
+    match path {
+        "/login_sid.lua" => "authentication",
+        "/webservices/homeautoswitch.lua" => "Smart Home API",
+        "/upnp/control/deviceinfo" => "DeviceInfo SOAP",
+        "/igdupnp/control/WANCommonIFC1" => "WAN SOAP",
+        _ => "other endpoint",
+    }
+}
+
 fn record_http_response_with_method(
     url: &reqwest::Url,
     status: reqwest::StatusCode,
     method: &'static str,
 ) {
+    crate::diagnostics::debug(format!(
+        "FRITZ HTTP {method} {} responded {} (HTTPS: {})",
+        syslog_fritz_endpoint(url.path()),
+        status.as_u16(),
+        url.scheme() == "https"
+    ));
     if let Ok(mut log) = HTTP_REQUEST_LOG.lock() {
         log.push_back(HttpRequestDiagnostic {
             timestamp: chrono::Local::now()
@@ -1995,11 +2013,11 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
         .cloned()
         .collect();
 
-    eprintln!(
-        "fritz-power-monitor: reading refresh started (FRITZ: {}, Tasmota: {})",
+    crate::diagnostics::debug(format!(
+        "reading refresh started (FRITZ: {}, Tasmota: {})",
         selected_fritz.len(),
         selected_tasmota.len()
-    );
+    ));
     if !selected_fritz.is_empty() {
         validate_settings(&settings, true)?;
     } else if selected_tasmota.is_empty() {
@@ -2033,11 +2051,11 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
                 devices_xml = fetch_device_list_xml(&client, base, &sid).await;
             }
             let mut fetched = parse_fetch_result_xml(&devices_xml?, &selected_fritz)?;
-            eprintln!(
-                "fritz-power-monitor: FRITZ device list parsed (readings: {}, missing: {})",
+            crate::diagnostics::debug(format!(
+                "FRITZ device list parsed (readings: {}, missing: {})",
                 fetched.readings.len(),
                 fetched.missing_devices.len()
-            );
+            ));
             // Re-read only absent devices (two retries after the first check).
             // Healthy readings remain valid even if a subsequent request fails.
             for _retry in 1..3 {
@@ -2057,13 +2075,13 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
                     }
                 }
             }
-            eprintln!("fritz-power-monitor: loading FRITZ system and WAN device information");
+            crate::diagnostics::debug("loading FRITZ system and WAN device information");
             let (device_info, wan_info) = tokio::join!(
                 tokio::time::timeout(Duration::from_secs(3), fetch_device_info(&client, base)),
                 tokio::time::timeout(Duration::from_secs(3), fetch_wan_link_info(&client, base)),
             );
             let wan_info = wan_info.ok().flatten();
-            eprintln!("fritz-power-monitor: FRITZ system and WAN information request finished");
+            crate::diagnostics::debug("FRITZ system and WAN information request finished");
             fetched.internet_bandwidth = wan_info.as_ref().and_then(|wan| {
                 Some(FritzInternetBandwidth {
                     download_bits_per_second: wan.download_bits_per_second?,
@@ -2104,7 +2122,10 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
         .await;
         match fritz_result {
             Ok(fetched) => result = fetched,
-            Err(error) => fritz_error = Some(error),
+            Err(error) => {
+                crate::diagnostics::warn("FRITZ device request failed; see applet diagnostics");
+                fritz_error = Some(error);
+            }
         }
     }
 
@@ -2223,11 +2244,11 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
             })
             .unwrap_or(usize::MAX)
     });
-    eprintln!(
-        "fritz-power-monitor: device refresh completed (readings: {}, missing: {})",
+    crate::diagnostics::debug(format!(
+        "device refresh completed (readings: {}, missing: {})",
         result.readings.len(),
         result.missing_devices.len()
-    );
+    ));
     Ok(result)
 }
 
@@ -2304,6 +2325,16 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn syslog_endpoint_labels_never_include_urls_or_tokens() {
+        assert_eq!(syslog_fritz_endpoint("/login_sid.lua"), "authentication");
+        assert_eq!(
+            syslog_fritz_endpoint("/webservices/homeautoswitch.lua"),
+            "Smart Home API"
+        );
+        assert_eq!(syslog_fritz_endpoint("/api/secret-token"), "other endpoint");
+    }
 
     #[test]
     fn oversized_xml_chunks_are_rejected_before_allocation() {
