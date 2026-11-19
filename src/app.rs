@@ -13320,6 +13320,45 @@ mod history_tests {
     }
 
     #[test]
+    fn netatmo_weather_details_include_only_new_live_metrics() {
+        let sensor = NetatmoSensor {
+            id: "indoor-1".into(),
+            name: "Office".into(),
+            is_outdoor: false,
+            temperature_c: Some(22.0),
+            humidity_percent: Some(50.0),
+            co2_ppm: Some(1350.0),
+            pressure_hpa: Some(1015.0),
+            noise_db: Some(44.0),
+            rain_mm: None,
+            wind_kmh: Some(10.0),
+            reachable: true,
+        };
+        assert_eq!(
+            netatmo_weather_extra_metrics(&[sensor.clone()], &[]),
+            vec![
+                ("Air quality (CO₂) · Office".into(), "1350 ppm".into()),
+                ("Noise · Office".into(), "44 dB".into()),
+            ]
+        );
+        assert!(netatmo_weather_extra_metrics(&[sensor.clone()], &["indoor-1".into()]).is_empty());
+        assert!(netatmo_weather_extra_metrics(&[NetatmoSensor { reachable: false, ..sensor.clone() }], &[]).is_empty());
+        assert!(netatmo_weather_extra_metrics(&[NetatmoSensor {
+            co2_ppm: Some(f64::NAN), noise_db: None, ..sensor.clone()
+        }], &[]).is_empty());
+        let rain = NetatmoSensor {
+            id: "rain".into(), name: "Garden".into(), is_outdoor: false,
+            temperature_c: None, humidity_percent: None, co2_ppm: None,
+            pressure_hpa: None, noise_db: None, rain_mm: Some(1.25),
+            wind_kmh: None, reachable: true,
+        };
+        assert_eq!(
+            netatmo_weather_extra_metrics(&[rain], &[]),
+            vec![("Rain · Garden".into(), "1.2 mm".into())],
+        );
+    }
+
+    #[test]
     fn netatmo_outdoor_override_uses_only_live_outdoor_temperature() {
         let sensor = NetatmoSensor {
             id: "outdoor-1".into(),
