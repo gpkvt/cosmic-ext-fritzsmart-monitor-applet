@@ -10,6 +10,8 @@
 
 ### Improved
 
+- Reduce the weather photograph and its unified four-column table area by about 25% without restoring an internal table scrollbar. Preserve dynamic height growth for additional OpenWeatherMap and Netatmo readings.
+
 - Show current values and native units in each collapsed Netatmo device **graph heading**, including temperature, humidity, CO₂, pressure, noise, rain and wind. Restore the device rows from PR #859; offline and invalid graph values appear as unavailable.
 
 - Allow a configurable Prometheus exporter bind address (`IP:port`), including loopback, specific LAN interfaces and wildcard listeners. Preserve disabled-by-default, loopback-default behavior; validate the address, rebind without restarting and document unauthenticated network access risks.
