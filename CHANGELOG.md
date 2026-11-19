@@ -1,5 +1,7 @@
 # Changelog
 
+- Make compact power, temperature, and bandwidth graphs use the full available popup width; place device readings below their graphs rather than beside them, and adjust compact SVG proportions for the wider layout.
+
 - Align the Total Power Input & Output title copy button to the far right of its header, keeping the expandable summary and disclosure control intact.
 
 - Remove obsolete `input_low`/`input_high` local bindings after consolidating the Total Power Input & Output metric rows, eliminating release-build unused-variable warnings.
