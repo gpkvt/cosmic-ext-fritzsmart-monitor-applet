@@ -118,7 +118,7 @@ scrape_configs:
 
 When Prometheus runs in Docker or on another machine, `127.0.0.1` refers to that service, not the desktop applet. Use a controlled local forwarding/reverse proxy with authentication rather than binding the exporter to the LAN. Prometheus stores historical samples itself; this endpoint exports the most recent applet readings, not the applet's full saved history.
 
-**Optional Netatmo weather details:** Under **Settings → Weather**, enable **Show additional Netatmo weather readings** to add live CO₂/air-quality (ppm), sound level (dB), and rainfall (mm) to the Weather details, each labeled with its Netatmo module. It is off by default; only visible, reachable modules contribute, and humidity, wind and pressure are not duplicated from OpenWeatherMap.
+**Optional Netatmo weather details:** Under **Settings → Weather**, enable **Show additional Netatmo weather readings** to add CO₂-based air quality (Good / Moderate / Elevated / Very high, with measured ppm), sound level (dB), and rainfall (mm) to the Weather details, each labeled with its Netatmo module. It is off by default; only visible, reachable modules contribute, and humidity, wind and pressure are not duplicated from OpenWeatherMap.
 
 **CO₂ notifications:** In **Settings → Devices**, a Netatmo module with CO₂ measurements exposes a toggle and an adjustable high threshold (600–5,000 ppm; default 1,200 ppm). Alerts are disabled by default, notify only when a valid reading rises from safe to above the limit, and re-arm after returning to the safe range. Missing or stale readings do not notify. Threshold changes reset the alarm baseline.
 
