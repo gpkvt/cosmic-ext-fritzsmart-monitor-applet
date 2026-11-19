@@ -1,6 +1,7 @@
 # Explicit exceptions for transitive dependencies pinned by the current
-# libcosmic/desktop stack. Keep these IDs specific: new advisories must still
-# fail the security workflow and every exception should be reviewed on updates.
+# libcosmic/desktop stack. Keep these IDs specific. The repository no
+# longer runs security CI, so review this allow-list manually with
+# `cargo audit --deny warnings` and track unresolved risks in issue #270.
 [advisories]
 ignore = [
     # Unmaintained upstream crates with no fixed release in the RustSec database.
