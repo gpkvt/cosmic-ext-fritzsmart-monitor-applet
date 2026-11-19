@@ -229,7 +229,10 @@ impl Default for FritzSettings {
             hidden_panel_items: Vec::new(),
             panel_order: default_panel_order(),
             device_order: Vec::new(),
-            collapsed_menu_sections: vec!["internet-bandwidth".into(), "daily-energy-history".into()],
+            collapsed_menu_sections: vec![
+                "internet-bandwidth".into(),
+                "daily-energy-history".into(),
+            ],
             daily_energy_history_default_applied: true,
             expanded_devices: Vec::new(),
             quick_options_expanded: false,
@@ -592,7 +595,9 @@ impl FritzSettings {
                 };
                 let default_applied = get("DAILY_ENERGY_HISTORY_DEFAULT_APPLIED")
                     .eq_ignore_ascii_case("true");
-                if !default_applied && !sections.iter().any(|section| section == "daily-energy-history") {
+                if !default_applied
+                    && !sections.iter().any(|section| section == "daily-energy-history")
+                {
                     sections.push("daily-energy-history".into());
                 }
                 sections
@@ -771,7 +776,11 @@ impl FritzSettings {
             panel_order,
             device_order,
             collapsed_menu_sections,
-            if self.daily_energy_history_default_applied { "true" } else { "false" },
+            if self.daily_energy_history_default_applied {
+                "true"
+            } else {
+                "false"
+            },
             expanded_devices,
             if self.quick_options_expanded {
                 "true"
