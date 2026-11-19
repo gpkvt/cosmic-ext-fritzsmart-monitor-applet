@@ -182,6 +182,7 @@ pub enum Message {
     RemoveDevice(String),
     DeviceSearchChanged(String),
     ToggleDevice(String, bool),
+    ToggleHueDeviceVisible(String, bool),
     MoveDevice(String, bool),
     SortDeviceList(&'static str),
     ToggleDeviceInput(String, bool),
@@ -2819,8 +2820,55 @@ fn compare_optional_device_values(
     }
 }
 
+fn hue_device_id(kind: &str, id: &str) -> String {
+    format!("hue-{kind}-{id}")
+}
+
 fn hue_device_list_key(kind: &str, id: &str) -> String {
-    format!("2-hue-{kind}-{id}")
+    format!("2-{}", hue_device_id(kind, id))
+}
+
+fn hue_device_is_visible(hidden: &[String], id: &str) -> bool {
+    let key = crate::fritz::canonical_device_key(id);
+    !hidden
+        .iter()
+        .any(|item| crate::fritz::canonical_device_key(item) == key)
+}
+
+enum SettingsDeviceEntry<'a> {
+    Metered(&'a FritzDevice),
+    HueLight(&'a HueLight),
+    HueSensor(&'a HueSensor),
+}
+
+impl SettingsDeviceEntry<'_> {
+    fn device_id(&self) -> String {
+        match self {
+            Self::Metered(device) => device.ain.clone(),
+            Self::HueLight(light) => hue_device_id("light", &light.id),
+            Self::HueSensor(sensor) => hue_device_id("sensor", &sensor.id),
+        }
+    }
+
+    fn matches_search(&self, query: &str) -> bool {
+        let query = query.trim().to_lowercase();
+        if query.is_empty() {
+            return true;
+        }
+        match self {
+            Self::Metered(device) => device_matches_search(device, &query),
+            Self::HueLight(light) => {
+                light.name.to_lowercase().contains(&query)
+                    || light.id.to_lowercase().contains(&query)
+                    || "hue light".contains(&query)
+            }
+            Self::HueSensor(sensor) => {
+                sensor.name.to_lowercase().contains(&query)
+                    || sensor.id.to_lowercase().contains(&query)
+                    || "hue sensor motion temperature lux".contains(&query)
+            }
+        }
+    }
 }
 
 /// Apply live name/power/temperature sorting without overwriting custom device order.
@@ -7589,7 +7637,10 @@ impl cosmic::Application for AppModel {
                 // Hue lights are independently refreshed, switchable devices, but
                 // do not publish measured watts or device temperatures.
                 for light in &self.hue_lights {
-                    let device_key = format!("hue-light-{}", light.id);
+                    let device_key = hue_device_id("light", &light.id);
+                    if !hue_device_is_visible(&self.settings.hidden_hue_devices, &device_key) {
+                        continue;
+                    }
                     let row_key = hue_device_list_key("light", &light.id);
                     let expanded = is_device_expanded(&self.expanded_devices, &device_key);
                     let toggle: cosmic::Element<'_, Message> = if light.reachable
@@ -7682,7 +7733,10 @@ impl cosmic::Application for AppModel {
                 // Hue motion sensors share the same device-list columns. Lux
                 // uses the spare history column, not a fabricated power graph.
                 for sensor in &self.hue_sensors {
-                    let device_key = format!("hue-sensor-{}", sensor.id);
+                    let device_key = hue_device_id("sensor", &sensor.id);
+                    if !hue_device_is_visible(&self.settings.hidden_hue_devices, &device_key) {
+                        continue;
+                    }
                     let row_key = hue_device_list_key("sensor", &sensor.id);
                     let expanded = is_device_expanded(&self.expanded_devices, &device_key);
                     let temperature = sensor
@@ -7924,7 +7978,14 @@ impl cosmic::Application for AppModel {
                                     descending,
                                 )
                                 .then_with(|| left_name.cmp(right_name)),
-                                _ => std::cmp::Ordering::Equal,
+                                _ => device_order_position(
+                                    &self.settings.device_order,
+                                    left.strip_prefix("2-").unwrap_or(left),
+                                )
+                                .cmp(&device_order_position(
+                                    &self.settings.device_order,
+                                    right.strip_prefix("2-").unwrap_or(right),
+                                )),
                             }
                         })
                 });
@@ -9497,10 +9558,13 @@ impl cosmic::Application for AppModel {
                 self.schedule_settings_save();
             }
             Message::MoveDevice(ain, move_up) => {
+                // One saved ordering for FRITZ!Box, Tasmota and Hue.
                 let mut order: Vec<String> = self
                     .devices
                     .iter()
                     .map(|device| device.ain.clone())
+                    .chain(self.hue_lights.iter().map(|light| hue_device_id("light", &light.id)))
+                    .chain(self.hue_sensors.iter().map(|sensor| hue_device_id("sensor", &sensor.id)))
                     .collect();
                 order.sort_by_key(|device_ain| {
                     device_order_position(&self.settings.device_order, device_ain)
@@ -10323,9 +10387,23 @@ impl cosmic::Application for AppModel {
                     format!("Device discovery started against {}.", self.settings.url),
                 );
                 self.settings_status = Some("Connecting and loading devices…".into());
-                return Task::perform(discover_devices(settings), |result| {
+                let mut tasks = vec![Task::perform(discover_devices(settings), |result| {
                     cosmic::Action::App(Message::DevicesLoaded(result))
-                });
+                })];
+                if !self.hue_loading
+                    && !self.settings.hue_bridge_ip.trim().is_empty()
+                    && !self.settings.hue_application_key.trim().is_empty()
+                {
+                    self.hue_loading = true;
+                    tasks.push(Task::perform(
+                        crate::hue::fetch_snapshot(
+                            self.settings.hue_bridge_ip.clone(),
+                            self.settings.hue_application_key.clone(),
+                        ),
+                        |result| cosmic::Action::App(Message::HueSnapshotLoaded(result)),
+                    ));
+                }
+                return Task::batch(tasks);
             }
             Message::DeviceSearchChanged(value) => {
                 self.device_search = value;
@@ -10529,6 +10607,24 @@ impl cosmic::Application for AppModel {
                     &mut self.diagnostic_events,
                     format!("Device removed from saved inventory by user: {ain}."),
                 );
+            }
+            Message::ToggleHueDeviceVisible(id, visible) => {
+                let known = self.hue_lights.iter().any(|light| {
+                    hue_device_id("light", &light.id) == id
+                }) || self.hue_sensors.iter().any(|sensor| {
+                    hue_device_id("sensor", &sensor.id) == id
+                });
+                if !known {
+                    return Task::none();
+                }
+                self.settings.hidden_hue_devices.retain(|hidden| {
+                    crate::fritz::canonical_device_key(hidden)
+                        != crate::fritz::canonical_device_key(&id)
+                });
+                if !visible {
+                    self.settings.hidden_hue_devices.push(id);
+                }
+                self.persist_settings();
             }
             Message::ToggleDevice(ain, selected) => {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
@@ -10834,6 +10930,18 @@ mod history_tests {
             hue_device_list_key("sensor", "00112233-4455-6677-8899-aabbccddeeff"),
             "2-hue-sensor-00112233-4455-6677-8899-aabbccddeeff"
         );
+    }
+
+    #[test]
+    fn hue_visibility_is_scoped_to_each_resource_and_defaults_to_shown() {
+        let light = hue_device_id("light", "00112233-4455-6677-8899-aabbccddeeff");
+        let sensor = hue_device_id("sensor", "00112233-4455-6677-8899-aabbccddeeff");
+        let hidden = vec![light.clone()];
+        assert!(!hue_device_is_visible(&hidden, &light));
+        assert!(hue_device_is_visible(&hidden, &sensor));
+        assert!(hue_device_is_visible(&[], &light));
+        assert_eq!(hue_device_list_key("light", "00112233-4455-6677-8899-aabbccddeeff"),
+            format!("2-{light}"));
     }
 
     #[test]
