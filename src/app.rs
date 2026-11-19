@@ -59,6 +59,7 @@ pub struct AppModel {
     hue_pending: HashSet<String>,
     hue_next_refresh_at: Option<Instant>,
     netatmo_sensors: Vec<NetatmoSensor>,
+    netatmo_history: crate::netatmo::NetatmoHistory,
     netatmo_error: Option<String>,
     netatmo_loading: bool,
     netatmo_next_refresh_at: Option<Instant>,
@@ -4285,6 +4286,7 @@ impl cosmic::Application for AppModel {
         let history_storage_window = graph_history_storage_window(settings.graph_timespan_minutes);
         let (mut history, device_history) = crate::history::load(history_storage_window);
         let hue_sensor_history = crate::history::load_hue_sensors(history_storage_window);
+        let netatmo_history = crate::netatmo::load_history(history_storage_window);
         crate::diagnostics::debug(format!(
             "saved history restored (power samples: {}, metered devices: {}, Hue sensors: {})",
             history.len(),
@@ -4393,6 +4395,7 @@ impl cosmic::Application for AppModel {
                 history,
                 device_history,
                 hue_sensor_history,
+                netatmo_history,
                 history_storage_diagnostics,
                 collapsed_menu_sections,
                 expanded_devices,
@@ -10711,6 +10714,7 @@ impl cosmic::Application for AppModel {
                         graph_history_storage_window(self.settings.graph_timespan_minutes);
                     (self.history, self.device_history) = crate::history::load(storage_window);
                     self.hue_sensor_history = crate::history::load_hue_sensors(storage_window);
+                self.netatmo_history = crate::netatmo::load_history(storage_window);
                     let window = graph_history_window(self.settings.graph_timespan_minutes);
                     let now = Instant::now();
                     self.history
@@ -11134,7 +11138,10 @@ impl cosmic::Application for AppModel {
                         }
                         match snapshot.stations {
                             Ok(sensors) => {
+                                let window = graph_history_storage_window(self.settings.graph_timespan_minutes);
+                                let now = Instant::now();
                                 for sensor in &sensors {
+                                    crate::netatmo::record_history(&mut self.netatmo_history, sensor, now, window);
                                     let key = crate::fritz::normalize_ain_for_selection(
                                         &format!("NETATMO:{}", sensor.id));
                                     if let Some(thresholds) =
@@ -11162,6 +11169,9 @@ impl cosmic::Application for AppModel {
                                     } else {
                                         self.temperature_alert_state.remove(&key);
                                     }
+                                }
+                                if let Err(error) = crate::netatmo::save_history(&self.netatmo_history) {
+                                    eprintln!("Could not save Netatmo sensor history: {error}");
                                 }
                                 self.netatmo_sensors = sensors;
                                 self.netatmo_error = None;
@@ -11573,6 +11583,7 @@ impl cosmic::Application for AppModel {
                     graph_history_storage_window(self.settings.graph_timespan_minutes);
                 (self.history, self.device_history) = crate::history::load(storage_window);
                 self.hue_sensor_history = crate::history::load_hue_sensors(storage_window);
+                self.netatmo_history = crate::netatmo::load_history(storage_window);
                 let window = graph_history_window(self.settings.graph_timespan_minutes);
                 let now = Instant::now();
                 self.history
