@@ -1373,7 +1373,10 @@ fn parse_devices_xml(xml: &str) -> Result<Vec<FritzDevice>, String> {
             .is_some();
         let has_temperature = child_text(node, "temperature", "celsius")
             .and_then(|value| value.parse::<i64>().ok())
-            .is_some();
+            .is_some()
+            || child_text(node, "hkr", "tist")
+                .and_then(|value| value.parse::<u16>().ok())
+                .is_some_and(|value| (16..=56).contains(&value));
         let has_switch = node.children().any(|child| child.has_tag_name("switch") || child.has_tag_name("simpleonoff"));
         let has_thermostat = node.children().any(|child| child.has_tag_name("hkr"));
         if !has_power_meter && !has_temperature && !has_switch && !has_thermostat {
@@ -1406,7 +1409,9 @@ fn parse_device_reading(device: Node<'_, '_>) -> Result<FritzReading, String> {
         .attribute("identifier")
         .ok_or_else(|| "Device is missing an identifier".to_string())?;
     let power_mw = child_text(device, "powermeter", "power")
-        .and_then(|power| power.parse::<i64>().ok());
+        .map(|power| power.parse::<i64>()
+            .map_err(|_| format!("Device {ain} returned an invalid power measurement")))
+        .transpose()?;
     let temperature_c = child_text(device, "temperature", "celsius")
         .and_then(|celsius| celsius.parse::<i64>().ok())
         .map(|celsius| celsius as f64 / 10.0)
@@ -2263,6 +2268,7 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
                         ain: reading.id,
                         name: reading.name,
                         power_w: reading.power_w,
+                        has_power_meter: true,
                         // NaN is an internal "not supported" sentinel. All
                         // temperature aggregation and presentation must filter it.
                         temperature_c: f64::NAN,
