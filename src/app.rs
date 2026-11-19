@@ -1336,8 +1336,8 @@ fn daily_energy_history_section(
         .push(widget::text::body("DAILY ENERGY · LAST 7 DAYS"))
         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
     if collapsed {
-        heading_content = heading_content
-            .push(widget::text::body(format!("Today · {today_percentage}")));
+        heading_content =
+            heading_content.push(widget::text::body(format!("Today · {today_percentage}")));
     }
     let heading = widget::button::custom(
         heading_content.push(
@@ -12758,9 +12758,18 @@ mod daily_energy_history_tests {
 
     #[test]
     fn daily_energy_percentages_match_overview_and_preserve_unavailable_values() {
-        assert_eq!(format_daily_energy_percentage(Some(250.0), Some(500.0)), "50.0%");
-        assert_eq!(format_daily_energy_percentage(Some(750.0), Some(500.0)), "150.0%");
-        assert_eq!(format_daily_energy_percentage(Some(0.0), Some(200.0)), "0.0%");
+        assert_eq!(
+            format_daily_energy_percentage(Some(250.0), Some(500.0)),
+            "50.0%"
+        );
+        assert_eq!(
+            format_daily_energy_percentage(Some(750.0), Some(500.0)),
+            "150.0%"
+        );
+        assert_eq!(
+            format_daily_energy_percentage(Some(0.0), Some(200.0)),
+            "0.0%"
+        );
         assert_eq!(format_daily_energy_percentage(None, Some(200.0)), "—");
         assert_eq!(format_daily_energy_percentage(Some(100.0), None), "—");
         assert_eq!(format_daily_energy_percentage(Some(100.0), Some(0.0)), "—");
