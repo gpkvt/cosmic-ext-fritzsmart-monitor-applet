@@ -5262,10 +5262,10 @@ impl cosmic::Application for AppModel {
                 content = content
                     .push(widget::text::body(crate::i18n::tr(
                         &self.settings.language,
-                        "Discover and select power-meter devices",
+                        "Manage connected devices",
                     )))
                     .push(widget::text::caption(
-                        "Searches the FRITZ!Box and the local network for compatible Tasmota devices. Both appear in the same list below.",
+                        "Discover FRITZ!Box and Tasmota power meters plus paired Hue lights and sensors. Devices are managed together.",
                     ))
                     .push(
                         widget::Row::new().width(cosmic::iced::Length::Fill)
@@ -5289,7 +5289,7 @@ impl cosmic::Application for AppModel {
                 ));
                 if self.devices_loading {
                     content = content.push(widget::text::caption(
-                        "Searching FRITZ!Box and scanning the local network for Tasmota devices…",
+                        "Searching FRITZ!Box, Tasmota and configured Hue Bridge…",
                     ));
                 }
                 if let Some(status) = &self.settings_status {
