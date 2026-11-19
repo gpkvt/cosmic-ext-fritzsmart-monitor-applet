@@ -1033,7 +1033,7 @@ fn menu_energy_summary(
         .spacing(2)
         .width(cosmic::iced::Length::Fixed(150.0))
         .push(value_row("CURRENT", current_power_w, "W"))
-        .push(value_row("YESTERDAY", yesterday_wh, "Wh"))
+        .push(value_row("Y'DAY", yesterday_wh, "Wh"))
         .push(value_row("TODAY", today_wh, "Wh"));
     widget::Row::new()
         .spacing(10)
@@ -1041,6 +1041,79 @@ fn menu_energy_summary(
         .width(cosmic::iced::Length::Fill)
         .push(graph)
         .push(values)
+        .into()
+}
+
+fn menu_power_flow_summary(
+    current_input_w: f64,
+    current_output_w: f64,
+    today_input_wh: Option<f64>,
+    today_output_wh: Option<f64>,
+    yesterday_input_wh: Option<f64>,
+    yesterday_output_wh: Option<f64>,
+) -> cosmic::Element<'static, Message> {
+    let power_display = |value: f64| {
+        if value.is_finite() {
+            format!("{value:.0} W")
+        } else {
+            "— W".to_string()
+        }
+    };
+    let energy_display = |value: Option<f64>| {
+        value
+            .filter(|value| value.is_finite())
+            .map(|value| format!("{value:.0} Wh"))
+            .unwrap_or_else(|| "— Wh".to_string())
+    };
+    let heading = widget::Row::new()
+        .spacing(8)
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+        .push(
+            widget::text::caption("IN")
+                .width(cosmic::iced::Length::Fixed(88.0))
+                .align_x(cosmic::iced::Alignment::End),
+        )
+        .push(
+            widget::text::caption("OUT")
+                .width(cosmic::iced::Length::Fixed(88.0))
+                .align_x(cosmic::iced::Alignment::End),
+        );
+    let value_row = |label: &'static str, input: String, output: String| {
+        widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::text::caption(label).width(cosmic::iced::Length::Fill))
+            .push(
+                widget::text::title3(keep_value_unit_together(input))
+                    .width(cosmic::iced::Length::Fixed(88.0))
+                    .align_x(cosmic::iced::Alignment::End),
+            )
+            .push(
+                widget::text::title3(keep_value_unit_together(output))
+                    .width(cosmic::iced::Length::Fixed(88.0))
+                    .align_x(cosmic::iced::Alignment::End),
+            )
+    };
+    widget::Column::new()
+        .spacing(2)
+        .width(cosmic::iced::Length::Fill)
+        .padding([4, 8])
+        .push(heading)
+        .push(value_row(
+            "NOW",
+            power_display(current_input_w),
+            power_display(current_output_w),
+        ))
+        .push(value_row(
+            "TODAY",
+            energy_display(today_input_wh),
+            energy_display(today_output_wh),
+        ))
+        .push(value_row(
+            "Y'DAY",
+            energy_display(yesterday_input_wh),
+            energy_display(yesterday_output_wh),
+        ))
         .into()
 }
 
@@ -2181,6 +2254,12 @@ struct LivePowerSummaryData {
     energy_flow: Option<cosmic::Element<'static, Message>>,
     input_history: GraphSamples,
     output_history: GraphSamples,
+    current_input_w: f64,
+    current_output_w: f64,
+    today_input_wh: Option<f64>,
+    today_output_wh: Option<f64>,
+    yesterday_input_wh: Option<f64>,
+    yesterday_output_wh: Option<f64>,
     graph_style: String,
     language: String,
     axis_start: String,
@@ -2192,6 +2271,12 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
         energy_flow,
         input_history,
         output_history,
+        current_input_w,
+        current_output_w,
+        today_input_wh,
+        today_output_wh,
+        yesterday_input_wh,
+        yesterday_output_wh,
         graph_style,
         language,
         axis_start,
@@ -2232,15 +2317,24 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
         let output_label = crate::i18n::tr(&language, "TOTAL POWER OUTPUT");
         let input_label = crate::i18n::tr(&language, "TOTAL POWER INPUT");
         let combined_title = format!("{output_label} & {input_label}");
-        content = content.push(interactive_combined_graph_with_axis(
-            &combined_title,
-            output_history,
-            input_history,
-            &graph_style,
-            "W",
-            axis_start,
-            (output_label, input_label),
-        ));
+        content = content
+            .push(interactive_combined_graph_with_axis(
+                &combined_title,
+                output_history,
+                input_history,
+                &graph_style,
+                "W",
+                axis_start,
+                (output_label, input_label),
+            ))
+            .push(menu_power_flow_summary(
+                current_input_w,
+                current_output_w,
+                today_input_wh,
+                today_output_wh,
+                yesterday_input_wh,
+                yesterday_output_wh,
+            ));
     }
     surface_card(content.into(), 14)
 }
@@ -6364,6 +6458,28 @@ impl cosmic::Application for AppModel {
                     self.flow_animation_frame,
                     &self.settings.language,
                 );
+                let (yesterday_input_wh, today_input_wh) =
+                    yesterday_and_today_energy_wh_for_ains(
+                        &self.device_history,
+                        &self.settings.input_ains,
+                        &self.settings.input_ains,
+                        self.settings.refresh_interval_seconds,
+                        true,
+                    );
+                let output_ains: HashSet<String> = self
+                    .device_history
+                    .keys()
+                    .filter(|ain| !self.settings.input_ains.contains(*ain))
+                    .cloned()
+                    .collect();
+                let (yesterday_output_wh, today_output_wh) =
+                    yesterday_and_today_energy_wh_for_ains(
+                        &self.device_history,
+                        &output_ains,
+                        &self.settings.input_ains,
+                        self.settings.refresh_interval_seconds,
+                        false,
+                    );
                 let summary_card = live_power_summary(LivePowerSummaryData {
                     energy_flow,
                     input_history: {
@@ -6380,6 +6496,18 @@ impl cosmic::Application for AppModel {
                         );
                         aligned_power_series(&self.history, &input).0
                     },
+                    current_input_w: input_display_power_w(input_power_w(
+                        &self.readings,
+                        &self.settings.input_ains,
+                    )) as f64,
+                    current_output_w: output_power_w(
+                        &self.readings,
+                        &self.settings.input_ains,
+                    ) as f64,
+                    today_input_wh,
+                    today_output_wh,
+                    yesterday_input_wh,
+                    yesterday_output_wh,
                     graph_style: self.settings.graph_style.clone(),
                     language: self.settings.language.clone(),
                     axis_start: format_graph_axis_start(
