@@ -2414,7 +2414,7 @@ fn total_power_overview(
         interactive_graph_with_axis(
             &settings.language,
             &crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-            output_values,
+            output_values.into_iter(),
             &settings.graph_style,
             "W",
             axis_start,
