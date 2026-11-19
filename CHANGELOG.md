@@ -1,5 +1,9 @@
 # Changelog
 
+### Fixed
+
+- Convert the total power overview section to a COSMIC element before wrapping it in the shared surface card, fixing the release build type mismatch.
+
 ### Changed
 
 - Combine total input and output power histories into one interactive graph with distinct series, while retaining independent input/output energy summaries and low/high metrics. Keep the live input/output readings visible in the collapsed heading.

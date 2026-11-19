@@ -2584,7 +2584,7 @@ fn total_power_overview(
     }
     Some(vec![(
         "3-total-power-overview".to_string(),
-        surface_card(section, 14),
+        surface_card(section.into(), 14),
     )])
 }
 
