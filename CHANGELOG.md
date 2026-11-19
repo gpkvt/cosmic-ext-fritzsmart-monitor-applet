@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Improved
+
+- Show an indicative CO₂-based air quality category (Good, Moderate, Elevated or Very high) alongside Netatmo ppm readings inside the expanded weather image area; omit readings when the sensor is hidden or stale. CO₂ is a ventilation indicator, not a complete air quality index.
+
+
 ### Added
 
 - Add an opt-in localhost-only Prometheus `/metrics` exporter for live FRITZ!Box, Tasmota, Hue, Netatmo, weather, router and WAN monitoring, with safe labels, unavailable-value handling and no network request per scrape.
