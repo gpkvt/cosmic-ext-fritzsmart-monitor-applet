@@ -1,7 +1,9 @@
 # Changelog
 
+- Prevent COSMIC/Wayland crashes caused by competing XDG popup surfaces: keep panel value hover tooltips in the existing widget surface instead of creating secondary Wayland tooltip popups. Preserve click-only menu opening and outside-click dismissal.
+
 - Hide solar/input options and live/daily input values when no device is configured as an input; show output-only summaries, graphs, and daily energy instead. Keep the Input-device setting discoverable and preserve input UI when a configured device is offline.
-- Add native COSMIC tooltips scoped to individual panel values, showing device names, summed power contributors or average temperature without opening the applet menu on hover.
+- Add COSMIC tooltips scoped to individual panel values, showing device names, summed power contributors or average temperature without opening the applet menu on hover.
 
 - Show per-day solar input/grid use percentages in Daily Energy · Last 7 Days, and display today's percentage in its collapsed heading; missing/zero-denominator ratios remain unavailable, never silently 0%.
 
