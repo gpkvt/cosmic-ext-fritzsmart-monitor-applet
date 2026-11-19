@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.0.46 — 2026-11-19
+
+### Documentation
+
+- Document the **user-confirmed resolution** of the COSMIC Panel applet disappearing just after live readings appeared. The correction was first installed and confirmed in **v2.0.45**, and is now explained in the README and website guide.
+- Describe why `X-CosmicHoverPopup` must be **absent**, not set to `Auto`, `false` or another value: COSMIC Panel treats the key's presence as an opt-in to synthetic pointer clicks on hover. Record the complementary shrink-wrapped multiline panel layout fix.
+- Add installation and verification instructions for the packaged desktop entry, including the distinction between user-local and system-wide copies and a small privacy-conscious troubleshooting command.
+
+### Release
+
+- Document-only patch release using the existing automated stable Linux release pipeline (portable archive, Debian package, AppImage, Flatpak and SHA256 sums), followed by Pages publication.
+
+## Previously delivered changes
+
 - Fix unexpected hover-triggered menu actions in COSMIC Panel: remove `X-CosmicHoverPopup` from the installed desktop entry (COSMIC synthesizes pointer clicks whenever this key is present), keep the menu click-only and add a packaging CI regression check. Shrink-wrap every multiline panel item instead of requesting nested `Fill` widths during live device refreshes, preventing conflicting autosize constraints.
 
 - Add an independent syslog watchdog for disappearing panel items: sample process liveness, UI update count and panel view count every five seconds during startup, then once per minute. The watchdog remains active if the COSMIC event loop stalls, helping distinguish UI deadlock, surface invisibility and process termination without logging device identities.
