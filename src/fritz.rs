@@ -2699,8 +2699,7 @@ mod tests {
                 "devices",
                 "summary",
                 "weather",
-                "total-power-output",
-                "total-power-input"
+                "total-power-output"
             ]
             .into_iter()
             .map(str::to_string)
