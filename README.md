@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/latest"><img src="https://img.shields.io/github/v/release/gpkvt/cosmic-ext-fritzsmart-monitor-applet?label=release" alt="Latest GitHub release"></a>
-  <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/actions"><img src="https://img.shields.io/badge/GitHub_Actions-disabled-6b7280" alt="GitHub Actions workflows currently disabled"></a>
+  <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/actions/workflows/gh-pages.yml"><img src="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/actions/workflows/gh-pages.yml/badge.svg" alt="Manual GitHub Pages publication workflow status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/gpkvt/cosmic-ext-fritzsmart-monitor-applet" alt="MIT license"></a>
 </p>
 
@@ -153,7 +153,15 @@ make install UPDATE=0     # Local install without git pull
 make uninstall            # Remove source-installed user files
 ```
 
-**CI status:** GitHub Actions workflow files were intentionally removed; the badge above denotes **disabled**, not passing checks. Releases and Pages are not currently auto-published by repository Actions. Run `make check` locally before opening a PR. Historical workflow results are not current CI evidence.
+**Automation status:** GitHub Pages has a **manual-only** publishing workflow; its badge reports the last run, not continuous testing. No push/schedule-triggered CI or release workflow is enabled. Run `make check` locally before opening a PR.
+
+To publish the website, open **Actions → Publish GitHub Pages → Run workflow** on `main`, or run:
+
+```bash
+make publish-pages
+```
+
+The workflow builds `docs/` from the repository README and security policy, validates links and assets, and publishes to the `gh-pages` branch. GitHub Pages must be configured under **Settings → Pages** to deploy from **gh-pages / (root)**. Publishing is intentionally not triggered by regular pushes. The workflow updates the site only when explicitly dispatched.
 
 See [CHANGELOG.md](CHANGELOG.md) for changes, [SECURITY.md](SECURITY.md) for vulnerability reporting, and [Issues](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues) for bugs and feature requests. When reporting a bug, include the applet version, COSMIC version, FRITZ!OS version (if relevant) and redacted diagnostics.
 
