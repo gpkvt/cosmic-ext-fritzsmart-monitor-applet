@@ -30,7 +30,7 @@ FRITZ!Power Monitor is an independent, native [COSMIC](https://system76.com/cosm
 - **Live power at a glance.** Independent input and output readings (W), device-level graphs and estimated daily energy (Wh). Input power is *not* subtracted from output power.
 - **One device list.** Search, reorder, hide, expand and sort connected devices; switch compatible FRITZ!Box, Tasmota and Hue lights.
 - **Useful histories.** Collapsible power and sensor graphs, selectable retention, seven-day energy summaries and temperature alerts.
-- **More than power.** Temperature from supported devices; Hue light level and motion; Netatmo humidity, CO₂, pressure, noise, rain and wind where supplied.
+- **More than power.** Temperature from supported devices; Hue light level and motion; Netatmo humidity, CO₂, pressure, noise, rain and wind where supplied. Optional CO₂ threshold notifications for Netatmo modules.
 - **COSMIC-native behavior.** Click-to-open panel popup, configurable panel metrics, scrollable details, saved disclosure states and accessible tooltips.
 - **Optional outdoor weather.** OpenWeatherMap conditions and forecast with credited Wikimedia Commons imagery; optional internet upload/download statistics.
 - **Independent connections.** An unavailable integration does not have to interrupt the others. Missing or offline sensor values are not presented as fresh measurements.
@@ -106,6 +106,8 @@ make install
 4. Optionally pair a local Hue Bridge, discover Tasmota devices, connect Netatmo or enable OpenWeatherMap. Each integration can be configured separately.
 
 The panel menu opens on **click**, not hover, and closes when clicked outside or toggled from the panel entry. No separate close button is required.
+
+**CO₂ notifications:** In **Settings → Devices**, a Netatmo module with CO₂ measurements exposes a toggle and an adjustable high threshold (600–5,000 ppm; default 1,200 ppm). Alerts are disabled by default, notify only when a valid reading rises from safe to above the limit, and re-arm after returning to the safe range. Missing or stale readings do not notify. Threshold changes reset the alarm baseline.
 
 **Outdoor temperature source:** In **Settings → Devices**, enable **Outdoor temperature source** on a Netatmo outdoor module (NAModule1) or a supported FRITZ!Box temperature device. Only one source can be active. The selected live value replaces the OpenWeatherMap temperature in the panel and Weather heading. If the source becomes unavailable, the OpenWeatherMap reading is used instead.
 
