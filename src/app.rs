@@ -7042,7 +7042,7 @@ impl cosmic::Application for AppModel {
                             .on_press(Message::ToggleDeviceDetails(device.ain.clone()))
                             .width(cosmic::iced::Length::Fill)
                             .padding([8, 12])
-                            .class(cosmic::theme::Button::ListItem(cosmic::iced::Border::default())),
+                            .class(cosmic::theme::Button::Text),
                         );
                     let device_row = if is_expanded {
                         device_row.add(widget::container(widget::text::caption(
