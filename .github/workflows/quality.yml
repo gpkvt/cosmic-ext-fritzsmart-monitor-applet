@@ -122,7 +122,8 @@ jobs:
       - name: Check shell syntax
         run: |
           bash -n packaging/build-linux-packages.sh
-          sh -n packaging/deb-postinst packaging/deb-prerm
+          sh -n packaging/deb-postinst
+          sh -n packaging/deb-prerm
 
       - name: Lint packaging scripts
         run: |
