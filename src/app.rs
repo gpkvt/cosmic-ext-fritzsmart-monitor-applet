@@ -9010,7 +9010,14 @@ impl cosmic::Application for AppModel {
             widget::Column::new()
                 .width(cosmic::iced::Length::Fill)
                 .height(cosmic::iced::Length::Fill)
-                .push(widget::container(sticky_header).padding([8, 12]))
+                .push(
+                    widget::container(sticky_header.push(icon_action_button(
+                        "window-close-symbolic",
+                        "Close menu",
+                        Message::TogglePopup,
+                    )))
+                    .padding([8, 12]),
+                )
                 .push(widget::divider::horizontal::default())
                 .push(scrollable_content)
         } else {
@@ -9056,6 +9063,11 @@ impl cosmic::Application for AppModel {
                         "⚙",
                         crate::i18n::tr(&self.settings.language, "Settings"),
                         Message::ToggleSettings,
+                    ))
+                    .push(icon_action_button(
+                        "window-close-symbolic",
+                        "Close menu",
+                        Message::TogglePopup,
                     )),
             )
             .padding([8, 12])
@@ -11330,6 +11342,10 @@ impl cosmic::Application for AppModel {
                     .max_width(720.0)
                     .min_width(720.0)
                     .max_height(max_height);
+                // A grabbed XDG popup is dismissed by the compositor when
+                // focus moves to another window. Leave it ungrabbed so only
+                // explicit panel/header clicks close the menu.
+                settings.grab = false;
                 return get_popup(settings);
             }
             Message::PopupClosed(id) => {
