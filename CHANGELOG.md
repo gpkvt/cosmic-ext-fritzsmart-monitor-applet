@@ -12,7 +12,7 @@
 ### Added
 
 - Add an opt-in localhost-only Prometheus `/metrics` exporter for live FRITZ!Box, Tasmota, Hue, Netatmo, weather, router and WAN monitoring, with safe labels, unavailable-value handling and no network request per scrape.
-- Keep the weather photograph confined to its fixed-height middle section, with the header above and a unified four-column OpenWeatherMap/Netatmo readings grid below. Keep Wikimedia Commons attribution beside the photo rather than overlaying its contents.
+- Keep the weather photograph confined to its fixed-height middle section, with the header above and a unified four-column OpenWeatherMap/Netatmo readings grid inside the photo. Additional readings scroll within the image; Wikimedia Commons attribution remains outside the image.
 
 
 ### Added
