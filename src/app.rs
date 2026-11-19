@@ -1962,43 +1962,6 @@ fn record_device_sample(
     }
 }
 
-fn graph_panel(content: cosmic::Element<'static, Message>) -> cosmic::Element<'static, Message> {
-    widget::container(
-        widget::container(content)
-            .padding(8)
-            .width(cosmic::iced::Length::Fill)
-            .style(|theme| {
-                let cosmic = theme.cosmic();
-                cosmic::iced::widget::container::Style {
-                    background: Some(
-                        cosmic::iced::Color::from(cosmic.background(false).base).into(),
-                    ),
-                    border: cosmic::iced::Border {
-                        radius: 8.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }
-            }),
-    )
-    .padding(1)
-    .width(cosmic::iced::Length::Fill)
-    .style(|theme| {
-        let cosmic = theme.cosmic();
-        cosmic::iced::widget::container::Style {
-            background: Some(
-                cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
-            ),
-            border: cosmic::iced::Border {
-                radius: 8.0.into(),
-                ..Default::default()
-            },
-            ..Default::default()
-        }
-    })
-    .into()
-}
-
 fn surface_card<'a>(
     content: cosmic::Element<'a, Message>,
     padding: u16,
