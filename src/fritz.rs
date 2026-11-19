@@ -267,7 +267,11 @@ fn parse_graph_timespan_minutes(value: &str) -> u32 {
 }
 
 fn parse_temperature_unit(value: &str) -> String {
-    if value.eq_ignore_ascii_case("F") { "F".into() } else { "C".into() }
+    if value.eq_ignore_ascii_case("F") {
+        "F".into()
+    } else {
+        "C".into()
+    }
 }
 
 fn parse_refresh_interval_seconds(value: &str) -> u32 {
@@ -359,9 +363,18 @@ fn parse_unique_known_ids(value: &str, allowed: &[&str]) -> Vec<String> {
 }
 
 fn parse_hidden_menu_elements(value: &str) -> Vec<String> {
-    let migrated = value.split(',').map(str::trim).map(|id| {
-        if id == "total-power-input" || id == "total-power" { "total-power-output" } else { id }
-    }).collect::<Vec<_>>().join(",");
+    let migrated = value
+        .split(',')
+        .map(str::trim)
+        .map(|id| {
+            if id == "total-power-input" || id == "total-power" {
+                "total-power-output"
+            } else {
+                id
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(",");
     parse_unique_known_ids(&migrated, &MENU_ELEMENT_IDS)
 }
 
@@ -750,7 +763,11 @@ impl FritzSettings {
             } else {
                 "line"
             },
-            if self.temperature_unit.eq_ignore_ascii_case("F") { "F" } else { "C" },
+            if self.temperature_unit.eq_ignore_ascii_case("F") {
+                "F"
+            } else {
+                "C"
+            },
             self.refresh_interval_seconds.clamp(30, 3600),
             temperature_alerts,
             if self.weather_enabled {
@@ -2109,7 +2126,10 @@ mod tests {
     fn internet_bandwidth_is_collapsed_by_default() {
         assert_eq!(
             FritzSettings::default().collapsed_menu_sections,
-            vec!["internet-bandwidth".to_string(), "daily-energy-history".to_string()]
+            vec![
+                "internet-bandwidth".to_string(),
+                "daily-energy-history".to_string()
+            ]
         );
     }
 
