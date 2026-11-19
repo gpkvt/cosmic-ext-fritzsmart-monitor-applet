@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Improved
+
+- Add a **Remove inactive devices** button in Settings → Devices. It is shown only for saved FRITZ!Box/Tasmota devices confirmed unreachable by a successful refresh, and removes those entries, selections and related preferences in one operation without touching active devices, Hue/Netatmo modules or historical graphs. Devices may be rediscovered later.
+
 ### Added
 
 - Restore manual GitHub Releases and Linux package workflows for checked semantic version bumps, Debian, AppImage, Flatpak and portable archive artifacts with SHA256 checksums. Release tags and source versions are published only after checks and packaging succeed.
