@@ -337,6 +337,36 @@ mod tests {
     }
 
     #[test]
+    fn exporter_keeps_meterless_devices_out_of_power_and_preserves_temperature() {
+        let settings = FritzSettings::default();
+        let readings = [
+            FritzReading {
+                ain: "meter1".into(), name: "Meter".into(), power_w: 42,
+                has_power_meter: true, temperature_c: 21.5,
+                power_state: Some(true), power_controllable: true,
+                power_toggle_allowed: true,
+            },
+            FritzReading {
+                ain: "sensor1".into(), name: "Room sensor".into(), power_w: 0,
+                has_power_meter: false, temperature_c: 19.7,
+                power_state: None, power_controllable: false,
+                power_toggle_allowed: false,
+            },
+        ];
+        let rendered = render(LiveData {
+            settings: &settings, devices: &readings,
+            hue_lights: &[], hue_sensors: &[], netatmo_sensors: &[],
+            weather: None, bandwidth: None, router: None,
+            fritz_error: false, hue_error: false,
+            netatmo_error: false, weather_error: false,
+        });
+        assert!(rendered.contains("fritz_monitor_output_power_watts 42\n"));
+        assert!(rendered.contains("fritz_monitor_device_temperature_celsius{source=\"fritzbox\",id=\"sensor1\",name=\"Room sensor\"} 19.7\n"));
+        assert!(!rendered.contains("fritz_monitor_device_power_watts{source=\"fritzbox\",id=\"sensor1\""));
+        assert!(rendered.contains("# TYPE fritz_monitor_device_temperature_celsius gauge"));
+    }
+
+    #[test]
     fn exporter_defaults_disabled_and_uses_localhost_only() {
         assert_eq!(PORT, 9817);
         assert!(ENDPOINT.starts_with("http://127.0.0.1:"));
