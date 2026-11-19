@@ -1,5 +1,7 @@
 # Changelog
 
+- Combine current (NOW) input and output readings with their LOW/HIGH metrics into two three-column rows, matching the daily energy grid and keeping current power at the bottom of the section.
+
 - Unify the Total Power Input & Output large-value layout: daily IN/OUT/percentage values first, input/output LOW/HIGH in the same visual style, and larger NOW readings last at the bottom without nested metric cards.
 
 - Add a standalone Cargo release-build workflow for Rust changes, pull requests and manual runs, verifying the binary and retaining a short-lived build artifact.
