@@ -2527,17 +2527,20 @@ fn total_power_overview(
             ))
             .align_x(cosmic::iced::Alignment::End),
         );
+    let collapsed_summary_element: cosmic::Element<'static, Message> = if collapsed {
+        collapsed_summary.into()
+    } else {
+        widget::Space::new()
+            .width(cosmic::iced::Length::Shrink)
+            .into()
+    };
     let heading = widget::button::custom(
         widget::Row::new()
             .spacing(8)
             .align_y(cosmic::iced::Alignment::Center)
             .push(widget::text::caption("TOTAL POWER INPUT & OUTPUT"))
             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-            .push(if collapsed {
-                collapsed_summary.into()
-            } else {
-                widget::Space::new().width(cosmic::iced::Length::Shrink).into()
-            })
+            .push(collapsed_summary_element)
             .push(
                 widget::icon::from_name(if collapsed {
                     "go-next-symbolic"
