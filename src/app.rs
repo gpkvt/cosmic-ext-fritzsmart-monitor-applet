@@ -9640,6 +9640,13 @@ impl cosmic::Application for AppModel {
             Message::ToggleSettingsSection(section) => {
                 self.active_settings_section = Some(section);
                 self.persist_layout_state();
+                if section == "connection" && !self.hue_discovering {
+                    self.hue_discovering = true;
+                    self.hue_discovery_note = None;
+                    return Task::perform(crate::hue::discover_bridges(), |result| {
+                        cosmic::Action::App(Message::HueBridgesDiscovered(result))
+                    });
+                }
                 if section == "diagnostics" {
                     record_diagnostic_event(
                         &mut self.diagnostic_events,
@@ -9681,10 +9688,68 @@ impl cosmic::Application for AppModel {
                 self.persist_settings();
             }
             Message::HueBridgeIpChanged(value) => {
+                if self.hue_pairing {
+                    return Task::none();
+                }
+                if self.settings.hue_bridge_ip != value {
+                    // A Hue application key is bound to one physical bridge.
+                    self.settings.hue_application_key.clear();
+                    self.hue_lights.clear();
+                    self.hue_next_refresh_at = None;
+                }
                 self.settings.hue_bridge_ip = value;
-                self.hue_lights.clear();
                 self.hue_error = None;
-                self.hue_next_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::DiscoverHueBridges => {
+                if self.hue_discovering {
+                    return Task::none();
+                }
+                self.hue_discovering = true;
+                self.hue_discovery_note = None;
+                return Task::perform(crate::hue::discover_bridges(), |result| {
+                    cosmic::Action::App(Message::HueBridgesDiscovered(result))
+                });
+            }
+            Message::HueBridgesDiscovered(result) => {
+                self.hue_discovering = false;
+                match result {
+                    Ok(bridges) => {
+                        self.hue_discovery_note = Some(if bridges.is_empty() {
+                            "No Hue Bridge advertised itself via mDNS. Check the same local network, multicast DNS and the bridge's network connection; you can still enter an IP manually.".into()
+                        } else if bridges.len() == 1 {
+                            format!("Hue Bridge found at {}.", bridges[0])
+                        } else {
+                            format!("{} Hue Bridges found. Select the correct one.", bridges.len())
+                        });
+                        if self.settings.hue_bridge_ip.trim().is_empty() && bridges.len() == 1 {
+                            self.settings.hue_bridge_ip = bridges[0].clone();
+                            self.persist_settings();
+                        }
+                        self.hue_bridges = bridges;
+                    }
+                    Err(error) => {
+                        self.hue_bridges.clear();
+                        self.hue_discovery_note = Some(format!(
+                            "Hue discovery failed: {error}. Enter the bridge IP manually if needed."
+                        ));
+                    }
+                }
+            }
+            Message::UseHueBridge(ip) => {
+                if self.hue_pairing || !self.hue_bridges.contains(&ip) {
+                    return Task::none();
+                }
+                if self.settings.hue_bridge_ip != ip {
+                    self.settings.hue_application_key.clear();
+                    self.hue_lights.clear();
+                    self.hue_next_refresh_at = None;
+                }
+                self.settings.hue_bridge_ip = ip.clone();
+                self.hue_error = None;
+                self.hue_discovery_note = Some(format!(
+                    "Using Hue Bridge {ip}. Press its physical link button and select Pair Hue Bridge."
+                ));
                 self.persist_settings();
             }
             Message::HueApplicationKeyChanged(value) => {
@@ -9698,8 +9763,22 @@ impl cosmic::Application for AppModel {
                 if self.hue_pairing {
                     return Task::none();
                 }
+                if self.settings.hue_bridge_ip.trim().is_empty() {
+                    if self.hue_bridges.len() == 1 {
+                        self.settings.hue_bridge_ip = self.hue_bridges[0].clone();
+                        self.persist_settings();
+                    } else {
+                        self.hue_error = Some(
+                            "Choose a discovered Hue Bridge or enter its local IP address before pairing.".into()
+                        );
+                        return Task::none();
+                    }
+                }
                 self.hue_pairing = true;
                 self.hue_error = None;
+                self.hue_discovery_note = Some(
+                    "Pairing for up to 30 seconds. Press the physical link button on the Hue Bridge now.".into()
+                );
                 return Task::perform(
                     crate::hue::pair(self.settings.hue_bridge_ip.clone()),
                     |result| cosmic::Action::App(Message::HueBridgePaired(result)),
@@ -9715,6 +9794,9 @@ impl cosmic::Application for AppModel {
                         self.hue_loading = true;
                         self.hue_next_refresh_at = None;
                         self.hue_error = None;
+                        self.hue_discovery_note = Some(
+                            "Hue Bridge paired successfully. Loading lights…".into()
+                        );
                         return Task::perform(
                             crate::hue::fetch_lights(
                                 self.settings.hue_bridge_ip.clone(),
