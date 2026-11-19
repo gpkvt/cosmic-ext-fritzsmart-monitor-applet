@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Render symbolic toolbar icons as actual COSMIC icons instead of their literal identifier text; the close-menu action no longer appears as a truncated `win-` button. Use the native settings icon alongside it.
+- Make repository publishing helper commands fail early with clear guidance while their GitHub Actions workflow files are intentionally absent.
+
+### Changed
+
+- Stop Dependabot from proposing GitHub Actions dependency updates when the repository has no workflows.
+- Correct documentation about independent input/output power, CodeQL's separately managed default setup, the Hue Bridge's distinct TLS limitations and manual RustSec auditing. Track unresolved upstream COSMIC/Iced advisories in issue #270 without claiming they are fixed.
+
 All notable changes to FRITZ!Power Monitor are recorded below. See [GitHub Releases](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases) for published versions.
 
 ## v3.0.1 — 2026-11-19
