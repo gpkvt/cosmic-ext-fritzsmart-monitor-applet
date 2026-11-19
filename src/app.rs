@@ -448,12 +448,12 @@ fn newly_missing_devices(
 ) -> Vec<String> {
     let current: HashSet<String> = missing_devices
         .iter()
-        .map(|(ain, _)| crate::fritz::normalize_ain_for_selection(ain))
+        .map(|(ain, _)| crate::fritz::canonical_device_key(ain))
         .collect();
     let newly_missing = missing_devices
         .iter()
         .filter(|(ain, _)| {
-            let key = crate::fritz::normalize_ain_for_selection(ain);
+            let key = crate::fritz::canonical_device_key(ain);
             !previously_missing.contains(&key) && !suppressed_ains.contains(&key)
         })
         .map(|(_, name)| name.clone())
@@ -523,7 +523,7 @@ fn recovered_device_names(
         .iter()
         .filter(|reading| {
             previously_missing
-                .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+                .contains(&crate::fritz::canonical_device_key(&reading.ain))
         })
         .map(|reading| reading.name.clone())
         .collect()
