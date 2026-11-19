@@ -266,7 +266,10 @@ mod tests {
 
     #[test]
     fn accepts_only_local_bridge_ips() {
-        assert_eq!(bridge_origin("192.168.42.12").unwrap(), "https://192.168.42.12");
+        assert_eq!(
+            bridge_origin("192.168.42.12").unwrap(),
+            "https://192.168.42.12"
+        );
         assert_eq!(bridge_origin("fd00::12").unwrap(), "https://[fd00::12]");
         assert!(bridge_origin("8.8.8.8").is_err());
         assert!(bridge_origin("https://192.168.42.12").is_err());
@@ -279,7 +282,9 @@ mod tests {
             parse_pairing(&json!([{"success": {"username": "local-key"}}])).unwrap(),
             "local-key"
         );
-        assert!(parse_pairing(&json!([{"error": {"description": "link button not pressed"}}])).is_err());
+        assert!(
+            parse_pairing(&json!([{"error": {"description": "link button not pressed"}}])).is_err()
+        );
     }
 
     #[test]

@@ -1,9 +1,9 @@
-use crate::hue::HueLight;
 use crate::fritz::{
     FritzBoxSystemInfo, FritzDevice, FritzFetchResult, FritzInternetBandwidth, FritzReading,
     FritzSettings, TemperatureAlertThresholds, collect_fritzbox_debug_dump, discover_devices,
     fetch_fritz_data,
 };
+use crate::hue::HueLight;
 use crate::weather::{
     WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather,
     fetch_weather_forecast, starry_night_overlay,
@@ -5083,9 +5083,7 @@ impl cosmic::Application for AppModel {
             }
             if self.active_settings_section == Some("connection") {
                 if let Some(error) = &self.hue_error {
-                    content = content.push(widget::text::caption(format!(
-                        "Hue Bridge: {error}"
-                    )));
+                    content = content.push(widget::text::caption(format!("Hue Bridge: {error}")));
                 } else if self.hue_pairing {
                     content = content.push(widget::text::caption(
                         "Waiting for the Hue Bridge to authorize pairing…",
@@ -7955,7 +7953,9 @@ impl cosmic::Application for AppModel {
                         {
                             let id = light.id.clone();
                             widget::toggler(light.on.unwrap_or(false))
-                                .on_toggle(move |enabled| Message::SetHueLightPower(id.clone(), enabled))
+                                .on_toggle(move |enabled| {
+                                    Message::SetHueLightPower(id.clone(), enabled)
+                                })
                                 .into()
                         } else {
                             widget::toggler(light.on.unwrap_or(false)).into()
@@ -8621,7 +8621,9 @@ impl cosmic::Application for AppModel {
                 if !self.hue_loading
                     && !self.settings.hue_application_key.trim().is_empty()
                     && !self.settings.hue_bridge_ip.trim().is_empty()
-                    && self.hue_next_refresh_at.is_some_and(|deadline| Instant::now() >= deadline)
+                    && self
+                        .hue_next_refresh_at
+                        .is_some_and(|deadline| Instant::now() >= deadline)
                 {
                     self.hue_loading = true;
                     self.hue_next_refresh_at = None;
@@ -9748,9 +9750,10 @@ impl cosmic::Application for AppModel {
             }
             Message::SetHueLightPower(id, on) => {
                 if self.hue_pending.contains(&id)
-                    || !self.hue_lights.iter().any(|light| {
-                        light.id == id && light.reachable && light.on.is_some()
-                    })
+                    || !self
+                        .hue_lights
+                        .iter()
+                        .any(|light| light.id == id && light.reachable && light.on.is_some())
                 {
                     return Task::none();
                 }
