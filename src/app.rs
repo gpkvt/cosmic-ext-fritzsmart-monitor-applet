@@ -7200,33 +7200,6 @@ impl cosmic::Application for AppModel {
                     .spacing(8)
                     .height(cosmic::iced::Length::Fill)
                     .push(date_row);
-                if self.weather_attribution_expanded {
-                    for credit in current_attributions {
-                        weather_details = weather_details.push(widget::text::caption(format!(
-                            "{} {} · {} · {}",
-                            crate::i18n::tr(&self.settings.language, "Photo"),
-                            credit.title,
-                            credit.artist,
-                            credit.license
-                        )));
-                        weather_details = weather_details.push(
-                            widget::button::custom(widget::text::caption(
-                                "Wikimedia Commons file page ↗",
-                            ))
-                            .on_press(Message::OpenCommonsPage(credit.page_url.clone()))
-                            .padding([2, 6])
-                            .class(cosmic::theme::Button::Text),
-                        );
-                        if let Some(license_url) = &credit.license_url {
-                            weather_details = weather_details.push(
-                                widget::button::custom(widget::text::caption("License terms ↗"))
-                                    .on_press(Message::OpenCommonsPage(license_url.clone()))
-                                    .padding([2, 6])
-                                    .class(cosmic::theme::Button::Text),
-                            );
-                        }
-                    }
-                }
                 weather_details = weather_details
                     .push(
                         widget::Row::new()
@@ -7478,6 +7451,62 @@ impl cosmic::Application for AppModel {
                     );
                 }
                 weather_section = weather_section.push(weather_visual);
+                // Keep the source link OUTSIDE the fixed-height, clipped
+                // photograph. The old attribution expander placed its buttons
+                // inside the 260px overlay, where they disappeared below the
+                // visible image on smaller screens and longer credit strings.
+                // Link to the current image's file page even while the full
+                // credits remain collapsed.
+                if let Some(first_credit) = current_attributions.first() {
+                    weather_section = weather_section.push(
+                        widget::Row::new()
+                            .spacing(6)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::icon::from_name("image-x-generic-symbolic")
+                                    .size(14),
+                            )
+                            .push(
+                                widget::button::custom(widget::text::caption(
+                                    "Wikimedia Commons ↗",
+                                ))
+                                .on_press(Message::OpenCommonsPage(
+                                    first_credit.page_url.clone(),
+                                ))
+                                .padding([2, 6])
+                                .class(cosmic::theme::Button::Text),
+                            ),
+                    );
+                    if self.weather_attribution_expanded {
+                        for credit in &current_attributions {
+                            weather_section = weather_section.push(widget::text::caption(format!(
+                                "{} {} · {} · {}",
+                                crate::i18n::tr(&self.settings.language, "Photo"),
+                                credit.title,
+                                credit.artist,
+                                credit.license
+                            )));
+                            // Every source in a cross-faded image must remain
+                            // individually attributable, not just the first.
+                            weather_section = weather_section.push(
+                                widget::button::custom(widget::text::caption(
+                                    "Wikimedia Commons file page ↗",
+                                ))
+                                .on_press(Message::OpenCommonsPage(credit.page_url.clone()))
+                                .padding([2, 6])
+                                .class(cosmic::theme::Button::Text),
+                            );
+                            if let Some(license_url) = &credit.license_url {
+                                weather_section = weather_section.push(
+                                    widget::button::custom(widget::text::caption("License terms ↗"))
+                                        .on_press(Message::OpenCommonsPage(license_url.clone()))
+                                        .padding([2, 6])
+                                        .class(cosmic::theme::Button::Text),
+                                );
+                            }
+                        }
+                    }
+                }
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
                     let forecast_range_selector = widget::Row::new()
