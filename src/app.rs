@@ -2051,21 +2051,20 @@ fn panel_power_source_label(
     input_ains: &HashSet<String>,
     input: bool,
 ) -> String {
+    if !input {
+        return "Grid".to_string();
+    }
     let names: Vec<&str> = readings
         .iter()
         .filter(|reading| {
-            input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain)) == input
+            input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
         })
         .map(|reading| reading.name.as_str())
         .collect();
     match names.as_slice() {
         [name] => (*name).to_string(),
-        [] => if input { "Power input" } else { "Power output" }.to_string(),
-        _ => if input {
-            format!("Total input: {}", names.join(", "))
-        } else {
-            format!("Grid: {}", names.join(", "))
-        },
+        [] => "Power input".to_string(),
+        _ => format!("Total input: {}", names.join(", ")),
     }
 }
 
@@ -12905,7 +12904,7 @@ mod history_tests {
         let inputs = HashSet::from(["222222".to_string(), "333333".to_string()]);
         assert_eq!(
             panel_power_source_label(&readings, &inputs, false),
-            "Living room"
+            "Grid"
         );
         assert_eq!(
             panel_power_source_label(&readings, &inputs, true),
@@ -12913,9 +12912,10 @@ mod history_tests {
         );
         assert_eq!(
             panel_power_source_label(&readings, &HashSet::new(), false),
-            "Grid: Living room, Solar roof, Solar garage"
+            "Grid"
         );
         assert_eq!(panel_power_source_label(&[], &inputs, true), "Power input");
+        assert_eq!(panel_power_source_label(&[], &inputs, false), "Grid");
     }
 
     #[test]
