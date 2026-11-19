@@ -1399,8 +1399,8 @@ fn graph_visual_with_dimensions(
     let values: Vec<f64> = values.collect();
     let current_value = values.last().copied().unwrap_or(0.0);
     const COUNT: usize = 48;
-    // Match each viewBox to its rendered width so SVG text remains proportional.
-    let width: f64 = if graph_height > 200.0 { 800.0 } else { 400.0 };
+    // Mini graphs now span the popup width; keep SVG labels proportionate.
+    let width: f64 = if graph_height > 200.0 { 800.0 } else { 640.0 };
     const GRID_ROWS: usize = 4;
     const GRID_COLUMNS: usize = 4;
     let height = graph_height;
@@ -1564,6 +1564,7 @@ fn graph_visual_with_dimensions(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\" preserveAspectRatio=\"none\" font-family=\"Inter, sans-serif\"><title>Graph over time. Minimum {minimum:.1} {unit}; maximum {maximum:.1} {unit}; current {current_value:.1} {unit}</title><path d=\"{grid}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.28\" stroke-width=\"1\"/><path d=\"M{plot_left:.2} {plot_top:.2}V{plot_bottom:.2}H{plot_right:.2}\" fill=\"none\" stroke=\"#808080\" stroke-opacity=\"0.7\" stroke-width=\"1.5\"/>{min_max_labels}{y_labels}{x_labels}{y_axis_title}{x_axis_title}{drawing}</svg>"
     );
     widget::Column::new()
+        .width(cosmic::iced::Length::Fill)
         .spacing(2)
         .push(
             widget::svg(cosmic::iced::widget::svg::Handle::from_memory(
@@ -1736,6 +1737,7 @@ fn interactive_graph_card(
     message: Message,
 ) -> cosmic::Element<'static, Message> {
     let content = widget::Column::new()
+        .width(cosmic::iced::Length::Fill)
         .spacing(6)
         .push(
             widget::Row::new()
@@ -6611,6 +6613,7 @@ impl cosmic::Application for AppModel {
                 );
                 let bandwidth_card = if let Some(bandwidth) = self.internet_bandwidth.as_ref() {
                     widget::Column::new()
+                        .width(cosmic::iced::Length::Fill)
                         .spacing(8)
                         .padding([8, 12])
                         .push(
@@ -6912,29 +6915,18 @@ impl cosmic::Application for AppModel {
                             ..Default::default()
                         }
                     });
+                    // Keep mini graphs on a full-width row; show metrics beneath them.
                     let mut device_graph_content = widget::Column::new()
                         .spacing(12)
                         .width(cosmic::iced::Length::Fill)
-                        .push(
-                            widget::Row::new()
-                                .spacing(12)
-                                .align_y(cosmic::iced::Alignment::Center)
-                                .width(cosmic::iced::Length::Fill)
-                                .push(
-                                    widget::container(power_graph)
-                                        .width(cosmic::iced::Length::FillPortion(3)),
-                                )
-                                .push(
-                                    widget::container(menu_energy_values(
-                                        device_history
-                                            .and_then(|samples| samples.back())
-                                            .map(|(_, power, _)| *power as f64),
-                                        device_yesterday_wh,
-                                        device_today_wh,
-                                    ))
-                                    .width(cosmic::iced::Length::FillPortion(2)),
-                                ),
-                        );
+                        .push(power_graph)
+                        .push(menu_energy_values(
+                            device_history
+                                .and_then(|samples| samples.back())
+                                .map(|(_, power, _)| *power as f64),
+                            device_yesterday_wh,
+                            device_today_wh,
+                        ));
                     if reading.temperature_c.is_finite() {
                         let temperature_samples: Vec<f64> = device_history
                             .into_iter()
@@ -7027,25 +7019,14 @@ impl cosmic::Application for AppModel {
                                 ..Default::default()
                             }
                         });
-                        device_graph_content = device_graph_content.push(
-                            widget::Row::new()
-                                .spacing(12)
-                                .align_y(cosmic::iced::Alignment::Center)
-                                .width(cosmic::iced::Length::Fill)
-                                .push(
-                                    widget::container(temperature_graph)
-                                        .width(cosmic::iced::Length::FillPortion(3)),
-                                )
-                                .push(
-                                    widget::container(menu_temperature_values(
-                                        current_temperature,
-                                        minimum_temperature,
-                                        maximum_temperature,
-                                        &self.settings.temperature_unit,
-                                    ))
-                                    .width(cosmic::iced::Length::FillPortion(2)),
-                                ),
-                        );
+                        device_graph_content = device_graph_content
+                            .push(temperature_graph)
+                            .push(menu_temperature_values(
+                                current_temperature,
+                                minimum_temperature,
+                                maximum_temperature,
+                                &self.settings.temperature_unit,
+                            ));
                     }
                     let graph_columns = device_graph_content;
                     let device_graphs = collapsible_graph(
