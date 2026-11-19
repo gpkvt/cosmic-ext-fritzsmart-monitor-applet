@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- Add one-click copy controls beside menu section and device titles, copying the displayed title text without triggering disclosure actions.
+
 ### Fixed
 
 - Scope the safeguard-icon check to the details section so compatibility-card icons are validated separately instead of being counted twice.
