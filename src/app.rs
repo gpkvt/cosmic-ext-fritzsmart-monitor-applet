@@ -18,10 +18,12 @@ use cosmic::widget;
 use futures::{SinkExt, StreamExt};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::LazyLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant, SystemTime};
 
 static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
     LazyLock::new(|| widget::Id::new("fritz-power-monitor-autosize-main"));
+static FIRST_POPULATED_PANEL_RENDERED: AtomicBool = AtomicBool::new(false);
 pub type GraphSamples = Vec<(Instant, f64)>;
 type CopyFeedback = (String, Instant);
 const COPY_FEEDBACK_DURATION: Duration = Duration::from_millis(900);
@@ -73,6 +75,7 @@ pub struct AppModel {
     missing_device_ains: HashSet<String>,
     next_refresh_at: Option<Instant>,
     refresh_started_at: Option<Instant>,
+    last_liveness_logged_at: Option<Instant>,
     weather: Option<WeatherData>,
     weather_slideshow_index: usize,
     weather_images_loading: bool,
@@ -4958,11 +4961,21 @@ impl cosmic::Application for AppModel {
         } else {
             widget::Row::new().push(button)
         };
-        widget::autosize::autosize(
+        let panel = widget::autosize::autosize(
             widget::container(panel_controls).padding([0, 6, 0, 0]),
             AUTOSIZE_MAIN_ID.clone(),
-        )
-        .into()
+        );
+        if !self.readings.is_empty()
+            && !FIRST_POPULATED_PANEL_RENDERED.swap(true, Ordering::Relaxed)
+        {
+            // Confirms the first populated widget tree was constructed.
+            // Rendering to the compositor still happens asynchronously.
+            crate::diagnostics::info(format!(
+                "first populated panel widget tree constructed (readings: {})",
+                self.readings.len()
+            ));
+        }
+        panel.into()
     }
 
     fn view_window(&self, id: Id) -> Element<'_, Self::Message> {
@@ -9652,6 +9665,21 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::ClockTick => {
+                let now = Instant::now();
+                if self
+                    .last_liveness_logged_at
+                    .is_none_or(|previous| now.saturating_duration_since(previous) >= Duration::from_secs(60))
+                {
+                    self.last_liveness_logged_at = Some(now);
+                    crate::diagnostics::debug(format!(
+                        "applet event loop alive (readings: {}, Hue lights: {}, Hue sensors: {}, menu open: {}, connection error: {})",
+                        self.readings.len(),
+                        self.hue_lights.len(),
+                        self.hue_sensors.len(),
+                        self.popup.is_some(),
+                        self.error.is_some()
+                    ));
+                }
                 if self.devices_loading {
                     for diagnostic in crate::tasmota::take_discovery_diagnostics() {
                         let progress = diagnostic.contains("IP scan: scanning ")
