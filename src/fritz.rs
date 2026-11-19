@@ -168,6 +168,8 @@ pub struct FritzSettings {
     pub netatmo_client_secret: String,
     pub netatmo_refresh_token: String,
     pub hidden_netatmo_devices: Vec<String>,
+    /// Enabled CO₂ thresholds (ppm), keyed by Netatmo station/module ID.
+    pub netatmo_co2_alerts: HashMap<String, u16>,
     /// Hue devices hidden from the unified Devices list; other services are unaffected.
     pub hidden_hue_devices: Vec<String>,
     pub tasmota_subnet_scan: bool,
@@ -234,6 +236,7 @@ impl Default for FritzSettings {
             netatmo_client_secret: String::new(),
             netatmo_refresh_token: String::new(),
             hidden_netatmo_devices: Vec::new(),
+            netatmo_co2_alerts: HashMap::new(),
             hidden_hue_devices: Vec::new(),
             tasmota_subnet_scan: true,
             ain: String::new(),
@@ -582,6 +585,32 @@ fn parse_temperature_alerts(value: &str) -> HashMap<String, TemperatureAlertThre
         .collect()
 }
 
+/// Treat each Netatmo module as an opaque ID: colons are valid within IDs,
+/// so split each entry at its final separator. Malformed values are ignored.
+fn parse_netatmo_co2_alerts(value: &str) -> HashMap<String, u16> {
+    value
+        .split(';')
+        .filter_map(|entry| {
+            let (id, threshold) = entry.rsplit_once(':')?;
+            let ppm = threshold.parse::<u16>().ok()?;
+            (crate::netatmo::valid_id(id) && (600..=5000).contains(&ppm))
+                .then_some((id.to_owned(), ppm))
+        })
+        .collect()
+}
+
+fn serialize_netatmo_co2_alerts(alerts: &HashMap<String, u16>) -> String {
+    let mut entries: Vec<_> = alerts
+        .iter()
+        .filter(|(id, threshold)| {
+            crate::netatmo::valid_id(id) && (600..=5000).contains(threshold)
+        })
+        .map(|(id, threshold)| format!("{id}:{threshold}"))
+        .collect();
+    entries.sort_unstable();
+    entries.join(";")
+}
+
 impl FritzSettings {
     pub fn load() -> Result<Self, String> {
         let path = config_path()?;
@@ -623,6 +652,7 @@ impl FritzSettings {
             netatmo_client_id: get("NETATMO_CLIENT_ID"),
             netatmo_client_secret: get("NETATMO_CLIENT_SECRET"),
             netatmo_refresh_token: get("NETATMO_REFRESH_TOKEN"),
+            netatmo_co2_alerts: parse_netatmo_co2_alerts(&get("NETATMO_CO2_ALERTS")),
             hidden_netatmo_devices: get("NETATMO_HIDDEN_DEVICES")
                 .split(',').map(str::trim).filter(|id| !id.is_empty())
                 .map(str::to_owned).collect(),
@@ -966,11 +996,12 @@ impl FritzSettings {
         // Keep rotating Netatmo OAuth refresh tokens in the same owner-only
         // atomic settings file as the existing Hue and router credentials.
         contents.push_str(&format!(
-            "NETATMO_CLIENT_ID={}\nNETATMO_CLIENT_SECRET={}\nNETATMO_REFRESH_TOKEN={}\nNETATMO_HIDDEN_DEVICES={}\n",
+            "NETATMO_CLIENT_ID={}\nNETATMO_CLIENT_SECRET={}\nNETATMO_REFRESH_TOKEN={}\nNETATMO_HIDDEN_DEVICES={}\nNETATMO_CO2_ALERTS={}\n",
             self.netatmo_client_id,
             self.netatmo_client_secret,
             self.netatmo_refresh_token,
             self.hidden_netatmo_devices.join(","),
+            serialize_netatmo_co2_alerts(&self.netatmo_co2_alerts),
         ));
         #[cfg(unix)]
         let mut file = {
@@ -2666,6 +2697,21 @@ mod tests {
             HashSet::from(["123456".to_string(), "789012".to_string()])
         );
         assert!(parse_input_ains("").is_empty());
+    }
+
+    #[test]
+    fn netatmo_co2_alert_settings_parse_and_serialize_safely() {
+        let values = parse_netatmo_co2_alerts(
+            "70:ee:50:11:22:33:1200;module-2:2000;bad:abc;invalid/id:900;too-low:100;too-high:6500"
+        );
+        assert_eq!(values.len(), 2);
+        assert_eq!(values.get("70:ee:50:11:22:33"), Some(&1200));
+        assert_eq!(values.get("module-2"), Some(&2000));
+        assert_eq!(
+            serialize_netatmo_co2_alerts(&values),
+            "70:ee:50:11:22:33:1200;module-2:2000"
+        );
+        assert!(FritzSettings::default().netatmo_co2_alerts.is_empty());
     }
 
     #[test]
