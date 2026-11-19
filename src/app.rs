@@ -6798,6 +6798,7 @@ impl cosmic::Application for AppModel {
                             })
                         }),
                     );
+                    let current_temperature = reading.temperature_c.is_finite().then_some(reading.temperature_c);
                     let device_graph_pair_id = format!("device-graph-pair-{device_key}");
                     let device_graph_pair_collapsed =
                         self.collapsed_menu_sections.contains(&device_graph_pair_id);
@@ -6986,7 +6987,6 @@ impl cosmic::Application for AppModel {
                                 ),
                         );
                     }
-                    let current_temperature = reading.temperature_c.is_finite().then_some(reading.temperature_c);
                     let graph_columns = device_graph_content;
                     let device_graphs = collapsible_graph(
                         if reading.temperature_c.is_finite() {
