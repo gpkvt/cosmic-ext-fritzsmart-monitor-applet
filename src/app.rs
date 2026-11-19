@@ -4667,8 +4667,7 @@ impl cosmic::Application for AppModel {
                             .hidden_panel_items
                             .iter()
                             .any(|hidden| hidden == "temperature"),
-                )
-                .into(),
+                ),
             ));
         }
         if self.error.is_none() {
@@ -4694,8 +4693,7 @@ impl cosmic::Application for AppModel {
                         ),
                         panel_value(keep_value_unit_together(power)),
                         false,
-                    )
-                    .into(),
+                    ),
                 ));
             }
             if has_input_device(&self.settings)
@@ -4725,8 +4723,7 @@ impl cosmic::Application for AppModel {
                         ),
                         panel_value(keep_value_unit_together(input_power)),
                         false,
-                    )
-                    .into(),
+                    ),
                 ));
             }
 
@@ -4810,8 +4807,7 @@ impl cosmic::Application for AppModel {
                             && (self.settings.hidden_panel_items.iter().any(|hidden| hidden == "weather")
                                 || !self.settings.weather_enabled
                                 || self.weather.is_none()),
-                    )
-                    .into(),
+                    ),
                 ));
             }
         }
