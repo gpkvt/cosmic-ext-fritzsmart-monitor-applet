@@ -419,6 +419,11 @@ async fn discover_devices_with_options(
     scan_subnet: bool,
     mdns_duration: Duration,
 ) -> Result<Vec<TasmotaDevice>, String> {
+    crate::diagnostics::info(format!(
+        "Tasmota discovery started (mDNS seconds: {}, subnet scan: {})",
+        mdns_duration.as_secs(),
+        scan_subnet
+    ));
     record_discovery_diagnostic(format!(
         "Starting Tasmota discovery: browsing _http._tcp.local. for {} seconds.",
         mdns_duration.as_secs()
@@ -558,6 +563,12 @@ async fn discover_devices_with_options(
         .unwrap_or_else(std::sync::PoisonError::into_inner) =
         Some((Instant::now(), devices.clone()));
     persist_devices(&devices);
+    crate::diagnostics::info(format!(
+        "Tasmota discovery finished (accepted: {}, rejected: {}, IP responses: {})",
+        devices.len(),
+        rejected,
+        ip_scan_responses
+    ));
     Ok(devices)
 }
 
@@ -566,6 +577,10 @@ pub async fn fetch_readings(
     username: &str,
     password: &str,
 ) -> (Vec<TasmotaReading>, Vec<(String, String)>) {
+    crate::diagnostics::debug(format!(
+        "Tasmota reading requests started (devices: {})",
+        devices.len()
+    ));
     let client = match Client::builder().timeout(Duration::from_secs(5)).build() {
         Ok(client) => client,
         Err(error) => {
@@ -611,6 +626,11 @@ pub async fn fetch_readings(
             Err(device) => errors.push(device),
         }
     }
+    crate::diagnostics::debug(format!(
+        "Tasmota reading requests finished (readings: {}, unreachable: {})",
+        readings.len(),
+        errors.len()
+    ));
     (readings, errors)
 }
 
