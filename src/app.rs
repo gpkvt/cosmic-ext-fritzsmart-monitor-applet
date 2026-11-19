@@ -2109,9 +2109,11 @@ fn average_temperature_with_hue_c(
     selected_ains: &[String],
     sensors: &[HueSensor],
     hidden_hue_devices: &[String],
+    netatmo_sensors: &[NetatmoSensor],
+    hidden_netatmo_devices: &[String],
     exclude_solar: bool,
 ) -> Option<f64> {
-    if sensors.is_empty() {
+    if sensors.is_empty() && netatmo_sensors.is_empty() {
         return average_selected_temperature_c(readings, selected_ains, exclude_solar);
     }
     let selected_metered = readings
@@ -2137,8 +2139,17 @@ fn average_temperature_with_hue_c(
                 .temperature_c
                 .filter(|temperature| temperature.is_finite())
         });
+    let selected_netatmo = netatmo_sensors
+        .iter()
+        .filter(|sensor| {
+            sensor.reachable
+                && !hidden_netatmo_devices.contains(&sensor.id)
+                && (!exclude_solar || !sensor.name.to_lowercase().contains("solar"))
+        })
+        .filter_map(|sensor| sensor.temperature_c.filter(|value| value.is_finite()));
     let (sum, count) = selected_metered
         .chain(selected_hue)
+        .chain(selected_netatmo)
         .fold((0.0_f64, 0_usize), |(sum, count), temperature| {
             (sum + temperature, count + 1)
         });
@@ -4498,6 +4509,8 @@ impl cosmic::Application for AppModel {
                 &self.selected_ains,
                 &self.hue_sensors,
                 &self.settings.hidden_hue_devices,
+                &self.netatmo_sensors,
+                &self.settings.hidden_netatmo_devices,
                 self.settings.panel_exclude_solar_temperature,
             )
             .map(|temperature| format_temperature(temperature, &self.settings.temperature_unit))
@@ -12830,6 +12843,8 @@ mod history_tests {
                 &selected,
                 &sensors,
                 &[],
+                &[],
+                &[],
                 false,
             ),
             Some(22.0)
@@ -12841,6 +12856,8 @@ mod history_tests {
                 &selected,
                 &sensors,
                 &hidden,
+                &[],
+                &[],
                 false,
             ),
             Some(20.0)
@@ -12850,7 +12867,7 @@ mod history_tests {
             ..sensor.clone()
         };
         assert_eq!(
-            average_temperature_with_hue_c(&[reading], &selected, &[offline], &[], false,),
+            average_temperature_with_hue_c(&[reading], &selected, &[offline], &[], &[], &[], false,),
             Some(20.0)
         );
         let invalid = HueSensor {
@@ -12858,7 +12875,7 @@ mod history_tests {
             ..sensor.clone()
         };
         assert_eq!(
-            average_temperature_with_hue_c(&[], &[], &[invalid], &[], false,),
+            average_temperature_with_hue_c(&[], &[], &[invalid], &[], &[], &[], false,),
             None
         );
         let solar = HueSensor {
@@ -12866,7 +12883,7 @@ mod history_tests {
             ..sensor
         };
         assert_eq!(
-            average_temperature_with_hue_c(&[], &[], &[solar], &[], true,),
+            average_temperature_with_hue_c(&[], &[], &[solar], &[], &[], &[], true,),
             None
         );
     }
