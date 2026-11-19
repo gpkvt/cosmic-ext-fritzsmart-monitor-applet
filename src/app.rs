@@ -7036,10 +7036,7 @@ impl cosmic::Application for AppModel {
                         }
                         continue;
                     }
-                    if key.starts_with("3-")
-                        || key.starts_with("4-")
-                        || key.starts_with("5-")
-                    {
+                    if key.starts_with("3-") || key.starts_with("4-") || key.starts_with("5-") {
                         // Total-power and history rows provide their own disclosure controls.
                         device_cards = device_cards.push(card);
                         continue;
