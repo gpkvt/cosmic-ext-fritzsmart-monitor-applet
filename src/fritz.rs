@@ -266,6 +266,10 @@ fn parse_graph_timespan_minutes(value: &str) -> u32 {
     parse_clamped(value, 15, 5, 2_102_400)
 }
 
+fn parse_temperature_unit(value: &str) -> String {
+    if value.eq_ignore_ascii_case("F") { "F".into() } else { "C".into() }
+}
+
 fn parse_refresh_interval_seconds(value: &str) -> u32 {
     parse_clamped(value, 60, 30, 3600)
 }
@@ -552,7 +556,7 @@ impl FritzSettings {
             } else {
                 "line".into()
             },
-            temperature_unit: if get("TEMPERATURE_UNIT").eq_ignore_ascii_case("F") { "F".into() } else { "C".into() },
+            temperature_unit: parse_temperature_unit(&get("TEMPERATURE_UNIT")),
             refresh_interval_seconds: parse_refresh_interval_seconds(&get(
                 "REFRESH_INTERVAL_SECONDS",
             )),
@@ -2732,6 +2736,15 @@ mod tests {
             .map(str::to_string)
             .collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn temperature_unit_setting_defaults_to_celsius_and_accepts_fahrenheit() {
+        assert_eq!(parse_temperature_unit(""), "C");
+        assert_eq!(parse_temperature_unit("invalid"), "C");
+        assert_eq!(parse_temperature_unit("F"), "F");
+        assert_eq!(parse_temperature_unit("f"), "F");
+        assert_eq!(FritzSettings::default().temperature_unit, "C");
     }
 
     #[test]
