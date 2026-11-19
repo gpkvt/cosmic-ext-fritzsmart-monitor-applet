@@ -1352,6 +1352,7 @@ fn parse_device_reading(device: Node<'_, '_>) -> Result<FritzReading, String> {
     })
 }
 
+#[cfg(test)]
 fn parse_device_readings_xml(
     xml: &str,
     selected_ains: &[String],
@@ -2299,6 +2300,8 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn oversized_xml_chunks_are_rejected_before_allocation() {
         assert!(xml_chunk_fits(0, MAX_FRITZ_XML_BYTES));
@@ -2307,8 +2310,6 @@ mod tests {
         assert!(!xml_chunk_fits(MAX_FRITZ_XML_BYTES, 1));
         assert!(!xml_chunk_fits(usize::MAX, usize::MAX));
     }
-
-    use super::*;
 
     #[test]
     fn defaults_external_temperature_to_first_solar_device_case_insensitively() {
