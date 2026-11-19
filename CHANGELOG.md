@@ -1,5 +1,7 @@
 # Changelog
 
+- Remove obsolete `input_low`/`input_high` local bindings after consolidating the Total Power Input & Output metric rows, eliminating release-build unused-variable warnings.
+
 - Always show input LOW/HIGH next to output LOW/HIGH stats in Total Power Input & Output, including while input readings are unavailable; represent missing input history as `— W` instead of zero. Share the metric tile row rendering and add regression coverage.
 
 - Remove the unused `graph_panel` helper left behind after deduplicating the power history graph, eliminating the release-build dead-code warning.
