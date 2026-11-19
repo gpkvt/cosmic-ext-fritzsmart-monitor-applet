@@ -28,11 +28,29 @@ pub fn http_request_diagnostics() -> Vec<HttpRequestDiagnostic> {
         .unwrap_or_default()
 }
 
+/// Keep journal labels constant: even a malformed configured URL cannot
+/// leak query parameters, session IDs or other private network details.
+fn syslog_fritz_endpoint(path: &str) -> &'static str {
+    match path {
+        "/login_sid.lua" => "authentication",
+        "/webservices/homeautoswitch.lua" => "Smart Home API",
+        "/upnp/control/deviceinfo" => "DeviceInfo SOAP",
+        "/igdupnp/control/WANCommonIFC1" => "WAN SOAP",
+        _ => "other endpoint",
+    }
+}
+
 fn record_http_response_with_method(
     url: &reqwest::Url,
     status: reqwest::StatusCode,
     method: &'static str,
 ) {
+    crate::diagnostics::debug(format!(
+        "FRITZ HTTP {method} {} responded {} (HTTPS: {})",
+        syslog_fritz_endpoint(url.path()),
+        status.as_u16(),
+        url.scheme() == "https"
+    ));
     if let Ok(mut log) = HTTP_REQUEST_LOG.lock() {
         log.push_back(HttpRequestDiagnostic {
             timestamp: chrono::Local::now()
@@ -2307,6 +2325,16 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn syslog_endpoint_labels_never_include_urls_or_tokens() {
+        assert_eq!(syslog_fritz_endpoint("/login_sid.lua"), "authentication");
+        assert_eq!(
+            syslog_fritz_endpoint("/webservices/homeautoswitch.lua"),
+            "Smart Home API"
+        );
+        assert_eq!(syslog_fritz_endpoint("/api/secret-token"), "other endpoint");
+    }
 
     #[test]
     fn oversized_xml_chunks_are_rejected_before_allocation() {
