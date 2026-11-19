@@ -1,5 +1,11 @@
 # FRITZ!Power Monitor
 
+<p align="center">
+  <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/actions"><img alt="GitHub Actions: disabled" src="https://img.shields.io/badge/GitHub%20Actions-disabled-6b7280?logo=githubactions"></a>
+  <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/gpkvt/cosmic-ext-fritzsmart-monitor-applet?label=release"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/gpkvt/cosmic-ext-fritzsmart-monitor-applet"></a>
+</p>
+
 A native COSMIC panel applet for monitoring power, temperature and optional weather data from FRITZ!Box Smart Home devices.
 
 FRITZ!Power Monitor connects directly to your router. It brings household power readings, device status and historical graphs into the COSMIC desktop without requiring an external monitoring service.
@@ -253,7 +259,7 @@ cargo test --locked --all-targets
 cargo build --release
 ```
 
-GitHub Actions runs the project checks and validates release artifacts. A separate **Cargo release build** workflow runs `cargo build --locked --release` on pull requests and Rust source changes to `main` (and can be started manually). It verifies the binary and uploads it as a 7-day build artifact; this is separate from the packaged release.
+**Automation status:** All GitHub Actions workflow definitions were intentionally removed from `.github/workflows/` in [PR #835](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/835). The neutral **GitHub Actions: disabled** badge above reflects that state; it is not a passing build or security result. The release and license badges reflect repository metadata independently of CI. Run the checks above locally; automatic builds, tests, security scans, package releases and Pages deployments are currently unavailable.
 
 ## Request changes with ChatGPT
 
@@ -267,30 +273,16 @@ The helper gathers the current branch, working-tree status, recent commits and a
 
 ## Repository maintenance
 
-The repository includes a small command-line helper for common development and
-publishing tasks. Run it from the checkout; GitHub operations require the
-[GitHub CLI](https://cli.github.com/) and an authenticated session
-(`gh auth login`).
+The local checkout includes a command-line helper for development:
 
 | Command | Action |
 | --- | --- |
 | `make update` | Fast-forward the current branch from its configured upstream (`git pull --ff-only`). |
 | `make check` | Run Rust formatting, compilation, Clippy and tests locally. |
-| `make publish-pages` | Dispatch the Pages workflow to rebuild, validate and publish `docs/` to `gh-pages`. |
-| `make publish-release` | Start a patch release (version bump, Linux packages, GitHub release and Pages publication). |
-| `make publish-release BUMP=minor` | Start a minor or major release; accepted values are `patch`, `minor` and `major`. |
-| `make build-release` | Build Debian, AppImage and Flatpak packages from `main` as workflow artifacts without publishing a release. |
-| `make build-release REF=v2.0.0` | Build packages from a specific branch, tag or commit. |
-| `make workflows` | List configured GitHub Actions workflows. |
-| `make workflow-runs` | List recent workflow runs. Use `WORKFLOW=release.yml` to filter. |
-| `make workflow-watch RUN_ID=123456789` | Follow a workflow run and return a failing exit status if it fails. |
+| `make build` | Compile the application in release mode locally. |
+| `make install` | Build and install the applet to your user profile, then reload COSMIC Panel. |
 
-The same operations are available directly through `bash scripts/repo.sh help`.
-The release workflow creates an immutable version tag and publishes the
-portable archive, Debian package, AppImage, Flatpak and checksums. Package-only
-builds are retained as GitHub Actions artifacts for 14 days. Pages publication
-is also triggered automatically after a successful release, so the website's
-download links follow the latest published version.
+The scripts still contain commands such as `make publish-pages`, `make publish-release` and `make build-release`, but **these cannot dispatch a job while the corresponding GitHub Actions workflows are absent**. Historical releases and Actions results remain accessible; they do not represent current CI status. Packaging can still be performed locally using `packaging/build-linux-packages.sh` with its native dependencies installed.
 
 ## Data, security and privacy
 
