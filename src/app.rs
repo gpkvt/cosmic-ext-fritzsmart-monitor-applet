@@ -7316,51 +7316,64 @@ impl cosmic::Application for AppModel {
                 for device in missing_devices {
                     let device_key = crate::fritz::normalize_ain_for_selection(&device.ain);
                     let is_expanded = is_device_expanded(&self.expanded_devices, &device_key);
+                    // Keep unavailable devices in the same column grid as
+                    // reachable ones; disconnected switches cannot be operated.
                     let device_row = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
                         .list_item_padding([0, 0])
                         .add(
-                            widget::button::custom(
-                                widget::Row::new()
-                                    .spacing(12)
-                                    .align_y(cosmic::iced::Alignment::Center)
-                                    .push(widget::icon::from_name("computer-symbolic").size(20))
-                                    .push(
-                                        widget::Column::new()
-                                            .spacing(2)
-                                            .width(cosmic::iced::Length::Fill)
-                                            .push(widget::text::body(device.name.clone()))
-                                            .push(widget::text::caption(crate::i18n::tr(
-                                                &self.settings.language,
-                                                "No live reading available",
-                                            ))),
+                            widget::Row::new()
+                                .spacing(8)
+                                .width(cosmic::iced::Length::Fill)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(
+                                    widget::button::custom(
+                                        widget::Row::new()
+                                            .spacing(8)
+                                            .align_y(cosmic::iced::Alignment::Center)
+                                            .push(
+                                                widget::text::body(device.name.clone())
+                                                    .width(cosmic::iced::Length::Fill),
+                                            )
+                                            .push(
+                                                widget::icon::from_name(if is_expanded {
+                                                    "go-up-symbolic"
+                                                } else {
+                                                    "go-down-symbolic"
+                                                })
+                                                .size(16),
+                                            ),
                                     )
-                                    .push(
-                                        widget::text::body("— W")
-                                            .width(cosmic::iced::Length::Fixed(76.0))
-                                            .align_x(cosmic::iced::Alignment::End),
-                                    )
-                                    .push(
-                                        widget::text::body(format!(
-                                            "— {}",
-                                            temperature_unit_label(&self.settings.temperature_unit)
-                                        ))
-                                        .width(cosmic::iced::Length::Fixed(90.0))
+                                    .on_press(Message::ToggleDeviceDetails(device.ain.clone()))
+                                    .width(cosmic::iced::Length::Fill)
+                                    .padding([8, 12])
+                                    .class(cosmic::theme::Button::Text),
+                                )
+                                .push(
+                                    widget::text::body("— W")
+                                        .width(cosmic::iced::Length::Fixed(76.0))
                                         .align_x(cosmic::iced::Alignment::End),
-                                    )
-                                    .push(
-                                        widget::icon::from_name(if is_expanded {
-                                            "go-up-symbolic"
-                                        } else {
-                                            "go-down-symbolic"
-                                        })
-                                        .size(16),
-                                    ),
-                            )
-                            .on_press(Message::ToggleDeviceDetails(device.ain.clone()))
-                            .width(cosmic::iced::Length::Fill)
-                            .padding([8, 12])
-                            .class(cosmic::theme::Button::Text),
+                                )
+                                .push(
+                                    widget::text::body(format!(
+                                        "— {}",
+                                        temperature_unit_label(&self.settings.temperature_unit)
+                                    ))
+                                    .width(cosmic::iced::Length::Fixed(90.0))
+                                    .align_x(cosmic::iced::Alignment::End),
+                                )
+                                .push(
+                                    widget::Space::new()
+                                        .width(cosmic::iced::Length::Fixed(108.0)),
+                                )
+                                .push(copy_menu_title_button(
+                                    device.name.clone(),
+                                    self.copy_feedback.as_ref(),
+                                ))
+                                .push(
+                                    widget::container(widget::toggler(false))
+                                        .width(cosmic::iced::Length::Fixed(52.0)),
+                                ),
                         );
                     let device_row = if is_expanded {
                         device_row.add(
