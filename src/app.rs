@@ -2434,58 +2434,6 @@ fn total_power_overview(
     let (input_low, input_high) = input_display_range(&input_history);
     let total_output_w = output_power_w(readings, &settings.input_ains);
     let total_input_w = input_display_power_w(input_power_w(readings, &settings.input_ains));
-    let axis_start = format_graph_axis_start(
-        settings.graph_timespan_minutes,
-        history
-            .front()
-            .map(|(timestamp, _)| Instant::now().duration_since(*timestamp).as_secs() / 60),
-    );
-    let output_values: GraphSamples = history
-        .iter()
-        .map(|(timestamp, value)| (*timestamp, *value as f64))
-        .collect();
-    let input_values: GraphSamples = input_history
-        .iter()
-        .map(|(timestamp, value)| (*timestamp, input_display_power_w(*value) as f64))
-        .collect();
-    let graph = if has_input_readings {
-        let (output_aligned, input_aligned) =
-            aligned_power_series(&history.iter().copied().collect(), &input_history);
-        let graph_title = format!(
-            "{} & {}",
-            crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-            crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
-        );
-        interactive_combined_graph_with_axis(
-            &graph_title,
-            if output_aligned.is_empty() {
-                output_values
-            } else {
-                output_aligned
-            },
-            if input_aligned.is_empty() {
-                input_values
-            } else {
-                input_aligned
-            },
-            &settings.graph_style,
-            "W",
-            axis_start,
-            (
-                crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-                crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
-            ),
-        )
-    } else {
-        interactive_graph_with_axis(
-            &settings.language,
-            &crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-            output_values.into_iter(),
-            &settings.graph_style,
-            "W",
-            axis_start,
-        )
-    };
     let output_ains: HashSet<String> = device_history
         .keys()
         .filter(|ain| !settings.input_ains.contains(*ain))
@@ -2505,11 +2453,11 @@ fn total_power_overview(
         settings.refresh_interval_seconds,
         true,
     );
+    // CURRENT POWER HISTORY owns the shared graph. Keep only the
+    // complementary live, daily and low/high metrics in this section.
     let mut content = widget::Column::new()
         .spacing(10)
         .width(cosmic::iced::Length::Fill)
-        .push(graph_panel(graph));
-    content = content
         .push(
             widget::Row::new()
                 .spacing(8)
