@@ -2453,7 +2453,8 @@ fn total_power_overview(
     if has_input_readings {
         content = content.push(graph_panel(input_graph));
     }
-    content = content.push(
+    content = content
+        .push(
             widget::Row::new()
                 .spacing(8)
                 .width(cosmic::iced::Length::Fill)
