@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 REPO="${GITHUB_REPOSITORY:-gpkvt/cosmic-ext-fritzsmart-monitor-applet}"
 GH=(gh)
+REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
 usage() {
   cat <<'EOF'
@@ -16,15 +17,16 @@ Usage:
       Run Rust formatting, compilation, lint and test checks locally.
 
   ./scripts/repo.sh publish-pages
-      Build, validate and publish docs/ to the gh-pages branch.
+      Dispatch Pages publication (unavailable without gh-pages.yml).
 
   ./scripts/repo.sh publish-release [patch|minor|major]
-      Run the release pipeline: bump version, build packages, publish the
-      GitHub release and trigger GitHub Pages publication.
+      Dispatch a release (unavailable without release.yml).
 
   ./scripts/repo.sh build-release [ref]
-      Build Debian, AppImage and Flatpak packages for a branch, tag or commit.
-      The resulting packages are workflow artifacts (not a GitHub release).
+      Dispatch package generation (unavailable without its workflow).
+
+      These commands explain that workflows are disabled before calling gh.
+      Local checks and packaging/build-linux-packages.sh remain available.
 
   ./scripts/repo.sh workflows
       List repository workflows.
@@ -50,6 +52,11 @@ require_gh() {
 dispatch() {
   local workflow="$1"
   shift
+  # Workflow definitions were removed from this repository. Avoid misleading
+  # GitHub CLI/authentication errors when the requested workflow is absent.
+  [[ -f "$REPO_ROOT/.github/workflows/$workflow" ]] ||
+    die "GitHub Actions is disabled: .github/workflows/$workflow does not exist. Restore the workflow before using this command; use make check for local validation."
+  require_gh
   printf 'Dispatching %s in %s...\n' "$workflow" "$REPO"
   "${GH[@]}" workflow run "$workflow" --repo "$REPO" --ref main "$@"
   printf 'Workflow dispatched. Follow it with: make workflow-runs or make workflow-watch RUN_ID=<id>\n'
@@ -79,21 +86,18 @@ case "$command" in
     ;;
   publish-pages|pages)
     [[ $# -eq 0 ]] || die "publish-pages does not accept arguments."
-    require_gh
     dispatch gh-pages.yml
     ;;
   publish-release|release)
     bump="${1:-patch}"
     [[ $# -le 1 ]] || die "publish-release accepts at most one bump type."
     case "$bump" in patch|minor|major) ;; *) die "Bump type must be patch, minor or major." ;; esac
-    require_gh
     dispatch release.yml -f "bump_type=$bump"
     ;;
   build-release|build-packages)
     ref="${1:-main}"
     [[ $# -le 1 ]] || die "build-release accepts at most one ref."
     [[ -n "$ref" ]] || die "Ref must not be empty."
-    require_gh
     dispatch generate-linux-packages.yml -f "ref=$ref"
     ;;
   workflows)

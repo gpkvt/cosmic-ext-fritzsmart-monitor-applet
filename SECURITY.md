@@ -86,13 +86,31 @@ OpenWeatherMap and retrieve illustrative weather images.
 
 ### Network access and optional integrations
 
-- The applet needs network access to reach the configured FRITZ!Box.
+- The applet needs network access to reach the configured FRITZ!Box and any
+  selected Tasmota devices or optional Hue Bridge.
+- Philips Hue Bridge support operates on the local network. The Hue-specific
+  HTTPS client currently **does not validate the bridge certificate or
+  hostname** because the certificate is tied to the bridge ID, not its local
+  IP address. Older bridge pairing can fall back to unencrypted HTTP. This
+  is separate from the default FRITZ!Box TLS validation described above.
+  Only pair and control Hue devices on a trusted LAN; protect and rotate
+  Hue application keys if local traffic might have been intercepted.
 - Enabling weather integration sends requests to OpenWeatherMap using the
   configured API key and location. Review that provider's privacy policy and
   avoid using a sensitive location if you do not want to share it.
 - Weather photographs are illustrative remote content, not a live camera feed.
 - The Flatpak requests network access for these integrations. Install packages
   only from trusted sources and verify release checksums when provided.
+
+### Dependency security audit
+
+The repository currently has **no GitHub Actions workflows**. Review the
+`.cargo/audit.toml` exceptions and run `cargo audit --deny warnings` locally
+when assessing dependencies. The pinned COSMIC/Iced stack still contains
+documented transitive RustSec advisories, including unresolved unsoundness
+entries. See [issue #270](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues/270)
+for the affected dependency paths; a passing audit with exceptions is **not**
+proof that the underlying problems have been fixed.
 
 ### Local system and logs
 
@@ -108,7 +126,7 @@ OpenWeatherMap and retrieve illustrative weather images.
 
 Reports are in scope when they demonstrate a security impact in this project,
 including its authentication or TLS handling, credential storage, device
-control, local data handling, packaging, or release workflow.
+control, local data handling, packaging, or manual release procedures.
 
 Issues solely in FRITZ!OS, the COSMIC desktop, Linux distributions, or third-party
 services should normally be reported to their respective maintainers. If this

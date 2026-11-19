@@ -3755,8 +3755,11 @@ fn icon_action_button<'a>(
         .center_x(36)
         .center_y(36)
         .into()
-    } else if glyph == "view-refresh-symbolic" {
-        widget::container(widget::icon::from_name("view-refresh-symbolic").size(16))
+    } else if glyph.ends_with("-symbolic") {
+        // Symbolic icon names are identifiers, not printable glyphs. Rendering
+        // "window-close-symbolic" as text truncated it to "win-" inside
+        // this 36px button instead of displaying a proper close icon.
+        widget::container(widget::icon::from_name(glyph).size(16))
             .center_x(36)
             .center_y(36)
             .into()
@@ -9317,7 +9320,7 @@ impl cosmic::Application for AppModel {
                         icon_action_button("view-refresh-symbolic", "Reload now", Message::Refresh)
                     })
                     .push(icon_action_button(
-                        "⚙",
+                        "preferences-system-symbolic",
                         crate::i18n::tr(&self.settings.language, "Settings"),
                         Message::ToggleSettings,
                     ))
