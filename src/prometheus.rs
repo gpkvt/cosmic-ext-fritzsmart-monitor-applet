@@ -104,7 +104,8 @@ impl Encoder {
 pub fn render(data: LiveData<'_>) -> String {
     let mut e = Encoder::default();
     e.gauge("fritz_monitor_info", &[("version", env!("CARGO_PKG_VERSION"))], 1.0);
-    e.flag("fritz_monitor_router_up", &[], !data.fritz_error && !data.devices.is_empty());
+    e.flag("fritz_monitor_router_up", &[], !data.fritz_error &&
+        (data.router.is_some() || data.bandwidth.is_some() || data.devices.iter().any(|device| !device.ain.to_ascii_uppercase().starts_with("TASMOTA:"))));
     e.flag("fritz_monitor_hue_up", &[], !data.hue_error &&
         (data.hue_lights.iter().any(|item| item.reachable) ||
          data.hue_sensors.iter().any(|item| item.reachable)));
@@ -146,9 +147,32 @@ pub fn render(data: LiveData<'_>) -> String {
             e.gauge("fritz_monitor_temperature_alert_low_celsius", &labels, thresholds.low_c as f64);
         }
     }
+    // Include selected but unavailable devices with an explicit 0 reachability
+    // gauge; their missing power/temperature/switch data is not exported.
+    // The 0 denotes reachability, not power consumption.
+    for id in &data.settings.ains {
+        if data.devices.iter().any(|device| {
+            crate::fritz::normalize_ain_for_selection(&device.ain)
+                == crate::fritz::normalize_ain_for_selection(id)
+        }) {
+            continue;
+        }
+        let source = if id.to_ascii_uppercase().starts_with("TASMOTA:") {
+            "tasmota"
+        } else {
+            "fritzbox"
+        };
+        let name = data.settings.known_devices.iter().find(|device| {
+            crate::fritz::normalize_ain_for_selection(&device.ain)
+                == crate::fritz::normalize_ain_for_selection(id)
+        }).map(|device| device.name.as_str()).unwrap_or(id.as_str());
+        let labels = [("source", source), ("id", id.as_str()), ("name", name)];
+        e.flag("fritz_monitor_device_reachable", &labels, false);
+    }
     e.gauge("fritz_monitor_output_power_watts", &[], output_w as f64);
     e.gauge("fritz_monitor_input_power_watts", &[], input_w as f64);
     e.gauge("fritz_monitor_reading_devices", &[], data.devices.len() as f64);
+    e.gauge("fritz_monitor_selected_devices", &[], data.settings.ains.len() as f64);
 
     for light in data.hue_lights {
         let labels = [("id", light.id.as_str()), ("name", light.name.as_str())];
