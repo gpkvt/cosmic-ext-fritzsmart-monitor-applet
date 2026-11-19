@@ -8,16 +8,31 @@ use crate::netatmo::NetatmoSensor;
 use crate::weather::WeatherData;
 use std::collections::HashSet;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 
 pub const PORT: u16 = 9817;
-pub const ENDPOINT: &str = "http://127.0.0.1:9817/metrics";
+pub const DEFAULT_BIND_ADDRESS: &str = "127.0.0.1:9817";
+
+/// Accept IP literals only (including bracketed IPv6), not hostnames. Port 0
+/// would create a random listening address that Prometheus could not scrape.
+pub fn parse_bind_address(value: &str) -> Option<SocketAddr> {
+    value
+        .trim()
+        .parse::<SocketAddr>()
+        .ok()
+        .filter(|address| address.port() != 0)
+}
+
+pub fn endpoint_url(value: &str) -> Option<String> {
+    parse_bind_address(value).map(|address| format!("http://{address}/metrics"))
+}
 
 #[derive(Default)]
 struct Snapshot {
     enabled: bool,
+    bind_address: String,
     text: String,
 }
 static SNAPSHOT: LazyLock<Mutex<Snapshot>> = LazyLock::new(|| Mutex::new(Snapshot::default()));
@@ -238,9 +253,10 @@ pub fn render(data: LiveData<'_>) -> String {
 }
 
 /// Called only from the COSMIC UI render; it never waits on network I/O.
-pub fn publish(enabled: bool, data: Option<LiveData<'_>>) {
+pub fn publish(enabled: bool, bind_address: &str, data: Option<LiveData<'_>>) {
     if let Ok(mut snapshot) = SNAPSHOT.lock() {
         snapshot.enabled = enabled;
+        snapshot.bind_address = bind_address.to_owned();
         if enabled {
             if let Some(data) = data {
                 snapshot.text = render(data);
@@ -272,23 +288,32 @@ fn reply(mut stream: TcpStream, enabled: bool, payload: &str) -> std::io::Result
     stream.write_all(body.as_bytes())
 }
 
-/// Worker never binds a public interface and releases its listening socket
-/// when disabled. Each scrape returns a cached snapshot, not live API calls.
+/// The listener follows the configured IP:port. Disabling or changing the
+/// address drops the old socket before any new bind attempt. Invalid addresses
+/// never fall back to a potentially wider interface.
 pub fn serve() {
     let mut listener: Option<TcpListener> = None;
+    let mut configured_address: Option<SocketAddr> = None;
     let mut bind_failed = false;
     loop {
-        let enabled = SNAPSHOT.lock()
-            .map(|state| state.enabled)
-            .unwrap_or(false);
-        if !enabled {
+        let (enabled, bind_address) = SNAPSHOT.lock()
+            .map(|state| (state.enabled, state.bind_address.clone()))
+            .unwrap_or((false, String::new()));
+        let desired_address = enabled
+            .then(|| parse_bind_address(&bind_address))
+            .flatten();
+        if desired_address != configured_address {
             listener = None;
+            configured_address = desired_address;
             bind_failed = false;
+        }
+        let Some(address) = desired_address else {
+            listener = None;
             std::thread::sleep(Duration::from_millis(250));
             continue;
-        }
+        };
         if listener.is_none() {
-            match TcpListener::bind(("127.0.0.1", PORT)) {
+            match TcpListener::bind(address) {
                 Ok(socket) => {
                     if let Err(error) = socket.set_nonblocking(true) {
                         eprintln!("Prometheus listener could not become nonblocking: {error}");
@@ -298,7 +323,7 @@ pub fn serve() {
                     }
                 }
                 Err(error) if !bind_failed => {
-                    eprintln!("Prometheus listener unavailable on localhost:{PORT}: {error}");
+                    eprintln!("Prometheus listener unavailable on {address}: {error}");
                     bind_failed = true;
                 }
                 Err(_) => {}
@@ -367,9 +392,31 @@ mod tests {
     }
 
     #[test]
-    fn exporter_defaults_disabled_and_uses_localhost_only() {
+    fn exporter_defaults_disabled_and_loopback_only() {
         assert_eq!(PORT, 9817);
-        assert!(ENDPOINT.starts_with("http://127.0.0.1:"));
+        assert_eq!(FritzSettings::default().prometheus_bind_address, DEFAULT_BIND_ADDRESS);
         assert!(!FritzSettings::default().prometheus_enabled);
+    }
+
+    #[test]
+    fn bind_address_accepts_specific_and_wildcard_ip_ports() {
+        let cases = [
+            ("127.0.0.1:9817", "http://127.0.0.1:9817/metrics"),
+            ("192.168.42.1:9818", "http://192.168.42.1:9818/metrics"),
+            ("0.0.0.0:9817", "http://0.0.0.0:9817/metrics"),
+            ("[::1]:9817", "http://[::1]:9817/metrics"),
+            ("[::]:9817", "http://[::]:9817/metrics"),
+        ];
+        for (bind, url) in cases {
+            assert!(parse_bind_address(bind).is_some(), "{bind}");
+            assert_eq!(endpoint_url(bind).as_deref(), Some(url));
+        }
+        for invalid in [
+            "", "localhost:9817", "127.0.0.1", "127.0.0.1:0",
+            "0.0.0.0:65536", "127.0.0.1:9817\\nPROMETHEUS_ENABLED=true",
+        ] {
+            assert_eq!(parse_bind_address(invalid), None, "{invalid}");
+            assert_eq!(endpoint_url(invalid), None);
+        }
     }
 }
