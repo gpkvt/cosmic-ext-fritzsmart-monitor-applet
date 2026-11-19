@@ -7127,7 +7127,7 @@ impl cosmic::Application for AppModel {
                                     widget::text::body(reading.name.clone())
                                         .width(cosmic::iced::Length::Fill),
                                 )
-                                .push(widget::text::body(format!("{:.0} W", reading.power_w)))
+                                .push(widget::text::body(if reading.has_power_meter { format!("{} W", reading.power_w) } else { "— W".into() }))
                                 .push(if reading.temperature_c.is_finite() {
                                     widget::text::caption(format!(
                                         "{} · {state}",
@@ -7197,7 +7197,7 @@ impl cosmic::Application for AppModel {
                                 "ain": reading.ain,
                                 "normalized_ain": ain,
                                 "current_reading_available": true,
-                                "current_power_w": reading.power_w,
+                                "current_power_w": reading.has_power_meter.then_some(reading.power_w),
                                 "current_temperature_c": reading.temperature_c.is_finite().then_some(reading.temperature_c),
                                 "history_entry_found": samples.is_some(),
                                 "sample_count": sample_count,
@@ -8262,10 +8262,11 @@ impl cosmic::Application for AppModel {
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(device_heading_button)
                         .push(
-                            widget::text::body(keep_value_unit_together(format!(
-                                "{} W",
-                                reading.power_w
-                            )))
+                            widget::text::body(keep_value_unit_together(if reading.has_power_meter {
+                                format!("{} W", reading.power_w)
+                            } else {
+                                "— W".to_string()
+                            }))
                             .width(cosmic::iced::Length::Fixed(76.0))
                             .align_x(cosmic::iced::Alignment::End),
                         )
@@ -8537,7 +8538,7 @@ impl cosmic::Application for AppModel {
                         row_key.clone(),
                         (
                             reading.name.to_lowercase(),
-                            Some(reading.power_w as f64),
+                            reading.has_power_meter.then_some(reading.power_w as f64),
                             reading
                                 .temperature_c
                                 .is_finite()
