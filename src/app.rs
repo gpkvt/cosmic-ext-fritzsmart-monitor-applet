@@ -7019,14 +7019,14 @@ impl cosmic::Application for AppModel {
                                 ..Default::default()
                             }
                         });
-                        device_graph_content = device_graph_content
-                            .push(temperature_graph)
-                            .push(menu_temperature_values(
+                        device_graph_content = device_graph_content.push(temperature_graph).push(
+                            menu_temperature_values(
                                 current_temperature,
                                 minimum_temperature,
                                 maximum_temperature,
                                 &self.settings.temperature_unit,
-                            ));
+                            ),
+                        );
                     }
                     let graph_columns = device_graph_content;
                     let device_graphs = collapsible_graph(
