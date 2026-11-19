@@ -2037,7 +2037,6 @@ fn device_corner_radius(index: usize, device_count: usize) -> cosmic::iced::bord
     }
 }
 
-
 fn range_metric_tile<'a>(
     label: &'static str,
     value: String,
@@ -6760,7 +6759,10 @@ impl cosmic::Application for AppModel {
                             })
                         }),
                     );
-                    let current_temperature = reading.temperature_c.is_finite().then_some(reading.temperature_c);
+                    let current_temperature = reading
+                        .temperature_c
+                        .is_finite()
+                        .then_some(reading.temperature_c);
                     let device_graph_pair_id = format!("device-graph-pair-{device_key}");
                     let device_graph_pair_collapsed =
                         self.collapsed_menu_sections.contains(&device_graph_pair_id);
@@ -6857,11 +6859,15 @@ impl cosmic::Application for AppModel {
                     if reading.temperature_c.is_finite() {
                         let temperature_samples: Vec<f64> = device_history
                             .into_iter()
-                            .flat_map(|samples| samples.iter().map(|(_, _, temperature)| *temperature))
+                            .flat_map(|samples| {
+                                samples.iter().map(|(_, _, temperature)| *temperature)
+                            })
                             .filter(|temperature| temperature.is_finite())
                             .collect();
-                        let minimum_temperature = temperature_samples.iter().copied().reduce(f64::min);
-                        let maximum_temperature = temperature_samples.iter().copied().reduce(f64::max);
+                        let minimum_temperature =
+                            temperature_samples.iter().copied().reduce(f64::min);
+                        let maximum_temperature =
+                            temperature_samples.iter().copied().reduce(f64::max);
                         let temperature_graph = widget::container(
                             widget::container(
                                 widget::Column::new()
@@ -6966,18 +6972,17 @@ impl cosmic::Application for AppModel {
                         .push(device_graphs);
                     // Use COSMIC's list-column disclosure pattern so the
                     // header, separator, and expanded content share native list spacing.
-                    
+
                     let mut card_column = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
                         .list_item_padding([0, 0])
                         .add(device_heading);
                     if is_expanded {
-                        card_column = card_column
-                            .add(
-                                widget::container(device_content)
-                                    .padding([12, 0])
-                                    .width(cosmic::iced::Length::Fill),
-                            );
+                        card_column = card_column.add(
+                            widget::container(device_content)
+                                .padding([12, 0])
+                                .width(cosmic::iced::Length::Fill),
+                        );
                     }
                     let device_card = widget::container(card_column)
                         .width(cosmic::iced::Length::Fill)
