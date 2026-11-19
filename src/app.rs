@@ -181,6 +181,7 @@ pub enum Message {
     ToggleNetatmoVisible(String, bool),
     ToggleNetatmoCo2Alert(String, bool),
     NetatmoCo2ThresholdChanged(String, u16),
+    PrometheusEnabledChanged(bool),
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
@@ -4594,6 +4595,24 @@ impl cosmic::Application for AppModel {
 
     fn view(&self) -> Element<'_, Self::Message> {
         PANEL_VIEW_COUNT.fetch_add(1, Ordering::Relaxed);
+        if self.settings.prometheus_enabled {
+            crate::prometheus::publish(true, Some(crate::prometheus::LiveData {
+                settings: &self.settings,
+                devices: &self.readings,
+                hue_lights: &self.hue_lights,
+                hue_sensors: &self.hue_sensors,
+                netatmo_sensors: &self.netatmo_sensors,
+                weather: self.weather.as_ref(),
+                bandwidth: self.internet_bandwidth.as_ref(),
+                router: self.fritzbox_system_info.as_ref(),
+                fritz_error: self.error.is_some(),
+                hue_error: self.hue_error.is_some(),
+                netatmo_error: self.netatmo_error.is_some(),
+                weather_error: self.weather_error.is_some(),
+            }));
+        } else {
+            crate::prometheus::publish(false, None);
+        }
         let primary_reading = self
             .selected_ains
             .first()
@@ -6116,6 +6135,18 @@ impl cosmic::Application for AppModel {
                     }))
                     .push(widget::text::caption(
                         "Netatmo requires internet access. This applet supports read-only Weather Station modules, not Netatmo thermostats or cameras."
+                    ))
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3("Prometheus exporter"))
+                    .push(widget::Row::new()
+                        .width(cosmic::iced::Length::Fill)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::body("Enable local /metrics endpoint"))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(widget::toggler(self.settings.prometheus_enabled)
+                            .on_toggle(Message::PrometheusEnabledChanged)))
+                    .push(widget::text::caption(
+                        "HTTP 127.0.0.1:9817/metrics · disabled by default. Read-only, no API requests on scrape. Device IDs and names are exposed to local clients. Never expose or proxy this endpoint to an untrusted network."
                     ))
                     .push(widget::divider::horizontal::default())
             }
@@ -11166,6 +11197,13 @@ impl cosmic::Application for AppModel {
                             ),
                     );
                 }
+            }
+            Message::PrometheusEnabledChanged(enabled) => {
+                self.settings.prometheus_enabled = enabled;
+                if !enabled {
+                    crate::prometheus::publish(false, None);
+                }
+                self.persist_settings();
             }
             Message::WeatherNetatmoExtraMetricsChanged(enabled) => {
                 self.settings.weather_netatmo_extra_metrics = enabled;
