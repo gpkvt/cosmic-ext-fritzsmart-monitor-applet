@@ -2105,7 +2105,7 @@ mod tests {
     fn internet_bandwidth_is_collapsed_by_default() {
         assert_eq!(
             FritzSettings::default().collapsed_menu_sections,
-            vec!["internet-bandwidth".to_string()]
+            vec!["internet-bandwidth".to_string(), "daily-energy-history".to_string()]
         );
     }
 
