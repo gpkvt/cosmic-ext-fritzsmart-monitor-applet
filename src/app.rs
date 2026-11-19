@@ -7767,6 +7767,25 @@ impl cosmic::Application for AppModel {
                         self.copy_feedback.as_ref(),
                     ),
                 ));
+                // The configured bridge is a device source even before its first
+                // snapshot; expose setup/connection state inside Devices.
+                if !self.settings.hue_bridge_ip.trim().is_empty()
+                    && self.hue_lights.is_empty()
+                    && self.hue_sensors.is_empty()
+                {
+                    let note = if self.hue_loading {
+                        "Loading Hue lights and sensors…".to_string()
+                    } else if let Some(error) = &self.hue_error {
+                        format!("Hue Bridge unavailable: {error}")
+                    } else {
+                        "No Hue devices found. Pair and refresh in Connection settings.".to_string()
+                    };
+                    menu_cards.push((
+                        "2-hue-bridge-placeholder".into(),
+                        widget::container(widget::text::caption(note))
+                            .padding([8, 12]).width(cosmic::iced::Length::Fill).into(),
+                    ));
+                }
                 menu_cards.retain(|(key, _)| {
                     let element = if key == "0-summary" {
                         "summary"
@@ -7846,25 +7865,6 @@ impl cosmic::Application for AppModel {
                             }
                         })
                 });
-                // The configured bridge is a device source even before its first
-                // snapshot; expose setup/connection state inside Devices.
-                if !self.settings.hue_bridge_ip.trim().is_empty()
-                    && self.hue_lights.is_empty()
-                    && self.hue_sensors.is_empty()
-                {
-                    let note = if self.hue_loading {
-                        "Loading Hue lights and sensors…".to_string()
-                    } else if let Some(error) = &self.hue_error {
-                        format!("Hue Bridge unavailable: {error}")
-                    } else {
-                        "No Hue devices found. Pair and refresh in Connection settings.".to_string()
-                    };
-                    menu_cards.push((
-                        "2-hue-bridge-placeholder".into(),
-                        widget::container(widget::text::caption(note))
-                            .padding([8, 12]).width(cosmic::iced::Length::Fill).into(),
-                    ));
-                }
                 let device_count = menu_cards
                     .iter()
                     .filter(|(key, _)| key.starts_with("2-")
