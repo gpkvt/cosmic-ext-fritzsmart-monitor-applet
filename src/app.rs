@@ -3721,7 +3721,7 @@ impl cosmic::Application for AppModel {
                 panel_items.push((
                     "power-consumption",
                     panel_item(
-                        "Watt OUT",
+                        "Power OUT",
                         Some(
                             widget::svg(widget::svg::Handle::from_memory(
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5M16 3v5"/><path d="M6 8h12v3a6 6 0 0 1-6 6h0a6 6 0 0 1-6-6V8Z"/><path d="M12 17v2a3 3 0 0 0 3 3h1"/></svg>"#.to_vec(),
@@ -3733,7 +3733,7 @@ impl cosmic::Application for AppModel {
                             }))
                             .into(),
                         ),
-                        panel_value(panel_value_with_unit(power, self.settings.panel_multiline)),
+                        panel_value(keep_value_unit_together(power)),
                         self.settings.panel_multiline,
                     )
                     .into(),
@@ -3745,7 +3745,7 @@ impl cosmic::Application for AppModel {
                 panel_items.push((
                     "solar-power",
                     panel_item(
-                        "Watt IN",
+                        "Power IN",
                         Some(
                             widget::svg(widget::svg::Handle::from_memory(
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2-5h14l2 5H3Z"/><path d="M4 9h16l-2 11H6L4 9Z"/><path d="M8 9l1 11M16 9l-1 11M5 13h14M6 17h12"/><path d="M12 1v2M2 5l2 1M22 5l-2 1"/></svg>"#.to_vec(),
@@ -3759,7 +3759,7 @@ impl cosmic::Application for AppModel {
                             }))
                             .into(),
                         ),
-                        panel_value(panel_value_with_unit(input_power, self.settings.panel_multiline)),
+                        panel_value(keep_value_unit_together(input_power)),
                         self.settings.panel_multiline,
                     )
                     .into(),
