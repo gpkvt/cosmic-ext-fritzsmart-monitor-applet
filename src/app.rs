@@ -133,6 +133,7 @@ pub enum Message {
     PanelNetPowerChanged(bool),
     GraphTimespanChanged(u32),
     GraphStyleChanged(String),
+    TemperatureUnitChanged(String),
     ShowGraph(String, GraphSamples, String, Option<String>),
     ShowCombinedGraph(
         String,
@@ -251,7 +252,7 @@ fn build_debug_report(app: &AppModel, fritzbox_dump: &str) -> String {
                     "- {} (AIN {masked_ain}): {} W, {}, power state {:?}",
                     reading.name,
                     reading.power_w,
-                    format_panel_temperature(reading.temperature_c),
+                    format_temperature(reading.temperature_c, &settings.temperature_unit),
                     reading.power_state
                 )
             })
@@ -287,7 +288,7 @@ fn build_debug_report(app: &AppModel, fritzbox_dump: &str) -> String {
             .join("\n")
     };
     let cpu_temperature = cpu_temperature_c()
-        .map(|temperature| format!("{temperature:.1} °C"))
+        .map(|temperature| format_temperature(temperature, &settings.temperature_unit))
         .unwrap_or_else(|| "Not available".into());
     let history_diagnostics = serde_json::to_string_pretty(&app.history_storage_diagnostics)
         .unwrap_or_else(|error| format!("Could not serialize history diagnostics: {error}"));
@@ -513,23 +514,26 @@ fn notify_temperature_alert(
     temperature: f64,
     thresholds: TemperatureAlertThresholds,
     language: &str,
+    unit: &str,
 ) {
     let (summary, body) = if temperature > f64::from(thresholds.high_c) {
         (
             format!("{}: {name}", crate::i18n::tr(language, "High temperature")),
             format!(
-                "{temperature:.1} °C ({}: {} °C)",
+                "{} ({}: {})",
+                format_temperature(temperature, unit),
                 crate::i18n::tr(language, "maximum"),
-                thresholds.high_c
+                format_temperature(f64::from(thresholds.high_c), unit)
             ),
         )
     } else {
         (
             format!("{}: {name}", crate::i18n::tr(language, "Low temperature")),
             format!(
-                "{temperature:.1} °C ({}: {} °C)",
+                "{} ({}: {})",
+                format_temperature(temperature, unit),
                 crate::i18n::tr(language, "minimum"),
-                thresholds.low_c
+                format_temperature(f64::from(thresholds.low_c), unit)
             ),
         )
     };
@@ -695,11 +699,19 @@ fn selected_weather_temperature(
         .unwrap_or(fallback_c)
 }
 
-fn format_panel_temperature(temperature_c: f64) -> String {
+fn temperature_in_unit(temperature_c: f64, unit: &str) -> f64 {
+    if unit.eq_ignore_ascii_case("F") { temperature_c * 9.0 / 5.0 + 32.0 } else { temperature_c }
+}
+
+fn temperature_unit_label(unit: &str) -> &'static str {
+    if unit.eq_ignore_ascii_case("F") { "°F" } else { "°C" }
+}
+
+fn format_temperature(temperature_c: f64, unit: &str) -> String {
     if temperature_c.is_finite() {
-        format!("{} °C", format_compact_decimal(temperature_c))
+        format!("{} {}", format_compact_decimal(temperature_in_unit(temperature_c, unit)), temperature_unit_label(unit))
     } else {
-        "-- °C".into()
+        format!("-- {}", temperature_unit_label(unit))
     }
 }
 
@@ -1059,12 +1071,13 @@ fn menu_temperature_values(
     current_c: Option<f64>,
     minimum_c: Option<f64>,
     maximum_c: Option<f64>,
+    unit: &str,
 ) -> cosmic::Element<'static, Message> {
     let value_row = |label: &'static str, value: Option<f64>| {
         let display = value
             .filter(|value| value.is_finite())
-            .map(|value| format!("{value:.1} °C"))
-            .unwrap_or_else(|| "— °C".to_string());
+            .map(|value| format!("{:.1} {}", temperature_in_unit(value, unit), temperature_unit_label(unit)))
+            .unwrap_or_else(|| format!("— {}", temperature_unit_label(unit)));
         widget::Row::new()
             .spacing(8)
             .align_y(cosmic::iced::Alignment::Center)
@@ -1364,7 +1377,7 @@ fn escape_svg_text(value: &str) -> String {
 }
 
 fn format_graph_y_tick(value: f64, unit: &str) -> String {
-    if unit == "°C" || unit.contains("/s") {
+    if unit.starts_with("°") || unit.contains("/s") {
         format!("{value:.1}")
     } else if value.abs() >= 100.0 {
         format!("{value:.0}")
@@ -2037,6 +2050,7 @@ fn device_corner_radius(index: usize, device_count: usize) -> cosmic::iced::bord
     }
 }
 
+
 fn range_metric_tile<'a>(
     label: &'static str,
     value: String,
@@ -2433,216 +2447,92 @@ fn total_power_overview(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     collapsed_sections: &HashSet<String>,
 ) -> Option<Vec<(String, cosmic::Element<'static, Message>)>> {
-    let output_low = history.iter().map(|(_, value)| *value).min()?;
-    let output_high = history.iter().map(|(_, value)| *value).max()?;
+    let (output_low, output_high) = {
+        let mut values = history.iter().map(|(_, value)| *value);
+        let first = values.next()?;
+        values.fold((first, first), |(low, high), value| (low.min(value), high.max(value)))
+    };
     let input_history = rebuild_input_power_history(device_history, &settings.input_ains);
     let has_input_readings = readings.iter().any(|reading| {
-        settings
-            .input_ains
-            .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+        settings.input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
     });
-    let output_temperature_history =
-        rebuild_temperature_history(device_history, &settings.input_ains, false);
-    let input_temperature_history =
-        rebuild_temperature_history(device_history, &settings.input_ains, true);
     let (input_low, input_high) = input_display_range(&input_history);
-    let total_power = output_power_w(readings, &settings.input_ains);
-    let input_power = input_display_power_w(input_power_w(readings, &settings.input_ains));
+    let total_output_w = output_power_w(readings, &settings.input_ains);
+    let total_input_w = input_display_power_w(input_power_w(readings, &settings.input_ains));
     let axis_start = format_graph_axis_start(
         settings.graph_timespan_minutes,
-        history
-            .front()
-            .map(|(timestamp, _)| Instant::now().duration_since(*timestamp).as_secs() / 60),
+        history.front().map(|(timestamp, _)| Instant::now().duration_since(*timestamp).as_secs() / 60),
     );
-
-    let mut output_graph = widget::Column::new().spacing(8).push(collapsible_graph(
-        "POWER OUTPUT & TEMPERATURE",
-        "graph-total-output-pair",
-        collapsed_sections.contains("graph-total-output-pair"),
-        widget::Column::new()
-            .spacing(8)
-            .push(interactive_graph_with_axis(
-                &settings.language,
+    let output_values: GraphSamples = history.iter().map(|(timestamp, value)| (*timestamp, *value as f64)).collect();
+    let input_values: GraphSamples = input_history.iter().map(|(timestamp, value)| (*timestamp, input_display_power_w(*value) as f64)).collect();
+    let graph_title = format!(
+        "{} & {}",
+        crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
+        crate::i18n::tr(&settings.language, "TOTAL POWER INPUT")
+    );
+    let graph = if has_input_readings {
+        let (output_aligned, input_aligned) = aligned_power_series(
+            &history.iter().copied().collect(),
+            &input_history,
+        );
+        interactive_combined_graph_with_axis(
+            &graph_title,
+            if output_aligned.is_empty() { output_values } else { output_aligned },
+            if input_aligned.is_empty() { input_values } else { input_aligned },
+            &settings.graph_style,
+            "W",
+            axis_start,
+            (
                 crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-                history
-                    .iter()
-                    .map(|(timestamp, value)| (*timestamp, *value as f64)),
-                &settings.graph_style,
-                "W",
-                axis_start.clone(),
-            ))
-            .push(interactive_graph_with_axis(
-                &settings.language,
-                crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
-                output_temperature_history
-                    .iter()
-                    .map(|(timestamp, value)| (*timestamp, *value)),
-                &settings.graph_style,
-                "°C",
-                axis_start.clone(),
-            ))
-            .into(),
-    ));
-    if let Some((energy_wh, timespan)) = power_energy_and_timespan(history) {
-        output_graph = output_graph.push(widget::text::caption(format!(
-            "{}: {energy_wh:.1} Wh · {}",
-            crate::i18n::tr(&settings.language, "TOTAL ENERGY"),
-            format_elapsed_timespan(timespan)
-        )));
-    }
-    let output_content = widget::Column::new()
-        .spacing(8)
-        .width(cosmic::iced::Length::Fill)
-        .push(
-            widget::Row::new()
-                .spacing(8)
-                .width(cosmic::iced::Length::Fill)
-                .push(
-                    widget::container(range_metric_tile(
-                        "LOW",
-                        format!("{output_low} W"),
-                        "go-down-symbolic",
-                    ))
-                    .width(cosmic::iced::Length::Fill),
-                )
-                .push(
-                    widget::container(range_metric_tile(
-                        "HIGH",
-                        format!("{output_high} W"),
-                        "go-up-symbolic",
-                    ))
-                    .width(cosmic::iced::Length::Fill),
-                ),
+                crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
+            ),
         )
-        .push(graph_panel(output_graph.into()));
-    let output_ains: HashSet<String> = device_history
-        .keys()
+    } else {
+        interactive_graph_with_axis(
+            &settings.language,
+            &crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
+            output_values,
+            &settings.graph_style,
+            "W",
+            axis_start,
+        )
+    };
+    let output_ains: HashSet<String> = device_history.keys()
         .filter(|ain| !settings.input_ains.contains(*ain))
         .cloned()
         .collect();
     let (output_yesterday_wh, output_today_wh) = yesterday_and_today_energy_wh_for_ains(
-        device_history,
-        &output_ains,
-        &settings.input_ains,
-        settings.refresh_interval_seconds,
-        false,
+        device_history, &output_ains, &settings.input_ains,
+        settings.refresh_interval_seconds, false,
     );
-    let output_summary = menu_energy_summary(
-        history.iter().map(|(_, value)| *value as f64),
-        Some(total_power as f64),
-        output_yesterday_wh,
-        output_today_wh,
+    let (input_yesterday_wh, input_today_wh) = yesterday_and_today_energy_wh_for_ains(
+        device_history, &settings.input_ains, &settings.input_ains,
+        settings.refresh_interval_seconds, true,
     );
-    let output_section = total_power_section(
-        "TOTAL POWER OUTPUT",
-        total_power,
-        output_temperature_history
-            .back()
-            .map(|(_, value)| *value)
-            .filter(|value| value.is_finite())
-            .map(|value| format!("{value:.1} °C")),
-        "total-power-output",
-        collapsed_sections.contains("total-power-output"),
-        output_summary,
-        output_content.into(),
-    );
-    let mut sections = vec![("3-total-power-output".to_string(), output_section)];
-
-    if has_input_readings {
-        let input_energy_summary =
-            power_energy_and_timespan(&input_history).map(|(energy_wh, timespan)| {
-                widget::text::caption(format!(
-                    "{}: {energy_wh:.1} Wh · {}",
-                    crate::i18n::tr(&settings.language, "TOTAL ENERGY"),
-                    format_elapsed_timespan(timespan)
-                ))
-            });
-        let mut input_graph = widget::Column::new().spacing(8).push(collapsible_graph(
-            "POWER INPUT & TEMPERATURE",
-            "graph-total-input-pair",
-            collapsed_sections.contains("graph-total-input-pair"),
-            widget::Column::new()
-                .spacing(8)
-                .push(interactive_graph_with_axis(
-                    &settings.language,
-                    crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
-                    input_history.iter().map(|(timestamp, value)| {
-                        (*timestamp, input_display_power_w(*value) as f64)
-                    }),
-                    &settings.graph_style,
-                    "W",
-                    axis_start.clone(),
-                ))
-                .push(interactive_graph_with_axis(
-                    &settings.language,
-                    crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
-                    input_temperature_history
-                        .iter()
-                        .map(|(timestamp, value)| (*timestamp, *value)),
-                    &settings.graph_style,
-                    "°C",
-                    axis_start.clone(),
-                ))
-                .into(),
+    let mut content = widget::Column::new()
+        .spacing(10)
+        .width(cosmic::iced::Length::Fill)
+        .push(graph_panel(graph))
+        .push(widget::Row::new().spacing(8).width(cosmic::iced::Length::Fill)
+            .push(widget::container(range_metric_tile("OUTPUT LOW", format!("{output_low} W"), "go-down-symbolic")).width(cosmic::iced::Length::Fill))
+            .push(widget::container(range_metric_tile("OUTPUT HIGH", format!("{output_high} W"), "go-up-symbolic")).width(cosmic::iced::Length::Fill)))
+        .push(menu_power_flow_summary(
+            total_input_w as f64, total_output_w as f64,
+            input_today_wh, output_today_wh,
+            input_yesterday_wh, output_yesterday_wh,
         ));
-        if let Some(summary) = input_energy_summary {
-            input_graph = input_graph.push(summary);
-        }
-
-        let input_content = widget::Column::new()
-            .spacing(8)
-            .width(cosmic::iced::Length::Fill)
-            .push(
-                widget::Row::new()
-                    .spacing(8)
-                    .width(cosmic::iced::Length::Fill)
-                    .push(
-                        widget::container(range_metric_tile(
-                            "LOW",
-                            format!("{input_low} W"),
-                            "go-down-symbolic",
-                        ))
-                        .width(cosmic::iced::Length::Fill),
-                    )
-                    .push(
-                        widget::container(range_metric_tile(
-                            "HIGH",
-                            format!("{input_high} W"),
-                            "go-up-symbolic",
-                        ))
-                        .width(cosmic::iced::Length::Fill),
-                    ),
-            )
-            .push(graph_panel(input_graph.into()));
-        let (input_yesterday_wh, input_today_wh) = yesterday_and_today_energy_wh_for_ains(
-            device_history,
-            &settings.input_ains,
-            &settings.input_ains,
-            settings.refresh_interval_seconds,
-            true,
-        );
-        let input_summary = menu_energy_summary(
-            input_history
-                .iter()
-                .map(|(_, value)| input_display_power_w(*value) as f64),
-            Some(input_power as f64),
-            input_yesterday_wh,
-            input_today_wh,
-        );
-        let input_section = total_power_section(
-            "TOTAL POWER INPUT",
-            input_power,
-            input_temperature_history
-                .back()
-                .map(|(_, value)| format!("{value:.1} °C")),
-            "total-power-input",
-            collapsed_sections.contains("total-power-input"),
-            input_summary,
-            input_content.into(),
-        );
-        sections.push(("4-total-power-input".to_string(), input_section));
+    if has_input_readings {
+        content = content.push(widget::Row::new().spacing(8).width(cosmic::iced::Length::Fill)
+            .push(widget::container(range_metric_tile("INPUT LOW", format!("{input_low} W"), "go-down-symbolic")).width(cosmic::iced::Length::Fill))
+            .push(widget::container(range_metric_tile("INPUT HIGH", format!("{input_high} W"), "go-up-symbolic")).width(cosmic::iced::Length::Fill)));
     }
-    Some(sections)
+    let section = collapsible_graph(
+        "TOTAL POWER INPUT & OUTPUT",
+        "total-power-overview",
+        collapsed_sections.contains("total-power-overview"),
+        content.into(),
+    );
+    Some(vec![("3-total-power-overview".to_string(), surface_card(section, 14))])
 }
 
 fn panel_order_group_key(id: &str, multiline: bool) -> &str {
@@ -2805,8 +2695,7 @@ fn menu_element_label(id: &str) -> &'static str {
         "weather" => "Weather",
         "internet-bandwidth" => "Internet bandwidth",
         "devices" => "Devices",
-        "total-power-output" => "Total power out",
-        "total-power-input" => "Total power in",
+        "total-power-output" => "Total power input & output",
         _ => "Unknown element",
     }
 }
@@ -3485,11 +3374,11 @@ impl cosmic::Application for AppModel {
                 &self.selected_ains,
                 self.settings.panel_exclude_solar_temperature,
             )
-            .map(format_panel_temperature)
+            .map(|temperature| format_temperature(temperature, &self.settings.temperature_unit))
         } else {
             primary_reading
                 .filter(|reading| reading.temperature_c.is_finite())
-                .map(|reading| format_panel_temperature(reading.temperature_c))
+                .map(|reading| format_temperature(reading.temperature_c, &self.settings.temperature_unit))
         };
         let input_power = self
             .readings
@@ -3689,13 +3578,13 @@ impl cosmic::Application for AppModel {
                             .into(),
                     ),
                     panel_value(panel_value_with_unit(
-                        format!(
-                            "{:.0} °C",
+                        format_temperature(
                             selected_weather_temperature(
                                 &self.readings,
                                 &self.settings.weather_temperature_ain,
                                 weather.temperature_c,
-                            )
+                            ),
+                            &self.settings.temperature_unit,
                         ),
                         self.settings.panel_multiline
                             && self
@@ -4634,6 +4523,15 @@ impl cosmic::Application for AppModel {
                             ),
                     )
                     .push(widget::divider::horizontal::default())
+                    .push(widget::text::caption("TEMPERATURE UNIT"))
+                    .push(widget::Row::new().spacing(8).push(
+                        widget::button::text(if self.settings.temperature_unit == "C" { "✓ °C" } else { "°C" })
+                            .on_press(Message::TemperatureUnitChanged("C".into())),
+                    ).push(
+                        widget::button::text(if self.settings.temperature_unit == "F" { "✓ °F" } else { "°F" })
+                            .on_press(Message::TemperatureUnitChanged("F".into())),
+                    ))
+                    .push(widget::divider::horizontal::default())
                     .push(widget::text::caption(format!(
                         "{}: {}",
                         crate::i18n::tr(&self.settings.language, "GRAPH HISTORY"),
@@ -4812,7 +4710,6 @@ impl cosmic::Application for AppModel {
                         "internet-bandwidth" => "internet-bandwidth",
                         "devices" => "devices",
                         "total-power-output" => "total-power-output",
-                        "total-power-input" => "total-power-input",
                         _ => continue,
                     };
                     let label = crate::i18n::tr(&self.settings.language, menu_element_label(id));
@@ -5043,37 +4940,43 @@ impl cosmic::Application for AppModel {
                         if let Some(thresholds) = alert_thresholds {
                             device_row = device_row
                                 .push(widget::text::caption(format!(
-                                    "{}: {} °C",
+                                    "{}: {}",
                                     crate::i18n::tr(&self.settings.language, "Upper limit"),
-                                    thresholds.high_c
+                                    format_temperature(f64::from(thresholds.high_c), &self.settings.temperature_unit)
                                 )))
                                 .push(
-                                    widget::slider(0.0..=40.0, f32::from(thresholds.high_c), {
-                                        let ain = ain.clone();
-                                        move |value| {
-                                            Message::TemperatureAlertHighChanged(
-                                                ain.clone(),
-                                                value.round() as i16,
-                                            )
-                                        }
-                                    })
+                                    widget::slider(
+                                        if self.settings.temperature_unit == "F" { 32.0..=104.0 } else { 0.0..=40.0 },
+                                        temperature_in_unit(f64::from(thresholds.high_c), &self.settings.temperature_unit) as f32,
+                                        {
+                                            let ain = ain.clone();
+                                            let unit = self.settings.temperature_unit.clone();
+                                            move |value| {
+                                                let celsius = if unit == "F" { (f64::from(value) - 32.0) * 5.0 / 9.0 } else { f64::from(value) };
+                                                Message::TemperatureAlertHighChanged(ain.clone(), celsius.round() as i16)
+                                            }
+                                        },
+                                    )
                                     .step(1.0_f32),
                                 )
                                 .push(widget::text::caption(format!(
-                                    "{}: {} °C",
+                                    "{}: {}",
                                     crate::i18n::tr(&self.settings.language, "Lower limit"),
-                                    thresholds.low_c
+                                    format_temperature(f64::from(thresholds.low_c), &self.settings.temperature_unit)
                                 )))
                                 .push(
-                                    widget::slider(-10.0..=10.0, f32::from(thresholds.low_c), {
-                                        let ain = ain.clone();
-                                        move |value| {
-                                            Message::TemperatureAlertLowChanged(
-                                                ain.clone(),
-                                                value.round() as i16,
-                                            )
-                                        }
-                                    })
+                                    widget::slider(
+                                        if self.settings.temperature_unit == "F" { 14.0..=32.0 } else { -10.0..=0.0 },
+                                        temperature_in_unit(f64::from(thresholds.low_c), &self.settings.temperature_unit) as f32,
+                                        {
+                                            let ain = ain.clone();
+                                            let unit = self.settings.temperature_unit.clone();
+                                            move |value| {
+                                                let celsius = if unit == "F" { (f64::from(value) - 32.0) * 5.0 / 9.0 } else { f64::from(value) };
+                                                Message::TemperatureAlertLowChanged(ain.clone(), celsius.round() as i16)
+                                            }
+                                        },
+                                    )
                                     .step(1.0_f32),
                                 )
                                 .push(widget::text::caption(
@@ -5437,7 +5340,7 @@ impl cosmic::Application for AppModel {
 
                 let cpu_temperature = cpu_temperature_c();
                 let cpu_temperature_label = cpu_temperature
-                    .map(|temperature| format!("{temperature:.1} °C"))
+                    .map(|temperature| format_temperature(temperature, &self.settings.temperature_unit))
                     .unwrap_or_else(|| {
                         crate::i18n::tr(&self.settings.language, "Not available").to_string()
                     });
@@ -5678,7 +5581,7 @@ impl cosmic::Application for AppModel {
                                 .push(if reading.temperature_c.is_finite() {
                                     widget::text::caption(format!(
                                         "{} · {state}",
-                                        format_panel_temperature(reading.temperature_c)
+                                        format_temperature(reading.temperature_c, &self.settings.temperature_unit)
                                     ))
                                 } else {
                                     widget::text::caption(state)
@@ -6055,9 +5958,9 @@ impl cosmic::Application for AppModel {
                                     .spacing(2)
                                     .push(widget::text::body(weather.description.clone()))
                                     .push(widget::text::caption(format!(
-                                        "{} {:.1} °C",
+                                        "{} {}",
                                         crate::i18n::tr(&self.settings.language, "Feels like"),
-                                        weather.feels_like_c
+                                        format_temperature(weather.feels_like_c, &self.settings.temperature_unit)
                                     ))),
                             ),
                     )
@@ -6145,13 +6048,13 @@ impl cosmic::Application for AppModel {
                                 )))
                                 .push(widget::text::caption(weather.location_name.clone())),
                         )
-                        .push(widget::text::title2(format!(
-                            "{:.0} °C",
+                        .push(widget::text::title2(format_temperature(
                             selected_weather_temperature(
                                 &self.readings,
                                 &self.settings.weather_temperature_ain,
                                 weather.temperature_c,
-                            )
+                            ),
+                            &self.settings.temperature_unit,
                         )))
                         .push(
                             widget::icon::from_name(if self.weather_forecast_expanded {
@@ -6396,8 +6299,11 @@ impl cosmic::Application for AppModel {
                                         .align_x(cosmic::iced::Alignment::End)
                                         .push(
                                             widget::text::body(format!(
-                                                "{:.0} °C\n{:.0} °C",
-                                                day.max_temperature_c, day.min_temperature_c
+                                                "{:.0} {}\n{:.0} {}",
+                                                temperature_in_unit(day.max_temperature_c, &self.settings.temperature_unit),
+                                                temperature_unit_label(&self.settings.temperature_unit),
+                                                temperature_in_unit(day.min_temperature_c, &self.settings.temperature_unit),
+                                                temperature_unit_label(&self.settings.temperature_unit)
                                             ))
                                             .width(cosmic::iced::Length::Fill)
                                             .align_x(cosmic::iced::Alignment::End),
@@ -6700,7 +6606,7 @@ impl cosmic::Application for AppModel {
                                         format!(
                                             "{} W · {}",
                                             reading.power_w,
-                                            format_panel_temperature(reading.temperature_c)
+                                            format_temperature(reading.temperature_c, &self.settings.temperature_unit)
                                         )
                                     })),
                             )
@@ -6759,10 +6665,7 @@ impl cosmic::Application for AppModel {
                             })
                         }),
                     );
-                    let current_temperature = reading
-                        .temperature_c
-                        .is_finite()
-                        .then_some(reading.temperature_c);
+                    let current_temperature = reading.temperature_c.is_finite().then_some(reading.temperature_c);
                     let device_graph_pair_id = format!("device-graph-pair-{device_key}");
                     let device_graph_pair_collapsed =
                         self.collapsed_menu_sections.contains(&device_graph_pair_id);
@@ -6859,15 +6762,11 @@ impl cosmic::Application for AppModel {
                     if reading.temperature_c.is_finite() {
                         let temperature_samples: Vec<f64> = device_history
                             .into_iter()
-                            .flat_map(|samples| {
-                                samples.iter().map(|(_, _, temperature)| *temperature)
-                            })
+                            .flat_map(|samples| samples.iter().map(|(_, _, temperature)| *temperature))
                             .filter(|temperature| temperature.is_finite())
                             .collect();
-                        let minimum_temperature =
-                            temperature_samples.iter().copied().reduce(f64::min);
-                        let maximum_temperature =
-                            temperature_samples.iter().copied().reduce(f64::max);
+                        let minimum_temperature = temperature_samples.iter().copied().reduce(f64::min);
+                        let maximum_temperature = temperature_samples.iter().copied().reduce(f64::max);
                         let temperature_graph = widget::container(
                             widget::container(
                                 widget::Column::new()
@@ -6875,7 +6774,7 @@ impl cosmic::Application for AppModel {
                                     .width(cosmic::iced::Length::Fill)
                                     .push(widget::text::caption(crate::i18n::tr(
                                         &self.settings.language,
-                                        "TEMPERATURE (°C)",
+                                        if self.settings.temperature_unit == "F" { "TEMPERATURE (°F)" } else { "TEMPERATURE (°C)" },
                                     )))
                                     .push(interactive_graph_with_axis(
                                         &self.settings.language,
@@ -6884,7 +6783,7 @@ impl cosmic::Application for AppModel {
                                             reading.name,
                                             crate::i18n::tr(
                                                 &self.settings.language,
-                                                "TEMPERATURE (°C)"
+                                                if self.settings.temperature_unit == "F" { "TEMPERATURE (°F)" } else { "TEMPERATURE (°C)" }
                                             )
                                         ),
                                         device_history.into_iter().flat_map(|samples| {
@@ -6892,12 +6791,12 @@ impl cosmic::Application for AppModel {
                                                 |(timestamp, _, temperature)| {
                                                     temperature
                                                         .is_finite()
-                                                        .then_some((*timestamp, *temperature))
+                                                        .then_some((*timestamp, temperature_in_unit(*temperature, &self.settings.temperature_unit)))
                                                 },
                                             )
                                         }),
                                         &self.settings.graph_style,
-                                        "°C",
+                                        temperature_unit_label(&self.settings.temperature_unit),
                                         device_axis_start,
                                     )),
                             )
@@ -6950,6 +6849,7 @@ impl cosmic::Application for AppModel {
                                         current_temperature,
                                         minimum_temperature,
                                         maximum_temperature,
+                                        &self.settings.temperature_unit,
                                     ))
                                     .width(cosmic::iced::Length::FillPortion(2)),
                                 ),
@@ -6972,17 +6872,18 @@ impl cosmic::Application for AppModel {
                         .push(device_graphs);
                     // Use COSMIC's list-column disclosure pattern so the
                     // header, separator, and expanded content share native list spacing.
-
+                    
                     let mut card_column = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
                         .list_item_padding([0, 0])
                         .add(device_heading);
                     if is_expanded {
-                        card_column = card_column.add(
-                            widget::container(device_content)
-                                .padding([12, 0])
-                                .width(cosmic::iced::Length::Fill),
-                        );
+                        card_column = card_column
+                            .add(
+                                widget::container(device_content)
+                                    .padding([12, 0])
+                                    .width(cosmic::iced::Length::Fill),
+                            );
                     }
                     let device_card = widget::container(card_column)
                         .width(cosmic::iced::Length::Fill)
@@ -7260,7 +7161,7 @@ impl cosmic::Application for AppModel {
                                     };
                                     (
                                         format!("{value} W"),
-                                        temperature.map(|value| format!("{value:.1} °C")),
+                                        temperature.map(|value| format_temperature(value, &self.settings.temperature_unit)),
                                     )
                                 }),
                             "internet-bandwidth" => Some((
@@ -8188,6 +8089,7 @@ impl cosmic::Application for AppModel {
                                             reading.temperature_c,
                                             thresholds,
                                             &self.settings.language,
+                                            &self.settings.temperature_unit,
                                         );
                                     }
                                     // First observation establishes a baseline without
@@ -9121,11 +9023,11 @@ impl cosmic::Application for AppModel {
                 self.persist_settings();
             }
             Message::GraphStyleChanged(value) => {
-                self.settings.graph_style = if value == "bar" {
-                    "bar".into()
-                } else {
-                    "line".into()
-                };
+                self.settings.graph_style = if value == "bar" { "bar".into() } else { "line".into() };
+                self.persist_settings();
+            }
+            Message::TemperatureUnitChanged(value) => {
+                self.settings.temperature_unit = if value.eq_ignore_ascii_case("F") { "F".into() } else { "C".into() };
                 self.persist_settings();
             }
             Message::RefreshIntervalChanged(value) => {
@@ -10020,9 +9922,18 @@ mod history_tests {
 
     #[test]
     fn panel_temperature_omits_trailing_decimal_zero() {
-        assert_eq!(format_panel_temperature(20.0), "20 °C");
-        assert_eq!(format_panel_temperature(20.5), "20.5 °C");
-        assert_eq!(format_panel_temperature(-3.0), "-3 °C");
+        assert_eq!(format_temperature(20.0, "C"), "20 °C");
+        assert_eq!(format_temperature(20.5, "C"), "20.5 °C");
+        assert_eq!(format_temperature(-3.0, "C"), "-3 °C");
+    }
+
+    #[test]
+    fn temperature_conversion_supports_fahrenheit_without_rounding_source_data() {
+        assert_eq!(temperature_in_unit(0.0, "F"), 32.0);
+        assert_eq!(temperature_in_unit(100.0, "F"), 212.0);
+        assert_eq!(temperature_in_unit(20.0, "C"), 20.0);
+        assert_eq!(format_temperature(20.0, "F"), "68 °F");
+        assert_eq!(format_temperature(-3.0, "F"), "26.6 °F");
     }
 
     #[test]
