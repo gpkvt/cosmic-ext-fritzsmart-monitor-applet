@@ -461,7 +461,7 @@ fn parse_settings_section(value: &str) -> String {
 }
 
 fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
-    const SECTION_IDS: [&str; 11] = [
+    const SECTION_IDS: [&str; 16] = [
         "summary",
         "weather",
         "devices",
@@ -469,6 +469,11 @@ fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
         "total-power-output",
         "total-power-input",
         "total-power-overview",
+        "graph-overview-output-power",
+        "graph-overview-input-power",
+        "graph-overview-daily-input",
+        "graph-overview-daily-output",
+        "graph-overview-daily-ratio",
         "current-power-history",
         "graph-total-output-pair",
         "graph-total-input-pair",
@@ -2296,7 +2301,7 @@ mod tests {
     fn parses_persisted_collapsed_menu_sections_safely() {
         assert_eq!(
             parse_collapsed_menu_sections(
-                "weather,unknown,summary,weather,devices,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature,graph-total-output-pair,graph-total-input-pair,graph-bandwidth-pair,total-power-overview,daily-energy-history,device-graph-pair-0876101234567890,device-graph-pair-invalid!"
+                "weather,unknown,summary,weather,devices,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature,graph-total-output-pair,graph-total-input-pair,graph-bandwidth-pair,total-power-overview,daily-energy-history,graph-overview-output-power,graph-overview-input-power,graph-overview-daily-input,graph-overview-daily-output,graph-overview-daily-ratio,graph-overview-fake,graph-overview-output-power,device-graph-pair-0876101234567890,device-graph-pair-invalid!"
             ),
             vec![
                 "weather".to_string(),
@@ -2311,6 +2316,11 @@ mod tests {
                 "graph-bandwidth-pair".to_string(),
                 "total-power-overview".to_string(),
                 "daily-energy-history".to_string(),
+                "graph-overview-output-power".to_string(),
+                "graph-overview-input-power".to_string(),
+                "graph-overview-daily-input".to_string(),
+                "graph-overview-daily-output".to_string(),
+                "graph-overview-daily-ratio".to_string(),
                 "device-graph-pair-0876101234567890".to_string(),
             ]
         );
@@ -2318,6 +2328,14 @@ mod tests {
         assert!(!FritzSettings::default().weather_attribution_expanded);
         assert!(!FritzSettings::default().graph_history_diagnostics_expanded);
         assert_eq!(parse_collapsed_menu_sections("devices"), vec!["devices"]);
+        // Unknown graph names never survive a configuration reload.
+        assert!(parse_collapsed_menu_sections("graph-overview-invalid").is_empty());
+        // New graph controls are expanded by default, independently from the
+        // outer Total Power Input & Output section.
+        assert!(!FritzSettings::default()
+            .collapsed_menu_sections
+            .iter()
+            .any(|id| id.starts_with("graph-overview-")));
     }
 
     #[test]
