@@ -2034,6 +2034,35 @@ fn range_metric_tile<'a>(
     surface_card(content.into(), 12)
 }
 
+fn power_range_row(
+    low_label: &'static str,
+    high_label: &'static str,
+    low: String,
+    high: String,
+) -> cosmic::Element<'static, Message> {
+    widget::Row::new()
+        .spacing(8)
+        .width(cosmic::iced::Length::Fill)
+        .push(
+            widget::container(range_metric_tile(low_label, low, "go-down-symbolic"))
+                .width(cosmic::iced::Length::Fill),
+        )
+        .push(
+            widget::container(range_metric_tile(high_label, high, "go-up-symbolic"))
+                .width(cosmic::iced::Length::Fill),
+        )
+        .into()
+}
+
+/// Render unavailable input history as missing rather than as a measured zero.
+fn input_range_labels(history: &VecDeque<(Instant, i64)>) -> (String, String) {
+    if history.is_empty() {
+        return ("— W".into(), "— W".into());
+    }
+    let (low, high) = input_display_range(history);
+    (format!("{low} W"), format!("{high} W"))
+}
+
 fn displayed_power_w(readings: &[FritzReading], selected_ains: &[String]) -> Option<i64> {
     selected_ains
         .first()
@@ -2416,32 +2445,24 @@ fn total_power_overview(
         settings.refresh_interval_seconds,
         true,
     );
-    // CURRENT POWER HISTORY owns the shared graph. Keep only the
-    // complementary live, daily and low/high metrics in this section.
-    let mut content = widget::Column::new()
+    // CURRENT POWER HISTORY owns the graph. Keep both input and output
+    // low/high values visible here, even if an input device is now offline.
+    let (input_low_label, input_high_label) = input_range_labels(&input_history);
+    let content = widget::Column::new()
         .spacing(10)
         .width(cosmic::iced::Length::Fill)
-        .push(
-            widget::Row::new()
-                .spacing(8)
-                .width(cosmic::iced::Length::Fill)
-                .push(
-                    widget::container(range_metric_tile(
-                        "OUTPUT LOW",
-                        format!("{output_low} W"),
-                        "go-down-symbolic",
-                    ))
-                    .width(cosmic::iced::Length::Fill),
-                )
-                .push(
-                    widget::container(range_metric_tile(
-                        "OUTPUT HIGH",
-                        format!("{output_high} W"),
-                        "go-up-symbolic",
-                    ))
-                    .width(cosmic::iced::Length::Fill),
-                ),
-        )
+        .push(power_range_row(
+            "OUTPUT LOW",
+            "OUTPUT HIGH",
+            format!("{output_low} W"),
+            format!("{output_high} W"),
+        ))
+        .push(power_range_row(
+            "INPUT LOW",
+            "INPUT HIGH",
+            input_low_label,
+            input_high_label,
+        ))
         .push(menu_power_flow_summary(
             total_input_w as f64,
             total_output_w as f64,
@@ -2450,29 +2471,6 @@ fn total_power_overview(
             input_yesterday_wh,
             output_yesterday_wh,
         ));
-    if has_input_readings {
-        content = content.push(
-            widget::Row::new()
-                .spacing(8)
-                .width(cosmic::iced::Length::Fill)
-                .push(
-                    widget::container(range_metric_tile(
-                        "INPUT LOW",
-                        format!("{input_low} W"),
-                        "go-down-symbolic",
-                    ))
-                    .width(cosmic::iced::Length::Fill),
-                )
-                .push(
-                    widget::container(range_metric_tile(
-                        "INPUT HIGH",
-                        format!("{input_high} W"),
-                        "go-up-symbolic",
-                    ))
-                    .width(cosmic::iced::Length::Fill),
-                ),
-        );
-    }
     let collapsed = collapsed_sections.contains("total-power-overview");
     let current_value = |value: i64| format!("{value} W");
     let current_input = if has_input_readings {
@@ -10467,6 +10465,28 @@ mod history_tests {
         assert!(is_current_or_newer_version("1.1.0", "1.0.0"));
         assert!(is_current_or_newer_version("1.0.1", "1.0.0"));
         assert!(!is_current_or_newer_version("0.9.9", "1.0.0"));
+    }
+
+    #[test]
+    fn input_range_labels_distinguish_missing_samples_from_actual_zero() {
+        assert_eq!(
+            input_range_labels(&VecDeque::new()),
+            ("— W".to_string(), "— W".to_string())
+        );
+        let start = Instant::now();
+        let zero = VecDeque::from([(start, 0)]);
+        assert_eq!(
+            input_range_labels(&zero),
+            ("0 W".to_string(), "0 W".to_string())
+        );
+        let recorded = VecDeque::from([
+            (start, -250),
+            (start + Duration::from_secs(60), -100),
+        ]);
+        assert_eq!(
+            input_range_labels(&recorded),
+            ("100 W".to_string(), "250 W".to_string())
+        );
     }
 
     #[test]
