@@ -1004,7 +1004,7 @@ impl FritzSettings {
             if self.weather_netatmo_extra_metrics { "true" } else { "false" },
         ));
         contents.push_str(&format!(
-            "NETATMO_CLIENT_ID={},\nNETATMO_CLIENT_SECRET={}\nNETATMO_REFRESH_TOKEN={}\nNETATMO_HIDDEN_DEVICES={}\nNETATMO_CO2_ALERTS={}\n",
+            "NETATMO_CLIENT_ID={}\nNETATMO_CLIENT_SECRET={}\nNETATMO_REFRESH_TOKEN={}\nNETATMO_HIDDEN_DEVICES={}\nNETATMO_CO2_ALERTS={}\n",
             self.netatmo_client_id,
             self.netatmo_client_secret,
             self.netatmo_refresh_token,
