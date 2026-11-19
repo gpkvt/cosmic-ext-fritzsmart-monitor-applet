@@ -679,7 +679,11 @@ impl FritzSettings {
             self.password,
             self.tasmota_username,
             self.tasmota_password,
-            if self.tasmota_subnet_scan { "true" } else { "false" },
+            if self.tasmota_subnet_scan {
+                "true"
+            } else {
+                "false"
+            },
             first_ain,
             selected_ains,
             known_devices,
