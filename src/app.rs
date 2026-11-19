@@ -1995,6 +1995,9 @@ fn average_temperature_with_hue_c(
     hidden_hue_devices: &[String],
     exclude_solar: bool,
 ) -> Option<f64> {
+    if sensors.is_empty() {
+        return average_selected_temperature_c(readings, selected_ains, exclude_solar);
+    }
     let selected_metered = readings.iter().filter(|reading| {
         reading.temperature_c.is_finite()
             && selected_ains.iter().any(|ain| {
@@ -3036,14 +3039,14 @@ impl SettingsDeviceEntry<'_> {
         match self {
             Self::Metered(device) => device_matches_search(device, &query),
             Self::HueLight(light) => {
-                light.name.to_lowercase().contains(&query)
-                    || light.id.to_lowercase().contains(&query)
-                    || "hue light".contains(&query)
+                light.name.to_lowercase().contains(query.as_str())
+                    || light.id.to_lowercase().contains(query.as_str())
+                    || "hue light".contains(query.as_str())
             }
             Self::HueSensor(sensor) => {
-                sensor.name.to_lowercase().contains(&query)
-                    || sensor.id.to_lowercase().contains(&query)
-                    || "hue sensor motion temperature lux".contains(&query)
+                sensor.name.to_lowercase().contains(query.as_str())
+                    || sensor.id.to_lowercase().contains(query.as_str())
+                    || "hue sensor motion temperature lux".contains(query.as_str())
             }
         }
     }
@@ -5066,7 +5069,7 @@ impl cosmic::Application for AppModel {
                                                 "Average temperature",
                                             )))
                                             .push(widget::text::caption(
-                                                "When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.",
+                                                "When enabled, the panel averages selected device temperatures and visible Hue sensor readings instead of showing a single device's temperature.",
                                             )),
                                     )
                                     .push(
