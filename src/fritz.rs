@@ -593,10 +593,12 @@ impl FritzSettings {
                 } else {
                     vec!["internet-bandwidth".into()]
                 };
-                let default_applied = get("DAILY_ENERGY_HISTORY_DEFAULT_APPLIED")
-                    .eq_ignore_ascii_case("true");
+                let default_applied =
+                    get("DAILY_ENERGY_HISTORY_DEFAULT_APPLIED").eq_ignore_ascii_case("true");
                 if !default_applied
-                    && !sections.iter().any(|section| section == "daily-energy-history")
+                    && !sections
+                        .iter()
+                        .any(|section| section == "daily-energy-history")
                 {
                     sections.push("daily-energy-history".into());
                 }
