@@ -22,6 +22,8 @@ use std::time::{Duration, Instant, SystemTime};
 static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
     LazyLock::new(|| widget::Id::new("fritz-power-monitor-autosize-main"));
 pub type GraphSamples = Vec<(Instant, f64)>;
+type CopyFeedback = (String, Instant);
+const COPY_FEEDBACK_DURATION: Duration = Duration::from_millis(900);
 
 #[derive(Default)]
 pub struct AppModel {
@@ -50,6 +52,7 @@ pub struct AppModel {
     settings_status: Option<String>,
     settings_saved_until: Option<Instant>,
     settings_save_at: Option<Instant>,
+    copy_feedback: Option<CopyFeedback>,
     history: VecDeque<(Instant, i64)>,
     device_history: HashMap<String, VecDeque<(Instant, i64, f64)>>,
     temperature_alert_state: HashMap<String, bool>,
@@ -103,6 +106,7 @@ pub enum Message {
     TooltipSurfaceAction(cosmic::surface::Action<Message>),
     Refresh,
     ClockTick,
+    CopyFeedbackTick,
     GraphRefreshTick,
     FlowAnimationTick,
     Updated(Box<Result<FritzFetchResult, String>>),
@@ -1176,6 +1180,7 @@ fn daily_energy_history_section(
     input_ains: &HashSet<String>,
     refresh_interval_seconds: u32,
     collapsed: bool,
+    copy_feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
     let history = daily_energy_history(device_history, input_ains, refresh_interval_seconds);
     let heading = widget::button::custom(
@@ -1204,6 +1209,7 @@ fn daily_energy_history_section(
         .push(heading)
         .push(copy_menu_title_button(
             "DAILY ENERGY · LAST 7 DAYS".to_string(),
+            copy_feedback,
         ));
     let mut section = widget::Column::new()
         .spacing(0)
@@ -2277,7 +2283,10 @@ struct LivePowerSummaryData {
     history_collapsed: bool,
 }
 
-fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Message> {
+fn live_power_summary(
+    data: LivePowerSummaryData,
+    copy_feedback: Option<&CopyFeedback>,
+) -> cosmic::Element<'static, Message> {
     let LivePowerSummaryData {
         energy_flow,
         input_history,
@@ -2330,6 +2339,7 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
             .push(history_heading)
             .push(copy_menu_title_button(
                 crate::i18n::tr(&language, "CURRENT POWER HISTORY").to_string(),
+                copy_feedback,
             )),
     );
     if !history_collapsed {
@@ -2363,6 +2373,7 @@ fn collapsible_graph(
     section_id: impl Into<String>,
     collapsed: bool,
     graph: cosmic::Element<'static, Message>,
+    copy_feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
     let section_id = section_id.into();
     let heading = widget::button::custom(
@@ -2388,7 +2399,7 @@ fn collapsible_graph(
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
         .push(heading)
-        .push(copy_menu_title_button(title.to_string()));
+        .push(copy_menu_title_button(title.to_string(), copy_feedback));
     let mut section = widget::Column::new()
         .spacing(4)
         .width(cosmic::iced::Length::Fill)
@@ -2405,6 +2416,7 @@ fn total_power_overview(
     history: &VecDeque<(Instant, i64)>,
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     collapsed_sections: &HashSet<String>,
+    copy_feedback: Option<&CopyFeedback>,
 ) -> Option<Vec<(String, cosmic::Element<'static, Message>)>> {
     let (output_low, output_high) = {
         let mut values = history.iter().map(|(_, value)| *value);
@@ -2578,11 +2590,15 @@ fn total_power_overview(
             .width(cosmic::iced::Length::Shrink)
             .into()
     };
-    let heading = widget::button::custom(
+    // Copy sits beside the title; the disclosure control remains at the right.
+    let title_button = widget::button::custom(widget::text::caption("TOTAL POWER INPUT & OUTPUT"))
+        .on_press(Message::ToggleMenuSection("total-power-overview".into()))
+        .padding([4, 0])
+        .class(cosmic::theme::Button::Text);
+    let disclosure_button = widget::button::custom(
         widget::Row::new()
             .spacing(8)
             .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::text::caption("TOTAL POWER INPUT & OUTPUT"))
             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
             .push(collapsed_summary_element)
             .push(
@@ -2599,12 +2615,15 @@ fn total_power_overview(
     .padding([4, 0])
     .class(cosmic::theme::Button::Text);
     let heading_row = widget::Row::new()
+        .spacing(4)
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(heading)
+        .push(title_button)
         .push(copy_menu_title_button(
             "TOTAL POWER INPUT & OUTPUT".to_string(),
-        ));
+            copy_feedback,
+        ))
+        .push(disclosure_button);
     let mut section = widget::Column::new()
         .spacing(4)
         .width(cosmic::iced::Length::Fill)
@@ -2951,7 +2970,10 @@ fn error_notice<'a>(title: &'static str, message: &'a str) -> cosmic::Element<'a
     .into()
 }
 
-fn diagnostic_url_button(url: String) -> cosmic::Element<'static, Message> {
+fn diagnostic_url_button(
+    url: String,
+    copy_feedback: Option<&CopyFeedback>,
+) -> cosmic::Element<'static, Message> {
     const MAX_VISIBLE_CHARS: usize = 24;
     let visible = if url.chars().count() > MAX_VISIBLE_CHARS {
         format!(
@@ -2967,7 +2989,7 @@ fn diagnostic_url_button(url: String) -> cosmic::Element<'static, Message> {
             .align_y(cosmic::iced::Alignment::Center)
             .width(cosmic::iced::Length::Fill)
             .push(widget::text::caption(visible).width(cosmic::iced::Length::Fill))
-            .push(widget::icon::from_name("edit-copy-symbolic").size(14)),
+            .push(copy_feedback_icon(&url, copy_feedback)),
     )
     .on_press(Message::CopyDiagnosticUrl(url))
     .padding([2, 0])
@@ -2976,8 +2998,60 @@ fn diagnostic_url_button(url: String) -> cosmic::Element<'static, Message> {
     .into()
 }
 
-fn copy_menu_title_button(title: String) -> cosmic::Element<'static, Message> {
-    widget::button::custom(widget::icon::from_name("edit-copy-symbolic").size(14))
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CopyIconPhase {
+    Idle,
+    Pulse,
+    Confirmed,
+}
+
+fn copy_icon_phase(value: &str, feedback: Option<&CopyFeedback>, now: Instant) -> CopyIconPhase {
+    let Some((last_copied, started)) = feedback else {
+        return CopyIconPhase::Idle;
+    };
+    if last_copied != value {
+        return CopyIconPhase::Idle;
+    }
+    let elapsed = now.saturating_duration_since(*started);
+    if elapsed >= COPY_FEEDBACK_DURATION {
+        CopyIconPhase::Idle
+    } else if elapsed < Duration::from_millis(250) {
+        CopyIconPhase::Pulse
+    } else {
+        CopyIconPhase::Confirmed
+    }
+}
+
+fn copy_feedback_icon(
+    value: &str,
+    feedback: Option<&CopyFeedback>,
+) -> cosmic::Element<'static, Message> {
+    let phase = copy_icon_phase(value, feedback, Instant::now());
+    let icon = if phase == CopyIconPhase::Idle {
+        "edit-copy-symbolic"
+    } else {
+        "emblem-ok-symbolic"
+    };
+    // Fixed icon bounds prevent shifting adjacent heading controls.
+    let size = if phase == CopyIconPhase::Pulse {
+        18
+    } else {
+        14
+    };
+    widget::container(widget::icon::from_name(icon).size(size))
+        .width(cosmic::iced::Length::Fixed(20.0))
+        .height(cosmic::iced::Length::Fixed(20.0))
+        .align_x(cosmic::iced::Alignment::Center)
+        .align_y(cosmic::iced::Alignment::Center)
+        .into()
+}
+
+fn copy_menu_title_button(
+    title: String,
+    feedback: Option<&CopyFeedback>,
+) -> cosmic::Element<'static, Message> {
+    let icon = copy_feedback_icon(&title, feedback);
+    widget::button::custom(icon)
         .on_press(Message::CopyMenuTitle(title))
         .padding([4, 6])
         .class(cosmic::theme::Button::Text)
@@ -3208,6 +3282,10 @@ fn animation_ticks() -> impl futures::Stream<Item = Message> {
     clock_ticks(Duration::from_secs(1))
 }
 
+fn copy_feedback_ticks() -> impl futures::Stream<Item = Message> {
+    clock_ticks(Duration::from_millis(125)).map(|_| Message::CopyFeedbackTick)
+}
+
 fn graph_refresh_ticks() -> impl futures::Stream<Item = Message> {
     clock_ticks(Duration::from_secs(30)).map(|_| Message::GraphRefreshTick)
 }
@@ -3431,6 +3509,9 @@ impl cosmic::Application for AppModel {
         };
 
         let mut subscriptions = vec![clock];
+        if self.copy_feedback.is_some() {
+            subscriptions.push(Subscription::run(copy_feedback_ticks));
+        }
         if self.graph_window.is_some() {
             subscriptions.push(Subscription::run(graph_refresh_ticks));
         }
@@ -5323,6 +5404,7 @@ impl cosmic::Application for AppModel {
                     ))
                     .push(diagnostic_url_button(
                         "https://api.openweathermap.org/data/2.5/weather".into(),
+                        self.copy_feedback.as_ref(),
                     ));
 
                 let commons_status = if !self.settings.weather_enabled {
@@ -5364,6 +5446,7 @@ impl cosmic::Application for AppModel {
                     ))
                     .push(diagnostic_url_button(
                         "https://commons.wikimedia.org/w/api.php".into(),
+                        self.copy_feedback.as_ref(),
                     ));
 
                 let forecast_status = if self.settings.weather_location.trim().is_empty() {
@@ -5403,6 +5486,7 @@ impl cosmic::Application for AppModel {
                     ))
                     .push(diagnostic_url_button(
                         "https://geocoding-api.open-meteo.com/v1/search".into(),
+                        self.copy_feedback.as_ref(),
                     ))
                     .push(diagnostic_status_row(
                         crate::i18n::tr(&self.settings.language, "Open-Meteo · forecast"),
@@ -5411,6 +5495,7 @@ impl cosmic::Application for AppModel {
                     ))
                     .push(diagnostic_url_button(
                         "https://api.open-meteo.com/v1/forecast".into(),
+                        self.copy_feedback.as_ref(),
                     ))
                     .push(action_button(
                         "view-refresh-symbolic",
@@ -5626,7 +5711,7 @@ impl cosmic::Application for AppModel {
                         ))
                         .into()
                     } else {
-                        diagnostic_url_button(endpoint.to_string())
+                        diagnostic_url_button(endpoint.to_string(), self.copy_feedback.as_ref())
                     });
 
                 let auth = fritz_endpoint_status("/login_sid.lua");
@@ -5640,7 +5725,7 @@ impl cosmic::Application for AppModel {
                         "/login_sid.lua".to_string()
                     } else {
                         format!("{fritz_base}/login_sid.lua")
-                    }));
+                    }, self.copy_feedback.as_ref()));
 
                 let device_list = fritz_endpoint_status(
                     "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
@@ -5651,7 +5736,7 @@ impl cosmic::Application for AppModel {
                         "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos".to_string()
                     } else {
                         format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos")
-                    }));
+                    }, self.copy_feedback.as_ref()));
 
                 content = content.push(widget::text::title3(crate::i18n::tr(
                     &self.settings.language,
@@ -5684,7 +5769,7 @@ impl cosmic::Application for AppModel {
                         "/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>".to_string()
                     } else {
                         format!("{fritz_base}/webservices/homeautoswitch.lua?switchcmd=getswitchstate&ain=<AIN>")
-                    }))
+                    }, self.copy_feedback.as_ref()))
                     .push(widget::text::caption(format!(
                         "{}: {}",
                         crate::i18n::tr(&self.settings.language, "Configured devices"),
@@ -6232,6 +6317,7 @@ impl cosmic::Application for AppModel {
                             .push(weather_heading)
                             .push(copy_menu_title_button(
                                 crate::i18n::tr(&self.settings.language, "Weather").to_string(),
+                                self.copy_feedback.as_ref(),
                             )),
                     )
                     .push(weather_details);
@@ -6511,6 +6597,7 @@ impl cosmic::Application for AppModel {
                         )))
                         .push(copy_menu_title_button(
                             crate::i18n::tr(&self.settings.language, "Weather").to_string(),
+                            self.copy_feedback.as_ref(),
                         )),
                 );
                 if let Some(error) = &self.weather_error {
@@ -6592,7 +6679,7 @@ impl cosmic::Application for AppModel {
                     history_collapsed: self
                         .collapsed_menu_sections
                         .contains("current-power-history"),
-                });
+                }, self.copy_feedback.as_ref());
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
                 menu_cards.push(("0-summary".to_string(), summary_card));
@@ -6675,6 +6762,7 @@ impl cosmic::Application for AppModel {
                                     bandwidth_axis_start,
                                 ))
                                 .into(),
+                            self.copy_feedback.as_ref(),
                         ))
                 } else {
                     widget::Column::new()
@@ -6819,7 +6907,10 @@ impl cosmic::Application for AppModel {
                         .width(cosmic::iced::Length::Fill)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(device_heading_button)
-                        .push(copy_menu_title_button(reading.name.clone()))
+                        .push(copy_menu_title_button(
+                            reading.name.clone(),
+                            self.copy_feedback.as_ref(),
+                        ))
                         .push(history_button)
                         .push(power_toggle);
                     let device_axis_start = format_graph_axis_start(
@@ -7052,6 +7143,7 @@ impl cosmic::Application for AppModel {
                         device_graph_pair_id,
                         device_graph_pair_collapsed,
                         graph_columns.into(),
+                        self.copy_feedback.as_ref(),
                     );
                     let device_content = widget::Column::new()
                         .spacing(10)
@@ -7181,6 +7273,7 @@ impl cosmic::Application for AppModel {
                     &self.history,
                     &self.device_history,
                     &self.collapsed_menu_sections,
+                    self.copy_feedback.as_ref(),
                 ) {
                     menu_cards.extend(power_sections);
                 }
@@ -7192,6 +7285,7 @@ impl cosmic::Application for AppModel {
                         self.settings.refresh_interval_seconds,
                         self.collapsed_menu_sections
                             .contains("daily-energy-history"),
+                        self.copy_feedback.as_ref(),
                     ),
                 ));
                 menu_cards.retain(|(key, _)| {
@@ -7283,6 +7377,7 @@ impl cosmic::Application for AppModel {
                                     .push(copy_menu_title_button(
                                         crate::i18n::tr(&self.settings.language, "DEVICES")
                                             .to_string(),
+                                        self.copy_feedback.as_ref(),
                                     )),
                             );
                             device_section_started = true;
@@ -7410,7 +7505,10 @@ impl cosmic::Application for AppModel {
                         .width(cosmic::iced::Length::Fill)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(heading)
-                        .push(copy_menu_title_button(section.1.to_string()));
+                        .push(copy_menu_title_button(
+                            section.1.to_string(),
+                            self.copy_feedback.as_ref(),
+                        ));
                     let mut section_column = widget::Column::new().spacing(0).push(heading_row);
                     if !collapsed {
                         section_column = section_column.push(card);
@@ -8079,6 +8177,15 @@ impl cosmic::Application for AppModel {
             Message::FlowAnimationTick => {
                 self.flow_animation_frame = (self.flow_animation_frame + 1) % 4;
             }
+            Message::CopyFeedbackTick => {
+                if self
+                    .copy_feedback
+                    .as_ref()
+                    .is_some_and(|(_, started)| started.elapsed() >= COPY_FEEDBACK_DURATION)
+                {
+                    self.copy_feedback = None;
+                }
+            }
             Message::ClockTick => {
                 if self.devices_loading {
                     for diagnostic in crate::tasmota::take_discovery_diagnostics() {
@@ -8405,9 +8512,11 @@ impl cosmic::Application for AppModel {
                 );
             }
             Message::CopyDiagnosticUrl(url) => {
+                self.copy_feedback = Some((url.clone(), Instant::now()));
                 return cosmic::iced::clipboard::write(url);
             }
             Message::CopyMenuTitle(title) => {
+                self.copy_feedback = Some((title.clone(), Instant::now()));
                 return cosmic::iced::clipboard::write(title);
             }
             Message::ClearDiagnosticEvents => {
@@ -10771,6 +10880,33 @@ mod energy_input_output_ratio_tests {
         assert_eq!(
             energy_input_output_ratio_percent(Some(f64::NAN), Some(500.0)),
             None
+        );
+    }
+}
+
+#[cfg(test)]
+mod copy_feedback_tests {
+    use super::*;
+
+    #[test]
+    fn copy_icon_pulses_and_returns_to_idle_without_affecting_other_buttons() {
+        let start = Instant::now();
+        let feedback = ("Title".to_string(), start);
+        assert_eq!(
+            copy_icon_phase("Title", Some(&feedback), start),
+            CopyIconPhase::Pulse
+        );
+        assert_eq!(
+            copy_icon_phase("Other", Some(&feedback), start),
+            CopyIconPhase::Idle
+        );
+        assert_eq!(
+            copy_icon_phase("Title", Some(&feedback), start + Duration::from_millis(300)),
+            CopyIconPhase::Confirmed
+        );
+        assert_eq!(
+            copy_icon_phase("Title", Some(&feedback), start + COPY_FEEDBACK_DURATION),
+            CopyIconPhase::Idle
         );
     }
 }
