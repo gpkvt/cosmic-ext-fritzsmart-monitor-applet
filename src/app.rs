@@ -1014,26 +1014,33 @@ fn menu_energy_summary(
     )
     .width(cosmic::iced::Length::Fill)
     .into();
-    let value_column = |label: &'static str, value: Option<f64>, unit: &'static str| {
+    let value_row = |label: &'static str, value: Option<f64>, unit: &'static str| {
         let display = value
             .filter(|value| value.is_finite())
             .map(|value| format!("{value:.0} {unit}"))
             .unwrap_or_else(|| format!("— {unit}"));
-        widget::Column::new()
-            .spacing(2)
-            .align_x(cosmic::iced::Alignment::End)
-            .width(cosmic::iced::Length::Fixed(92.0))
-            .push(widget::text::caption(label))
-            .push(widget::text::title3(keep_value_unit_together(display)))
+        widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::text::caption(label).width(cosmic::iced::Length::Fill))
+            .push(
+                widget::text::title3(keep_value_unit_together(display))
+                    .width(cosmic::iced::Length::Fixed(92.0))
+                    .horizontal_alignment(cosmic::iced::alignment::Horizontal::Right),
+            )
     };
+    let values = widget::Column::new()
+        .spacing(2)
+        .width(cosmic::iced::Length::Fixed(150.0))
+        .push(value_row("CURRENT", current_power_w, "W"))
+        .push(value_row("YESTERDAY", yesterday_wh, "Wh"))
+        .push(value_row("TODAY", today_wh, "Wh"));
     widget::Row::new()
         .spacing(10)
         .align_y(cosmic::iced::Alignment::Center)
         .width(cosmic::iced::Length::Fill)
         .push(graph)
-        .push(value_column("CURRENT", current_power_w, "W"))
-        .push(value_column("YESTERDAY", yesterday_wh, "Wh"))
-        .push(value_column("TODAY", today_wh, "Wh"))
+        .push(values)
         .into()
 }
 
