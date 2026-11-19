@@ -12,7 +12,6 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 
-pub const PORT: u16 = 9817;
 pub const DEFAULT_BIND_ADDRESS: &str = "127.0.0.1:9817";
 
 /// Accept IP literals only (including bracketed IPv6), not hostnames. Port 0
@@ -32,7 +31,7 @@ pub fn endpoint_url(value: &str) -> Option<String> {
 #[derive(Default)]
 struct Snapshot {
     enabled: bool,
-    bind_address: String,
+    bind_address: Option<SocketAddr>,
     text: String,
 }
 static SNAPSHOT: LazyLock<Mutex<Snapshot>> = LazyLock::new(|| Mutex::new(Snapshot::default()));
@@ -256,7 +255,7 @@ pub fn render(data: LiveData<'_>) -> String {
 pub fn publish(enabled: bool, bind_address: &str, data: Option<LiveData<'_>>) {
     if let Ok(mut snapshot) = SNAPSHOT.lock() {
         snapshot.enabled = enabled;
-        snapshot.bind_address = bind_address.to_owned();
+        snapshot.bind_address = parse_bind_address(bind_address);
         if enabled {
             if let Some(data) = data {
                 snapshot.text = render(data);
@@ -297,11 +296,9 @@ pub fn serve() {
     let mut bind_failed = false;
     loop {
         let (enabled, bind_address) = SNAPSHOT.lock()
-            .map(|state| (state.enabled, state.bind_address.clone()))
-            .unwrap_or((false, String::new()));
-        let desired_address = enabled
-            .then(|| parse_bind_address(&bind_address))
-            .flatten();
+            .map(|state| (state.enabled, state.bind_address))
+            .unwrap_or((false, None));
+        let desired_address = if enabled { bind_address } else { None };
         if desired_address != configured_address {
             listener = None;
             configured_address = desired_address;
@@ -393,7 +390,7 @@ mod tests {
 
     #[test]
     fn exporter_defaults_disabled_and_loopback_only() {
-        assert_eq!(PORT, 9817);
+        assert_eq!(parse_bind_address(DEFAULT_BIND_ADDRESS).unwrap().port(), 9817);
         assert_eq!(FritzSettings::default().prometheus_bind_address, DEFAULT_BIND_ADDRESS);
         assert!(!FritzSettings::default().prometheus_enabled);
     }
