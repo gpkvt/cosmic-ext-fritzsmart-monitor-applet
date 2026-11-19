@@ -215,7 +215,7 @@ cargo test --locked --all-targets
 cargo build --release
 ```
 
-GitHub Actions runs the project checks and validates release artifacts.
+GitHub Actions runs the project checks and validates release artifacts. A separate **Cargo release build** workflow runs `cargo build --locked --release` on pull requests and Rust source changes to `main` (and can be started manually). It verifies the binary and uploads it as a 7-day build artifact; this is separate from the packaged release.
 
 ## Request changes with ChatGPT
 
