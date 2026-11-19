@@ -132,10 +132,11 @@ for page in pages:
             "monitor.svg",
             "router.svg",
             "plug-zap.svg",
+            "hue-bridge.svg",
             "cloud-sun.svg",
         }
-        if set(compatibility_icons) != expected_compatibility_icons or len(compatibility_icons) != 4:
-            fail("index.html: all four compatibility cards must have dedicated SVG icons")
+        if set(compatibility_icons) != expected_compatibility_icons or len(compatibility_icons) != 5:
+            fail("index.html: all five compatibility cards must have dedicated SVG icons")
         hero_gallery = re.search(r'<div class="hero-gallery"[^>]*>(.*?)</div>', content, re.S)
         if not hero_gallery:
             fail("index.html: screenshot card gallery is missing")
