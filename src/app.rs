@@ -7743,9 +7743,19 @@ impl cosmic::Application for AppModel {
                             .width(cosmic::iced::Length::Fill)
                             .height(cosmic::iced::Length::Fixed(weather_card_height))
                             .clip(true);
+                        // Keep a non-image base layer. Iced renders the first
+                        // Stack child directly, without a dedicated scissor layer.
+                        // Put the photo on the next layer so Cover cropping cannot
+                        // paint over the header, readings or other menu cards.
                         let mut weather_layers = cosmic::iced::widget::Stack::new()
                             .width(cosmic::iced::Length::Fill)
                             .height(cosmic::iced::Length::Fixed(weather_card_height))
+                            .clip(true)
+                            .push(
+                                widget::container(widget::Space::new())
+                                    .width(cosmic::iced::Length::Fill)
+                                    .height(cosmic::iced::Length::Fixed(weather_card_height)),
+                            )
                             .push(image_layer);
                         // Add a subtle transparent star field to nighttime
                         // weather scenes without replacing the condition-matched
