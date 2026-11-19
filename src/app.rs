@@ -6429,7 +6429,7 @@ impl cosmic::Application for AppModel {
                     &self.missing_device_ains,
                     &self.readings,
                 );
-                if !inactive_saved_devices.is_empty() {
+                if !self.devices_loading && !inactive_saved_devices.is_empty() {
                     content = content.push(
                         widget::Row::new()
                             .spacing(10)
@@ -6446,9 +6446,10 @@ impl cosmic::Application for AppModel {
                                 ),
                                 Message::RemoveInactiveDevices,
                             ))
-                            .push(widget::text::caption(
+                            .push(widget::text::caption(crate::i18n::tr(
+                                &self.settings.language,
                                 "Remove confirmed-offline devices from the saved list. They can be discovered again.",
-                            )),
+                            ))),
                     );
                 }
                 if self.devices_loading {
@@ -12453,6 +12454,9 @@ impl cosmic::Application for AppModel {
                 );
             }
             Message::RemoveInactiveDevices => {
+                if self.devices_loading {
+                    return Task::none();
+                }
                 let ids = inactive_saved_device_ids(
                     &self.devices,
                     &self.selected_ains,
@@ -12472,7 +12476,8 @@ impl cosmic::Application for AppModel {
                     );
                     if self.settings_saved_until.is_some() {
                         self.settings_status = Some(format!(
-                            "Removed {} inactive device(s). Run discovery to add them again.",
+                            "{}: {}",
+                            crate::i18n::tr(&self.settings.language, "Remove inactive devices"),
                             ids.len(),
                         ));
                     }
