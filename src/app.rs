@@ -781,30 +781,6 @@ fn input_display_range(history: &VecDeque<(Instant, i64)>) -> (i64, i64) {
     })
 }
 
-fn power_energy_and_timespan(history: &VecDeque<(Instant, i64)>) -> Option<(f64, Duration)> {
-    let (first_timestamp, _) = history.front()?;
-    let (last_timestamp, _) = history.back()?;
-    let timespan = last_timestamp.saturating_duration_since(*first_timestamp);
-    let energy_wh = history
-        .iter()
-        .zip(history.iter().skip(1))
-        .map(|((start, start_power), (end, end_power))| {
-            let elapsed_hours = end.saturating_duration_since(*start).as_secs_f64() / 3600.0;
-            (start_power.abs() as f64 + end_power.abs() as f64) / 2.0 * elapsed_hours
-        })
-        .sum();
-    Some((energy_wh, timespan))
-}
-
-fn format_elapsed_timespan(timespan: Duration) -> String {
-    let total_minutes = timespan.as_secs() / 60;
-    if total_minutes == 0 {
-        format!("{} seconds", timespan.as_secs())
-    } else {
-        format_graph_timespan(total_minutes.min(u64::from(u32::MAX)) as u32)
-    }
-}
-
 fn record_power_sample(
     history: &mut VecDeque<(Instant, i64)>,
     power_w: i64,
