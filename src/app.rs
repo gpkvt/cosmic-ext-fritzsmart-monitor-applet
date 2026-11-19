@@ -7726,13 +7726,19 @@ impl cosmic::Application for AppModel {
                         .width(cosmic::iced::Length::Fill)
                         .padding([4, 10]),
                 );
-                // The image height is fixed. Only the condition summary is
-                // rendered on top of the photo; the metrics sit beneath it.
+                // Keep both the condition summary and the unified weather /
+                // Netatmo metric table within the single clipped photo area.
+                // Overflow from additional modules scrolls inside this area
+                // rather than increasing the image height or menu background.
                 let weather_content = widget::Column::new()
+                    .spacing(10)
                     .width(cosmic::iced::Length::Fill)
                     .height(cosmic::iced::Length::Fixed(weather_card_height - 20.0))
-                    .push(widget::Space::new().height(cosmic::iced::Length::Fill))
-                    .push(weather_summary);
+                    .push(weather_summary)
+                    .push(
+                        widget::scrollable(weather_metric_grid)
+                            .height(cosmic::iced::Length::Fill),
+                    );
                 let current_image_handle = weather
                     .slideshow_sequence
                     .get(self.weather_slideshow_index)
@@ -7916,11 +7922,6 @@ impl cosmic::Application for AppModel {
                             .padding([6, 10]),
                     );
                 }
-                weather_section = weather_section.push(
-                    widget::container(weather_metric_grid)
-                        .width(cosmic::iced::Length::Fill)
-                        .padding([6, 10]),
-                );
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
                     let forecast_range_selector = widget::Row::new()
