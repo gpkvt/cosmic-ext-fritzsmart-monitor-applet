@@ -9756,6 +9756,10 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::Updated(result) => {
+                eprintln!(
+                    "fritz-power-monitor: FRITZ/Tasmota device refresh returned ({})",
+                    if result.is_ok() { "success" } else { "error" }
+                );
                 self.refresh_started_at = None;
                 match *result {
                     Ok(result) => {
@@ -9976,6 +9980,11 @@ impl cosmic::Application for AppModel {
                             self.settings.refresh_interval_seconds,
                             !self.missing_device_ains.is_empty() || self.error.is_some(),
                         )),
+                );
+                eprintln!(
+                    "fritz-power-monitor: FRITZ/Tasmota state applied (readings: {}, inactive: {})",
+                    self.readings.len(),
+                    self.missing_device_ains.len()
                 );
             }
             Message::CopyDiagnosticUrl(url) => {
@@ -10900,6 +10909,10 @@ impl cosmic::Application for AppModel {
                 );
             }
             Message::HueSnapshotLoaded(result) => {
+                eprintln!(
+                    "fritz-power-monitor: Hue device refresh returned ({})",
+                    if result.is_ok() { "success" } else { "error" }
+                );
                 self.hue_loading = false;
                 self.hue_next_refresh_at = Some(Instant::now() + Duration::from_secs(60));
                 match result {
@@ -10955,6 +10968,11 @@ impl cosmic::Application for AppModel {
                         self.hue_sensors = snapshot.sensors;
                         self.hue_sensor_warning = snapshot.sensor_warning;
                         self.hue_error = None;
+                        eprintln!(
+                            "fritz-power-monitor: Hue state applied (lights: {}, sensors: {})",
+                            self.hue_lights.len(),
+                            self.hue_sensors.len()
+                        );
                     }
                     Err(error) => {
                         // Keep known Hue identities visible as unavailable in
@@ -11170,6 +11188,10 @@ impl cosmic::Application for AppModel {
                 self.device_search = value;
             }
             Message::DevicesLoaded(result) => {
+                eprintln!(
+                    "fritz-power-monitor: device discovery returned ({})",
+                    if result.is_ok() { "success" } else { "error" }
+                );
                 let tasmota_diagnostics = crate::tasmota::take_discovery_diagnostics();
                 if tasmota_diagnostics.is_empty() {
                     record_diagnostic_event(

@@ -414,7 +414,7 @@ async fn fetch_resource(
     key: &str,
     resource: &str,
 ) -> Result<Value, String> {
-    let response = client
+    let mut response = client
         .get(format!("{origin}/clip/v2/resource/{resource}"))
         .header("hue-application-key", key)
         .send()
@@ -422,9 +422,27 @@ async fn fetch_resource(
         .map_err(|error| format!("Hue Bridge request failed: {error}"))?
         .error_for_status()
         .map_err(|error| format!("Hue Bridge returned an HTTP error: {error}"))?;
-    let value = response
-        .json::<Value>()
+    // Six Hue resources can refresh concurrently; reject unbounded responses
+    // from a misbehaving bridge instead of exhausting the panel's memory.
+    const MAX_HUE_RESOURCE_BYTES: usize = 4 * 1024 * 1024;
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_HUE_RESOURCE_BYTES as u64)
+    {
+        return Err(format!("Hue Bridge {resource} response exceeds 4 MiB"));
+    }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
         .await
+        .map_err(|error| format!("Hue Bridge {resource} response could not be read: {error}"))?
+    {
+        if chunk.len() > MAX_HUE_RESOURCE_BYTES.saturating_sub(bytes.len()) {
+            return Err(format!("Hue Bridge {resource} response exceeds 4 MiB"));
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    let value = serde_json::from_slice::<Value>(&bytes)
         .map_err(|error| format!("Hue Bridge sent an invalid response: {error}"))?;
     api_errors(&value)?;
     Ok(value)

@@ -1,5 +1,7 @@
 # Changelog
 
+- Harden device-information loading: cap FRITZ!Box XML, Tasmota status and Hue resource bodies to avoid unbounded memory allocation; parse FRITZ!Box device XML once per refresh while keeping broken devices inactive independently. Add regression coverage and privacy-safe journal checkpoints for each device refresh stage to help diagnose panel restarts.
+
 - Prevent COSMIC/Wayland crashes caused by competing XDG popup surfaces: keep panel value hover tooltips in the existing widget surface instead of creating secondary Wayland tooltip popups. Preserve click-only menu opening and outside-click dismissal.
 
 - Hide solar/input options and live/daily input values when no device is configured as an input; show output-only summaries, graphs, and daily energy instead. Keep the Input-device setting discoverable and preserve input UI when a configured device is offline.

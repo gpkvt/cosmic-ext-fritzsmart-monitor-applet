@@ -256,7 +256,7 @@ async fn query_status(
     } else {
         username
     };
-    let response = client
+    let mut response = client
         .get(format!("http://{address}/cm"))
         .query(&[
             ("user", username),
@@ -272,18 +272,35 @@ async fn query_status(
             )
         })?;
     let status = response.status();
-    let body = response.text().await.map_err(|error| {
-        format!(
-            "Tasmota at {address} status response could not be read (HTTP {status}): {}",
-            error.without_url()
-        )
-    })?;
     if !status.is_success() {
         return Err(format!(
             "Tasmota at {address} rejected the status request (HTTP {status}); check the Tasmota web username/password and web server settings"
         ));
     }
-    serde_json::from_str::<Value>(&body).map_err(|error| {
+    // Local status payloads should be small. A broken HTTP server must not
+    // accumulate an unbounded response while scanning many device addresses.
+    const MAX_TASMOTA_STATUS_BYTES: usize = 256 * 1024;
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_TASMOTA_STATUS_BYTES as u64)
+    {
+        return Err(format!("Tasmota at {address} returned an oversized status response"));
+    }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|error| {
+        format!(
+            "Tasmota at {address} status response could not be read (HTTP {status}): {}",
+            error.without_url()
+        )
+    })? {
+        if chunk.len() > MAX_TASMOTA_STATUS_BYTES.saturating_sub(bytes.len()) {
+            return Err(format!("Tasmota at {address} returned an oversized status response"));
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    let body = std::str::from_utf8(&bytes)
+        .map_err(|error| format!("Tasmota at {address} returned invalid UTF-8: {error}"))?;
+    serde_json::from_str::<Value>(body).map_err(|error| {
         format!(
             "Tasmota at {address} returned invalid status JSON: {error}; response starts with {:?}",
             body.chars().take(160).collect::<String>()
