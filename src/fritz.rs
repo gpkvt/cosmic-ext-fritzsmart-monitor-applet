@@ -1922,8 +1922,16 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
         let fritz_result = async {
             let (client, sid) = authenticated_client(&settings).await?;
             let base = settings.url.trim_end_matches('/');
-            let devices_xml = fetch_device_list_xml(&client, base, &sid).await?;
-            let mut fetched = parse_fetch_result_xml(&devices_xml, &selected_fritz)?;
+            let mut devices_xml = fetch_device_list_xml(&client, base, &sid).await;
+            // Retry transport failures as well as absent individual readings.
+            for _retry in 1..3 {
+                if devices_xml.is_ok() {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(350)).await;
+                devices_xml = fetch_device_list_xml(&client, base, &sid).await;
+            }
+            let mut fetched = parse_fetch_result_xml(&devices_xml?, &selected_fritz)?;
             // Re-read only absent devices (two retries after the first check).
             // Healthy readings remain valid even if a subsequent request fails.
             for _retry in 1..3 {
@@ -2069,9 +2077,9 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
         && !result.readings.is_empty()
         && !selected_fritz.is_empty()
     {
-        result
-            .missing_devices
-            .push(("FRITZ!Box".into(), error.clone()));
+        // A router-level error must not be mistaken for a confirmed device
+        // outage. Keep the Tasmota readings, and report the router separately.
+        eprintln!("FRITZ!Box readings unavailable: {error}");
     }
 
     if result.readings.is_empty()
