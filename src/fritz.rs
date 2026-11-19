@@ -178,6 +178,9 @@ pub struct FritzSettings {
     pub hidden_panel_items: Vec<String>,
     pub panel_order: Vec<String>,
     pub device_order: Vec<String>,
+    /// Popup device list sorting (saved, name, power, temperature).
+    pub device_sort: String,
+    pub device_sort_descending: bool,
     pub collapsed_menu_sections: Vec<String>,
     pub daily_energy_history_default_applied: bool,
     pub expanded_devices: Vec<String>,
@@ -232,6 +235,8 @@ impl Default for FritzSettings {
             hidden_panel_items: Vec::new(),
             panel_order: default_panel_order(),
             device_order: Vec::new(),
+            device_sort: "saved".into(),
+            device_sort_descending: false,
             collapsed_menu_sections: vec![
                 "internet-bandwidth".into(),
                 "daily-energy-history".into(),
@@ -603,6 +608,13 @@ impl FritzSettings {
             hidden_panel_items: parse_hidden_panel_items(&get("HIDDEN_PANEL_ITEMS")),
             panel_order: parse_panel_order(&get("PANEL_ORDER")),
             device_order: parse_device_order(&get("DEVICE_ORDER")),
+            device_sort: match get("DEVICE_SORT").as_str() {
+                "name" => "name".into(),
+                "power" => "power".into(),
+                "temperature" => "temperature".into(),
+                _ => "saved".into(),
+            },
+            device_sort_descending: get("DEVICE_SORT_DESCENDING").eq_ignore_ascii_case("true"),
             collapsed_menu_sections: {
                 let mut sections = if values.contains_key("COLLAPSED_MENU_SECTIONS") {
                     parse_collapsed_menu_sections(&get("COLLAPSED_MENU_SECTIONS"))
@@ -704,7 +716,7 @@ impl FritzSettings {
             parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
         let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
-            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nTEMPERATURE_UNIT={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nDAILY_ENERGY_HISTORY_DEFAULT_APPLIED={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nGRAPH_HISTORY_DIAGNOSTICS_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nTEMPERATURE_UNIT={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nDEVICE_SORT={}\nDEVICE_SORT_DESCENDING={}\nCOLLAPSED_MENU_SECTIONS={}\nDAILY_ENERGY_HISTORY_DEFAULT_APPLIED={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nGRAPH_HISTORY_DIAGNOSTICS_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
             match self.language.as_str() {
                 "de" => "de",
                 "en" => "en",
@@ -800,6 +812,13 @@ impl FritzSettings {
             hidden_panel_items,
             panel_order,
             device_order,
+            match self.device_sort.as_str() {
+                "name" => "name",
+                "power" => "power",
+                "temperature" => "temperature",
+                _ => "saved",
+            },
+            if self.device_sort_descending { "true" } else { "false" },
             collapsed_menu_sections,
             if self.daily_energy_history_default_applied {
                 "true"
@@ -1903,8 +1922,35 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
         let fritz_result = async {
             let (client, sid) = authenticated_client(&settings).await?;
             let base = settings.url.trim_end_matches('/');
-            let devices_xml = fetch_device_list_xml(&client, base, &sid).await?;
-            let mut fetched = parse_fetch_result_xml(&devices_xml, &selected_fritz)?;
+            let mut devices_xml = fetch_device_list_xml(&client, base, &sid).await;
+            // Retry transport failures as well as absent individual readings.
+            for _retry in 1..3 {
+                if devices_xml.is_ok() {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(350)).await;
+                devices_xml = fetch_device_list_xml(&client, base, &sid).await;
+            }
+            let mut fetched = parse_fetch_result_xml(&devices_xml?, &selected_fritz)?;
+            // Re-read only absent devices (two retries after the first check).
+            // Healthy readings remain valid even if a subsequent request fails.
+            for _retry in 1..3 {
+                if fetched.missing_devices.is_empty() {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(350)).await;
+                if let Ok(xml) = fetch_device_list_xml(&client, base, &sid).await {
+                    let absent_ids: Vec<String> = fetched
+                        .missing_devices
+                        .iter()
+                        .map(|(ain, _)| ain.clone())
+                        .collect();
+                    if let Ok(retried) = parse_fetch_result_xml(&xml, &absent_ids) {
+                        fetched.readings.extend(retried.readings);
+                        fetched.missing_devices = retried.missing_devices;
+                    }
+                }
+            }
             let (device_info, wan_info) = tokio::join!(
                 tokio::time::timeout(Duration::from_secs(3), fetch_device_info(&client, base)),
                 tokio::time::timeout(Duration::from_secs(3), fetch_wan_link_info(&client, base)),
@@ -1971,6 +2017,27 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
                     .into_iter()
                     .filter(|device| wanted.contains(&normalize_ain_for_selection(&device.id)))
                     .collect();
+                // The persisted selection can contain devices that are missing
+                // from the current Tasmota address cache. Preserve their identity
+                // so the UI can display each device as inactive individually.
+                let available_ids: HashSet<String> = devices
+                    .iter()
+                    .map(|device| normalize_ain_for_selection(&device.id))
+                    .collect();
+                for ain in &selected_tasmota {
+                    if !available_ids.contains(&normalize_ain_for_selection(ain)) {
+                        let name = settings
+                            .known_devices
+                            .iter()
+                            .find(|device| {
+                                normalize_ain_for_selection(&device.ain)
+                                    == normalize_ain_for_selection(ain)
+                            })
+                            .map(|device| device.name.clone())
+                            .unwrap_or_else(|| ain.clone());
+                        result.missing_devices.push((ain.clone(), name));
+                    }
+                }
                 let (readings, errors) = crate::tasmota::fetch_readings(
                     &devices,
                     &settings.tasmota_username,
@@ -1990,17 +2057,31 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
                         power_controllable: true,
                         power_toggle_allowed: true,
                     }));
-                if !errors.is_empty() {
-                    result
-                        .missing_devices
-                        .push(("TASMOTA".into(), errors.join("; ")));
+                result.missing_devices.extend(errors);
+                if result.missing_devices.iter().any(|(ain, _)| {
+                    selected_tasmota
+                        .iter()
+                        .any(|selected| normalize_ain_for_selection(selected) == normalize_ain_for_selection(ain))
+                }) {
+                    // Refresh mDNS addresses for the next minute's retry, while
+                    // retaining cached identities for currently unreachable plugs.
+                    crate::tasmota::refresh_addresses_for_recovery(
+                        settings.tasmota_username.clone(),
+                        settings.tasmota_password.clone(),
+                        settings.url.clone(),
+                    )
+                    .await;
                 }
             }
             Err(error) => {
-                if result.readings.is_empty() {
-                    fritz_error = Some(error.clone());
+                if selected_fritz.is_empty() {
+                    // No usable Tasmota inventory at all: surface a connection error,
+                    // rather than declaring all devices inactive without probing.
+                    fritz_error = Some(error);
                 } else {
-                    result.missing_devices.push(("TASMOTA".into(), error));
+                    // The FRITZ!Box readings are independent of Tasmota discovery.
+                    // A cache/discovery error does not establish which plug is offline.
+                    eprintln!("Could not resolve cached Tasmota devices: {error}");
                 }
             }
         }
@@ -2010,12 +2091,18 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
         && !result.readings.is_empty()
         && !selected_fritz.is_empty()
     {
-        result
-            .missing_devices
-            .push(("FRITZ!Box".into(), error.clone()));
+        // A router-level error must not be mistaken for a confirmed device
+        // outage. Keep the Tasmota readings, and report the router separately.
+        eprintln!("FRITZ!Box readings unavailable: {error}");
     }
 
-    if result.readings.is_empty() {
+    if result.readings.is_empty()
+        && !result.missing_devices.iter().any(|(ain, _)| {
+            selected_ains.iter().any(|selected| {
+                normalize_ain_for_selection(selected) == normalize_ain_for_selection(ain)
+            })
+        })
+    {
         return Err(
             fritz_error.unwrap_or_else(|| "No selected devices returned usable readings".into())
         );

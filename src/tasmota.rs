@@ -544,17 +544,42 @@ pub async fn fetch_readings(
     devices: &[TasmotaDevice],
     username: &str,
     password: &str,
-) -> (Vec<TasmotaReading>, Vec<String>) {
+) -> (Vec<TasmotaReading>, Vec<(String, String)>) {
     let client = match Client::builder().timeout(Duration::from_secs(5)).build() {
         Ok(client) => client,
-        Err(error) => return (Vec::new(), vec![error.to_string()]),
+        Err(error) => {
+            record_discovery_diagnostic(format!("Could not create Tasmota client: {error}"));
+            return (
+                Vec::new(),
+                devices
+                    .iter()
+                    .map(|device| (device.id.clone(), device.name.clone()))
+                    .collect(),
+            );
+        }
     };
-    // Probe selected Tasmota devices concurrently. Serial requests made the
-    // initial refresh take up to five seconds per device on an unresponsive LAN.
+    // Each device gets three attempts, in parallel with the other devices.
+    // Never make a slow or disconnected plug block healthy plugs.
     let results = futures::future::join_all(devices.iter().map(|device| async {
-        query_status(&client, &device.address, username, password)
-            .await
-            .and_then(|status| parse_reading(device, &status))
+        for attempt in 0..3 {
+            let result = query_status(&client, &device.address, username, password)
+                .await
+                .and_then(|status| parse_reading(device, &status));
+            match result {
+                Ok(reading) => return Ok(reading),
+                Err(error) => {
+                    if attempt == 2 {
+                        record_discovery_diagnostic(format!(
+                            "Tasmota {} unavailable after 3 attempts: {error}",
+                            device.name
+                        ));
+                        return Err((device.id.clone(), device.name.clone()));
+                    }
+                    tokio::time::sleep(Duration::from_millis(350)).await;
+                }
+            }
+        }
+        unreachable!("the third attempt always returns");
     }))
     .await;
     let mut readings = Vec::new();
@@ -562,10 +587,60 @@ pub async fn fetch_readings(
     for result in results {
         match result {
             Ok(reading) => readings.push(reading),
-            Err(error) => errors.push(error),
+            Err(device) => errors.push(device),
         }
     }
     (readings, errors)
+}
+
+/// When a cached address stops answering, try a short mDNS rediscovery.
+/// Preserve old records for devices currently offline and refresh any changed IPs.
+pub async fn refresh_addresses_for_recovery(
+    username: String,
+    password: String,
+    fritzbox_url: String,
+) {
+    static LAST_RECOVERY_SCAN: LazyLock<Mutex<Option<Instant>>> =
+        LazyLock::new(|| Mutex::new(None));
+    {
+        let mut last = LAST_RECOVERY_SCAN
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if last.is_some_and(|time| time.elapsed() < Duration::from_secs(60)) {
+            return;
+        }
+        *last = Some(Instant::now());
+    }
+    let saved = known_devices(username.clone(), password.clone(), fritzbox_url.clone())
+        .await
+        .unwrap_or_default();
+    let Ok(rediscovered) = discover_devices_with_options(
+        username,
+        password,
+        fritzbox_url,
+        false,
+        Duration::from_secs(2),
+    )
+    .await
+    else {
+        return;
+    };
+    let mut merged = saved;
+    for device in rediscovered {
+        if let Some(known) = merged
+            .iter_mut()
+            .find(|known| known.id.eq_ignore_ascii_case(&device.id))
+        {
+            *known = device;
+        } else {
+            merged.push(device);
+        }
+    }
+    *device_cache()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) =
+        Some((Instant::now(), merged.clone()));
+    persist_devices(&merged);
 }
 
 pub async fn set_power(

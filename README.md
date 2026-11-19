@@ -136,7 +136,7 @@ The popup provides a live overview and individual cards for selected devices. Po
 
 - **Total power output** — current output power and its recorded history.
 - **Total power input** — current input power and its recorded history, shown alongside output in the **Current Power History** graph. The separate **Total Power Input & Output** section contains the numeric summary and **OUTPUT LOW / HIGH** and **INPUT LOW / HIGH** tiles without repeating the graph. The input tiles remain visible if a device disconnects; missing history is displayed as `— W`, not zero.
-- **Today and yesterday** — separate input/output energy readings in Wh and their input-to-output percentage when both readings are available.
+- **Today and yesterday** — two rows of three large values: input energy (Wh), output energy (Wh), and the input/output percentage. Missing readings display a dash, not a zero.
 
 Input and output totals are displayed independently; the applet does not subtract one from the other in the shared overview. Set each device's **Input** option according to what it measures. Devices with “solar” in their name are initially suggested as inputs when discovered; manual choices are retained.
 
@@ -151,7 +151,11 @@ Panel settings control the displayed text size and optional metrics:
 - Exclude devices whose names contain “solar” from that average.
 - Optionally combine consumption and solar generation into a net panel value.
 
-The popup's section order and device order can be changed separately in Settings. Sections, individual device cards and their graphs can be collapsed independently. Their expanded/collapsed states, Quick Settings disclosure, weather forecast/attribution disclosure and diagnostics history JSON disclosure are saved in the local configuration and restored on restart. The scroll position is not saved. Device cards show live power and temperature when available, and support individual history graphs. Click the copy icon next to a menu heading to copy its title without expanding the section.
+The popup's section order and device order can be changed separately in Settings. The device list shows wattage and temperature in separate, aligned columns; select the **Name**, **W**, or **°C/°F** headings to sort ascending or descending, or **Custom** to restore your manual order. The selected sort persists across restarts. Sections, individual device cards and their graphs can be collapsed independently. Their expanded/collapsed states, Quick Settings disclosure, weather forecast/attribution disclosure and diagnostics history JSON disclosure are saved in the local configuration and restored on restart. The scroll position is not saved. Device cards show live power and temperature when available, and support individual history graphs. Click the copy icon next to a menu heading to copy its title without expanding the section.
+
+### Device reachability
+
+A failed device reading is retried up to three times before its entry appears under **Inactive devices** with no stale live wattage or temperature. The applet notifies you when a device becomes inactive and when a successful reading restores it to the active list. When any device is inactive, readings are checked at least once per minute, even if the normal refresh interval is longer. Tasmota devices are also briefly rediscovered via mDNS to recover from changed local IP addresses. Router or authentication failures remain separate connection errors rather than being treated as individual device outages.
 
 ### Refresh and history
 

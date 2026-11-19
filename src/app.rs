@@ -159,6 +159,7 @@ pub enum Message {
     DeviceSearchChanged(String),
     ToggleDevice(String, bool),
     MoveDevice(String, bool),
+    SortDeviceList(&'static str),
     ToggleDeviceInput(String, bool),
     ToggleTemperatureAlert(String, bool),
     TemperatureAlertHighChanged(String, i16),
@@ -447,12 +448,12 @@ fn newly_missing_devices(
 ) -> Vec<String> {
     let current: HashSet<String> = missing_devices
         .iter()
-        .map(|(ain, _)| crate::fritz::normalize_ain_for_selection(ain))
+        .map(|(ain, _)| crate::fritz::canonical_device_key(ain))
         .collect();
     let newly_missing = missing_devices
         .iter()
         .filter(|(ain, _)| {
-            let key = crate::fritz::normalize_ain_for_selection(ain);
+            let key = crate::fritz::canonical_device_key(ain);
             !previously_missing.contains(&key) && !suppressed_ains.contains(&key)
         })
         .map(|(_, name)| name.clone())
@@ -506,12 +507,47 @@ fn notify_missing_devices(names: &[String], language: &str) {
     let body = names.join("\n");
     let _ = notify_rust::Notification::new()
         .summary(if names.len() == 1 {
-            crate::i18n::tr(language, "FRITZ!Box device unavailable")
+            crate::i18n::tr(language, "Device moved to inactive list")
         } else {
-            crate::i18n::tr(language, "FRITZ!Box devices unavailable")
+            crate::i18n::tr(language, "Devices moved to inactive list")
         })
         .body(&body)
         .show();
+}
+
+fn recovered_device_names(
+    previously_missing: &HashSet<String>,
+    readings: &[FritzReading],
+) -> Vec<String> {
+    readings
+        .iter()
+        .filter(|reading| {
+            previously_missing
+                .contains(&crate::fritz::canonical_device_key(&reading.ain))
+        })
+        .map(|reading| reading.name.clone())
+        .collect()
+}
+
+fn notify_recovered_devices(names: &[String], language: &str) {
+    if names.is_empty() {
+        return;
+    }
+    let body = names.join("\n");
+    let _ = notify_rust::Notification::new()
+        .summary(if names.len() == 1 {
+            crate::i18n::tr(language, "Device restored to active list")
+        } else {
+            crate::i18n::tr(language, "Devices restored to active list")
+        })
+        .body(&body)
+        .show();
+}
+
+/// Recheck inactive devices at least every minute, independent of the normal refresh setting.
+fn refresh_interval_with_inactive_devices(configured_seconds: u32, has_inactive: bool) -> u64 {
+    let seconds = u64::from(configured_seconds.clamp(30, 3600));
+    if has_inactive { seconds.min(60) } else { seconds }
 }
 
 fn notify_temperature_alert(
@@ -1159,6 +1195,67 @@ fn menu_power_flow_summary(
                         .width(cosmic::iced::Length::FillPortion(1)),
                 ),
         )
+        .into()
+}
+
+/// Two rows by three columns for the overview's daily energy figures.
+fn daily_power_metric(
+    label: &'static str,
+    value: String,
+) -> cosmic::Element<'static, Message> {
+    widget::container(
+        widget::Column::new()
+            .spacing(5)
+            .width(cosmic::iced::Length::Fill)
+            .push(widget::text::caption(label))
+            .push(widget::text::title2(keep_value_unit_together(value))),
+    )
+    .width(cosmic::iced::Length::FillPortion(1))
+    .padding([6, 4])
+    .into()
+}
+
+fn daily_power_metrics_grid(
+    today_input_wh: Option<f64>,
+    today_output_wh: Option<f64>,
+    yesterday_input_wh: Option<f64>,
+    yesterday_output_wh: Option<f64>,
+) -> cosmic::Element<'static, Message> {
+    let energy_display = |value: Option<f64>| {
+        value
+            .filter(|value| value.is_finite())
+            .map(|value| format!("{value:.0} Wh"))
+            .unwrap_or_else(|| "— Wh".to_string())
+    };
+    let percent_display = |input: Option<f64>, output: Option<f64>| {
+        energy_input_output_ratio_percent(input, output)
+            .map(|value| format!("{value:.1}%"))
+            .unwrap_or_else(|| "—".to_string())
+    };
+    let today = widget::Row::new()
+        .spacing(10)
+        .width(cosmic::iced::Length::Fill)
+        .push(daily_power_metric("TODAY INPUT", energy_display(today_input_wh)))
+        .push(daily_power_metric("TODAY OUTPUT", energy_display(today_output_wh)))
+        .push(daily_power_metric(
+            "TODAY IN / OUT",
+            percent_display(today_input_wh, today_output_wh),
+        ));
+    let yesterday = widget::Row::new()
+        .spacing(10)
+        .width(cosmic::iced::Length::Fill)
+        .push(daily_power_metric("Y'DAY INPUT", energy_display(yesterday_input_wh)))
+        .push(daily_power_metric("Y'DAY OUTPUT", energy_display(yesterday_output_wh)))
+        .push(daily_power_metric(
+            "Y'DAY IN / OUT",
+            percent_display(yesterday_input_wh, yesterday_output_wh),
+        ));
+    widget::Column::new()
+        .spacing(10)
+        .width(cosmic::iced::Length::Fill)
+        .push(today)
+        .push(widget::divider::horizontal::default())
+        .push(yesterday)
         .into()
 }
 
@@ -2464,9 +2561,25 @@ fn total_power_overview(
             input_low_label,
             input_high_label,
         ))
-        .push(menu_power_flow_summary(
-            total_input_w as f64,
-            total_output_w as f64,
+        .push(
+            widget::Row::new()
+                .spacing(14)
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::caption("NOW").width(cosmic::iced::Length::Fill))
+                .push(widget::text::body(format!(
+                    "IN {}",
+                    keep_value_unit_together(if has_input_readings {
+                        format!("{total_input_w} W")
+                    } else {
+                        "— W".to_string()
+                    })
+                )))
+                .push(widget::text::body(format!(
+                    "OUT {}",
+                    keep_value_unit_together(format!("{total_output_w} W"))
+                ))),
+        )
+        .push(daily_power_metrics_grid(
             input_today_wh,
             output_today_wh,
             input_yesterday_wh,
@@ -2685,6 +2798,128 @@ fn toggle_collapsible_state(ids: &mut HashSet<String>, id: String) {
     if !ids.remove(&id) {
         ids.insert(id);
     }
+}
+
+/// Apply live name/power/temperature sorting without overwriting custom device order.
+fn sorted_device_readings<'a>(
+    readings: &'a [FritzReading],
+    saved_order: &[String],
+    column: &str,
+    descending: bool,
+) -> Vec<&'a FritzReading> {
+    let mut sorted: Vec<_> = readings.iter().collect();
+    sorted.sort_by(|left, right| {
+        let comparison = match column {
+            "name" => {
+                let value = left.name.to_lowercase().cmp(&right.name.to_lowercase());
+                if descending { value.reverse() } else { value }
+            }
+            "power" => {
+                let value = left.power_w.cmp(&right.power_w);
+                if descending { value.reverse() } else { value }
+            }
+            "temperature" => match (
+                left.temperature_c.is_finite(),
+                right.temperature_c.is_finite(),
+            ) {
+                (true, true) => {
+                    let value = left.temperature_c.total_cmp(&right.temperature_c);
+                    if descending { value.reverse() } else { value }
+                }
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                (false, false) => std::cmp::Ordering::Equal,
+            },
+            _ => device_order_position(saved_order, &left.ain)
+                .cmp(&device_order_position(saved_order, &right.ain)),
+        };
+        comparison
+            .then_with(|| {
+                device_order_position(saved_order, &left.ain)
+                    .cmp(&device_order_position(saved_order, &right.ain))
+            })
+            .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
+            .then_with(|| {
+                crate::fritz::canonical_device_key(&left.ain)
+                    .cmp(&crate::fritz::canonical_device_key(&right.ain))
+            })
+    });
+    sorted
+}
+
+/// COSMIC text buttons expose sort direction without adding a separate toolbar.
+fn device_sort_button(
+    label: &str,
+    column: &'static str,
+    current_column: &str,
+    descending: bool,
+    width: cosmic::iced::Length,
+) -> cosmic::Element<'static, Message> {
+    let indicator = if column == current_column {
+        if column == "saved" {
+            " ✓"
+        } else if descending {
+            " ↓"
+        } else {
+            " ↑"
+        }
+    } else {
+        ""
+    };
+    widget::button::custom(
+        widget::text::caption(format!("{label}{indicator}")).align_x(
+            if column == "name" {
+                cosmic::iced::Alignment::Start
+            } else {
+                cosmic::iced::Alignment::End
+            },
+        ),
+    )
+        .on_press(Message::SortDeviceList(column))
+        .width(width)
+        .padding([4, 2])
+        .class(cosmic::theme::Button::Text)
+        .into()
+}
+
+fn device_sort_header(
+    current_column: &str,
+    descending: bool,
+    temperature_unit: &str,
+    language: &str,
+) -> cosmic::Element<'static, Message> {
+    widget::Row::new()
+        .spacing(8)
+        .width(cosmic::iced::Length::Fill)
+        .padding([2, 12])
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(40.0)))
+        .push(device_sort_button(
+            crate::i18n::tr(language, "NAME"),
+            "name",
+            current_column,
+            descending,
+            cosmic::iced::Length::Fill,
+        ))
+        .push(device_sort_button(
+            "W",
+            "power",
+            current_column,
+            descending,
+            cosmic::iced::Length::Fixed(76.0),
+        ))
+        .push(device_sort_button(
+            if temperature_unit == "F" { "°F" } else { "°C" },
+            "temperature",
+            current_column,
+            descending,
+            cosmic::iced::Length::Fixed(90.0),
+        ))
+        // Match the disclosure chevron and the copy/history/power controls
+        // to keep the numeric headings aligned with their device columns.
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(16.0)))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(168.0)))
+        .into()
 }
 
 /// Shared persisted visibility state for Panel settings and item-order controls.
@@ -6528,7 +6763,9 @@ impl cosmic::Application for AppModel {
                 weather_menu_card = Some(weather_section.into());
             }
 
-            if self.error.is_none() && !self.readings.is_empty() {
+            if self.error.is_none()
+                && (!self.readings.is_empty() || !self.missing_device_ains.is_empty())
+            {
                 let energy_flow = energy_flow_overview(
                     &self.readings,
                     &self.settings.input_ains,
@@ -6695,12 +6932,13 @@ impl cosmic::Application for AppModel {
                         ))
                 };
                 menu_cards.push(("bandwidth".to_string(), bandwidth_card.into()));
-                // The settings list is authoritative for popup device order.
-                // Keep newly discovered devices after configured entries.
-                let mut ordered_readings: Vec<_> = self.readings.iter().collect();
-                ordered_readings.sort_by_key(|reading| {
-                    device_order_position(&self.settings.device_order, &reading.ain)
-                });
+                // Custom order remains the default; column sort overrides it only in this list.
+                let ordered_readings = sorted_device_readings(
+                    &self.readings,
+                    &self.settings.device_order,
+                    &self.settings.device_sort,
+                    self.settings.device_sort_descending,
+                );
                 for (index, reading) in ordered_readings.iter().enumerate() {
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                     let is_expanded = is_device_expanded(&self.expanded_devices, &device_key);
@@ -6743,9 +6981,23 @@ impl cosmic::Application for AppModel {
                             device_corner_radius.bottom_left
                         },
                     ];
+                    let mut device_title = widget::Column::new()
+                        .spacing(3)
+                        .width(cosmic::iced::Length::Fill)
+                        .push(
+                            widget::text::body(reading.name.clone())
+                                .class(cosmic::theme::Text::Accent),
+                        );
+                    if is_expanded {
+                        device_title = device_title.push(widget::text::caption(format!(
+                            "{} {}",
+                            crate::i18n::tr(&self.settings.language, "LAST"),
+                            format_graph_timespan(self.settings.graph_timespan_minutes).to_uppercase()
+                        )));
+                    }
                     let device_heading_button = widget::button::custom(
                         widget::Row::new()
-                            .spacing(12)
+                            .spacing(8)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(
                                 widget::container(
@@ -6754,33 +7006,22 @@ impl cosmic::Application for AppModel {
                                 .center_x(32)
                                 .center_y(36),
                             )
+                            .push(device_title)
                             .push(
-                                widget::Column::new()
-                                    .spacing(3)
-                                    .width(cosmic::iced::Length::Fill)
-                                    .push(
-                                        widget::text::body(reading.name.clone())
-                                            .class(cosmic::theme::Text::Accent),
-                                    )
-                                    .push(widget::text::caption(if is_expanded {
-                                        format!(
-                                            "{} {}",
-                                            crate::i18n::tr(&self.settings.language, "LAST"),
-                                            format_graph_timespan(
-                                                self.settings.graph_timespan_minutes
-                                            )
-                                            .to_uppercase()
-                                        )
-                                    } else {
-                                        format!(
-                                            "{} W · {}",
-                                            reading.power_w,
-                                            format_temperature(
-                                                reading.temperature_c,
-                                                &self.settings.temperature_unit
-                                            )
-                                        )
-                                    })),
+                                widget::text::body(keep_value_unit_together(format!(
+                                    "{} W",
+                                    reading.power_w
+                                )))
+                                .width(cosmic::iced::Length::Fixed(76.0))
+                                .align_x(cosmic::iced::Alignment::End),
+                            )
+                            .push(
+                                widget::text::body(keep_value_unit_together(format_temperature(
+                                    reading.temperature_c,
+                                    &self.settings.temperature_unit,
+                                )))
+                                .width(cosmic::iced::Length::Fixed(90.0))
+                                .align_x(cosmic::iced::Alignment::End),
                             )
                             .push(
                                 widget::icon::from_name(if is_expanded {
@@ -7095,8 +7336,21 @@ impl cosmic::Application for AppModel {
                         })
                     })
                     .collect();
-                missing_devices.sort_by_key(|device| {
-                    device_order_position(&self.settings.device_order, &device.ain)
+                missing_devices.sort_by(|left, right| {
+                    let comparison = if self.settings.device_sort == "name" {
+                        let comparison = left.name.to_lowercase().cmp(&right.name.to_lowercase());
+                        if self.settings.device_sort_descending {
+                            comparison.reverse()
+                        } else {
+                            comparison
+                        }
+                    } else {
+                        std::cmp::Ordering::Equal
+                    };
+                    comparison.then_with(|| {
+                        device_order_position(&self.settings.device_order, &left.ain)
+                            .cmp(&device_order_position(&self.settings.device_order, &right.ain))
+                    })
                 });
                 for device in missing_devices {
                     let device_key = crate::fritz::normalize_ain_for_selection(&device.ain);
@@ -7119,6 +7373,19 @@ impl cosmic::Application for AppModel {
                                                 &self.settings.language,
                                                 "No live reading available",
                                             ))),
+                                    )
+                                    .push(
+                                        widget::text::body("— W")
+                                            .width(cosmic::iced::Length::Fixed(76.0))
+                                            .align_x(cosmic::iced::Alignment::End),
+                                    )
+                                    .push(
+                                        widget::text::body(format!(
+                                            "— {}",
+                                            temperature_unit_label(&self.settings.temperature_unit)
+                                        ))
+                                        .width(cosmic::iced::Length::Fixed(90.0))
+                                        .align_x(cosmic::iced::Alignment::End),
                                     )
                                     .push(
                                         widget::icon::from_name(if is_expanded {
@@ -7159,7 +7426,10 @@ impl cosmic::Application for AppModel {
                                 ..Default::default()
                             }
                         });
-                    menu_cards.push((format!("2-{device_key}"), device_card.into()));
+                    menu_cards.push((
+                        format!("2-inactive-{device_key}"),
+                        device_card.into(),
+                    ));
                 }
 
                 if let Some(power_sections) = total_power_overview(
@@ -7232,7 +7502,12 @@ impl cosmic::Application for AppModel {
                     .iter()
                     .filter(|(key, _)| key.starts_with("2-"))
                     .count();
+                let inactive_count = menu_cards
+                    .iter()
+                    .filter(|(key, _)| key.starts_with("2-inactive-"))
+                    .count();
                 let mut device_section_started = false;
+                let mut inactive_section_started = false;
                 let mut device_cards = widget::Column::new().spacing(0);
                 for (index, (key, card)) in menu_cards.into_iter().enumerate() {
                     if index > 0 {
@@ -7269,15 +7544,48 @@ impl cosmic::Application for AppModel {
                                     .width(cosmic::iced::Length::Fill)
                                     .align_y(cosmic::iced::Alignment::Center)
                                     .push(heading)
+                                    .push(device_sort_button(
+                                        crate::i18n::tr(&self.settings.language, "CUSTOM"),
+                                        "saved",
+                                        &self.settings.device_sort,
+                                        self.settings.device_sort_descending,
+                                        cosmic::iced::Length::Fixed(82.0),
+                                    ))
                                     .push(copy_menu_title_button(
                                         crate::i18n::tr(&self.settings.language, "DEVICES")
                                             .to_string(),
                                         self.copy_feedback.as_ref(),
                                     )),
                             );
+                            if !collapsed {
+                                device_cards = device_cards.push(device_sort_header(
+                                    &self.settings.device_sort,
+                                    self.settings.device_sort_descending,
+                                    &self.settings.temperature_unit,
+                                    &self.settings.language,
+                                ));
+                            }
                             device_section_started = true;
                         }
                         if !self.collapsed_menu_sections.contains("devices") {
+                            if key.starts_with("2-inactive-") && !inactive_section_started {
+                                device_cards = device_cards
+                                    .push(widget::divider::horizontal::default())
+                                    .push(
+                                        widget::Row::new()
+                                            .spacing(8)
+                                            .padding([8, 12])
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::icon::from_name("dialog-warning-symbolic").size(16))
+                                            .push(widget::text::caption(crate::i18n::tr(
+                                                &self.settings.language,
+                                                "INACTIVE DEVICES",
+                                            )))
+                                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                            .push(widget::text::caption(inactive_count.to_string())),
+                                    );
+                                inactive_section_started = true;
+                            }
                             device_cards = device_cards.push(card);
                         }
                         continue;
@@ -8204,12 +8512,18 @@ impl cosmic::Application for AppModel {
                 self.refresh_started_at = None;
                 match *result {
                     Ok(result) => {
+                        let previously_missing = self.missing_device_ains.clone();
+                        let recovered = recovered_device_names(
+                            &previously_missing,
+                            &result.readings,
+                        );
                         let newly_missing = newly_missing_devices(
                             &mut self.missing_device_ains,
                             &result.missing_devices,
                             &self.pending_power_changes,
                         );
                         notify_missing_devices(&newly_missing, &self.settings.language);
+                        notify_recovered_devices(&recovered, &self.settings.language);
                         let history_window =
                             graph_history_window(self.settings.graph_timespan_minutes);
                         if let Some(bandwidth) = result.internet_bandwidth.as_ref() {
@@ -8233,11 +8547,16 @@ impl cosmic::Application for AppModel {
                             // An empty successful fetch means every selected device
                             // is missing. Do not leave old values visible as live data.
                             self.readings.clear();
-                            self.error =
-                                Some("No selected devices returned usable readings".into());
+                            // Individual reachability failures belong to the
+                            // inactive list rather than a global connection error.
+                            self.error = if self.missing_device_ains.is_empty() {
+                                Some("No selected devices returned usable readings".into())
+                            } else {
+                                None
+                            };
                             record_diagnostic_event(
                                 &mut self.diagnostic_events,
-                                "FRITZ!Box request returned successfully, but no selected devices supplied usable readings.",
+                                "Refresh succeeded, but no device supplied a live reading; showing confirmed inactive devices.",
                             );
                         } else {
                             let total_power = output_power_w(&readings, &self.settings.input_ains);
@@ -8388,10 +8707,10 @@ impl cosmic::Application for AppModel {
                     }
                     Err(error) => {
                         self.internet_bandwidth = None;
-                        // Do not continue presenting the last known switch state as live.
-                        for reading in &mut self.readings {
-                            reading.power_state = None;
-                        }
+                        self.fritzbox_system_info = None;
+                        // A failed global refresh must not leave old measurements
+                        // visible as if they were live readings.
+                        self.readings.clear();
                         record_diagnostic_event(
                             &mut self.diagnostic_events,
                             format!("FRITZ!Box refresh failed: {error}"),
@@ -8401,8 +8720,9 @@ impl cosmic::Application for AppModel {
                 }
                 self.next_refresh_at = Some(
                     Instant::now()
-                        + Duration::from_secs(u64::from(
-                            self.settings.refresh_interval_seconds.clamp(30, 3600),
+                        + Duration::from_secs(refresh_interval_with_inactive_devices(
+                            self.settings.refresh_interval_seconds,
+                            !self.missing_device_ains.is_empty() || self.error.is_some(),
                         )),
                 );
             }
@@ -8680,6 +9000,15 @@ impl cosmic::Application for AppModel {
                     self.schedule_settings_save();
                 }
             }
+            Message::SortDeviceList(column) => {
+                if self.settings.device_sort == column && column != "saved" {
+                    self.settings.device_sort_descending = !self.settings.device_sort_descending;
+                } else {
+                    self.settings.device_sort = column.to_string();
+                    self.settings.device_sort_descending = false;
+                }
+                self.schedule_settings_save();
+            }
             Message::MoveDevice(ain, move_up) => {
                 let mut order: Vec<String> = self
                     .devices
@@ -8705,6 +9034,8 @@ impl cosmic::Application for AppModel {
                 if let Some(target) = target {
                     order.swap(index, target);
                     self.settings.device_order = order;
+                    self.settings.device_sort = "saved".into();
+                    self.settings.device_sort_descending = false;
                     self.schedule_settings_save();
                 }
             }
@@ -9423,6 +9754,7 @@ impl cosmic::Application for AppModel {
             }
             Message::RemoveDevice(ain) => {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
+                self.missing_device_ains.remove(&crate::fritz::canonical_device_key(&ain));
                 self.devices.retain(|device| {
                     crate::fritz::normalize_ain_for_selection(&device.ain) != normalized
                 });
@@ -9455,6 +9787,7 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleDevice(ain, selected) => {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
+                let canonical = crate::fritz::canonical_device_key(&ain);
                 self.selected_ains.retain(|existing| {
                     crate::fritz::normalize_ain_for_selection(existing) != normalized
                 });
@@ -9466,6 +9799,9 @@ impl cosmic::Application for AppModel {
                 {
                     self.settings.weather_temperature_ain.clear();
                     self.settings.weather_temperature_source_initialized = true;
+                }
+                if !selected {
+                    self.missing_device_ains.remove(&canonical);
                 }
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
@@ -10826,6 +11162,89 @@ mod copy_feedback_tests {
 }
 
 #[cfg(test)]
+mod device_list_sort_tests {
+    use super::sorted_device_readings;
+    use crate::fritz::FritzReading;
+
+    fn reading(ain: &str, name: &str, power_w: i64, temperature_c: f64) -> FritzReading {
+        FritzReading {
+            ain: ain.into(),
+            name: name.into(),
+            power_w,
+            temperature_c,
+            power_state: None,
+            power_controllable: false,
+            power_toggle_allowed: false,
+        }
+    }
+
+    fn ids<'a>(readings: &[&'a FritzReading]) -> Vec<&'a str> {
+        readings.iter().map(|reading| reading.ain.as_str()).collect()
+    }
+
+    #[test]
+    fn custom_order_is_default_and_used_as_stable_tiebreaker() {
+        let readings = vec![
+            reading("B", "Beta", 20, 12.0),
+            reading("A", "Alpha", 20, 12.0),
+            reading("C", "Gamma", 10, 5.0),
+        ];
+        let saved = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &saved, "saved", false)),
+            vec!["A", "B", "C"]
+        );
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &saved, "power", true)),
+            vec!["A", "B", "C"]
+        );
+        assert_eq!(readings[0].ain, "B"); // Sorting must not mutate source readings.
+    }
+
+    #[test]
+    fn name_and_power_columns_toggle_sort_direction() {
+        let readings = vec![
+            reading("B", "zeta", 200, 24.0),
+            reading("A", "Alpha", 10, 18.0),
+            reading("C", "bravo", 50, 21.0),
+        ];
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &[], "name", false)),
+            vec!["A", "C", "B"]
+        );
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &[], "name", true)),
+            vec!["B", "C", "A"]
+        );
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &[], "power", false)),
+            vec!["A", "C", "B"]
+        );
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &[], "power", true)),
+            vec!["B", "C", "A"]
+        );
+    }
+
+    #[test]
+    fn temperature_sort_keeps_unavailable_readings_last() {
+        let readings = vec![
+            reading("B", "No temperature", 10, f64::NAN),
+            reading("A", "Cold", 10, 13.0),
+            reading("C", "Warm", 10, 23.0),
+        ];
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &[], "temperature", false)),
+            vec!["A", "C", "B"]
+        );
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &[], "temperature", true)),
+            vec!["C", "A", "B"]
+        );
+    }
+}
+
+#[cfg(test)]
 mod disclosure_state_tests {
     use super::{device_order_position, is_device_expanded, toggle_collapsible_state};
     use std::collections::HashSet;
@@ -10845,6 +11264,46 @@ mod disclosure_state_tests {
         assert!(is_device_expanded(&expanded, "tasmota:aa:bb:cc"));
         toggle_collapsible_state(&mut expanded, "TASMOTAAABBCC".into());
         assert!(!is_device_expanded(&expanded, "TASMOTA:AABBCC"));
+    }
+
+    #[test]
+    fn inactive_device_transition_notifies_only_on_change() {
+        let mut previous = HashSet::new();
+        let missing = vec![("TASMOTA:AA:BB".to_string(), "Desk plug".to_string())];
+        assert_eq!(
+            super::newly_missing_devices(&mut previous, &missing, &HashSet::new()),
+            vec!["Desk plug".to_string()]
+        );
+        assert!(
+            super::newly_missing_devices(&mut previous, &missing, &HashSet::new()).is_empty()
+        );
+        let recovered = vec![super::FritzReading {
+            ain: "TASMOTA:AABB".into(),
+            name: "Desk plug".into(),
+            power_w: 42,
+            temperature_c: f64::NAN,
+            power_state: Some(true),
+            power_controllable: true,
+            power_toggle_allowed: true,
+        }];
+        assert_eq!(
+            super::recovered_device_names(&previous, &recovered),
+            vec!["Desk plug".to_string()]
+        );
+        assert!(super::newly_missing_devices(
+            &mut previous,
+            &[],
+            &HashSet::new()
+        )
+        .is_empty());
+        assert!(super::recovered_device_names(&previous, &recovered).is_empty());
+    }
+
+    #[test]
+    fn inactive_devices_are_polled_at_least_once_per_minute() {
+        assert_eq!(super::refresh_interval_with_inactive_devices(3600, true), 60);
+        assert_eq!(super::refresh_interval_with_inactive_devices(30, true), 30);
+        assert_eq!(super::refresh_interval_with_inactive_devices(300, false), 300);
     }
 
     #[test]
