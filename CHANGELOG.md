@@ -1,5 +1,10 @@
 # Changelog
 
+- Show TODAY and Y'DAY input, output and input/output percentage as large values in a two-row, three-column grid in Total Power Input & Output, retaining the low/high readings.
+- Keep device power (W) and temperature in separate, single-line aligned columns. Add sortable Name, W, and temperature column headings with ascending/descending toggles and a Custom button to restore the saved manual order; persist sorting preferences.
+- Retry missing device readings up to three times before marking devices inactive. Show a separate inactive list and notify on transitions into and back out of that list; recheck inactive devices at least every minute. Preserve healthy readings and retry changed Tasmota addresses using short mDNS rediscovery.
+- Clear stale live readings on refresh errors and add regression coverage for sorting, outage transitions, and retry intervals.
+
 - Make compact power, temperature, and bandwidth graphs use the full available popup width; place device readings below their graphs rather than beside them, and adjust compact SVG proportions for the wider layout.
 
 - Align the Total Power Input & Output title copy button to the far right of its header, keeping the expandable summary and disclosure control intact.
