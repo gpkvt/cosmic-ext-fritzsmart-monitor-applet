@@ -6478,10 +6478,18 @@ impl cosmic::Application for AppModel {
                 weather_menu_card = Some(weather_section.into());
             } else if self.settings.weather_enabled {
                 let mut weather_section = widget::Column::new().spacing(8);
-                weather_section = weather_section.push(widget::text::title3(crate::i18n::tr(
-                    &self.settings.language,
-                    "Weather",
-                )));
+                weather_section = weather_section.push(
+                    widget::Row::new()
+                        .width(cosmic::iced::Length::Fill)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::title3(crate::i18n::tr(
+                            &self.settings.language,
+                            "Weather",
+                        )))
+                        .push(copy_menu_title_button(
+                            crate::i18n::tr(&self.settings.language, "Weather").to_string(),
+                        )),
+                );
                 if let Some(error) = &self.weather_error {
                     weather_section = weather_section.push(error_notice(
                         crate::i18n::tr(&self.settings.language, "WEATHER UNAVAILABLE"),
