@@ -11,27 +11,30 @@ resolve_desktop_user() {
     entry="$(getent passwd "$candidate" 2>/dev/null || true)"
     [ -n "$entry" ] || return 1
     uid="$(printf '%s\n' "$entry" | cut -d: -f3)"
-    home="$(printf '%s\n' "$entry" | cut -d: -f6)"
+    desktop_user="$(printf '%s\n' "$entry" | cut -d: -f1)"
+    desktop_home="$(printf '%s\n' "$entry" | cut -d: -f6)"
     [ -n "$uid" ] && [ "$uid" -ge 1000 ] 2>/dev/null || return 1
-    case "$home" in
+    [ -n "$desktop_user" ] || return 1
+    case "$desktop_home" in
         /*) ;;
-        *) return 1
+        *) return 1 ;;
     esac
-    printf '%s\n' "$home"
+    command -v runuser >/dev/null 2>&1 || return 1
 }
 
 remove_profile_link() {
     target=$1
     link=$2
     if [ -L "$link" ] && [ "$(readlink "$link")" = "$target" ]; then
-        rm -- "$link"
+        # Never unlink beneath a user-controlled home as root.
+        runuser -u "$desktop_user" -- rm -- "$link"
     fi
 }
 
-if home="$(resolve_desktop_user)"; then
-    remove_profile_link /usr/bin/fritz-power-monitor "$home/.local/bin/fritz-power-monitor"
-    remove_profile_link /usr/share/applications/com.gpkvt.FritzPowerMonitor.desktop "$home/.local/share/applications/com.gpkvt.FritzPowerMonitor.desktop"
-    remove_profile_link /usr/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg "$home/.local/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg"
+if resolve_desktop_user; then
+    remove_profile_link /usr/bin/fritz-power-monitor "$desktop_home/.local/bin/fritz-power-monitor"
+    remove_profile_link /usr/share/applications/com.gpkvt.FritzPowerMonitor.desktop "$desktop_home/.local/share/applications/com.gpkvt.FritzPowerMonitor.desktop"
+    remove_profile_link /usr/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg "$desktop_home/.local/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg"
 fi
 
 exit 0
