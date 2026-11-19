@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Automation
+
+- Restore **manual-only GitHub Pages publication** via Actions `workflow_dispatch` or `make publish-pages`: build static documentation, validate assets and links, then deploy to the existing `gh-pages` branch. Regular pushes and release workflows remain disabled.
+
 ### Documentation
 
 - Refresh the GitHub Pages homepage, compatibility and FAQ content for Netatmo Weather Stations, including the new outdoor temperature source, OAuth setup, cloud/credential boundaries, sensor histories and unsupported device types; expand the user guide and refresh the deployed Pages copy.
