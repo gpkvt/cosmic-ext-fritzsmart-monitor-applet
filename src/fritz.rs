@@ -457,8 +457,7 @@ fn parse_expanded_devices(value: &str) -> Vec<String> {
     unique_strings(
         value
             .split(',')
-            .map(normalize_ain_for_selection)
-            .map(|ain| ain.to_ascii_uppercase())
+            .map(canonical_device_key)
             .filter(|ain| !ain.is_empty())
             .collect::<Vec<_>>(),
     )
@@ -897,6 +896,11 @@ pub fn normalize_ain_for_selection(value: &str) -> String {
         .chars()
         .filter(|character| character.is_ascii_alphanumeric())
         .collect()
+}
+
+/// Stable, case-insensitive identity for saved device disclosure state and ordering.
+pub fn canonical_device_key(value: &str) -> String {
+    normalize_ain_for_selection(value).to_ascii_uppercase()
 }
 
 fn find_text<'a>(document: &'a Document<'a>, tag: &str) -> Option<&'a str> {
@@ -2172,10 +2176,23 @@ mod tests {
     }
 
     #[test]
+    fn canonical_device_keys_are_case_insensitive() {
+        assert_eq!(
+            canonical_device_key("tasmota:aa:bb:cc:dd:ee:ff"),
+            "TASMOTAAABBCCDDEEFF"
+        );
+        assert_eq!(canonical_device_key("12:34 aa"), "1234AA");
+    }
+
+    #[test]
     fn parses_persisted_expanded_devices_as_unique_normalized_ains() {
         assert_eq!(
-            parse_expanded_devices(" 12:34 aa,1234AA,!!!, ,9876"),
-            vec!["1234AA".to_string(), "9876".to_string()]
+            parse_expanded_devices(" 12:34 aa,1234AA,!!!, ,9876,tasmota:aa:bb,tasmota:AABB"),
+            vec![
+                "1234AA".to_string(),
+                "9876".to_string(),
+                "TASMOTAAABB".to_string()
+            ]
         );
     }
 
