@@ -507,12 +507,47 @@ fn notify_missing_devices(names: &[String], language: &str) {
     let body = names.join("\n");
     let _ = notify_rust::Notification::new()
         .summary(if names.len() == 1 {
-            crate::i18n::tr(language, "FRITZ!Box device unavailable")
+            crate::i18n::tr(language, "Device moved to inactive list")
         } else {
-            crate::i18n::tr(language, "FRITZ!Box devices unavailable")
+            crate::i18n::tr(language, "Devices moved to inactive list")
         })
         .body(&body)
         .show();
+}
+
+fn recovered_device_names(
+    previously_missing: &HashSet<String>,
+    readings: &[FritzReading],
+) -> Vec<String> {
+    readings
+        .iter()
+        .filter(|reading| {
+            previously_missing
+                .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+        })
+        .map(|reading| reading.name.clone())
+        .collect()
+}
+
+fn notify_recovered_devices(names: &[String], language: &str) {
+    if names.is_empty() {
+        return;
+    }
+    let body = names.join("\n");
+    let _ = notify_rust::Notification::new()
+        .summary(if names.len() == 1 {
+            crate::i18n::tr(language, "Device restored to active list")
+        } else {
+            crate::i18n::tr(language, "Devices restored to active list")
+        })
+        .body(&body)
+        .show();
+}
+
+/// Recheck inactive devices at least every minute, independent of the normal refresh setting.
+fn refresh_interval_with_inactive_devices(configured_seconds: u32, has_inactive: bool) -> u64 {
+    let seconds = u64::from(configured_seconds.clamp(30, 3600));
+    if has_inactive { seconds.min(60) } else { seconds }
 }
 
 fn notify_temperature_alert(
@@ -6721,7 +6756,9 @@ impl cosmic::Application for AppModel {
                 weather_menu_card = Some(weather_section.into());
             }
 
-            if self.error.is_none() && !self.readings.is_empty() {
+            if self.error.is_none()
+                && (!self.readings.is_empty() || !self.missing_device_ains.is_empty())
+            {
                 let energy_flow = energy_flow_overview(
                     &self.readings,
                     &self.settings.input_ains,
@@ -7382,7 +7419,10 @@ impl cosmic::Application for AppModel {
                                 ..Default::default()
                             }
                         });
-                    menu_cards.push((format!("2-{device_key}"), device_card.into()));
+                    menu_cards.push((
+                        format!("2-inactive-{device_key}"),
+                        device_card.into(),
+                    ));
                 }
 
                 if let Some(power_sections) = total_power_overview(
@@ -7455,7 +7495,12 @@ impl cosmic::Application for AppModel {
                     .iter()
                     .filter(|(key, _)| key.starts_with("2-"))
                     .count();
+                let inactive_count = menu_cards
+                    .iter()
+                    .filter(|(key, _)| key.starts_with("2-inactive-"))
+                    .count();
                 let mut device_section_started = false;
+                let mut inactive_section_started = false;
                 let mut device_cards = widget::Column::new().spacing(0);
                 for (index, (key, card)) in menu_cards.into_iter().enumerate() {
                     if index > 0 {
@@ -7508,6 +7553,21 @@ impl cosmic::Application for AppModel {
                             device_section_started = true;
                         }
                         if !self.collapsed_menu_sections.contains("devices") {
+                            if key.starts_with("2-inactive-") && !inactive_section_started {
+                                device_cards = device_cards
+                                    .push(widget::divider::horizontal::default())
+                                    .push(
+                                        widget::Row::new()
+                                            .spacing(8)
+                                            .padding([8, 12])
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::icon::from_name("dialog-warning-symbolic").size(16))
+                                            .push(widget::text::caption("INACTIVE DEVICES"))
+                                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                            .push(widget::text::caption(inactive_count.to_string())),
+                                    );
+                                inactive_section_started = true;
+                            }
                             device_cards = device_cards.push(card);
                         }
                         continue;
@@ -8434,12 +8494,18 @@ impl cosmic::Application for AppModel {
                 self.refresh_started_at = None;
                 match *result {
                     Ok(result) => {
+                        let previously_missing = self.missing_device_ains.clone();
+                        let recovered = recovered_device_names(
+                            &previously_missing,
+                            &result.readings,
+                        );
                         let newly_missing = newly_missing_devices(
                             &mut self.missing_device_ains,
                             &result.missing_devices,
                             &self.pending_power_changes,
                         );
                         notify_missing_devices(&newly_missing, &self.settings.language);
+                        notify_recovered_devices(&recovered, &self.settings.language);
                         let history_window =
                             graph_history_window(self.settings.graph_timespan_minutes);
                         if let Some(bandwidth) = result.internet_bandwidth.as_ref() {
@@ -8463,11 +8529,16 @@ impl cosmic::Application for AppModel {
                             // An empty successful fetch means every selected device
                             // is missing. Do not leave old values visible as live data.
                             self.readings.clear();
-                            self.error =
-                                Some("No selected devices returned usable readings".into());
+                            // Individual reachability failures belong to the
+                            // inactive list rather than a global connection error.
+                            self.error = if self.missing_device_ains.is_empty() {
+                                Some("No selected devices returned usable readings".into())
+                            } else {
+                                None
+                            };
                             record_diagnostic_event(
                                 &mut self.diagnostic_events,
-                                "FRITZ!Box request returned successfully, but no selected devices supplied usable readings.",
+                                "Refresh succeeded, but no device supplied a live reading; showing confirmed inactive devices.",
                             );
                         } else {
                             let total_power = output_power_w(&readings, &self.settings.input_ains);
@@ -8618,10 +8689,9 @@ impl cosmic::Application for AppModel {
                     }
                     Err(error) => {
                         self.internet_bandwidth = None;
-                        // Do not continue presenting the last known switch state as live.
-                        for reading in &mut self.readings {
-                            reading.power_state = None;
-                        }
+                        // A failed global refresh must not leave old measurements
+                        // visible as if they were live readings.
+                        self.readings.clear();
                         record_diagnostic_event(
                             &mut self.diagnostic_events,
                             format!("FRITZ!Box refresh failed: {error}"),
@@ -8631,8 +8701,9 @@ impl cosmic::Application for AppModel {
                 }
                 self.next_refresh_at = Some(
                     Instant::now()
-                        + Duration::from_secs(u64::from(
-                            self.settings.refresh_interval_seconds.clamp(30, 3600),
+                        + Duration::from_secs(refresh_interval_with_inactive_devices(
+                            self.settings.refresh_interval_seconds,
+                            !self.missing_device_ains.is_empty(),
                         )),
                 );
             }
