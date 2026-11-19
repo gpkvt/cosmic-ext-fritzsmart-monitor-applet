@@ -2126,25 +2126,7 @@ fn device_corner_radius(index: usize, device_count: usize) -> cosmic::iced::bord
     }
 }
 
-fn range_metric_tile<'a>(
-    label: &'static str,
-    value: String,
-    icon: &'static str,
-) -> cosmic::Element<'a, Message> {
-    let content = widget::Column::new()
-        .spacing(8)
-        .width(cosmic::iced::Length::Fill)
-        .push(
-            widget::Row::new()
-                .spacing(6)
-                .align_y(cosmic::iced::Alignment::Center)
-                .push(widget::icon::from_name(icon).size(14))
-                .push(widget::text::caption(label)),
-        )
-        .push(widget::text::title2(keep_value_unit_together(value)));
-    surface_card(content.into(), 12)
-}
-
+/// Match the large daily readings without nesting additional metric cards.
 fn power_range_row(
     low_label: &'static str,
     high_label: &'static str,
@@ -2152,16 +2134,10 @@ fn power_range_row(
     high: String,
 ) -> cosmic::Element<'static, Message> {
     widget::Row::new()
-        .spacing(8)
+        .spacing(10)
         .width(cosmic::iced::Length::Fill)
-        .push(
-            widget::container(range_metric_tile(low_label, low, "go-down-symbolic"))
-                .width(cosmic::iced::Length::Fill),
-        )
-        .push(
-            widget::container(range_metric_tile(high_label, high, "go-up-symbolic"))
-                .width(cosmic::iced::Length::Fill),
-        )
+        .push(daily_power_metric(low_label, low))
+        .push(daily_power_metric(high_label, high))
         .into()
 }
 
@@ -2558,9 +2534,24 @@ fn total_power_overview(
     // CURRENT POWER HISTORY owns the graph. Keep both input and output
     // low/high values visible here, even if an input device is now offline.
     let (input_low_label, input_high_label) = input_range_labels(&input_history);
+    let current_value = |value: i64| format!("{value} W");
+    let current_input = if has_input_readings {
+        current_value(total_input_w)
+    } else {
+        "— W".to_string()
+    };
+    // One consistent large-value layout: daily energy, historical range,
+    // and the current input/output power values at the very bottom.
     let content = widget::Column::new()
         .spacing(10)
         .width(cosmic::iced::Length::Fill)
+        .push(daily_power_metrics_grid(
+            input_today_wh,
+            output_today_wh,
+            input_yesterday_wh,
+            output_yesterday_wh,
+        ))
+        .push(widget::divider::horizontal::default())
         .push(power_range_row(
             "OUTPUT LOW",
             "OUTPUT HIGH",
@@ -2573,37 +2564,14 @@ fn total_power_overview(
             input_low_label,
             input_high_label,
         ))
-        .push(
-            widget::Row::new()
-                .spacing(14)
-                .width(cosmic::iced::Length::Fill)
-                .push(widget::text::caption("NOW").width(cosmic::iced::Length::Fill))
-                .push(widget::text::body(format!(
-                    "IN {}",
-                    keep_value_unit_together(if has_input_readings {
-                        format!("{total_input_w} W")
-                    } else {
-                        "— W".to_string()
-                    })
-                )))
-                .push(widget::text::body(format!(
-                    "OUT {}",
-                    keep_value_unit_together(format!("{total_output_w} W"))
-                ))),
-        )
-        .push(daily_power_metrics_grid(
-            input_today_wh,
-            output_today_wh,
-            input_yesterday_wh,
-            output_yesterday_wh,
+        .push(widget::divider::horizontal::default())
+        .push(power_range_row(
+            "NOW INPUT",
+            "NOW OUTPUT",
+            current_input.clone(),
+            current_value(total_output_w),
         ));
     let collapsed = collapsed_sections.contains("total-power-overview");
-    let current_value = |value: i64| format!("{value} W");
-    let current_input = if has_input_readings {
-        current_value(total_input_w)
-    } else {
-        "— W".to_string()
-    };
     let collapsed_summary = widget::Row::new()
         .spacing(8)
         .align_y(cosmic::iced::Alignment::Center)
