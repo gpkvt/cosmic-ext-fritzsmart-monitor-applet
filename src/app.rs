@@ -10649,3 +10649,33 @@ mod daily_energy_history_tests {
         assert!(history.last().unwrap().1.is_none());
     }
 }
+
+
+#[cfg(test)]
+mod energy_input_output_ratio_tests {
+    use super::energy_input_output_ratio_percent;
+
+    #[test]
+    fn energy_ratio_is_input_as_a_percentage_of_output() {
+        assert_eq!(
+            energy_input_output_ratio_percent(Some(250.0), Some(500.0)),
+            Some(50.0)
+        );
+        assert_eq!(
+            energy_input_output_ratio_percent(Some(750.0), Some(500.0)),
+            Some(150.0)
+        );
+    }
+
+    #[test]
+    fn energy_ratio_requires_valid_input_and_positive_output() {
+        assert_eq!(energy_input_output_ratio_percent(None, Some(500.0)), None);
+        assert_eq!(energy_input_output_ratio_percent(Some(250.0), None), None);
+        assert_eq!(energy_input_output_ratio_percent(Some(250.0), Some(0.0)), None);
+        assert_eq!(energy_input_output_ratio_percent(Some(250.0), Some(-1.0)), None);
+        assert_eq!(
+            energy_input_output_ratio_percent(Some(f64::NAN), Some(500.0)),
+            None
+        );
+    }
+}
