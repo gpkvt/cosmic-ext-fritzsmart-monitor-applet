@@ -6954,14 +6954,15 @@ impl cosmic::Application for AppModel {
                     let mut card_column = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
                         .list_item_padding([0, 0])
-                        .add(device_heading)
-                        .add(widget::container(device_summary).padding([0, 12]));
+                        .add(device_heading);
                     if is_expanded {
-                        card_column = card_column.add(
-                            widget::container(device_content)
-                                .padding([12, 0])
-                                .width(cosmic::iced::Length::Fill),
-                        );
+                        card_column = card_column
+                            .add(widget::container(device_summary).padding([0, 12]))
+                            .add(
+                                widget::container(device_content)
+                                    .padding([12, 0])
+                                    .width(cosmic::iced::Length::Fill),
+                            );
                     }
                     let device_card = widget::container(card_column)
                         .width(cosmic::iced::Length::Fill)
@@ -7012,26 +7013,44 @@ impl cosmic::Application for AppModel {
                 });
                 for device in missing_devices {
                     let device_key = crate::fritz::normalize_ain_for_selection(&device.ain);
+                    let is_expanded = self.expanded_devices.contains(&device_key);
                     let device_row = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
                         .list_item_padding([0, 0])
                         .add(
-                            widget::Row::new()
-                                .spacing(12)
-                                .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::icon::from_name("computer-symbolic").size(20))
-                                .push(
-                                    widget::Column::new()
-                                        .spacing(2)
-                                        .width(cosmic::iced::Length::Fill)
-                                        .push(widget::text::body(device.name.clone()))
-                                        .push(widget::text::caption(crate::i18n::tr(
-                                            &self.settings.language,
-                                            "No live reading available",
-                                        ))),
-                                )
-                                .push(widget::icon::from_name("dialog-warning-symbolic").size(16)),
+                            widget::button::custom(
+                                widget::Row::new()
+                                    .spacing(12)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(widget::icon::from_name("computer-symbolic").size(20))
+                                    .push(
+                                        widget::Column::new()
+                                            .spacing(2)
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::text::body(device.name.clone()))
+                                            .push(widget::text::caption(crate::i18n::tr(
+                                                &self.settings.language,
+                                                "No live reading available",
+                                            ))),
+                                    )
+                                    .push(widget::icon::from_name(if is_expanded {
+                                        "go-up-symbolic"
+                                    } else {
+                                        "go-down-symbolic"
+                                    }).size(16)),
+                            )
+                            .on_press(Message::ToggleDeviceDetails(device.ain.clone()))
+                            .width(cosmic::iced::Length::Fill)
+                            .padding([8, 12])
+                            .class(cosmic::theme::Button::Text),
                         );
+                    let device_row = if is_expanded {
+                        device_row.add(widget::container(widget::text::caption(
+                            crate::i18n::tr(&self.settings.language, "No live reading available"),
+                        )).padding([8, 12]))
+                    } else {
+                        device_row
+                    };
                     let device_card = widget::container(device_row)
                         .width(cosmic::iced::Length::Fill)
                         .style(|theme| {
