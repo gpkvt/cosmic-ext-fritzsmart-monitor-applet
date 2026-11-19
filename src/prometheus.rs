@@ -1,4 +1,5 @@
-//! Opt-in, loopback-only Prometheus text exposition.
+//! Opt-in Prometheus text exposition; binds to loopback unless the user
+//! explicitly chooses another IP:port in the applet settings.
 //! The exporter NEVER makes network requests to external services. It scrapes
 //! an in-memory snapshot populated by the normal COSMIC application render.
 //! The server only binds while enabled; shutting off removes the listening socket.
