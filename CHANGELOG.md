@@ -1,5 +1,8 @@
 # Changelog
 
+- Align the collapsed Total Power Input & Output heading with other popup sections, using the same title, summary, disclosure icon, padding and copy-button placement.
+- Remove the Custom sort button from Devices while keeping existing saved device order available through Settings. Reorder device rows as name/disclosure, W, temperature, History, Copy and Toggle; keep inactive devices in the same aligned columns.
+
 - Combine current (NOW) input and output readings with their LOW/HIGH metrics into two three-column rows, matching the daily energy grid and keeping current power at the bottom of the section.
 
 - Unify the Total Power Input & Output large-value layout: daily IN/OUT/percentage values first, input/output LOW/HIGH in the same visual style, and larger NOW readings last at the bottom without nested metric cards.

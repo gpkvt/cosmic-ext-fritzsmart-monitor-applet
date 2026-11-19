@@ -2573,71 +2573,56 @@ fn total_power_overview(
             current_input.clone(),
         ));
     let collapsed = collapsed_sections.contains("total-power-overview");
-    let collapsed_summary = widget::Row::new()
+    // Match the other collapsed popup sections: one full-width disclosure
+    // button containing the title, trailing live summary, and chevron.
+    let mut heading_content = widget::Row::new()
         .spacing(8)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(
-            widget::text::caption(format!("IN {}", keep_value_unit_together(current_input)))
-                .align_x(cosmic::iced::Alignment::End),
-        )
-        .push(
-            widget::text::caption(format!(
+        .push(widget::text::body("TOTAL POWER INPUT & OUTPUT"))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill));
+    if collapsed {
+        heading_content = heading_content
+            .push(widget::text::body(format!(
+                "IN {}",
+                keep_value_unit_together(current_input)
+            )))
+            .push(widget::text::body(format!(
                 "OUT {}",
                 keep_value_unit_together(current_value(total_output_w))
-            ))
-            .align_x(cosmic::iced::Alignment::End),
-        );
-    let collapsed_summary_element: cosmic::Element<'static, Message> = if collapsed {
-        collapsed_summary.into()
-    } else {
-        widget::Space::new()
-            .width(cosmic::iced::Length::Shrink)
-            .into()
-    };
-    // Keep the disclosure area flexible and anchor the copy action at the far right.
-    let title_button = widget::button::custom(widget::text::caption("TOTAL POWER INPUT & OUTPUT"))
-        .on_press(Message::ToggleMenuSection("total-power-overview".into()))
-        .padding([4, 0])
-        .class(cosmic::theme::Button::Text);
-    let disclosure_button = widget::button::custom(
-        widget::Row::new()
-            .spacing(8)
-            .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-            .push(collapsed_summary_element)
-            .push(
-                widget::icon::from_name(if collapsed {
-                    "go-next-symbolic"
-                } else {
-                    "go-down-symbolic"
-                })
-                .size(16),
-            ),
+            )));
+    }
+    let heading = widget::button::custom(
+        heading_content.push(
+            widget::icon::from_name(if collapsed {
+                "go-next-symbolic"
+            } else {
+                "go-down-symbolic"
+            })
+            .size(16),
+        ),
     )
     .on_press(Message::ToggleMenuSection("total-power-overview".into()))
     .width(cosmic::iced::Length::Fill)
-    .padding([4, 0])
+    .padding([8, 12])
     .class(cosmic::theme::Button::Text);
     let heading_row = widget::Row::new()
-        .spacing(4)
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(title_button)
-        .push(disclosure_button)
+        .push(heading)
         .push(copy_menu_title_button(
             "TOTAL POWER INPUT & OUTPUT".to_string(),
             copy_feedback,
         ));
     let mut section = widget::Column::new()
-        .spacing(4)
+        .spacing(0)
         .width(cosmic::iced::Length::Fill)
         .push(heading_row);
     if !collapsed {
-        section = section.push(content);
+        section = section.push(widget::container(content).padding([8, 12]));
     }
     Some(vec![(
         "3-total-power-overview".to_string(),
-        surface_card(section.into(), 14),
+        section.into(),
     )])
 }
 
@@ -2856,7 +2841,7 @@ fn device_sort_button(
     )
     .on_press(Message::SortDeviceList(column))
     .width(width)
-    .padding([4, 2])
+    .padding([4, if column == "name" { 12 } else { 2 }])
     .class(cosmic::theme::Button::Text)
     .into()
 }
@@ -2870,9 +2855,8 @@ fn device_sort_header(
     widget::Row::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
-        .padding([2, 12])
+        .padding([2, 0])
         .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(40.0)))
         .push(device_sort_button(
             crate::i18n::tr(language, "NAME"),
             "name",
@@ -2898,10 +2882,10 @@ fn device_sort_header(
             descending,
             cosmic::iced::Length::Fixed(90.0),
         ))
-        // Match the disclosure chevron and the copy/history/power controls
-        // to keep the numeric headings aligned with their device columns.
-        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(16.0)))
-        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(168.0)))
+        // Reserve the same widths as History, Copy, and Toggle in device rows.
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(108.0)))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(32.0)))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(52.0)))
         .into()
 }
 
@@ -6964,48 +6948,16 @@ impl cosmic::Application for AppModel {
                             device_corner_radius.bottom_left
                         },
                     ];
-                    let mut device_title = widget::Column::new()
-                        .spacing(3)
-                        .width(cosmic::iced::Length::Fill)
-                        .push(
-                            widget::text::body(reading.name.clone())
-                                .class(cosmic::theme::Text::Accent),
-                        );
-                    if is_expanded {
-                        device_title = device_title.push(widget::text::caption(format!(
-                            "{} {}",
-                            crate::i18n::tr(&self.settings.language, "LAST"),
-                            format_graph_timespan(self.settings.graph_timespan_minutes)
-                                .to_uppercase()
-                        )));
-                    }
+                    // Only the name and disclosure chevron are clickable here.
+                    // Live readings and the remaining actions are sibling columns.
                     let device_heading_button = widget::button::custom(
                         widget::Row::new()
                             .spacing(8)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(
-                                widget::container(
-                                    widget::icon::from_name("computer-symbolic").size(20),
-                                )
-                                .center_x(32)
-                                .center_y(36),
-                            )
-                            .push(device_title)
-                            .push(
-                                widget::text::body(keep_value_unit_together(format!(
-                                    "{} W",
-                                    reading.power_w
-                                )))
-                                .width(cosmic::iced::Length::Fixed(76.0))
-                                .align_x(cosmic::iced::Alignment::End),
-                            )
-                            .push(
-                                widget::text::body(keep_value_unit_together(format_temperature(
-                                    reading.temperature_c,
-                                    &self.settings.temperature_unit,
-                                )))
-                                .width(cosmic::iced::Length::Fixed(90.0))
-                                .align_x(cosmic::iced::Alignment::End),
+                                widget::text::body(reading.name.clone())
+                                    .class(cosmic::theme::Text::Accent)
+                                    .width(cosmic::iced::Length::Fill),
                             )
                             .push(
                                 widget::icon::from_name(if is_expanded {
@@ -7037,24 +6989,48 @@ impl cosmic::Application for AppModel {
                                 ))),
                         )
                         .on_press(Message::ShowDeviceHistoryGraph(reading.ain.clone()))
+                        .width(cosmic::iced::Length::Fixed(108.0))
                         .padding([8, 8])
                         .class(cosmic::theme::Button::Text)
                         .into()
                     } else {
                         widget::Space::new()
-                            .width(cosmic::iced::Length::Fixed(32.0))
+                            .width(cosmic::iced::Length::Fixed(108.0))
                             .into()
                     };
+                    // Requested column order: name/disclosure | W | °C |
+                    // history | copy | power. Fixed numeric/action widths
+                    // keep readings aligned across active devices.
                     let device_heading = widget::Row::new()
+                        .spacing(8)
                         .width(cosmic::iced::Length::Fill)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(device_heading_button)
+                        .push(
+                            widget::text::body(keep_value_unit_together(format!(
+                                "{} W",
+                                reading.power_w
+                            )))
+                            .width(cosmic::iced::Length::Fixed(76.0))
+                            .align_x(cosmic::iced::Alignment::End),
+                        )
+                        .push(
+                            widget::text::body(keep_value_unit_together(format_temperature(
+                                reading.temperature_c,
+                                &self.settings.temperature_unit,
+                            )))
+                            .width(cosmic::iced::Length::Fixed(90.0))
+                            .align_x(cosmic::iced::Alignment::End),
+                        )
+                        .push(history_button)
                         .push(copy_menu_title_button(
                             reading.name.clone(),
                             self.copy_feedback.as_ref(),
                         ))
-                        .push(history_button)
-                        .push(power_toggle);
+                        .push(
+                            widget::container(power_toggle)
+                                .width(cosmic::iced::Length::Fixed(52.0)),
+                        );
                     let device_axis_start = format_graph_axis_start(
                         self.settings.graph_timespan_minutes,
                         device_history.and_then(|samples| {
@@ -7340,51 +7316,64 @@ impl cosmic::Application for AppModel {
                 for device in missing_devices {
                     let device_key = crate::fritz::normalize_ain_for_selection(&device.ain);
                     let is_expanded = is_device_expanded(&self.expanded_devices, &device_key);
+                    // Keep unavailable devices in the same column grid as
+                    // reachable ones; disconnected switches cannot be operated.
                     let device_row = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
                         .list_item_padding([0, 0])
                         .add(
-                            widget::button::custom(
-                                widget::Row::new()
-                                    .spacing(12)
-                                    .align_y(cosmic::iced::Alignment::Center)
-                                    .push(widget::icon::from_name("computer-symbolic").size(20))
-                                    .push(
-                                        widget::Column::new()
-                                            .spacing(2)
-                                            .width(cosmic::iced::Length::Fill)
-                                            .push(widget::text::body(device.name.clone()))
-                                            .push(widget::text::caption(crate::i18n::tr(
-                                                &self.settings.language,
-                                                "No live reading available",
-                                            ))),
+                            widget::Row::new()
+                                .spacing(8)
+                                .width(cosmic::iced::Length::Fill)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(
+                                    widget::button::custom(
+                                        widget::Row::new()
+                                            .spacing(8)
+                                            .align_y(cosmic::iced::Alignment::Center)
+                                            .push(
+                                                widget::text::body(device.name.clone())
+                                                    .width(cosmic::iced::Length::Fill),
+                                            )
+                                            .push(
+                                                widget::icon::from_name(if is_expanded {
+                                                    "go-up-symbolic"
+                                                } else {
+                                                    "go-down-symbolic"
+                                                })
+                                                .size(16),
+                                            ),
                                     )
-                                    .push(
-                                        widget::text::body("— W")
-                                            .width(cosmic::iced::Length::Fixed(76.0))
-                                            .align_x(cosmic::iced::Alignment::End),
-                                    )
-                                    .push(
-                                        widget::text::body(format!(
-                                            "— {}",
-                                            temperature_unit_label(&self.settings.temperature_unit)
-                                        ))
-                                        .width(cosmic::iced::Length::Fixed(90.0))
+                                    .on_press(Message::ToggleDeviceDetails(device.ain.clone()))
+                                    .width(cosmic::iced::Length::Fill)
+                                    .padding([8, 12])
+                                    .class(cosmic::theme::Button::Text),
+                                )
+                                .push(
+                                    widget::text::body("— W")
+                                        .width(cosmic::iced::Length::Fixed(76.0))
                                         .align_x(cosmic::iced::Alignment::End),
-                                    )
-                                    .push(
-                                        widget::icon::from_name(if is_expanded {
-                                            "go-up-symbolic"
-                                        } else {
-                                            "go-down-symbolic"
-                                        })
-                                        .size(16),
-                                    ),
-                            )
-                            .on_press(Message::ToggleDeviceDetails(device.ain.clone()))
-                            .width(cosmic::iced::Length::Fill)
-                            .padding([8, 12])
-                            .class(cosmic::theme::Button::Text),
+                                )
+                                .push(
+                                    widget::text::body(format!(
+                                        "— {}",
+                                        temperature_unit_label(&self.settings.temperature_unit)
+                                    ))
+                                    .width(cosmic::iced::Length::Fixed(90.0))
+                                    .align_x(cosmic::iced::Alignment::End),
+                                )
+                                .push(
+                                    widget::Space::new()
+                                        .width(cosmic::iced::Length::Fixed(108.0)),
+                                )
+                                .push(copy_menu_title_button(
+                                    device.name.clone(),
+                                    self.copy_feedback.as_ref(),
+                                ))
+                                .push(
+                                    widget::container(widget::toggler(false))
+                                        .width(cosmic::iced::Length::Fixed(52.0)),
+                                ),
                         );
                     let device_row = if is_expanded {
                         device_row.add(
@@ -7526,13 +7515,6 @@ impl cosmic::Application for AppModel {
                                     .width(cosmic::iced::Length::Fill)
                                     .align_y(cosmic::iced::Alignment::Center)
                                     .push(heading)
-                                    .push(device_sort_button(
-                                        crate::i18n::tr(&self.settings.language, "CUSTOM"),
-                                        "saved",
-                                        &self.settings.device_sort,
-                                        self.settings.device_sort_descending,
-                                        cosmic::iced::Length::Fixed(82.0),
-                                    ))
                                     .push(copy_menu_title_button(
                                         crate::i18n::tr(&self.settings.language, "DEVICES")
                                             .to_string(),
