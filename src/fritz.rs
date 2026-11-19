@@ -144,6 +144,8 @@ pub struct FritzSettings {
     pub password: String,
     pub tasmota_username: String,
     pub tasmota_password: String,
+    pub hue_bridge_ip: String,
+    pub hue_application_key: String,
     pub tasmota_subnet_scan: bool,
     pub ain: String,
     pub ains: Vec<String>,
@@ -202,6 +204,8 @@ impl Default for FritzSettings {
             password: String::new(),
             tasmota_username: String::new(),
             tasmota_password: String::new(),
+            hue_bridge_ip: String::new(),
+            hue_application_key: String::new(),
             tasmota_subnet_scan: true,
             ain: String::new(),
             ains: Vec::new(),
@@ -533,6 +537,8 @@ impl FritzSettings {
             password: get("PASSWORD"),
             tasmota_username: get("TASMOTA_USERNAME"),
             tasmota_password: get("TASMOTA_PASSWORD"),
+            hue_bridge_ip: get("HUE_BRIDGE_IP"),
+            hue_application_key: get("HUE_APPLICATION_KEY"),
             tasmota_subnet_scan: !values.contains_key("TASMOTA_SUBNET_SCAN")
                 || get("TASMOTA_SUBNET_SCAN").eq_ignore_ascii_case("true"),
             ain: get("AIN"),
@@ -661,6 +667,8 @@ impl FritzSettings {
             &self.password,
             &self.tasmota_username,
             &self.tasmota_password,
+            &self.hue_bridge_ip,
+            &self.hue_application_key,
             &self.ain,
             &self.ca_cert_path,
             &self.openweathermap_api_key,
@@ -716,7 +724,7 @@ impl FritzSettings {
             parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
         let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
-            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nTEMPERATURE_UNIT={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nDEVICE_SORT={}\nDEVICE_SORT_DESCENDING={}\nCOLLAPSED_MENU_SECTIONS={}\nDAILY_ENERGY_HISTORY_DEFAULT_APPLIED={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nGRAPH_HISTORY_DIAGNOSTICS_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nHUE_BRIDGE_IP={}\nHUE_APPLICATION_KEY={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nTEMPERATURE_UNIT={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nDEVICE_SORT={}\nDEVICE_SORT_DESCENDING={}\nCOLLAPSED_MENU_SECTIONS={}\nDAILY_ENERGY_HISTORY_DEFAULT_APPLIED={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nGRAPH_HISTORY_DIAGNOSTICS_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
             match self.language.as_str() {
                 "de" => "de",
                 "en" => "en",
@@ -727,6 +735,8 @@ impl FritzSettings {
             self.password,
             self.tasmota_username,
             self.tasmota_password,
+            self.hue_bridge_ip,
+            self.hue_application_key,
             if self.tasmota_subnet_scan {
                 "true"
             } else {
