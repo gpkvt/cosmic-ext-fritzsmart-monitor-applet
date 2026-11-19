@@ -4165,7 +4165,7 @@ impl cosmic::Application for AppModel {
                         |value| Message::PanelItemSpacingChanged(value.round() as u8)).step(1.0_f32))
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Controls the gap between panel items")))
                     .push(
-                        widget::Row::new()
+                        widget::Row::new().width(cosmic::iced::Length::Fill)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(widget::Column::new()
                                 .spacing(3)
@@ -4177,7 +4177,7 @@ impl cosmic::Application for AppModel {
                                     .on_toggle(Message::PanelMultilineChanged)
                             ).padding([8, 10]))
                     )
-                    .push(widget::Row::new()
+                    .push(widget::Row::new().width(cosmic::iced::Length::Fill)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::Column::new()
                             .spacing(3)
@@ -4221,7 +4221,7 @@ impl cosmic::Application for AppModel {
                     };
                     let visible = panel_item_is_enabled(&self.settings, id);
                     let mut row =
-                        widget::Row::new()
+                        widget::Row::new().width(cosmic::iced::Length::Fill)
                             .spacing(8)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(
@@ -4230,10 +4230,7 @@ impl cosmic::Application for AppModel {
                                     panel_item_label(id),
                                 ))
                                 .width(cosmic::iced::Length::Fill),
-                            )
-                            .push(widget::toggler(visible).on_toggle(move |value| {
-                                Message::TogglePanelItemVisibility(id, value)
-                            }));
+                            );
                     let show_order_controls = !self.settings.panel_multiline
                         || panel_order_group_leader(&visible_panel_order_ids, id, true);
                     if show_order_controls {
@@ -4264,13 +4261,16 @@ impl cosmic::Application for AppModel {
                             ));
                         }
                     }
+                    row = row.push(widget::toggler(visible).on_toggle(move |value| {
+                        Message::TogglePanelItemVisibility(id, value)
+                    }));
                     content = content.push(row);
 
                     // Keep options directly beneath the panel item they affect.
                     if id == "power-consumption" && has_input_device {
                         content = content.push(
                             widget::container(
-                                widget::Row::new()
+                                widget::Row::new().width(cosmic::iced::Length::Fill)
                                     .align_y(cosmic::iced::Alignment::Center)
                                     .push(
                                         widget::Column::new()
@@ -4300,7 +4300,7 @@ impl cosmic::Application for AppModel {
                     if id == "temperature" {
                         content = content.push(
                             widget::container(
-                                widget::Row::new()
+                                widget::Row::new().width(cosmic::iced::Length::Fill)
                                     .align_y(cosmic::iced::Alignment::Center)
                                     .push(
                                         widget::Column::new()
@@ -4327,7 +4327,7 @@ impl cosmic::Application for AppModel {
                         if self.settings.panel_average_temperature && has_input_device {
                             content = content.push(
                                 widget::container(
-                                    widget::Row::new()
+                                    widget::Row::new().width(cosmic::iced::Length::Fill)
                                         .align_y(cosmic::iced::Alignment::Center)
                                         .push(
                                             widget::Column::new()
@@ -4366,7 +4366,7 @@ impl cosmic::Application for AppModel {
                 content = content
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "GRAPH STYLE")))
                     .push(
-                        widget::Row::new()
+                        widget::Row::new().width(cosmic::iced::Length::Fill)
                             .spacing(8)
                             .push(
                                 widget::button::text(crate::i18n::tr(&self.settings.language, if self.settings.graph_style == "line" {
@@ -4434,7 +4434,7 @@ impl cosmic::Application for AppModel {
 
             if self.active_settings_section == Some("weather") {
                 content = content
-                    .push(widget::Row::new()
+                    .push(widget::Row::new().width(cosmic::iced::Length::Fill)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::text::body(crate::i18n::tr(&self.settings.language, "Use current weather icon")))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
@@ -4530,7 +4530,7 @@ impl cosmic::Application for AppModel {
                     )
                     .push(widget::divider::horizontal::default())
                     .push(
-                        widget::Row::new()
+                        widget::Row::new().width(cosmic::iced::Length::Fill)
                             .width(cosmic::iced::Length::Fill)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(
@@ -4573,13 +4573,10 @@ impl cosmic::Application for AppModel {
                         .hidden_menu_elements
                         .iter()
                         .any(|hidden| hidden == id);
-                    let mut row = widget::Row::new()
+                    let mut row = widget::Row::new().width(cosmic::iced::Length::Fill)
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::body(label).width(cosmic::iced::Length::Fill))
-                        .push(widget::toggler(visible).on_toggle(move |value| {
-                            Message::ToggleMenuElementVisibility(id, value)
-                        }));
+                        .push(widget::text::body(label).width(cosmic::iced::Length::Fill));
                     row = row.push(icon_action_button(
                         "+",
                         crate::i18n::tr(&self.settings.language, "Move up"),
@@ -4590,6 +4587,9 @@ impl cosmic::Application for AppModel {
                         crate::i18n::tr(&self.settings.language, "Move down"),
                         Message::MoveMenuElement(id, false),
                     ));
+                    row = row.push(widget::toggler(visible).on_toggle(move |value| {
+                        Message::ToggleMenuElementVisibility(id, value)
+                    }));
                     content = content.push(row);
                     if index + 1 < self.settings.menu_order.len() {
                         content = content.push(widget::divider::horizontal::default());
@@ -4607,7 +4607,7 @@ impl cosmic::Application for AppModel {
                         "Searches the FRITZ!Box and the local network for compatible Tasmota devices. Both appear in the same list below.",
                     ))
                     .push(
-                        widget::Row::new()
+                        widget::Row::new().width(cosmic::iced::Length::Fill)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(
                                 widget::Column::new()
@@ -4668,7 +4668,7 @@ impl cosmic::Application for AppModel {
                                 == crate::fritz::normalize_ain_for_selection(&device.ain)
                         });
                         let ain = device.ain.clone();
-                        let row = widget::Row::new()
+                        let row = widget::Row::new().width(cosmic::iced::Length::Fill)
                             .spacing(6)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(
@@ -4723,7 +4723,7 @@ impl cosmic::Application for AppModel {
                                 "FRITZ!Box device"
                             }))
                             .push(
-                                widget::Row::new()
+                                widget::Row::new().width(cosmic::iced::Length::Fill)
                                     .align_y(cosmic::iced::Alignment::Center)
                                     .push(widget::text::caption(crate::i18n::tr(
                                         &self.settings.language,
@@ -4740,7 +4740,7 @@ impl cosmic::Application for AppModel {
                         if !is_tasmota {
                             device_row = device_row
                                 .push(
-                                    widget::Row::new()
+                                    widget::Row::new().width(cosmic::iced::Length::Fill)
                                         .align_y(cosmic::iced::Alignment::Center)
                                         .push(widget::text::caption(crate::i18n::tr(
                                             &self.settings.language,
@@ -4762,7 +4762,7 @@ impl cosmic::Application for AppModel {
                                         )),
                                 )
                                 .push(
-                                    widget::Row::new()
+                                    widget::Row::new().width(cosmic::iced::Length::Fill)
                                         .align_y(cosmic::iced::Alignment::Center)
                                         .push(widget::text::caption(crate::i18n::tr(
                                             &self.settings.language,
