@@ -5915,6 +5915,45 @@ impl cosmic::Application for AppModel {
                         "Hue's bridge certificate uses a bridge ID instead of its IP. The Hue-only LAN connection skips TLS certificate checks; use a trusted local network.",
                     ))
                     .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3("Netatmo Weather Stations"))
+                    .push(widget::text::caption(
+                        "Read-only Netatmo cloud API. Create an application and generate a refresh token with read_station scope at dev.netatmo.com. These credentials are saved locally (owner-only); readings are refreshed every five minutes.",
+                    ))
+                    .push(widget::text::body("Netatmo application client ID"))
+                    .push(widget::text_input(
+                        "Client ID",
+                        &self.settings.netatmo_client_id,
+                    ).on_input(Message::NetatmoClientIdChanged))
+                    .push(widget::text::body("Netatmo client secret"))
+                    .push(widget::secure_input(
+                        "Client secret",
+                        &self.settings.netatmo_client_secret,
+                        None,
+                        true,
+                    ).on_input(Message::NetatmoClientSecretChanged))
+                    .push(widget::text::body("Netatmo OAuth refresh token (read_station)"))
+                    .push(widget::secure_input(
+                        "Refresh token",
+                        &self.settings.netatmo_refresh_token,
+                        None,
+                        true,
+                    ).on_input(Message::NetatmoRefreshTokenChanged))
+                    .push(widget::button::text(if self.netatmo_loading {
+                        "Loading Netatmo stations…"
+                    } else {
+                        "Connect / Refresh Netatmo"
+                    }).on_press(Message::RefreshNetatmo))
+                    .push(widget::text::caption(if let Some(error) = &self.netatmo_error {
+                        format!("Netatmo: {error}")
+                    } else if self.netatmo_loading {
+                        "Contacting Netatmo's OAuth and Weather Station API…".to_owned()
+                    } else {
+                        format!("Netatmo · {} station/module(s) loaded", self.netatmo_sensors.len())
+                    }))
+                    .push(widget::text::caption(
+                        "Netatmo requires internet access. This applet supports read-only Weather Station modules, not Netatmo thermostats or cameras."
+                    ))
+                    .push(widget::divider::horizontal::default())
                     .push(
                         widget::Row::new().width(cosmic::iced::Length::Fill)
                             .width(cosmic::iced::Length::Fill)
