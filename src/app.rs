@@ -1115,12 +1115,12 @@ fn menu_power_flow_summary(
             .align_y(cosmic::iced::Alignment::Center)
             .push(widget::text::caption(label).width(cosmic::iced::Length::Fill))
             .push(
-                widget::text::title3(keep_value_unit_together(input))
+                widget::text::body(keep_value_unit_together(input))
                     .width(cosmic::iced::Length::Fixed(88.0))
                     .align_x(cosmic::iced::Alignment::End),
             )
             .push(
-                widget::text::title3(keep_value_unit_together(output))
+                widget::text::body(keep_value_unit_together(output))
                     .width(cosmic::iced::Length::Fixed(88.0))
                     .align_x(cosmic::iced::Alignment::End),
             )
