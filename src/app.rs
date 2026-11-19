@@ -3,7 +3,7 @@ use crate::fritz::{
     FritzSettings, TemperatureAlertThresholds, collect_fritzbox_debug_dump, discover_devices,
     fetch_fritz_data,
 };
-use crate::hue::HueLight;
+use crate::hue::{HueLight, HueSensor, HueSnapshot};
 use crate::weather::{
     WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather,
     fetch_weather_forecast, starry_night_overlay,
@@ -34,6 +34,8 @@ pub struct AppModel {
     graph_window: Option<Id>,
     readings: Vec<FritzReading>,
     hue_lights: Vec<HueLight>,
+    hue_sensors: Vec<HueSensor>,
+    hue_sensor_warning: Option<String>,
     hue_error: Option<String>,
     hue_loading: bool,
     hue_pairing: bool,
@@ -145,7 +147,7 @@ pub enum Message {
     PairHueBridge,
     HueBridgePaired(Result<String, String>),
     RefreshHueLights,
-    HueLightsLoaded(Result<Vec<HueLight>, String>),
+    HueSnapshotLoaded(Result<HueSnapshot, String>),
     SetHueLightPower(String, bool),
     HueLightPowerFinished(String, Result<(), String>),
     AllowInvalidCertsChanged(bool),
@@ -3591,11 +3593,11 @@ impl cosmic::Application for AppModel {
         }
         if hue_configured {
             tasks.push(Task::perform(
-                crate::hue::fetch_lights(
+                crate::hue::fetch_snapshot(
                     settings.hue_bridge_ip.clone(),
                     settings.hue_application_key.clone(),
                 ),
-                |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                |result| cosmic::Action::App(Message::HueSnapshotLoaded(result)),
             ));
         }
         if restore_forecast {
@@ -8572,11 +8574,11 @@ impl cosmic::Application for AppModel {
                     self.hue_loading = true;
                     self.hue_next_refresh_at = None;
                     tasks.push(Task::perform(
-                        crate::hue::fetch_lights(
+                        crate::hue::fetch_snapshot(
                             self.settings.hue_bridge_ip.clone(),
                             self.settings.hue_application_key.clone(),
                         ),
-                        |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                        |result| cosmic::Action::App(Message::HueSnapshotLoaded(result)),
                     ));
                 }
 
@@ -8665,11 +8667,11 @@ impl cosmic::Application for AppModel {
                     self.hue_loading = true;
                     self.hue_next_refresh_at = None;
                     return Task::perform(
-                        crate::hue::fetch_lights(
+                        crate::hue::fetch_snapshot(
                             self.settings.hue_bridge_ip.clone(),
                             self.settings.hue_application_key.clone(),
                         ),
-                        |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                        |result| cosmic::Action::App(Message::HueSnapshotLoaded(result)),
                     );
                 }
                 if self.settings.weather_enabled
@@ -9719,6 +9721,8 @@ impl cosmic::Application for AppModel {
                     // A Hue application key is bound to one physical bridge.
                     self.settings.hue_application_key.clear();
                     self.hue_lights.clear();
+                    self.hue_sensors.clear();
+                    self.hue_sensor_warning = None;
                     self.hue_next_refresh_at = None;
                 }
                 self.settings.hue_bridge_ip = value;
@@ -9803,6 +9807,8 @@ impl cosmic::Application for AppModel {
             Message::HueApplicationKeyChanged(value) => {
                 self.settings.hue_application_key = value;
                 self.hue_lights.clear();
+                    self.hue_sensors.clear();
+                    self.hue_sensor_warning = None;
                 self.hue_error = None;
                 self.hue_next_refresh_at = None;
                 self.persist_settings();
@@ -9857,11 +9863,11 @@ impl cosmic::Application for AppModel {
                         self.hue_discovery_note =
                             Some("Hue Bridge paired successfully. Loading lights…".into());
                         return Task::perform(
-                            crate::hue::fetch_lights(
+                            crate::hue::fetch_snapshot(
                                 self.settings.hue_bridge_ip.clone(),
                                 self.settings.hue_application_key.clone(),
                             ),
-                            |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                            |result| cosmic::Action::App(Message::HueSnapshotLoaded(result)),
                         );
                     }
                     Err(error) => self.hue_error = Some(error),
@@ -9880,25 +9886,29 @@ impl cosmic::Application for AppModel {
                 self.hue_loading = true;
                 self.hue_next_refresh_at = None;
                 return Task::perform(
-                    crate::hue::fetch_lights(
+                    crate::hue::fetch_snapshot(
                         self.settings.hue_bridge_ip.clone(),
                         self.settings.hue_application_key.clone(),
                     ),
-                    |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                    |result| cosmic::Action::App(Message::HueSnapshotLoaded(result)),
                 );
             }
-            Message::HueLightsLoaded(result) => {
+            Message::HueSnapshotLoaded(result) => {
                 self.hue_loading = false;
                 self.hue_next_refresh_at = Some(Instant::now() + Duration::from_secs(60));
                 match result {
-                    Ok(lights) => {
-                        self.hue_lights = lights;
+                    Ok(snapshot) => {
+                        self.hue_lights = snapshot.lights;
+                        self.hue_sensors = snapshot.sensors;
+                        self.hue_sensor_warning = snapshot.sensor_warning;
                         self.hue_error = None;
                     }
                     Err(error) => {
-                        // A bridge outage never leaves stale light states on-screen
-                        // and cannot invalidate FRITZ!/Tasmota power readings.
+                        // A bridge outage never leaves stale light/sensor states
+                        // on-screen or invalidate FRITZ!/Tasmota power readings.
                         self.hue_lights.clear();
+                        self.hue_sensors.clear();
+                        self.hue_sensor_warning = None;
                         self.hue_error = Some(error);
                     }
                 }
@@ -9930,11 +9940,11 @@ impl cosmic::Application for AppModel {
                         self.hue_loading = true;
                         self.hue_next_refresh_at = None;
                         return Task::perform(
-                            crate::hue::fetch_lights(
+                            crate::hue::fetch_snapshot(
                                 self.settings.hue_bridge_ip.clone(),
                                 self.settings.hue_application_key.clone(),
                             ),
-                            |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                            |result| cosmic::Action::App(Message::HueSnapshotLoaded(result)),
                         );
                     }
                     Err(error) => self.hue_error = Some(error),
