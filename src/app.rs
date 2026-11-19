@@ -117,7 +117,6 @@ pub enum Message {
     TogglePopup,
     PopupClosed(Id),
     PopupMonitorSize(Id, Option<f32>),
-    TooltipSurfaceAction(cosmic::surface::Action<Message>),
     Refresh,
     ClockTick,
     CopyFeedbackTick,
@@ -4398,10 +4397,11 @@ impl cosmic::Application for AppModel {
 
         // Keep every reading at its intrinsic width. Expanding each child to
         // Fill inside the horizontal panel row pushes later readings off-screen.
-        let panel_item = |label: &'static str,
+        let panel_item = |_label: &'static str,
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>,
-                          icon_at_top: bool| {
+                          icon_at_top: bool|
+         -> cosmic::Element<'static, Message> {
             let multiline_row_height = (panel_text_size * 1.15).clamp(16.0, 22.0);
             let item_height = if self.settings.panel_multiline {
                 // A two-line value occupies exactly two standard panel rows.
@@ -4455,13 +4455,10 @@ impl cosmic::Application for AppModel {
                 value = value.center_y(item_height as u16);
             }
             item = item.height(cosmic::iced::Length::Fixed(item_height));
-            self.core.applet.applet_tooltip(
-                item.push(value),
-                label,
-                false,
-                Message::TooltipSurfaceAction,
-                self.core.main_window_id(),
-            )
+            // Panel hover should not spawn an XDG tooltip popup or interact
+            // with the main menu's outside-click dismissal. The button below
+            // is the only event that opens or closes the applet menu.
+            item.push(value).into()
         };
 
         let mut content = widget::Row::new()
@@ -9112,9 +9109,6 @@ impl cosmic::Application for AppModel {
 
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
-            Message::TooltipSurfaceAction(action) => {
-                return Task::done(cosmic::Action::Surface(action));
-            }
             Message::ShowGraph(title, values, unit, _axis_start) => {
                 self.history_graph_devices.clear();
                 self.history_graph_index = None;
@@ -11348,10 +11342,10 @@ impl cosmic::Application for AppModel {
                     .max_width(720.0)
                     .min_width(720.0)
                     .max_height(max_height);
-                // A grabbed XDG popup is dismissed by the compositor when
-                // focus moves to another window. Leave it ungrabbed so only
-                // explicit panel/header clicks close the menu.
-                settings.grab = false;
+                // XDG popup grabs let the compositor dismiss the menu on
+                // an actual pointer click outside its surface. Panel hover
+                // is deliberately not an opening/closing event.
+                settings.grab = true;
                 return get_popup(settings);
             }
             Message::PopupClosed(id) => {
