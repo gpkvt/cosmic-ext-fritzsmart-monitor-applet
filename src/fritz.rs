@@ -83,6 +83,8 @@ pub struct FritzReading {
     pub ain: String,
     pub name: String,
     pub power_w: i64,
+    /// Whether the device actually reports watts; a missing meter is not 0 W.
+    pub has_power_meter: bool,
     pub temperature_c: f64,
     pub power_state: Option<bool>,
     pub power_controllable: bool,
@@ -1350,7 +1352,7 @@ pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<FritzDevice
     });
     if devices.is_empty() {
         return Err(
-            "No compatible FRITZ!Box or Tasmota power-monitoring devices were discovered".into(),
+            "No compatible FRITZ!Box Smart Home or Tasmota devices were discovered".into(),
         );
     }
     Ok(devices)
@@ -1372,7 +1374,9 @@ fn parse_devices_xml(xml: &str) -> Result<Vec<FritzDevice>, String> {
         let has_temperature = child_text(node, "temperature", "celsius")
             .and_then(|value| value.parse::<i64>().ok())
             .is_some();
-        if !has_power_meter || !has_temperature {
+        let has_switch = node.children().any(|child| child.has_tag_name("switch") || child.has_tag_name("simpleonoff"));
+        let has_thermostat = node.children().any(|child| child.has_tag_name("hkr"));
+        if !has_power_meter && !has_temperature && !has_switch && !has_thermostat {
             continue;
         }
         let child_name = node
@@ -1392,7 +1396,7 @@ fn parse_devices_xml(xml: &str) -> Result<Vec<FritzDevice>, String> {
     }
     devices.sort_by_key(|device| device.name.to_lowercase());
     if devices.is_empty() {
-        return Err("No devices with usable power-meter readings were found".into());
+        return Err("No supported FRITZ!Box Smart Home devices were found".into());
     }
     Ok(devices)
 }
@@ -1402,15 +1406,21 @@ fn parse_device_reading(device: Node<'_, '_>) -> Result<FritzReading, String> {
         .attribute("identifier")
         .ok_or_else(|| "Device is missing an identifier".to_string())?;
     let power_mw = child_text(device, "powermeter", "power")
-        .ok_or_else(|| format!("Device {} does not expose power measurements", ain))?
-        .parse::<i64>()
-        .map_err(|_| format!("Device {} returned an invalid power measurement", ain))?;
+        .and_then(|power| power.parse::<i64>().ok());
     let temperature_c = child_text(device, "temperature", "celsius")
-        .ok_or_else(|| format!("Device {} does not expose temperature measurements", ain))?
-        .parse::<i64>()
-        .map_err(|_| format!("Device {} returned an invalid temperature measurement", ain))?
-        as f64
-        / 10.0;
+        .and_then(|celsius| celsius.parse::<i64>().ok())
+        .map(|celsius| celsius as f64 / 10.0)
+        // Thermostats can expose the current temperature in half-degree units.
+        .or_else(|| child_text(device, "hkr", "tist")
+            .and_then(|tist| tist.parse::<u16>().ok())
+            .filter(|tist| (16..=56).contains(tist))
+            .map(|tist| f64::from(tist) / 2.0))
+        .unwrap_or(f64::NAN);
+    if power_mw.is_none() && !temperature_c.is_finite()
+        && !device.children().any(|node| node.has_tag_name("switch") || node.has_tag_name("simpleonoff") || node.has_tag_name("hkr"))
+    {
+        return Err(format!("Device {ain} has no supported Smart Home readings"));
+    }
     let name = device
         .children()
         .find(|child| child.has_tag_name("name"))
@@ -1428,7 +1438,9 @@ fn parse_device_reading(device: Node<'_, '_>) -> Result<FritzReading, String> {
         .and_then(|switch| switch.children().find(|child| child.has_tag_name("lock")))
         .and_then(|lock| lock.text())
         .is_some_and(|lock| lock.trim() == "0");
-    let power_state = child_text(device, "switch", "state").and_then(|state| match state.trim() {
+    let power_state = child_text(device, "switch", "state")
+        .or_else(|| child_text(device, "simpleonoff", "state"))
+        .and_then(|state| match state.trim() {
         "1" => Some(true),
         "0" => Some(false),
         _ => None,
@@ -1436,7 +1448,8 @@ fn parse_device_reading(device: Node<'_, '_>) -> Result<FritzReading, String> {
     Ok(FritzReading {
         ain: ain.to_string(),
         name,
-        power_w: power_mw / 1000,
+        power_w: power_mw.unwrap_or(0) / 1000,
+        has_power_meter: power_mw.is_some(),
         temperature_c,
         power_state,
         power_controllable,
