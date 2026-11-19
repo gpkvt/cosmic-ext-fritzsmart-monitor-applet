@@ -3,7 +3,7 @@
 //! Hue light resources expose on/off state, not measured watts. Keep them
 //! separate from FRITZ!/Tasmota metering and never manufacture power samples.
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     net::IpAddr,
     time::{Duration, Instant},
 };
@@ -20,6 +20,26 @@ pub struct HueLight {
     /// None means the bridge did not return a usable live state.
     pub on: Option<bool>,
     pub reachable: bool,
+}
+
+/// Read-only measurements published by Hue motion/presence sensors.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HueSensor {
+    /// Stable physical Hue device resource ID (not a power meter AIN).
+    pub id: String,
+    pub name: String,
+    pub temperature_c: Option<f64>,
+    pub illuminance_lux: Option<f64>,
+    pub motion: Option<bool>,
+    pub reachable: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct HueSnapshot {
+    pub lights: Vec<HueLight>,
+    pub sensors: Vec<HueSensor>,
+    /// Partial failures must not hide working light switches.
+    pub sensor_warning: Option<String>,
 }
 
 fn is_local_bridge_ip(ip: IpAddr) -> bool {
@@ -229,6 +249,138 @@ fn parse_lights(
     Ok(lights)
 }
 
+/// Hue CLIP v2 encodes illuminance logarithmically:
+/// level = 10000 * log10(lux) + 1, not a raw lux value.
+fn light_level_to_lux(raw: f64) -> Option<f64> {
+    if !raw.is_finite() || raw < 0.0 {
+        return None;
+    }
+    let lux = 10.0_f64.powf((raw - 1.0) / 10_000.0);
+    lux.is_finite().then_some(lux)
+}
+
+fn valid_sensor_feature(
+    resource: &Value,
+    feature: &str,
+    valid: &str,
+    report_path: &str,
+) -> bool {
+    resource.get("enabled").and_then(Value::as_bool) != Some(false)
+        // New CLIP v2 report data supersedes the deprecated validity flag.
+        && (resource.pointer(report_path).is_some()
+            || resource
+                .get(feature)
+                .and_then(|feature| feature.get(valid))
+                .and_then(Value::as_bool)
+                != Some(false))
+}
+
+/// Join separate temperature, light-level, and motion service resources by
+/// their owner device ID. Do not report disabled, invalid, or offline values.
+fn parse_sensors(
+    temperature_response: Option<&Value>,
+    light_response: Option<&Value>,
+    motion_response: Option<&Value>,
+    device_response: &Value,
+    connectivity_response: Option<&Value>,
+) -> Vec<HueSensor> {
+    let names: HashMap<&str, &str> = device_response
+        .get("data")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|device| {
+            Some((
+                device.get("id")?.as_str()?,
+                device.get("metadata")?.get("name")?.as_str()?,
+            ))
+        })
+        .collect();
+    let connectivity: HashMap<&str, bool> = connectivity_response
+        .and_then(|value| value.get("data"))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|resource| {
+            Some((
+                resource.get("owner")?.get("rid")?.as_str()?,
+                resource.get("status")?.as_str()? == "connected",
+            ))
+        })
+        .collect();
+    let mut sensors: BTreeMap<String, HueSensor> = BTreeMap::new();
+    for (kind, response) in [
+        ("temperature", temperature_response),
+        ("light_level", light_response),
+        ("motion", motion_response),
+    ] {
+        for resource in response
+            .and_then(|value| value.get("data"))
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let Some(owner) = resource
+                .get("owner")
+                .and_then(|owner| owner.get("rid"))
+                .and_then(Value::as_str)
+                .filter(|id| light_id_valid(id))
+            else {
+                continue;
+            };
+            let reachable = connectivity.get(owner).copied().unwrap_or(true);
+            let item = sensors.entry(owner.to_string()).or_insert_with(|| HueSensor {
+                id: owner.to_string(),
+                name: names.get(owner).copied().unwrap_or("Hue sensor").to_string(),
+                temperature_c: None,
+                illuminance_lux: None,
+                motion: None,
+                reachable,
+            });
+            item.reachable &= reachable;
+            if !item.reachable {
+                // If Zigbee connectivity is down, any previously parsed feature
+                // becomes unavailable, irrespective of resource enumeration order.
+                item.temperature_c = None;
+                item.illuminance_lux = None;
+                item.motion = None;
+                continue;
+            }
+            match kind {
+                "temperature" if valid_sensor_feature(resource, "temperature", "temperature_valid", "/temperature/temperature_report/temperature") => {
+                    item.temperature_c = resource
+                        .pointer("/temperature/temperature_report/temperature")
+                        .or_else(|| resource.pointer("/temperature/temperature"))
+                        .and_then(Value::as_f64)
+                        .filter(|value| value.is_finite());
+                }
+                "light_level" if valid_sensor_feature(resource, "light", "light_level_valid", "/light/light_level_report/light_level") => {
+                    item.illuminance_lux = resource
+                        .pointer("/light/light_level_report/light_level")
+                        .or_else(|| resource.pointer("/light/light_level"))
+                        .and_then(Value::as_f64)
+                        .and_then(light_level_to_lux);
+                }
+                "motion" if valid_sensor_feature(resource, "motion", "motion_valid", "/motion/motion_report/motion") => {
+                    item.motion = resource
+                        .pointer("/motion/motion_report/motion")
+                        .or_else(|| resource.pointer("/motion/motion"))
+                        .and_then(Value::as_bool);
+                }
+                _ => {}
+            }
+        }
+    }
+    let mut sensors: Vec<_> = sensors.into_values().collect();
+    sensors.sort_by(|left, right| {
+        left.name
+            .to_lowercase()
+            .cmp(&right.name.to_lowercase())
+            .then_with(|| left.id.cmp(&right.id))
+    });
+    sensors
+}
+
 async fn fetch_resource(
     client: &Client,
     origin: &str,
@@ -320,18 +472,61 @@ pub async fn pair(address: String) -> Result<String, String> {
     Err("Hue Bridge pairing timed out; press the link button and try again".into())
 }
 
-pub async fn fetch_lights(address: String, key: String) -> Result<Vec<HueLight>, String> {
+pub async fn fetch_snapshot(address: String, key: String) -> Result<HueSnapshot, String> {
     if key.trim().is_empty() {
         return Err("Pair the Hue Bridge or enter its application key first".into());
     }
     let origin = bridge_origin(&address)?;
     let client = client()?;
-    let (lights, devices, connectivity) = tokio::join!(
+    let (lights, devices, connectivity, temperature, level, motion) = tokio::join!(
         fetch_resource(&client, &origin, &key, "light"),
         fetch_resource(&client, &origin, &key, "device"),
         fetch_resource(&client, &origin, &key, "zigbee_connectivity"),
+        fetch_resource(&client, &origin, &key, "temperature"),
+        fetch_resource(&client, &origin, &key, "light_level"),
+        fetch_resource(&client, &origin, &key, "motion"),
     );
-    parse_lights(&lights?, &devices?, connectivity.ok().as_ref())
+    let devices = devices?;
+    let connectivity = connectivity.ok();
+    let lights = parse_lights(&lights?, &devices, connectivity.as_ref())?;
+    // A bridge/firmware may lack a sensor endpoint; keep usable lights and
+    // other sensor services visible rather than failing the whole snapshot.
+    let mut warnings = Vec::new();
+    let temperature = match temperature {
+        Ok(value) => Some(value),
+        Err(_) => {
+            warnings.push("temperature");
+            None
+        }
+    };
+    let level = match level {
+        Ok(value) => Some(value),
+        Err(_) => {
+            warnings.push("light level");
+            None
+        }
+    };
+    let motion = match motion {
+        Ok(value) => Some(value),
+        Err(_) => {
+            warnings.push("motion");
+            None
+        }
+    };
+    let sensors = parse_sensors(
+        temperature.as_ref(),
+        level.as_ref(),
+        motion.as_ref(),
+        &devices,
+        connectivity.as_ref(),
+    );
+    Ok(HueSnapshot {
+        lights,
+        sensors,
+        sensor_warning: (!warnings.is_empty()).then(|| {
+            format!("Hue sensor readings unavailable: {}", warnings.join(", "))
+        }),
+    })
 }
 
 pub async fn set_light_power(
@@ -442,6 +637,89 @@ mod tests {
             parse_lights(&lights, &devices, Some(&offline)).unwrap()[0].on,
             None
         );
+    }
+
+    #[test]
+    fn reads_current_temperature_lux_and_motion_for_one_physical_sensor() {
+        let id = "00112233-4455-6677-8899-aabbccddeeff";
+        let devices = json!({"data": [{"id": id, "metadata": {"name": "Hallway motion sensor"}}]});
+        let temp = json!({"data": [{
+            "owner": {"rid": id}, "enabled": true,
+            "temperature": {"temperature_report": {"temperature": 21.75}}
+        }]});
+        let light = json!({"data": [{
+            "owner": {"rid": id}, "enabled": true,
+            "light": {"light_level_report": {"light_level": 20001}}
+        }]});
+        let motion = json!({"data": [{
+            "owner": {"rid": id}, "motion": {"motion_report": {"motion": true}}
+        }]});
+        let sensor = parse_sensors(Some(&temp), Some(&light), Some(&motion), &devices, None);
+        assert_eq!(sensor.len(), 1);
+        assert_eq!(sensor[0].name, "Hallway motion sensor");
+        assert_eq!(sensor[0].temperature_c, Some(21.75));
+        assert!((sensor[0].illuminance_lux.unwrap() - 100.0).abs() < 0.001);
+        assert_eq!(sensor[0].motion, Some(true));
+    }
+
+    #[test]
+    fn accepts_legacy_sensor_values_and_excludes_invalid_or_disabled_readings() {
+        let id = "00112233-4455-6677-8899-aabbccddeeff";
+        let device = json!({"data": [{"id": id, "metadata": {"name": "Office"}}]});
+        let temp = json!({"data": [{
+            "owner": {"rid": id}, "temperature": {"temperature": 18.5, "temperature_valid": true}
+        }]});
+        let level = json!({"data": [{
+            "owner": {"rid": id}, "light": {"light_level": 10001, "light_level_valid": true}
+        }]});
+        let sensors = parse_sensors(Some(&temp), Some(&level), None, &device, None);
+        assert_eq!(sensors[0].temperature_c, Some(18.5));
+        assert!((sensors[0].illuminance_lux.unwrap() - 10.0).abs() < 0.001);
+
+        let disabled = json!({"data": [{
+            "owner": {"rid": id}, "enabled": false,
+            "temperature": {"temperature_report": {"temperature": 50.0}}
+        }]});
+        let invalid = json!({"data": [{
+            "owner": {"rid": id}, "light": {"light_level": 30001, "light_level_valid": false}
+        }]});
+        let sensors = parse_sensors(Some(&disabled), Some(&invalid), None, &device, None);
+        assert_eq!(sensors[0].temperature_c, None);
+        assert_eq!(sensors[0].illuminance_lux, None);
+    }
+
+    #[test]
+    fn modern_sensor_report_takes_priority_over_obsolete_validity_flag() {
+        let id = "00112233-4455-6677-8899-aabbccddeeff";
+        let device = json!({"data": [{"id": id, "metadata": {"name": "Entry sensor"}}]});
+        let temp = json!({"data": [{
+            "owner": {"rid": id}, "enabled": true,
+            "temperature": {
+                "temperature_valid": false,
+                "temperature_report": {"temperature": 19.25}
+            }
+        }]});
+        let sensors = parse_sensors(Some(&temp), None, None, &device, None);
+        assert_eq!(sensors[0].temperature_c, Some(19.25));
+    }
+
+    #[test]
+    fn disconnected_sensors_have_no_live_values() {
+        let id = "00112233-4455-6677-8899-aabbccddeeff";
+        let device = json!({"data": [{"id": id, "metadata": {"name": "Stairs"}}]});
+        let temp = json!({"data": [{
+            "owner": {"rid": id}, "temperature": {"temperature_report": {"temperature": 25.0}}
+        }]});
+        let connectivity = json!({"data": [{
+            "owner": {"rid": id}, "status": "disconnected"
+        }]});
+        let sensors = parse_sensors(Some(&temp), None, None, &device, Some(&connectivity));
+        assert_eq!(sensors.len(), 1);
+        assert!(!sensors[0].reachable);
+        assert_eq!(sensors[0].temperature_c, None);
+        assert_eq!(sensors[0].illuminance_lux, None);
+        assert!(light_level_to_lux(f64::NAN).is_none());
+        assert!(light_level_to_lux(-1.0).is_none());
     }
 
     #[test]

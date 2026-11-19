@@ -1,5 +1,7 @@
 # Changelog
 
+- Read Philips Hue motion/proximity sensor temperature, ambient light level (converted to lux) and motion state from CLIP v2; group service resources by physical device, filter invalid/disabled/offline readings, and show sensors alongside Hue lights without fabricating power measurements. Refresh both together and add parser regression tests.
+
 - Find Hue Bridges automatically via local mDNS on startup and when opening Connection settings, with a manual rescan and selection when multiple bridges are discovered; never overwrite a configured bridge silently.
 - Fix Hue pairing usability: make pairing retry while the physical link button is pressed, fall back to legacy HTTP registration only when HTTPS pairing is unsupported, and show errors and progress beside the pairing button. Include discovery/pairing regression tests.
 

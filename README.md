@@ -22,7 +22,7 @@ FRITZ!Power Monitor connects directly to your router. It brings household power 
 - Optional OpenWeatherMap conditions, forecast and weather-matched Wikimedia Commons imagery.
 - Configurable refresh intervals, graph retention, panel display and popup layout.
 - Temperature alerts and supported smart-home device switching.
-- Optional local Philips Hue Bridge lights, with link-button pairing, light discovery and on/off control; Hue lights do not contribute to power totals.
+- Optional local Philips Hue Bridge lights with on/off controls and Hue motion sensors with temperature (°C/°F), ambient light level (lux) and motion-state readings; Hue devices do not contribute to wattage totals.
 - Interface translations for English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean. All 121 interface strings are covered; technical names and URLs remain unchanged where appropriate.
 
 ## Philips Hue Bridge (optional)
@@ -32,11 +32,11 @@ The applet supports Philips Hue Bridges on the local network through the **CLIP 
 1. Open **Settings → Connection → Philips Hue Bridge**. The applet looks for local bridges via mDNS and fills in the IP automatically if it finds exactly one. Use **Find Hue Bridge automatically** to rescan, or choose a bridge if several are found.
 2. If mDNS cannot find the bridge, enter its **local IP address** from the Hue app or your router, without a scheme or port. Discovery stays on the local network; no Hue cloud lookup is used.
 3. Select **Pair Hue Bridge**, then press the physical link button on the bridge (or press the button first). Pairing retries for about 30 seconds while waiting for button authorization. A clear error appears directly below the pairing controls if authorization fails. Alternatively, paste an existing Hue application key into the secure field.
-4. Open the **Philips Hue** section in the popup. Lights are listed with their current on/off state and a switch; use **Refresh Hue lights** to reload them.
+4. Open the **Philips Hue** section in the popup. Lights are listed with their current on/off state and a switch. Compatible motion/proximity sensors appear in **Motion & Environment Sensors**, showing ambient temperature (°C/°F), illuminance (lux) and motion detection when reported by the bridge. **Refresh Hue lights** also refreshes sensor measurements.
 
-Hue state refreshes independently once per minute, as well as on manual refresh and after switching a light. When a bridge is unreachable, the applet clears stale light states and shows an error without affecting power monitoring. Only private/local bridge IP addresses are accepted.
+Hue light and sensor readings refresh independently once per minute, as well as on manual refresh and after switching a light. When a bridge is unreachable, the applet clears stale Hue states and measurements and shows an error without affecting power monitoring. Only private/local bridge IP addresses are accepted.
 
-**Measurements:** Hue lights typically provide switching state, not measured electricity usage. The applet **does not** invent watts or add Hue lights to consumption graphs or energy totals. This release controls individual Hue light resources; Hue scenes, brightness, rooms, sensors and groups are not yet supported.
+**Measurements:** Hue lights typically provide switching state, not measured electricity usage. The applet **does not** invent watts or add Hue lights to consumption graphs or energy totals. Temperature, light level and motion are read directly from separate Hue CLIP v2 sensor resources and grouped under each physical sensor; their values are read-only, not used for metered power/energy. Hue scenes, brightness, rooms, sensor configuration and groups are not yet supported.
 
 **Security:** Hue's bridge certificate is signed by the Hue-specific CA and uses the bridge ID as its hostname rather than the configured IP. The Hue-only HTTPS client currently bypasses certificate-chain and hostname validation. On older bridges that do not support HTTPS pairing, the registration request can fall back to HTTP; it transmits only the application name and receives the new key without TLS protection. Connect only on a trusted local network. The FRITZ!Box and other HTTPS clients retain their existing certificate validation. The Hue application key is saved in the existing owner-only configuration file and must be treated as a secret.
 
