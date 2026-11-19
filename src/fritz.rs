@@ -197,6 +197,7 @@ pub struct FritzSettings {
     pub input_ains: HashSet<String>,
     pub input_defaults_initialized: bool,
     pub prometheus_enabled: bool,
+    pub prometheus_bind_address: String,
     pub weather_enabled: bool,
     /// Show unique Netatmo measurements below the OpenWeatherMap weather card.
     pub weather_netatmo_extra_metrics: bool,
@@ -265,6 +266,7 @@ impl Default for FritzSettings {
             input_ains: HashSet::new(),
             input_defaults_initialized: false,
             prometheus_enabled: false,
+            prometheus_bind_address: crate::prometheus::DEFAULT_BIND_ADDRESS.into(),
             weather_enabled: false,
             weather_netatmo_extra_metrics: false,
             openweathermap_api_key: String::new(),
@@ -716,6 +718,9 @@ impl FritzSettings {
             input_defaults_initialized: get("INPUT_DEFAULTS_INITIALIZED")
                 .eq_ignore_ascii_case("true"),
             prometheus_enabled: get("PROMETHEUS_ENABLED").eq_ignore_ascii_case("true"),
+            prometheus_bind_address: crate::prometheus::parse_bind_address(&get("PROMETHEUS_BIND_ADDRESS"))
+                .map(|address| address.to_string())
+                .unwrap_or_else(|| crate::prometheus::DEFAULT_BIND_ADDRESS.into()),
             weather_enabled: get("WEATHER_ENABLED").eq_ignore_ascii_case("true"),
             weather_netatmo_extra_metrics: get("WEATHER_NETATMO_EXTRA_METRICS").eq_ignore_ascii_case("true"),
             openweathermap_api_key: get("OPENWEATHERMAP_API_KEY"),
@@ -1003,6 +1008,11 @@ impl FritzSettings {
             },
         );
         contents.push_str(&format!("PROMETHEUS_ENABLED={}\n", if self.prometheus_enabled { "true" } else { "false" }));
+        // Persist only parsed socket addresses to prevent newline/config injection.
+        let bind_address = crate::prometheus::parse_bind_address(&self.prometheus_bind_address)
+            .map(|address| address.to_string())
+            .unwrap_or_else(|| crate::prometheus::DEFAULT_BIND_ADDRESS.into());
+        contents.push_str(&format!("PROMETHEUS_BIND_ADDRESS={bind_address}\n"));
         // Keep rotating Netatmo OAuth refresh tokens in the same owner-only
         // atomic settings file as the existing Hue and router credentials.
         contents.push_str(&format!(
@@ -2427,6 +2437,20 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn prometheus_bind_is_safe_by_default_and_rejects_invalid_addresses() {
+        let defaults = FritzSettings::default();
+        assert!(!defaults.prometheus_enabled);
+        assert_eq!(
+            crate::prometheus::parse_bind_address(&defaults.prometheus_bind_address)
+                .map(|address| address.to_string()),
+            Some("127.0.0.1:9817".into()),
+        );
+        assert!(crate::prometheus::parse_bind_address(
+            "127.0.0.1:9817\nWEATHER_ENABLED=true"
+        ).is_none());
+    }
 
     #[test]
     fn syslog_endpoint_labels_never_include_urls_or_tokens() {

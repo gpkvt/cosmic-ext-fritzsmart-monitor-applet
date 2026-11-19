@@ -4,6 +4,8 @@
 
 ### Improved
 
+- Allow a configurable Prometheus exporter bind address (`IP:port`), including loopback, specific LAN interfaces and wildcard listeners. Preserve disabled-by-default, loopback-default behavior; validate the address, rebind without restarting and document unauthenticated network access risks.
+
 - Show an indicative CO₂-based air quality category (Good, Moderate, Elevated or Very high) alongside optional Netatmo ppm readings in the shared weather metrics grid; omit readings when the sensor is hidden or stale. CO₂ is a ventilation indicator, not a complete air quality index.
 
 
