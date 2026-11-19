@@ -175,6 +175,7 @@ pub enum Message {
     NetatmoRefreshTokenChanged(String),
     RefreshNetatmo,
     NetatmoLoaded(u64, Result<NetatmoSnapshot, String>),
+    ToggleNetatmoOutdoorTemperature(String, bool),
     ToggleNetatmoVisible(String, bool),
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
@@ -796,11 +797,20 @@ fn semi_transparent_weather_photo(bytes: &[u8]) -> Vec<u8> {
 
 fn selected_weather_temperature(
     readings: &[FritzReading],
+    netatmo_sensors: &[NetatmoSensor],
     selected_ain: &str,
     fallback_c: f64,
 ) -> f64 {
     if selected_ain.trim().is_empty() {
         return fallback_c;
+    }
+    if let Some(id) = selected_ain.strip_prefix("NETATMO:") {
+        return netatmo_sensors
+            .iter()
+            .find(|sensor| sensor.id == id && sensor.is_outdoor && sensor.reachable)
+            .and_then(|sensor| sensor.temperature_c)
+            .filter(|temperature| temperature.is_finite())
+            .unwrap_or(fallback_c);
     }
     let selected = crate::fritz::normalize_ain_for_selection(selected_ain);
     readings
@@ -4766,6 +4776,12 @@ impl cosmic::Application for AppModel {
                                 && reading.temperature_c.is_finite()
                         })
                         .map(|reading| reading.name.clone())
+                        .or_else(|| self.netatmo_sensors.iter()
+                            .find(|sensor| sensor.is_outdoor
+                                && sensor.reachable
+                                && sensor.temperature_c.is_some_and(f64::is_finite)
+                                && self.settings.weather_temperature_ain == format!("NETATMO:{}", sensor.id))
+                            .map(|sensor| sensor.name.clone()))
                         .unwrap_or_else(|| "Outdoor weather".to_string()),
                     Some(
                         widget::icon::from_name(weather.icon_name())
@@ -4788,6 +4804,7 @@ impl cosmic::Application for AppModel {
                         format_temperature(
                             selected_weather_temperature(
                                 &self.readings,
+                                &self.netatmo_sensors,
                                 &self.settings.weather_temperature_ain,
                                 weather.temperature_c,
                             ),
@@ -5890,6 +5907,20 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption(
                         "Leave empty to use the system certificate store",
                     ))
+                    .push(
+                        widget::Row::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::text::body(
+                                "Allow invalid TLS certificates (FRITZ!Box only)",
+                            ))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(widget::toggler(self.settings.allow_invalid_certs)
+                                .on_toggle(Message::AllowInvalidCertsChanged)),
+                    )
+                    .push(widget::text::caption(
+                        "Unsafe: disables certificate verification only for FRITZ!Box HTTPS. Prefer a trusted CA certificate. Other integrations have separate TLS policies.",
+                    ))
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::title3("Tasmota devices"))
                     .push(widget::text::caption(
@@ -6029,23 +6060,6 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption(
                         "Netatmo requires internet access. This applet supports read-only Weather Station modules, not Netatmo thermostats or cameras."
                     ))
-                    .push(widget::divider::horizontal::default())
-                    .push(
-                        widget::Row::new().width(cosmic::iced::Length::Fill)
-                            .width(cosmic::iced::Length::Fill)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(
-                                widget::text::body(crate::i18n::tr(
-                                    &self.settings.language,
-                                    "Allow invalid TLS certificates",
-                                ))
-                                .width(cosmic::iced::Length::Fill),
-                            )
-                            .push(
-                                widget::toggler(self.settings.allow_invalid_certs)
-                                    .on_toggle(Message::AllowInvalidCertsChanged),
-                            ),
-                    )
                     .push(widget::divider::horizontal::default())
             }
             if self.active_settings_section == Some("menu-order") {
@@ -6351,6 +6365,24 @@ impl cosmic::Application for AppModel {
                                     } else {
                                         "Netatmo · Weather Station · Unavailable / stale"
                                     }));
+                                if sensor.is_outdoor {
+                                    let source_id = format!("NETATMO:{}", sensor.id);
+                                    let selected = self.settings.weather_temperature_ain == source_id;
+                                    let module_id = sensor.id.clone();
+                                    details = details.push(
+                                        widget::Row::new()
+                                            .width(cosmic::iced::Length::Fill)
+                                            .align_y(cosmic::iced::Alignment::Center)
+                                            .push(widget::text::caption(crate::i18n::tr(
+                                                &self.settings.language,
+                                                "Outdoor temperature source",
+                                            )))
+                                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                            .push(widget::toggler(selected).on_toggle(move |enabled| {
+                                                Message::ToggleNetatmoOutdoorTemperature(module_id.clone(), enabled)
+                                            })),
+                                    );
+                                }
                                 if sensor.temperature_c.is_some() {
                                     let key = crate::fritz::normalize_ain_for_selection(&id);
                                     details = details.push(temperature_alert_controls(
@@ -7485,6 +7517,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::title2(format_temperature(
                             selected_weather_temperature(
                                 &self.readings,
+                                &self.netatmo_sensors,
                                 &self.settings.weather_temperature_ain,
                                 weather.temperature_c,
                             ),
@@ -11283,6 +11316,20 @@ impl cosmic::Application for AppModel {
                     self.netatmo_error.is_some()
                 ));
             }
+            Message::ToggleNetatmoOutdoorTemperature(id, enabled) => {
+                if !self.netatmo_sensors.iter().any(|sensor| sensor.id == id && sensor.is_outdoor) {
+                    return Task::none();
+                }
+                let source = format!("NETATMO:{id}");
+                if enabled {
+                    self.settings.weather_temperature_ain = source.clone();
+                    self.settings.hidden_netatmo_devices.retain(|entry| entry != &id);
+                } else if self.settings.weather_temperature_ain == source {
+                    self.settings.weather_temperature_ain.clear();
+                }
+                self.settings.weather_temperature_source_initialized = true;
+                self.persist_settings();
+            }
             Message::ToggleNetatmoVisible(id, visible) => {
                 if !self.netatmo_sensors.iter().any(|sensor| sensor.id == id) {
                     return Task::none();
@@ -13108,10 +13155,40 @@ mod history_tests {
     }
 
     #[test]
+    fn netatmo_outdoor_override_uses_only_live_outdoor_temperature() {
+        let sensor = NetatmoSensor {
+            id: "outdoor-1".into(),
+            name: "Garden".into(),
+            is_outdoor: true,
+            temperature_c: Some(8.5),
+            humidity_percent: None,
+            co2_ppm: None,
+            pressure_hpa: None,
+            noise_db: None,
+            rain_mm: None,
+            wind_kmh: None,
+            reachable: true,
+        };
+        let selected = "NETATMO:outdoor-1";
+        assert_eq!(selected_weather_temperature(&[], &[sensor.clone()], selected, 14.0), 8.5);
+        assert_eq!(selected_weather_temperature(&[], &[], selected, 14.0), 14.0);
+        assert_eq!(selected_weather_temperature(&[], &[NetatmoSensor {
+            reachable: false, ..sensor.clone()
+        }], selected, 14.0), 14.0);
+        assert_eq!(selected_weather_temperature(&[], &[NetatmoSensor {
+            temperature_c: None, ..sensor.clone()
+        }], selected, 14.0), 14.0);
+        assert_eq!(selected_weather_temperature(&[], &[NetatmoSensor {
+            is_outdoor: false, ..sensor
+        }], selected, 14.0), 14.0);
+    }
+
+    #[test]
     fn netatmo_temperature_average_excludes_hidden_and_unreachable_modules() {
         let station = NetatmoSensor {
             id: "70:ee:50:11:22:33".into(),
             name: "Living room".into(),
+            is_outdoor: false,
             temperature_c: Some(20.0),
             humidity_percent: Some(50.0),
             co2_ppm: None,
