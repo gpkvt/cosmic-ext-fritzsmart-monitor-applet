@@ -1,5 +1,7 @@
 # Changelog
 
+- Right-align the Quick Settings label and icon in the popup action row.
+
 - Use smaller body-sized values for the total input/output NOW, TODAY, and Y'DAY summary.
 
 ### Added
