@@ -1,5 +1,9 @@
 # Changelog
 
+### Fixed
+
+- Remove obsolete, unused power-history helper functions reported by the release compiler.
+
 ### Added
 
 - Show daily input-to-output energy percentages for today and yesterday in Current Power History; omit the ratio when output energy is unavailable or zero.
