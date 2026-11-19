@@ -2,7 +2,13 @@
 //!
 //! Hue light resources expose on/off state, not measured watts. Keep them
 //! separate from FRITZ!/Tasmota metering and never manufacture power samples.
-use std::{collections::HashMap, net::IpAddr, time::Duration};
+use std::{
+    collections::{BTreeSet, HashMap},
+    net::IpAddr,
+    time::{Duration, Instant},
+};
+
+use mdns_sd::{ServiceDaemon, ServiceEvent};
 
 use reqwest::Client;
 use serde_json::{Value, json};
@@ -16,22 +22,66 @@ pub struct HueLight {
     pub reachable: bool,
 }
 
+fn is_local_bridge_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => ip.is_private() || ip.is_link_local() || ip.is_loopback(),
+        IpAddr::V6(ip) => ip.is_unique_local() || ip.is_unicast_link_local() || ip.is_loopback(),
+    }
+}
+
 fn bridge_origin(address: &str) -> Result<String, String> {
     let ip: IpAddr = address
         .trim()
         .parse()
         .map_err(|_| "Enter the Hue Bridge's local IP address (without http:// or a port)")?;
-    let local = match ip {
-        IpAddr::V4(ip) => ip.is_private() || ip.is_link_local() || ip.is_loopback(),
-        IpAddr::V6(ip) => ip.is_unique_local() || ip.is_unicast_link_local() || ip.is_loopback(),
-    };
-    if !local {
+    if !is_local_bridge_ip(ip) {
         return Err("Only a private or link-local Hue Bridge IP address is supported".into());
     }
     Ok(match ip {
         IpAddr::V4(ip) => format!("https://{ip}"),
         IpAddr::V6(ip) => format!("https://[{ip}]"),
     })
+}
+
+/// Prefer an IPv4 address per discovered bridge; avoid listing every interface
+/// or accidentally returning an Internet-facing address from untrusted mDNS.
+fn local_service_address(addresses: impl IntoIterator<Item = IpAddr>) -> Option<String> {
+    let mut addresses: Vec<_> = addresses
+        .into_iter()
+        .filter(|ip| is_local_bridge_ip(*ip))
+        .collect();
+    addresses.sort_by_key(|ip| (matches!(ip, IpAddr::V6(_)), ip.to_string()));
+    addresses.first().map(ToString::to_string)
+}
+
+fn discover_bridges_mdns(duration: Duration) -> Result<Vec<String>, String> {
+    let daemon = ServiceDaemon::new().map_err(|error| format!("Cannot start Hue mDNS discovery: {error}"))?;
+    let service_type = "_hue._tcp.local.";
+    let receiver = daemon.browse(service_type)
+        .map_err(|error| format!("Cannot browse for Hue Bridges: {error}"))?;
+    let deadline = Instant::now() + duration;
+    let mut addresses = BTreeSet::new();
+    while Instant::now() < deadline {
+        let timeout = deadline
+            .saturating_duration_since(Instant::now())
+            .min(Duration::from_millis(250));
+        if let Ok(ServiceEvent::ServiceResolved(service)) = receiver.recv_timeout(timeout)
+            && let Some(ip) = local_service_address(service.get_addresses().iter().copied())
+        {
+            addresses.insert(ip);
+        }
+    }
+    let _ = daemon.stop_browse(service_type);
+    let _ = daemon.shutdown();
+    Ok(addresses.into_iter().collect())
+}
+
+/// Local-only discovery: no Hue cloud request, FRITZ!Box subnet sweep or
+/// UI-thread blocking.
+pub async fn discover_bridges() -> Result<Vec<String>, String> {
+    tokio::task::spawn_blocking(|| discover_bridges_mdns(Duration::from_secs(5)))
+        .await
+        .map_err(|error| format!("Hue Bridge discovery task failed: {error}"))?
 }
 
 fn light_id_valid(id: &str) -> bool {
@@ -199,21 +249,71 @@ async fn fetch_resource(
     Ok(value)
 }
 
-pub async fn pair(address: String) -> Result<String, String> {
-    let origin = bridge_origin(&address)?;
-    let response = client()?
+fn pairing_waits_for_link_button(value: &Value) -> bool {
+    let Some(error) = value
+        .as_array()
+        .and_then(|entries| entries.first())
+        .and_then(|entry| entry.get("error"))
+    else {
+        return false;
+    };
+    error.get("type").and_then(Value::as_i64) == Some(101)
+        || error
+            .get("description")
+            .and_then(Value::as_str)
+            .is_some_and(|description| {
+                description.to_ascii_lowercase().contains("link button not pressed")
+            })
+}
+
+async fn send_pair_request(client: &Client, origin: &str) -> Result<Value, reqwest::Error> {
+    client
         .post(format!("{origin}/api"))
-        .json(&json!({"devicetype": "fritz-power-monitor#cosmic"}))
+        .json(&json!({"devicetype": "fritz_power_monitor#cosmic"}))
         .send()
+        .await?
+        .error_for_status()?
+        .json::<Value>()
         .await
-        .map_err(|error| format!("Hue Bridge pairing request failed: {error}"))?
-        .error_for_status()
-        .map_err(|error| format!("Hue Bridge pairing HTTP error: {error}"))?;
-    let value: Value = response
-        .json()
-        .await
-        .map_err(|error| format!("Invalid Hue Bridge pairing response: {error}"))?;
-    parse_pairing(&value)
+}
+
+/// Keep attempting authorization while the user presses the physical link
+/// button. Older bridges may support pairing over HTTP only, while Hue Bridge
+/// Pro requires HTTPS; the HTTP fallback transmits no existing secrets.
+pub async fn pair(address: String) -> Result<String, String> {
+    let mut origin = bridge_origin(&address)?;
+    let client = client()?;
+    for attempt in 0..15 {
+        let value = match send_pair_request(&client, &origin).await {
+            Ok(value) => value,
+            Err(error)
+                if attempt == 0
+                    && (error.is_connect()
+                        || matches!(
+                            error.status(),
+                            Some(reqwest::StatusCode::NOT_FOUND)
+                                | Some(reqwest::StatusCode::METHOD_NOT_ALLOWED)
+                        )) =>
+            {
+                origin = origin.replacen("https://", "http://", 1);
+                send_pair_request(&client, &origin)
+                    .await
+                    .map_err(|error| format!("Hue Bridge pairing failed (HTTPS and HTTP): {error}"))?
+            }
+            Err(error) => return Err(format!("Hue Bridge pairing request failed: {error}")),
+        };
+        if pairing_waits_for_link_button(&value) {
+            if attempt == 14 {
+                return Err(
+                    "Hue Bridge link button was not detected within 30 seconds. Press the physical button and try pairing again.".into()
+                );
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            continue;
+        }
+        return parse_pairing(&value);
+    }
+    Err("Hue Bridge pairing timed out; press the link button and try again".into())
 }
 
 pub async fn fetch_lights(address: String, key: String) -> Result<Vec<HueLight>, String> {
@@ -274,6 +374,38 @@ mod tests {
         assert!(bridge_origin("8.8.8.8").is_err());
         assert!(bridge_origin("https://192.168.42.12").is_err());
         assert!(bridge_origin("localhost").is_err());
+    }
+
+    #[test]
+    fn discovery_prefers_local_ipv4_and_rejects_public_addresses() {
+        assert_eq!(
+            local_service_address([
+                "fd00::42".parse().unwrap(),
+                "192.168.42.21".parse().unwrap(),
+                "8.8.8.8".parse().unwrap(),
+            ]),
+            Some("192.168.42.21".to_string())
+        );
+        assert_eq!(
+            local_service_address(["1.1.1.1".parse().unwrap()]),
+            None
+        );
+    }
+
+    #[test]
+    fn link_button_detection_uses_api_error_type_not_just_text() {
+        assert!(pairing_waits_for_link_button(&json!([{
+            "error": {"type": 101, "description": "link button not pressed"}
+        }])));
+        assert!(pairing_waits_for_link_button(&json!([{
+            "error": {"description": "Link Button Not Pressed"}
+        }])));
+        assert!(!pairing_waits_for_link_button(&json!([{
+            "error": {"type": 1, "description": "unauthorized user"}
+        }])));
+        assert!(!pairing_waits_for_link_button(&json!([{
+            "success": {"username": "abc"}
+        }])));
     }
 
     #[test]
