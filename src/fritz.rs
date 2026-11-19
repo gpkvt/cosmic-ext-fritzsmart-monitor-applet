@@ -184,6 +184,7 @@ pub struct FritzSettings {
     pub quick_options_expanded: bool,
     pub weather_forecast_expanded: bool,
     pub weather_attribution_expanded: bool,
+    pub graph_history_diagnostics_expanded: bool,
     pub settings_section: String,
     pub setup_completed: bool,
     pub device_selection_initialized: bool,
@@ -240,6 +241,7 @@ impl Default for FritzSettings {
             quick_options_expanded: false,
             weather_forecast_expanded: false,
             weather_attribution_expanded: false,
+            graph_history_diagnostics_expanded: false,
             settings_section: String::new(),
             setup_completed: false,
             device_selection_initialized: false,
@@ -420,9 +422,10 @@ fn parse_settings_section(value: &str) -> String {
 }
 
 fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
-    const SECTION_IDS: [&str; 10] = [
+    const SECTION_IDS: [&str; 11] = [
         "summary",
         "weather",
+        "devices",
         "internet-bandwidth",
         "total-power-output",
         "total-power-input",
@@ -625,6 +628,8 @@ impl FritzSettings {
                 .eq_ignore_ascii_case("true"),
             weather_attribution_expanded: get("WEATHER_ATTRIBUTION_EXPANDED")
                 .eq_ignore_ascii_case("true"),
+            graph_history_diagnostics_expanded: get("GRAPH_HISTORY_DIAGNOSTICS_EXPANDED")
+                .eq_ignore_ascii_case("true"),
             settings_section: parse_settings_section(&get("SETTINGS_SECTION")),
             // Existing installations predate the assistant and should not be
             // interrupted; only a genuinely new configuration starts setup.
@@ -700,7 +705,7 @@ impl FritzSettings {
             parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
         let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
-            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nTEMPERATURE_UNIT={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nDAILY_ENERGY_HISTORY_DEFAULT_APPLIED={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nTEMPERATURE_UNIT={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nDAILY_ENERGY_HISTORY_DEFAULT_APPLIED={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nGRAPH_HISTORY_DIAGNOSTICS_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
             match self.language.as_str() {
                 "de" => "de",
                 "en" => "en",
@@ -814,6 +819,11 @@ impl FritzSettings {
                 "false"
             },
             if self.weather_attribution_expanded {
+                "true"
+            } else {
+                "false"
+            },
+            if self.graph_history_diagnostics_expanded {
                 "true"
             } else {
                 "false"
@@ -2137,11 +2147,12 @@ mod tests {
     fn parses_persisted_collapsed_menu_sections_safely() {
         assert_eq!(
             parse_collapsed_menu_sections(
-                "weather,unknown,summary,weather,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature,graph-total-output-pair,graph-total-input-pair,graph-bandwidth-pair,total-power-overview,daily-energy-history,device-graph-pair-0876101234567890,device-graph-pair-invalid!"
+                "weather,unknown,summary,weather,devices,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature,graph-total-output-pair,graph-total-input-pair,graph-bandwidth-pair,total-power-overview,daily-energy-history,device-graph-pair-0876101234567890,device-graph-pair-invalid!"
             ),
             vec![
                 "weather".to_string(),
                 "summary".to_string(),
+                "devices".to_string(),
                 "internet-bandwidth".to_string(),
                 "total-power-output".to_string(),
                 "total-power-input".to_string(),
@@ -2156,6 +2167,8 @@ mod tests {
         );
         assert!(parse_collapsed_menu_sections("").is_empty());
         assert!(!FritzSettings::default().weather_attribution_expanded);
+        assert!(!FritzSettings::default().graph_history_diagnostics_expanded);
+        assert_eq!(parse_collapsed_menu_sections("devices"), vec!["devices"]);
     }
 
     #[test]

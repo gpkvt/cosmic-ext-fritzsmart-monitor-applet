@@ -3059,6 +3059,7 @@ impl AppModel {
         self.settings.quick_options_expanded = self.quick_options_expanded;
         self.settings.weather_forecast_expanded = self.weather_forecast_expanded;
         self.settings.weather_attribution_expanded = self.weather_attribution_expanded;
+        self.settings.graph_history_diagnostics_expanded = self.graph_history_diagnostics_expanded;
         self.settings.settings_section = self.active_settings_section.unwrap_or_default().into();
         self.persist_settings();
     }
@@ -3306,6 +3307,7 @@ impl cosmic::Application for AppModel {
         let quick_options_expanded = settings.quick_options_expanded;
         let weather_forecast_expanded = settings.weather_forecast_expanded;
         let weather_attribution_expanded = settings.weather_attribution_expanded;
+        let graph_history_diagnostics_expanded = settings.graph_history_diagnostics_expanded;
         let active_settings_section = match settings.settings_section.as_str() {
             "language" => Some("language"),
             "panel" => Some("panel"),
@@ -3366,6 +3368,7 @@ impl cosmic::Application for AppModel {
                 quick_options_expanded,
                 weather_forecast_expanded,
                 weather_attribution_expanded,
+                graph_history_diagnostics_expanded,
                 quick_refresh_interval,
                 quick_graph_timespan,
                 weather_forecast_days: restore_forecast.then_some(7),
@@ -6686,7 +6689,7 @@ impl cosmic::Application for AppModel {
                 });
                 for (index, reading) in ordered_readings.iter().enumerate() {
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                    let is_expanded = self.expanded_devices.contains(&device_key);
+                    let is_expanded = self.expanded_devices.contains(&device_key.to_ascii_uppercase());
                     let device_corner_radius = device_corner_radius(index, ordered_readings.len());
                     let device_history = self.device_history.get(&device_key);
                     let power_toggle: cosmic::Element<'_, Message> = {
@@ -7108,7 +7111,7 @@ impl cosmic::Application for AppModel {
                 });
                 for device in missing_devices {
                     let device_key = crate::fritz::normalize_ain_for_selection(&device.ain);
-                    let is_expanded = self.expanded_devices.contains(&device_key);
+                    let is_expanded = self.expanded_devices.contains(&device_key.to_ascii_uppercase());
                     let device_row = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
                         .list_item_padding([0, 0])
@@ -8714,7 +8717,7 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::ToggleDeviceDetails(ain) => {
-                let key = crate::fritz::normalize_ain_for_selection(&ain);
+                let key = crate::fritz::normalize_ain_for_selection(&ain).to_ascii_uppercase();
                 if !self.expanded_devices.remove(&key) {
                     self.expanded_devices.insert(key);
                 }
@@ -9102,6 +9105,7 @@ impl cosmic::Application for AppModel {
             }
             Message::ToggleGraphHistoryDiagnostics => {
                 self.graph_history_diagnostics_expanded = !self.graph_history_diagnostics_expanded;
+                self.persist_layout_state();
             }
             Message::BackToSettingsCategories => {
                 self.active_settings_section = None;
@@ -9443,9 +9447,10 @@ impl cosmic::Application for AppModel {
                     .retain(|id| crate::fritz::normalize_ain_for_selection(id) != normalized);
                 self.settings.input_ains.remove(&normalized);
                 self.settings.temperature_alerts.remove(&normalized);
+                self.expanded_devices.remove(&normalized.to_ascii_uppercase());
                 self.settings
                     .expanded_devices
-                    .retain(|id| crate::fritz::normalize_ain_for_selection(id) != normalized);
+                    .retain(|id| !id.eq_ignore_ascii_case(&normalized));
                 if crate::fritz::normalize_ain_for_selection(&self.settings.weather_temperature_ain)
                     == normalized
                 {
