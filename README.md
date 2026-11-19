@@ -219,6 +219,22 @@ For a router using a self-signed certificate, provide its PEM certificate as a t
 
 The **Diagnostics** settings category provides connection and device information to help investigate problems. Do not share diagnostic output containing private network details or credentials publicly.
 
+#### Device-loading logs in syslog / systemd journal
+
+On Linux, the applet writes startup, discovery, FRITZ!Box/Tasmota/Hue device-loading progress, outcomes and Rust panic **locations** to the syslog socket (facility `user`, tag `fritz-power-monitor`). Debug-level stage messages are enabled by default to help diagnose an applet that exits while loading device information. Journal timestamps identify where a load stopped. These records intentionally include **only static stage names, counts and outcomes**, not router URLs, device names, credentials, AINs, Hue keys, XML or raw JSON.
+
+```sh
+journalctl -b -t fritz-power-monitor -p debug --no-pager | tail -n 150
+```
+
+If your account cannot read the system journal, use `sudo journalctl -b -t fritz-power-monitor -p debug --no-pager`. When a sandbox cannot access either syslog socket, diagnostics fall back to stderr, which COSMIC Panel normally captures:
+
+```sh
+journalctl --user -b --no-pager | grep -F 'fritz-power-monitor:' | tail -n 150
+```
+
+An applet terminating without a Rust panic message can also mean that the panel process was killed or restarted externally. Check the matching `cosmic-panel` and `cosmic-session` journal entries.
+
 ### Language
 
 The interface supports English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian. By default, it follows the COSMIC desktop language; an explicit language can also be selected in Settings. Translation coverage is being expanded, and strings not yet translated fall back to English.
