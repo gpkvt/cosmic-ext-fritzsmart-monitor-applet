@@ -2893,6 +2893,42 @@ mod tests {
     }
 
     #[test]
+    fn malformed_device_does_not_drop_other_valid_readings() {
+        let xml = r#"<devicelist>
+            <device identifier="111111111111">
+                <name>First plug</name>
+                <powermeter><power>45000</power></powermeter>
+                <temperature><celsius>205</celsius></temperature>
+            </device>
+            <device identifier="222222222222">
+                <name>Broken plug</name>
+                <powermeter><power>invalid</power></powermeter>
+                <temperature><celsius>220</celsius></temperature>
+            </device>
+            <device identifier="333333333333">
+                <name>Third plug</name>
+                <powermeter><power>72000</power></powermeter>
+                <temperature><celsius>230</celsius></temperature>
+            </device>
+        </devicelist>"#;
+        let selected = [
+            "333333333333".into(),
+            "222222222222".into(),
+            "111111111111".into(),
+        ];
+        let result = parse_fetch_result_xml(xml, &selected).unwrap();
+        assert_eq!(result.readings.len(), 2);
+        assert_eq!(result.readings[0].ain, "333333333333");
+        assert_eq!(result.readings[0].power_w, 72);
+        assert_eq!(result.readings[1].ain, "111111111111");
+        assert_eq!(result.readings[1].power_w, 45);
+        assert_eq!(
+            result.missing_devices,
+            vec![("222222222222".into(), "Broken plug".into())]
+        );
+    }
+
+    #[test]
     fn fetch_result_reports_all_selected_devices_as_missing() {
         let xml = r#"<devicelist></devicelist>"#;
         let result =
