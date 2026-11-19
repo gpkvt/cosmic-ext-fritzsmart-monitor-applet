@@ -149,6 +149,161 @@ pub async fn fetch_stations(
     Ok(NetatmoSnapshot { refresh_token: renewed, stations })
 }
 
+/// Netatmo history is separate from power and Hue history. No synthetic
+/// measurements are recorded when a module is offline or has an old timestamp.
+pub type NetatmoHistory = std::collections::HashMap<
+    String,
+    std::collections::HashMap<String, std::collections::VecDeque<(std::time::Instant, f64)>>,
+>;
+
+pub const METRICS: [(&str, &str, &str); 7] = [
+    ("temperature", "Temperature", "°C"),
+    ("humidity", "Humidity", "%"),
+    ("co2", "CO₂", "ppm"),
+    ("pressure", "Pressure", "hPa"),
+    ("noise", "Noise", "dB"),
+    ("rain", "Rain", "mm"),
+    ("wind", "Wind", "km/h"),
+];
+
+pub fn metric_value(sensor: &NetatmoSensor, key: &str) -> Option<f64> {
+    if !sensor.reachable { return None; }
+    match key {
+        "temperature" => sensor.temperature_c,
+        "humidity" => sensor.humidity_percent,
+        "co2" => sensor.co2_ppm,
+        "pressure" => sensor.pressure_hpa,
+        "noise" => sensor.noise_db,
+        "rain" => sensor.rain_mm,
+        "wind" => sensor.wind_kmh,
+        _ => None,
+    }.filter(|value| value.is_finite())
+}
+
+fn valid_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 128
+        && id.bytes().all(|byte| byte.is_ascii_alphanumeric()
+            || matches!(byte, b':' | b'-' | b'_'))
+}
+
+fn history_path() -> Result<std::path::PathBuf, String> {
+    let root = if let Some(path) = std::env::var_os("XDG_DATA_HOME") {
+        std::path::PathBuf::from(path)
+    } else {
+        std::path::PathBuf::from(std::env::var_os("HOME").ok_or("HOME is not set")?)
+            .join(".local/share")
+    };
+    Ok(root.join("fritz-power-monitor/netatmo-sensors.json"))
+}
+
+pub fn record_history(
+    history: &mut NetatmoHistory,
+    sensor: &NetatmoSensor,
+    now: std::time::Instant,
+    window: Duration,
+) {
+    if !valid_id(&sensor.id) { return; }
+    let keep_secs = window.as_secs().max(300);
+    let interval = Duration::from_secs((keep_secs / 5000).max(300));
+    let device = history.entry(sensor.id.clone()).or_default();
+    for (key, _, _) in METRICS {
+        let Some(value) = metric_value(sensor, key) else { continue; };
+        let readings = device.entry(key.to_owned()).or_default();
+        if let Some((previous, last)) = readings.back_mut()
+            && now.saturating_duration_since(*previous) < interval
+        {
+            *last = value;
+        } else {
+            readings.push_back((now, value));
+        }
+        while readings.front().is_some_and(|(time, _)| now.saturating_duration_since(*time) > window) {
+            readings.pop_front();
+        }
+        while readings.len() > 5000 {
+            readings.pop_front();
+        }
+    }
+}
+
+pub fn load_history(window: Duration) -> NetatmoHistory {
+    let Some(path) = history_path().ok() else { return NetatmoHistory::new(); };
+    let Ok(metadata) = std::fs::metadata(&path) else { return NetatmoHistory::new(); };
+    if metadata.len() > 16 * 1024 * 1024 { return NetatmoHistory::new(); }
+    let Ok(content) = std::fs::read(&path) else { return NetatmoHistory::new(); };
+    let Ok(data) = serde_json::from_slice::<Value>(&content) else { return NetatmoHistory::new(); };
+    if data.get("version").and_then(Value::as_u64) != Some(1) { return NetatmoHistory::new(); }
+    let Some(modules) = data.get("modules").and_then(Value::as_object) else { return NetatmoHistory::new(); };
+    let now = std::time::Instant::now();
+    let epoch = chrono::Utc::now().timestamp();
+    let mut history = NetatmoHistory::new();
+    for (id, metrics) in modules.iter().take(200) {
+        if !valid_id(id) { continue; }
+        let Some(metrics) = metrics.as_object() else { continue; };
+        let mut values = std::collections::HashMap::new();
+        for (key, _, _) in METRICS {
+            let Some(samples) = metrics.get(key).and_then(Value::as_array) else { continue; };
+            let mut readings = std::collections::VecDeque::new();
+            for sample in samples.iter().rev().take(5000).rev() {
+                let (Some(timestamp), Some(value)) = (
+                    sample.get(0).and_then(Value::as_i64),
+                    sample.get(1).and_then(Value::as_f64),
+                ) else { continue; };
+                let Some(age) = epoch.checked_sub(timestamp) else { continue; };
+                if !(0..=window.as_secs() as i64).contains(&age) || !value.is_finite() { continue; }
+                if let Some(instant) = now.checked_sub(Duration::from_secs(age as u64)) {
+                    readings.push_back((instant, value));
+                }
+            }
+            if !readings.is_empty() {
+                values.insert(key.to_owned(), readings);
+            }
+        }
+        if !values.is_empty() { history.insert(id.clone(), values); }
+    }
+    history
+}
+
+pub fn save_history(history: &NetatmoHistory) -> Result<(), String> {
+    let path = history_path()?;
+    let parent = path.parent().ok_or("Invalid Netatmo history directory")?;
+    std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let now = std::time::Instant::now();
+    let epoch = chrono::Utc::now().timestamp();
+    let mut modules = serde_json::Map::new();
+    for (id, metrics) in history {
+        if !valid_id(id) { continue; }
+        let mut series = serde_json::Map::new();
+        for (key, _, _) in METRICS {
+            let Some(readings) = metrics.get(key) else { continue; };
+            let points = readings.iter().rev().take(5000).rev().map(|(instant, value)| {
+                serde_json::json!([epoch.saturating_sub(now.saturating_duration_since(*instant).as_secs() as i64), value])
+            }).collect();
+            series.insert(key.to_owned(), Value::Array(points));
+        }
+        modules.insert(id.clone(), Value::Object(series));
+    }
+    let data = serde_json::to_vec(&serde_json::json!({"version":1, "modules": modules}))
+        .map_err(|error| error.to_string())?;
+    let temp = parent.join(format!(".netatmo-sensors-{}.tmp", std::process::id()));
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(&temp).map_err(|error| error.to_string())?;
+    use std::io::Write;
+    let result = file.write_all(&data)
+        .and_then(|_| file.sync_all())
+        .and_then(|_| std::fs::rename(&temp, &path));
+    if let Err(error) = result {
+        let _ = std::fs::remove_file(&temp);
+        return Err(error.to_string());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
