@@ -1,5 +1,7 @@
 # Changelog
 
+- Remove the redundant graph from Total Power Input & Output; keep the combined graph under Current Power History and preserve the numeric readings, low/high values, and energy summaries.
+
 - Move the Total Power Input & Output copy icon beside its heading and animate copy buttons with a brief pulsing checkmark, without moving the button hit targets.
 
 - Show TODAY and Y'DAY input/output percentages side by side on one row in the shared power history summary.
