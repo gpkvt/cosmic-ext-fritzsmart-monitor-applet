@@ -1,5 +1,8 @@
 # Changelog
 
+- Find Hue Bridges automatically via local mDNS on startup and when opening Connection settings, with a manual rescan and selection when multiple bridges are discovered; never overwrite a configured bridge silently.
+- Fix Hue pairing usability: make pairing retry while the physical link button is pressed, fall back to legacy HTTP registration only when HTTPS pairing is unsupported, and show errors and progress beside the pairing button. Include discovery/pairing regression tests.
+
 - Add optional Philips Hue Bridge (CLIP v2) integration with local IP setup, physical link-button pairing, secure application-key storage, independently refreshed light discovery, reachability awareness and individual on/off switches. Keep Hue states separate from power/temperature totals; document the Hue-only TLS trust limitation.
 
 - Hide redundant dividers between device rows when the Devices section is collapsed, retaining separators around the section and all row dividers when expanded.
