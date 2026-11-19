@@ -11006,7 +11006,7 @@ mod device_list_sort_tests {
         }
     }
 
-    fn ids(readings: &[&FritzReading]) -> Vec<&str> {
+    fn ids<'a>(readings: &[&'a FritzReading]) -> Vec<&'a str> {
         readings.iter().map(|reading| reading.ain.as_str()).collect()
     }
 
