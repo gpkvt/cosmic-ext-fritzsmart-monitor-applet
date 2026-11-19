@@ -984,60 +984,6 @@ fn yesterday_and_today_energy_wh_for_ains(
     (yesterday, today)
 }
 
-fn menu_energy_summary(
-    power_samples: impl Iterator<Item = f64>,
-    current_power_w: Option<f64>,
-    yesterday_wh: Option<f64>,
-    today_wh: Option<f64>,
-) -> cosmic::Element<'static, Message> {
-    let values: Vec<f64> = power_samples.collect();
-    let (minimum, maximum) = values
-        .iter()
-        .copied()
-        .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), value| {
-            (min.min(value), max.max(value))
-        });
-    let range = (maximum - minimum).max(1.0);
-    let points = if values.len() < 2 {
-        String::new()
-    } else {
-        values
-            .iter()
-            .enumerate()
-            .map(|(index, value)| {
-                let x = 4.0 + index as f64 * 352.0 / (values.len() - 1) as f64;
-                let y = 38.0 - ((*value - minimum) / range) * 32.0;
-                format!("{x:.1},{y:.1}")
-            })
-            .collect::<Vec<_>>()
-            .join(" ")
-    };
-    let sparkline = if points.is_empty() {
-        r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 44"><path d="M4 22H356" fill="none" stroke="#888888" stroke-opacity=".45" stroke-width="2" stroke-linecap="round"/></svg>"##.to_string()
-    } else {
-        format!(
-            r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 44"><polyline points="{points}" fill="none" stroke="#8ab4f8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>"##
-        )
-    };
-    let graph: cosmic::Element<'static, Message> = widget::container(
-        widget::svg(widget::svg::Handle::from_memory(sparkline.into_bytes()))
-            .width(cosmic::iced::Length::Fill)
-            .height(cosmic::iced::Length::Fixed(44.0)),
-    )
-    // Reserve explicit space for the figures alongside the graph. A plain
-    // Fill here consumed the entire row and pushed the values out of view.
-    .width(cosmic::iced::Length::FillPortion(3))
-    .into();
-    let values = menu_energy_values(current_power_w, yesterday_wh, today_wh);
-    widget::Row::new()
-        .spacing(10)
-        .align_y(cosmic::iced::Alignment::Center)
-        .width(cosmic::iced::Length::Fill)
-        .push(graph)
-        .push(values)
-        .into()
-}
-
 fn menu_energy_values(
     current_power_w: Option<f64>,
     yesterday_wh: Option<f64>,
@@ -1900,6 +1846,7 @@ fn rebuild_output_power_history(
     rebuild_power_history(device_history, input_ains, false)
 }
 
+#[cfg(test)]
 fn rebuild_temperature_history(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     input_ains: &HashSet<String>,
@@ -2387,55 +2334,6 @@ fn collapsible_graph(
         .push(heading);
     if !collapsed {
         section = section.push(graph);
-    }
-    section.into()
-}
-
-fn total_power_section(
-    title: &'static str,
-    value_w: i64,
-    temperature: Option<String>,
-    section_id: &'static str,
-    collapsed: bool,
-    summary: cosmic::Element<'static, Message>,
-    content: cosmic::Element<'static, Message>,
-) -> cosmic::Element<'static, Message> {
-    // Use the established disclosure style from the other popup sections.
-    let mut heading = widget::Row::new()
-        .spacing(8)
-        .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::text::body(title))
-        .push(widget::Space::new().width(cosmic::iced::Length::Fill));
-    if collapsed {
-        heading = heading.push(widget::text::body(keep_value_unit_together(format!(
-            "{value_w} W"
-        ))));
-        if let Some(temperature) = temperature {
-            heading = heading.push(widget::text::body(keep_value_unit_together(temperature)));
-        }
-    }
-    let heading = widget::button::custom(
-        heading.push(
-            widget::icon::from_name(if collapsed {
-                "go-next-symbolic"
-            } else {
-                "go-down-symbolic"
-            })
-            .size(16),
-        ),
-    )
-    .on_press(Message::ToggleMenuSection(section_id.into()))
-    .width(cosmic::iced::Length::Fill)
-    .padding([8, 12])
-    .class(cosmic::theme::Button::Text);
-
-    let mut section = widget::Column::new()
-        .spacing(0)
-        .width(cosmic::iced::Length::Fill)
-        .push(heading)
-        .push(widget::container(summary).padding([0, 12]));
-    if !collapsed {
-        section = section.push(content);
     }
     section.into()
 }
