@@ -2393,10 +2393,10 @@ fn total_power_overview(
                 ),
         )
         .push(graph_panel(output_graph.into()));
-    let output_ains: HashSet<String> = readings
-        .iter()
-        .map(|reading| crate::fritz::normalize_ain_for_selection(&reading.ain))
-        .filter(|ain| !settings.input_ains.contains(ain))
+    let output_ains: HashSet<String> = device_history
+        .keys()
+        .filter(|ain| !settings.input_ains.contains(*ain))
+        .cloned()
         .collect();
     let output_today_wh = today_energy_wh_for_ains(
         device_history,
