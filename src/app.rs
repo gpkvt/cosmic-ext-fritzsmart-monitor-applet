@@ -1426,6 +1426,16 @@ fn outdoor_air_pollution_metrics(pollution: &AirPollutionData) -> Vec<(String, S
     metrics
 }
 
+/// Keep the entire four-column weather table visible without an inner scrollbar.
+/// The photo and its night overlay expand together; all other menu cards remain
+/// separate, and the popup's outer scroll handles unusually large sensor sets.
+fn weather_photo_height(metric_count: usize) -> f32 {
+    const BASE_HEIGHT: f32 = 260.0;
+    const EXTRA_ROW_HEIGHT: f32 = 88.0;
+    let extra_rows = metric_count.div_ceil(4).saturating_sub(2);
+    BASE_HEIGHT + extra_rows as f32 * EXTRA_ROW_HEIGHT
+}
+
 fn weather_detail_metric_label(label: String, value: String) -> cosmic::Element<'static, Message> {
     widget::Column::new()
         .spacing(2)
@@ -7744,7 +7754,7 @@ impl cosmic::Application for AppModel {
                     metric_row = metric_row.push(widget::Space::new().width(cosmic::iced::Length::Fill));
                 }
                 weather_metric_grid = weather_metric_grid.push(metric_row);
-                let weather_card_height = 260.0;
+                let weather_card_height = weather_photo_height(metric_count);
                 let weather_heading = widget::button::custom(
                     widget::Row::new()
                         .spacing(8)
@@ -7801,19 +7811,16 @@ impl cosmic::Application for AppModel {
                         .width(cosmic::iced::Length::Fill)
                         .padding([4, 10]),
                 );
-                // Keep both the condition summary and the unified weather /
-                // Netatmo metric table within the single clipped photo area.
-                // Overflow from additional modules scrolls inside this area
-                // rather than increasing the image height or menu background.
+                // The condition summary and all OWM/Netatmo data rows live
+                // together on the photo. Grow this weather-only surface by
+                // the number of four-column rows rather than nesting a second
+                // scroll area inside the menu.
                 let weather_content = widget::Column::new()
                     .spacing(10)
                     .width(cosmic::iced::Length::Fill)
                     .height(cosmic::iced::Length::Fixed(weather_card_height - 20.0))
                     .push(weather_summary)
-                    .push(
-                        widget::scrollable(weather_metric_grid)
-                            .height(cosmic::iced::Length::Fill),
-                    );
+                    .push(weather_metric_grid);
                 let current_image_handle = weather
                     .slideshow_sequence
                     .get(self.weather_slideshow_index)
@@ -13587,6 +13594,16 @@ mod history_tests {
             }, "co2", &settings),
             "—"
         );
+    }
+
+    #[test]
+    fn weather_photo_grows_for_every_extra_metric_row_without_inner_scrolling() {
+        assert_eq!(weather_photo_height(0), 260.0);
+        assert_eq!(weather_photo_height(8), 260.0);
+        assert_eq!(weather_photo_height(9), 348.0);
+        assert_eq!(weather_photo_height(12), 348.0);
+        assert_eq!(weather_photo_height(13), 436.0);
+        assert_eq!(weather_photo_height(21), 612.0);
     }
 
     #[test]
