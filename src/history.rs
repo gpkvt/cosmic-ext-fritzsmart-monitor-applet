@@ -395,7 +395,10 @@ fn save_hue_sensors_to_path(path: &Path, history: &HueSensorHistory) -> Result<(
         .duration_since(UNIX_EPOCH)
         .map_err(|error| error.to_string())?
         .as_nanos();
-    let temporary = parent.join(format!(".hue-sensors.{}.{timestamp}.tmp", std::process::id()));
+    let temporary = parent.join(format!(
+        ".hue-sensors.{}.{timestamp}.tmp",
+        std::process::id()
+    ));
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
@@ -403,7 +406,9 @@ fn save_hue_sensors_to_path(path: &Path, history: &HueSensorHistory) -> Result<(
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    let mut file = options.open(&temporary).map_err(|error| error.to_string())?;
+    let mut file = options
+        .open(&temporary)
+        .map_err(|error| error.to_string())?;
     let result = file
         .write_all(&contents)
         .and_then(|_| file.sync_all())
@@ -483,7 +488,10 @@ mod tests {
         let loaded = load_hue_sensors_from_path(&path, Duration::from_secs(60));
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"].len(), 1);
-        assert_eq!(loaded["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"][0].1, Some(23.0));
+        assert_eq!(
+            loaded["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"][0].1,
+            Some(23.0)
+        );
         fs::remove_file(path).unwrap();
     }
 

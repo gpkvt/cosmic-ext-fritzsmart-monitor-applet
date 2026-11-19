@@ -2195,11 +2195,18 @@ fn hue_sensor_graph_samples(
         .flat_map(|samples| samples.iter())
         .filter_map(|(timestamp, celsius, lux)| {
             let value = if temperature {
-                celsius.map(|value| if fahrenheit { value * 9.0 / 5.0 + 32.0 } else { value })
+                celsius.map(|value| {
+                    if fahrenheit {
+                        value * 9.0 / 5.0 + 32.0
+                    } else {
+                        value
+                    }
+                })
             } else {
                 *lux
             };
-            value.filter(|number| number.is_finite() && (temperature || *number >= 0.0))
+            value
+                .filter(|number| number.is_finite() && (temperature || *number >= 0.0))
                 .map(|number| (*timestamp, number))
         })
         .collect()
@@ -3187,9 +3194,11 @@ fn temperature_alert_controls(
                     "Temperature alerts",
                 )))
                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                .push(widget::toggler(thresholds.is_some()).on_toggle(move |enabled| {
-                    Message::ToggleTemperatureAlert(toggle_id.clone(), enabled)
-                })),
+                .push(
+                    widget::toggler(thresholds.is_some()).on_toggle(move |enabled| {
+                        Message::ToggleTemperatureAlert(toggle_id.clone(), enabled)
+                    }),
+                ),
         );
     if let Some(thresholds) = thresholds {
         let fahrenheit = unit == "F";
@@ -3226,7 +3235,11 @@ fn temperature_alert_controls(
             )))
             .push(
                 widget::slider(
-                    if fahrenheit { 14.0..=86.0 } else { -10.0..=30.0 },
+                    if fahrenheit {
+                        14.0..=86.0
+                    } else {
+                        -10.0..=30.0
+                    },
                     temperature_in_unit(f64::from(thresholds.low_c), unit) as f32,
                     move |value| {
                         let celsius = if fahrenheit {
@@ -3234,10 +3247,7 @@ fn temperature_alert_controls(
                         } else {
                             f64::from(value)
                         };
-                        Message::TemperatureAlertLowChanged(
-                            low_id.clone(),
-                            celsius.round() as i16,
-                        )
+                        Message::TemperatureAlertLowChanged(low_id.clone(), celsius.round() as i16)
                     },
                 )
                 .step(1.0_f32),
@@ -5882,32 +5892,32 @@ impl cosmic::Application for AppModel {
                                             })),
                                     );
                                 if !is_tasmota {
-                                    device_row = device_row
-                                        .push(
-                                            widget::Row::new()
-                                                .width(cosmic::iced::Length::Fill)
-                                                .align_y(cosmic::iced::Alignment::Center)
-                                                .push(widget::text::caption(crate::i18n::tr(
-                                                    &self.settings.language,
-                                                    "Outdoor temperature source",
-                                                )))
-                                                .push(
-                                                    widget::Space::new()
-                                                        .width(cosmic::iced::Length::Fill),
-                                                )
-                                                .push(
-                                                    widget::toggler(is_external_temperature)
-                                                        .on_toggle({
-                                                            let ain = ain.clone();
-                                                            move |enabled| {
-                                                                Message::ToggleExternalTemperature(
-                                                                    ain.clone(),
-                                                                    enabled,
-                                                                )
-                                                            }
-                                                        }),
+                                    device_row = device_row.push(
+                                        widget::Row::new()
+                                            .width(cosmic::iced::Length::Fill)
+                                            .align_y(cosmic::iced::Alignment::Center)
+                                            .push(widget::text::caption(crate::i18n::tr(
+                                                &self.settings.language,
+                                                "Outdoor temperature source",
+                                            )))
+                                            .push(
+                                                widget::Space::new()
+                                                    .width(cosmic::iced::Length::Fill),
+                                            )
+                                            .push(
+                                                widget::toggler(is_external_temperature).on_toggle(
+                                                    {
+                                                        let ain = ain.clone();
+                                                        move |enabled| {
+                                                            Message::ToggleExternalTemperature(
+                                                                ain.clone(),
+                                                                enabled,
+                                                            )
+                                                        }
+                                                    },
                                                 ),
-                                        );
+                                            ),
+                                    );
                                 }
                                 if !is_tasmota {
                                     device_row = device_row.push(temperature_alert_controls(
@@ -5985,8 +5995,7 @@ impl cosmic::Application for AppModel {
                                         None => "Motion unavailable",
                                     }
                                 };
-                                let alert_key =
-                                    crate::fritz::normalize_ain_for_selection(&id);
+                                let alert_key = crate::fritz::normalize_ain_for_selection(&id);
                                 let thresholds =
                                     self.settings.temperature_alerts.get(&alert_key).copied();
                                 content = content.push(hue_settings_card(
@@ -10739,18 +10748,20 @@ impl cosmic::Application for AppModel {
                                 now,
                                 window,
                             );
-                            let key = crate::fritz::normalize_ain_for_selection(
-                                &hue_device_id("sensor", &sensor.id),
-                            );
+                            let key = crate::fritz::normalize_ain_for_selection(&hue_device_id(
+                                "sensor", &sensor.id,
+                            ));
                             if let Some(thresholds) =
                                 self.settings.temperature_alerts.get(&key).copied()
                             {
                                 // Offline or invalid readings must not fire alerts
                                 // or establish a fake temperature baseline.
-                                if let Some(temperature) = sensor.temperature_c
+                                if let Some(temperature) = sensor
+                                    .temperature_c
                                     .filter(|value| sensor.reachable && value.is_finite())
                                 {
-                                    let outside = temperature_outside_limits(temperature, thresholds);
+                                    let outside =
+                                        temperature_outside_limits(temperature, thresholds);
                                     if should_notify_temperature_alert(
                                         self.temperature_alert_state.get(&key).copied(),
                                         outside,

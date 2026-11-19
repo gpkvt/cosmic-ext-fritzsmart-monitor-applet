@@ -2555,16 +2555,16 @@ mod tests {
             }
         );
         assert!(FritzSettings::default().temperature_alerts.is_empty());
-        let hue_key = normalize_ain_for_selection(
-            "hue-sensor-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        let hue_key =
+            normalize_ain_for_selection("hue-sensor-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        let parsed = parse_temperature_alerts("huesensoraaaaaaaabbbbccccddddeeeeeeeeeeee:28:18");
+        assert_eq!(
+            parsed.get(&hue_key),
+            Some(&TemperatureAlertThresholds {
+                high_c: 28,
+                low_c: 18,
+            })
         );
-        let parsed = parse_temperature_alerts(
-            "huesensoraaaaaaaabbbbccccddddeeeeeeeeeeee:28:18"
-        );
-        assert_eq!(parsed.get(&hue_key), Some(&TemperatureAlertThresholds {
-            high_c: 28,
-            low_c: 18,
-        }));
         assert_eq!(parse_temperature_alerts("123:25:30")["123"].low_c, 24);
     }
 
