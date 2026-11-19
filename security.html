@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#10131a">
+<meta name="description" content="Security Policy — FRITZ!Power Monitor documentation.">
+<title>Security Policy — FRITZ!Power Monitor</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<style>
+:root{color-scheme:dark;--bg:#0b0e14;--surface:#121722;--text:#f2f5fa;--muted:#a2adbd;--line:#293344;--mint:#8be0c4;--max:1040px}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:90px}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.75 system-ui,sans-serif}
+a{color:var(--mint);text-underline-offset:3px}.wrap{width:min(var(--max),calc(100% - 40px));margin:auto}
+.topbar{position:sticky;top:0;z-index:5;border-bottom:1px solid #ffffff18;background:#0b0e14ed;backdrop-filter:blur(16px)}.nav{min-height:68px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}.brand{display:flex;align-items:center;gap:10px;color:var(--text);font-weight:800;text-decoration:none}.brand img{width:32px;height:32px}.nav-links{display:flex;gap:18px;flex-wrap:wrap;font-size:14px}
+main{padding:54px 0 100px}article{max-width:860px;margin:auto}h1{font-size:clamp(38px,6vw,64px);line-height:1.05;letter-spacing:-.06em;margin:0 0 32px}h2{font-size:27px;letter-spacing:-.04em;margin:42px 0 14px;padding-top:12px;border-top:1px solid var(--line)}h3{font-size:19px;margin:28px 0 8px}h4{font-size:16px;margin:22px 0 8px}p,li{color:#c5ceda}ul,ol{padding-left:25px}li{margin:7px 0}img{max-width:100%;height:auto;border-radius:12px}code{padding:2px 6px;border-radius:5px;background:#ffffff12;color:#d7e8e2;font:.9em monospace}pre{overflow:auto;padding:18px;border:1px solid var(--line);border-radius:12px;background:#080c12;color:#d7e8e2;line-height:1.6}pre code{padding:0;background:none}blockquote{margin:24px 0;padding:12px 18px;border-left:3px solid var(--mint);background:#8be0c40d;color:var(--muted)}table{width:100%;border-collapse:collapse;display:block;overflow-x:auto;margin:22px 0}th,td{padding:10px 13px;border:1px solid var(--line);text-align:left}th{background:var(--surface);color:var(--text)}td{color:#c5ceda}hr{border:0;border-top:1px solid var(--line);margin:32px 0}.page-foot{margin-top:54px;padding-top:22px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+@media(max-width:650px){.nav{padding:12px 0}.nav-links{gap:12px}main{padding-top:36px}}
+</style>
+</head>
+<body>
+<header class="topbar"><div class="wrap nav"><a class="brand" href="index.html"><img src="logo.svg" alt="">FRITZ!Power Monitor</a><nav class="nav-links" aria-label="Main navigation"><a href="index.html">Overview</a><a href="guide.html">User guide</a><a href="readme.html">README</a><a href="security.html">Security</a></nav></div></header>
+<main class="wrap"><article><h1>Security Policy</h1>
+<h2 id="supported-versions">Supported versions<a class="headerlink" href="#supported-versions" title="Permanent link">&para;</a></h2>
+<p>Security fixes are developed for the latest stable release. Please upgrade to the
+latest release before reporting an issue against an older version.</p>
+<table>
+<thead>
+<tr>
+<th>Version</th>
+<th>Security support</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Latest stable release</td>
+<td>Supported</td>
+</tr>
+<tr>
+<td>Older releases and development builds</td>
+<td>Not routinely supported; upgrade first</td>
+</tr>
+</tbody>
+</table>
+<p>The version in the repository may be newer than the latest published release.
+A fix on the default branch is not a published release until a new release is
+made available.</p>
+<h2 id="reporting-a-vulnerability">Reporting a vulnerability<a class="headerlink" href="#reporting-a-vulnerability" title="Permanent link">&para;</a></h2>
+<p><strong>Please do not report security vulnerabilities in public GitHub issues,
+discussions, pull requests, or reviews.</strong> A public report can expose users before
+they have had an opportunity to install a fix.</p>
+<p>Use GitHub's private vulnerability reporting for this repository:</p>
+<ol>
+<li>Open the repository's <strong>Security</strong> tab.</li>
+<li>Select <strong>Report a vulnerability</strong> and submit a private report.</li>
+<li>If that option is unavailable, contact the maintainer privately through
+   their GitHub profile and ask for a secure channel. Do not include exploit
+   details or secrets in a public issue.</li>
+</ol>
+<p>Please include as much of the following information as you can safely provide:</p>
+<ul>
+<li>A clear description of the vulnerability and its potential impact.</li>
+<li>The affected release, commit, operating system and COSMIC version.</li>
+<li>The FRITZ!Box model and FRITZ!OS version, where relevant.</li>
+<li>Reproduction steps or a minimal proof of concept.</li>
+<li>Any relevant logs with passwords, API keys, tokens, public IP addresses and
+  other private information removed.</li>
+</ul>
+<p>Do not attach an actual FRITZ!Box configuration file, credentials, API keys,
+private certificates or other secrets.</p>
+<h2 id="what-to-expect">What to expect<a class="headerlink" href="#what-to-expect" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The maintainer aims to acknowledge a private report within <strong>7 calendar days</strong>.</li>
+<li>The maintainer aims to provide an initial assessment within <strong>14 calendar
+  days</strong> and will share progress when practical.</li>
+<li>These are response targets, not guaranteed resolution deadlines. Complexity,
+  upstream dependencies and maintainer availability can affect the schedule.</li>
+<li>If the report is accepted, the maintainer will work on a fix and coordinate
+  disclosure and a release with the reporter where practical.</li>
+<li>If the issue is declined or considered out of scope, the reporter will be
+  given an explanation where possible.</li>
+</ul>
+<p>Please allow reasonable time for investigation and a fix before disclosing
+details publicly. Coordinated disclosure is appreciated.</p>
+<h2 id="security-considerations">Security considerations<a class="headerlink" href="#security-considerations" title="Permanent link">&para;</a></h2>
+<p>The applet connects directly to a FRITZ!Box to read Smart Home measurements and,
+where supported, control devices. It can also make optional requests to
+OpenWeatherMap and retrieve illustrative weather images.</p>
+<h3 id="fritzbox-credentials">FRITZ!Box credentials<a class="headerlink" href="#fritzbox-credentials" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Use a dedicated FRITZ!Box user with only the permissions the applet needs.</li>
+<li>The applet uses FRITZ!Box challenge-response authentication.</li>
+<li>Connection credentials and an optional OpenWeatherMap API key are stored in
+  <code>~/.config/fritz_solar.cfg</code>.</li>
+<li>The configuration file is intended to be readable only by its owner. This is
+  filesystem permission protection, <strong>not encryption at rest</strong>. Anyone with
+  access to your user account or an appropriately privileged process may be
+  able to read it.</li>
+<li>Protect your account, keep backups of the configuration file private, and
+  revoke or rotate credentials if you suspect they have been exposed.</li>
+</ul>
+<h3 id="https-and-certificates">HTTPS and certificates<a class="headerlink" href="#https-and-certificates" title="Permanent link">&para;</a></h3>
+<ul>
+<li>HTTPS certificate and hostname validation are enabled by default.</li>
+<li>If your router uses a private or self-signed certificate, configure its PEM
+  certificate as a trusted CA and use a hostname covered by the certificate.
+  This adds a trust anchor; it should not require disabling hostname checks.</li>
+<li>The <strong>Allow invalid TLS certificates</strong> compatibility option disables normal
+  certificate verification and makes connections vulnerable to interception.
+  Keep it disabled. Use it only temporarily on a network you trust, if at all.</li>
+</ul>
+<h3 id="network-access-and-optional-integrations">Network access and optional integrations<a class="headerlink" href="#network-access-and-optional-integrations" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The applet needs network access to reach the configured FRITZ!Box.</li>
+<li>Enabling weather integration sends requests to OpenWeatherMap using the
+  configured API key and location. Review that provider's privacy policy and
+  avoid using a sensitive location if you do not want to share it.</li>
+<li>Weather photographs are illustrative remote content, not a live camera feed.</li>
+<li>The Flatpak requests network access for these integrations. Install packages
+  only from trusted sources and verify release checksums when provided.</li>
+</ul>
+<h3 id="local-system-and-logs">Local system and logs<a class="headerlink" href="#local-system-and-logs" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Install the applet from this repository or a release source you trust.</li>
+<li>Keep COSMIC, your operating system and the applet updated.</li>
+<li>Do not share diagnostic logs or bug reports without checking them for
+  credentials, API keys, internal hostnames, IP addresses and other private
+  details.</li>
+<li>The applet is not a substitute for network segmentation, router access
+  controls, or the security controls of your Smart Home devices.</li>
+</ul>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<p>Reports are in scope when they demonstrate a security impact in this project,
+including its authentication or TLS handling, credential storage, device
+control, local data handling, packaging, or release workflow.</p>
+<p>Issues solely in FRITZ!OS, the COSMIC desktop, Linux distributions, or third-party
+services should normally be reported to their respective maintainers. If this
+project introduces a practical way to exploit such an upstream issue, that
+project-specific impact is in scope.</p>
+<p>This project does not currently operate a bug bounty programme.</p>
+<div class="page-foot"><a href="index.html">← Back to project overview</a></div>
+</article></main>
+</body>
+</html>
