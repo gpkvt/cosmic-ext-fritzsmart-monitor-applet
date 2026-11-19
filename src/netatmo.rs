@@ -15,6 +15,8 @@ const MAX_READING_AGE_SECONDS: i64 = 30 * 60;
 pub struct NetatmoSensor {
     pub id: String,
     pub name: String,
+    /// True only for a Netatmo outdoor module (NAModule1).
+    pub is_outdoor: bool,
     pub temperature_c: Option<f64>,
     pub humidity_percent: Option<f64>,
     pub co2_ppm: Option<f64>,
@@ -75,6 +77,7 @@ fn parse_module(module: &Value, fallback_name: &str, now_epoch: i64) -> Option<N
     Some(NetatmoSensor {
         id: id.to_owned(),
         name,
+        is_outdoor: module.get("type").and_then(Value::as_str) == Some("NAModule1"),
         temperature_c: measured("Temperature"),
         humidity_percent: measured("Humidity"),
         co2_ppm: measured("CO2"),
@@ -318,7 +321,7 @@ mod tests {
         let response = json!({"body":{"devices":[{
             "_id":"station-1", "station_name":"Living room",
             "dashboard_data":{"time_utc":1000,"Temperature":21.4,"CO2":850,"Humidity":48,"Pressure":1013},
-            "modules":[{"_id":"outdoor-1","module_name":"Garden","reachable":true,
+            "modules":[{"_id":"outdoor-1","module_name":"Garden","type":"NAModule1","reachable":true,
               "dashboard_data":{"time_utc":1000,"Temperature":8.7,"Humidity":81}},
               {"_id":"wind-1","module_name":"Wind","dashboard_data":{"time_utc":1000,"WindStrength":22}}]
         }]}});
@@ -326,6 +329,9 @@ mod tests {
         assert_eq!(sensors.len(), 3);
         assert_eq!(sensors[0].temperature_c, Some(21.4));
         assert_eq!(sensors[0].co2_ppm, Some(850.0));
+        assert!(sensors[1].is_outdoor);
+        assert!(!sensors[0].is_outdoor);
+        assert!(!sensors[2].is_outdoor);
         assert_eq!(sensors[1].humidity_percent, Some(81.0));
         assert_eq!(sensors[2].wind_kmh, Some(22.0));
         assert_eq!(sensors[2].temperature_c, None);
@@ -364,6 +370,7 @@ mod tests {
         let mut sensor = NetatmoSensor {
             id: "70:ee:50:11:22:33".into(),
             name: "Indoor".into(),
+            is_outdoor: false,
             temperature_c: Some(22.0),
             humidity_percent: Some(45.0),
             co2_ppm: Some(900.0),
