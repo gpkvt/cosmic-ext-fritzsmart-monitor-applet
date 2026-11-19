@@ -256,7 +256,7 @@ async fn query_status(
     } else {
         username
     };
-    let response = client
+    let mut response = client
         .get(format!("http://{address}/cm"))
         .query(&[
             ("user", username),
@@ -286,7 +286,6 @@ async fn query_status(
     {
         return Err(format!("Tasmota at {address} returned an oversized status response"));
     }
-    let mut response = response;
     let mut bytes = Vec::new();
     while let Some(chunk) = response.chunk().await.map_err(|error| {
         format!(
