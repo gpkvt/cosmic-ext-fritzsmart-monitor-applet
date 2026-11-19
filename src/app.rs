@@ -6689,7 +6689,9 @@ impl cosmic::Application for AppModel {
                 });
                 for (index, reading) in ordered_readings.iter().enumerate() {
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                    let is_expanded = self.expanded_devices.contains(&device_key.to_ascii_uppercase());
+                    let is_expanded = self
+                        .expanded_devices
+                        .contains(&device_key.to_ascii_uppercase());
                     let device_corner_radius = device_corner_radius(index, ordered_readings.len());
                     let device_history = self.device_history.get(&device_key);
                     let power_toggle: cosmic::Element<'_, Message> = {
@@ -7111,7 +7113,9 @@ impl cosmic::Application for AppModel {
                 });
                 for device in missing_devices {
                     let device_key = crate::fritz::normalize_ain_for_selection(&device.ain);
-                    let is_expanded = self.expanded_devices.contains(&device_key.to_ascii_uppercase());
+                    let is_expanded = self
+                        .expanded_devices
+                        .contains(&device_key.to_ascii_uppercase());
                     let device_row = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
                         .list_item_padding([0, 0])
@@ -9447,7 +9451,8 @@ impl cosmic::Application for AppModel {
                     .retain(|id| crate::fritz::normalize_ain_for_selection(id) != normalized);
                 self.settings.input_ains.remove(&normalized);
                 self.settings.temperature_alerts.remove(&normalized);
-                self.expanded_devices.remove(&normalized.to_ascii_uppercase());
+                self.expanded_devices
+                    .remove(&normalized.to_ascii_uppercase());
                 self.settings
                     .expanded_devices
                     .retain(|id| !id.eq_ignore_ascii_case(&normalized));
