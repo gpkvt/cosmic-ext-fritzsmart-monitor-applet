@@ -259,12 +259,7 @@ fn light_level_to_lux(raw: f64) -> Option<f64> {
     lux.is_finite().then_some(lux)
 }
 
-fn valid_sensor_feature(
-    resource: &Value,
-    feature: &str,
-    valid: &str,
-    report_path: &str,
-) -> bool {
+fn valid_sensor_feature(resource: &Value, feature: &str, valid: &str, report_path: &str) -> bool {
     resource.get("enabled").and_then(Value::as_bool) != Some(false)
         // New CLIP v2 report data supersedes the deprecated validity flag.
         && (resource.pointer(report_path).is_some()
@@ -329,14 +324,20 @@ fn parse_sensors(
                 continue;
             };
             let reachable = connectivity.get(owner).copied().unwrap_or(true);
-            let item = sensors.entry(owner.to_string()).or_insert_with(|| HueSensor {
-                id: owner.to_string(),
-                name: names.get(owner).copied().unwrap_or("Hue sensor").to_string(),
-                temperature_c: None,
-                illuminance_lux: None,
-                motion: None,
-                reachable,
-            });
+            let item = sensors
+                .entry(owner.to_string())
+                .or_insert_with(|| HueSensor {
+                    id: owner.to_string(),
+                    name: names
+                        .get(owner)
+                        .copied()
+                        .unwrap_or("Hue sensor")
+                        .to_string(),
+                    temperature_c: None,
+                    illuminance_lux: None,
+                    motion: None,
+                    reachable,
+                });
             item.reachable &= reachable;
             if !item.reachable {
                 // If Zigbee connectivity is down, any previously parsed feature
@@ -347,21 +348,42 @@ fn parse_sensors(
                 continue;
             }
             match kind {
-                "temperature" if valid_sensor_feature(resource, "temperature", "temperature_valid", "/temperature/temperature_report/temperature") => {
+                "temperature"
+                    if valid_sensor_feature(
+                        resource,
+                        "temperature",
+                        "temperature_valid",
+                        "/temperature/temperature_report/temperature",
+                    ) =>
+                {
                     item.temperature_c = resource
                         .pointer("/temperature/temperature_report/temperature")
                         .or_else(|| resource.pointer("/temperature/temperature"))
                         .and_then(Value::as_f64)
                         .filter(|value| value.is_finite());
                 }
-                "light_level" if valid_sensor_feature(resource, "light", "light_level_valid", "/light/light_level_report/light_level") => {
+                "light_level"
+                    if valid_sensor_feature(
+                        resource,
+                        "light",
+                        "light_level_valid",
+                        "/light/light_level_report/light_level",
+                    ) =>
+                {
                     item.illuminance_lux = resource
                         .pointer("/light/light_level_report/light_level")
                         .or_else(|| resource.pointer("/light/light_level"))
                         .and_then(Value::as_f64)
                         .and_then(light_level_to_lux);
                 }
-                "motion" if valid_sensor_feature(resource, "motion", "motion_valid", "/motion/motion_report/motion") => {
+                "motion"
+                    if valid_sensor_feature(
+                        resource,
+                        "motion",
+                        "motion_valid",
+                        "/motion/motion_report/motion",
+                    ) =>
+                {
                     item.motion = resource
                         .pointer("/motion/motion_report/motion")
                         .or_else(|| resource.pointer("/motion/motion"))
@@ -523,9 +545,8 @@ pub async fn fetch_snapshot(address: String, key: String) -> Result<HueSnapshot,
     Ok(HueSnapshot {
         lights,
         sensors,
-        sensor_warning: (!warnings.is_empty()).then(|| {
-            format!("Hue sensor readings unavailable: {}", warnings.join(", "))
-        }),
+        sensor_warning: (!warnings.is_empty())
+            .then(|| format!("Hue sensor readings unavailable: {}", warnings.join(", "))),
     })
 }
 

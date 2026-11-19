@@ -8000,8 +8000,7 @@ impl cosmic::Application for AppModel {
                     }
                     if !self.hue_lights.is_empty() {
                         hue_section = hue_section.push(
-                            widget::container(widget::text::caption("LIGHTS"))
-                                .padding([6, 12]),
+                            widget::container(widget::text::caption("LIGHTS")).padding([6, 12]),
                         );
                     }
                     for light in &self.hue_lights {
@@ -8049,8 +8048,12 @@ impl cosmic::Application for AppModel {
                     if !self.hue_sensors.is_empty() {
                         hue_section = hue_section
                             .push(widget::divider::horizontal::default())
-                            .push(widget::container(widget::text::caption("MOTION & ENVIRONMENT SENSORS"))
-                                .padding([8, 12]));
+                            .push(
+                                widget::container(widget::text::caption(
+                                    "MOTION & ENVIRONMENT SENSORS",
+                                ))
+                                .padding([8, 12]),
+                            );
                     }
                     for sensor in &self.hue_sensors {
                         let temperature = sensor
@@ -8101,9 +8104,11 @@ impl cosmic::Application for AppModel {
                                             .width(cosmic::iced::Length::Fixed(90.0))
                                             .align_x(cosmic::iced::Alignment::End),
                                     )
-                                    .push(widget::text::caption(motion)
-                                        .width(cosmic::iced::Length::Fixed(74.0))
-                                        .align_x(cosmic::iced::Alignment::End))
+                                    .push(
+                                        widget::text::caption(motion)
+                                            .width(cosmic::iced::Length::Fixed(74.0))
+                                            .align_x(cosmic::iced::Alignment::End),
+                                    )
                                     .push(copy_menu_title_button(
                                         sensor.name.clone(),
                                         self.copy_feedback.as_ref(),
@@ -9945,8 +9950,9 @@ impl cosmic::Application for AppModel {
                         self.hue_loading = true;
                         self.hue_next_refresh_at = None;
                         self.hue_error = None;
-                        self.hue_discovery_note =
-                            Some("Hue Bridge paired successfully. Loading lights and sensors…".into());
+                        self.hue_discovery_note = Some(
+                            "Hue Bridge paired successfully. Loading lights and sensors…".into(),
+                        );
                         return Task::perform(
                             crate::hue::fetch_snapshot(
                                 self.settings.hue_bridge_ip.clone(),
