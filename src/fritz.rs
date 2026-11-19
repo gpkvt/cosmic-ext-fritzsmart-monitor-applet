@@ -818,7 +818,11 @@ impl FritzSettings {
                 "temperature" => "temperature",
                 _ => "saved",
             },
-            if self.device_sort_descending { "true" } else { "false" },
+            if self.device_sort_descending {
+                "true"
+            } else {
+                "false"
+            },
             collapsed_menu_sections,
             if self.daily_energy_history_default_applied {
                 "true"
@@ -2059,9 +2063,9 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
                     }));
                 result.missing_devices.extend(errors);
                 if result.missing_devices.iter().any(|(ain, _)| {
-                    selected_tasmota
-                        .iter()
-                        .any(|selected| normalize_ain_for_selection(selected) == normalize_ain_for_selection(ain))
+                    selected_tasmota.iter().any(|selected| {
+                        normalize_ain_for_selection(selected) == normalize_ain_for_selection(ain)
+                    })
                 }) {
                     // Refresh mDNS addresses for the next minute's retry, while
                     // retaining cached identities for currently unreachable plugs.

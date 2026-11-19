@@ -522,8 +522,7 @@ fn recovered_device_names(
     readings
         .iter()
         .filter(|reading| {
-            previously_missing
-                .contains(&crate::fritz::canonical_device_key(&reading.ain))
+            previously_missing.contains(&crate::fritz::canonical_device_key(&reading.ain))
         })
         .map(|reading| reading.name.clone())
         .collect()
@@ -547,7 +546,11 @@ fn notify_recovered_devices(names: &[String], language: &str) {
 /// Recheck inactive devices at least every minute, independent of the normal refresh setting.
 fn refresh_interval_with_inactive_devices(configured_seconds: u32, has_inactive: bool) -> u64 {
     let seconds = u64::from(configured_seconds.clamp(30, 3600));
-    if has_inactive { seconds.min(60) } else { seconds }
+    if has_inactive {
+        seconds.min(60)
+    } else {
+        seconds
+    }
 }
 
 fn notify_temperature_alert(
@@ -1199,10 +1202,7 @@ fn menu_power_flow_summary(
 }
 
 /// Two rows by three columns for the overview's daily energy figures.
-fn daily_power_metric(
-    label: &'static str,
-    value: String,
-) -> cosmic::Element<'static, Message> {
+fn daily_power_metric(label: &'static str, value: String) -> cosmic::Element<'static, Message> {
     widget::container(
         widget::Column::new()
             .spacing(5)
@@ -1235,8 +1235,14 @@ fn daily_power_metrics_grid(
     let today = widget::Row::new()
         .spacing(10)
         .width(cosmic::iced::Length::Fill)
-        .push(daily_power_metric("TODAY INPUT", energy_display(today_input_wh)))
-        .push(daily_power_metric("TODAY OUTPUT", energy_display(today_output_wh)))
+        .push(daily_power_metric(
+            "TODAY INPUT",
+            energy_display(today_input_wh),
+        ))
+        .push(daily_power_metric(
+            "TODAY OUTPUT",
+            energy_display(today_output_wh),
+        ))
         .push(daily_power_metric(
             "TODAY IN / OUT",
             percent_display(today_input_wh, today_output_wh),
@@ -1244,8 +1250,14 @@ fn daily_power_metrics_grid(
     let yesterday = widget::Row::new()
         .spacing(10)
         .width(cosmic::iced::Length::Fill)
-        .push(daily_power_metric("Y'DAY INPUT", energy_display(yesterday_input_wh)))
-        .push(daily_power_metric("Y'DAY OUTPUT", energy_display(yesterday_output_wh)))
+        .push(daily_power_metric(
+            "Y'DAY INPUT",
+            energy_display(yesterday_input_wh),
+        ))
+        .push(daily_power_metric(
+            "Y'DAY OUTPUT",
+            energy_display(yesterday_output_wh),
+        ))
         .push(daily_power_metric(
             "Y'DAY IN / OUT",
             percent_display(yesterday_input_wh, yesterday_output_wh),
@@ -2867,19 +2879,17 @@ fn device_sort_button(
         ""
     };
     widget::button::custom(
-        widget::text::caption(format!("{label}{indicator}")).align_x(
-            if column == "name" {
-                cosmic::iced::Alignment::Start
-            } else {
-                cosmic::iced::Alignment::End
-            },
-        ),
+        widget::text::caption(format!("{label}{indicator}")).align_x(if column == "name" {
+            cosmic::iced::Alignment::Start
+        } else {
+            cosmic::iced::Alignment::End
+        }),
     )
-        .on_press(Message::SortDeviceList(column))
-        .width(width)
-        .padding([4, 2])
-        .class(cosmic::theme::Button::Text)
-        .into()
+    .on_press(Message::SortDeviceList(column))
+    .width(width)
+    .padding([4, 2])
+    .class(cosmic::theme::Button::Text)
+    .into()
 }
 
 fn device_sort_header(
@@ -2909,7 +2919,11 @@ fn device_sort_header(
             cosmic::iced::Length::Fixed(76.0),
         ))
         .push(device_sort_button(
-            if temperature_unit == "F" { "°F" } else { "°C" },
+            if temperature_unit == "F" {
+                "°F"
+            } else {
+                "°C"
+            },
             "temperature",
             current_column,
             descending,
@@ -6992,7 +7006,8 @@ impl cosmic::Application for AppModel {
                         device_title = device_title.push(widget::text::caption(format!(
                             "{} {}",
                             crate::i18n::tr(&self.settings.language, "LAST"),
-                            format_graph_timespan(self.settings.graph_timespan_minutes).to_uppercase()
+                            format_graph_timespan(self.settings.graph_timespan_minutes)
+                                .to_uppercase()
                         )));
                     }
                     let device_heading_button = widget::button::custom(
@@ -7348,8 +7363,9 @@ impl cosmic::Application for AppModel {
                         std::cmp::Ordering::Equal
                     };
                     comparison.then_with(|| {
-                        device_order_position(&self.settings.device_order, &left.ain)
-                            .cmp(&device_order_position(&self.settings.device_order, &right.ain))
+                        device_order_position(&self.settings.device_order, &left.ain).cmp(
+                            &device_order_position(&self.settings.device_order, &right.ain),
+                        )
                     })
                 });
                 for device in missing_devices {
@@ -7426,10 +7442,7 @@ impl cosmic::Application for AppModel {
                                 ..Default::default()
                             }
                         });
-                    menu_cards.push((
-                        format!("2-inactive-{device_key}"),
-                        device_card.into(),
-                    ));
+                    menu_cards.push((format!("2-inactive-{device_key}"), device_card.into()));
                 }
 
                 if let Some(power_sections) = total_power_overview(
@@ -7576,13 +7589,21 @@ impl cosmic::Application for AppModel {
                                             .spacing(8)
                                             .padding([8, 12])
                                             .width(cosmic::iced::Length::Fill)
-                                            .push(widget::icon::from_name("dialog-warning-symbolic").size(16))
+                                            .push(
+                                                widget::icon::from_name("dialog-warning-symbolic")
+                                                    .size(16),
+                                            )
                                             .push(widget::text::caption(crate::i18n::tr(
                                                 &self.settings.language,
                                                 "INACTIVE DEVICES",
                                             )))
-                                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                            .push(widget::text::caption(inactive_count.to_string())),
+                                            .push(
+                                                widget::Space::new()
+                                                    .width(cosmic::iced::Length::Fill),
+                                            )
+                                            .push(widget::text::caption(
+                                                inactive_count.to_string(),
+                                            )),
                                     );
                                 inactive_section_started = true;
                             }
@@ -8513,10 +8534,8 @@ impl cosmic::Application for AppModel {
                 match *result {
                     Ok(result) => {
                         let previously_missing = self.missing_device_ains.clone();
-                        let recovered = recovered_device_names(
-                            &previously_missing,
-                            &result.readings,
-                        );
+                        let recovered =
+                            recovered_device_names(&previously_missing, &result.readings);
                         let newly_missing = newly_missing_devices(
                             &mut self.missing_device_ains,
                             &result.missing_devices,
@@ -9754,7 +9773,8 @@ impl cosmic::Application for AppModel {
             }
             Message::RemoveDevice(ain) => {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
-                self.missing_device_ains.remove(&crate::fritz::canonical_device_key(&ain));
+                self.missing_device_ains
+                    .remove(&crate::fritz::canonical_device_key(&ain));
                 self.devices.retain(|device| {
                     crate::fritz::normalize_ain_for_selection(&device.ain) != normalized
                 });
@@ -11179,7 +11199,10 @@ mod device_list_sort_tests {
     }
 
     fn ids<'a>(readings: &[&'a FritzReading]) -> Vec<&'a str> {
-        readings.iter().map(|reading| reading.ain.as_str()).collect()
+        readings
+            .iter()
+            .map(|reading| reading.ain.as_str())
+            .collect()
     }
 
     #[test]
@@ -11234,7 +11257,12 @@ mod device_list_sort_tests {
             reading("C", "Warm", 10, 23.0),
         ];
         assert_eq!(
-            ids(&sorted_device_readings(&readings, &[], "temperature", false)),
+            ids(&sorted_device_readings(
+                &readings,
+                &[],
+                "temperature",
+                false
+            )),
             vec!["A", "C", "B"]
         );
         assert_eq!(
@@ -11274,9 +11302,7 @@ mod disclosure_state_tests {
             super::newly_missing_devices(&mut previous, &missing, &HashSet::new()),
             vec!["Desk plug".to_string()]
         );
-        assert!(
-            super::newly_missing_devices(&mut previous, &missing, &HashSet::new()).is_empty()
-        );
+        assert!(super::newly_missing_devices(&mut previous, &missing, &HashSet::new()).is_empty());
         let recovered = vec![super::FritzReading {
             ain: "TASMOTA:AABB".into(),
             name: "Desk plug".into(),
@@ -11290,20 +11316,21 @@ mod disclosure_state_tests {
             super::recovered_device_names(&previous, &recovered),
             vec!["Desk plug".to_string()]
         );
-        assert!(super::newly_missing_devices(
-            &mut previous,
-            &[],
-            &HashSet::new()
-        )
-        .is_empty());
+        assert!(super::newly_missing_devices(&mut previous, &[], &HashSet::new()).is_empty());
         assert!(super::recovered_device_names(&previous, &recovered).is_empty());
     }
 
     #[test]
     fn inactive_devices_are_polled_at_least_once_per_minute() {
-        assert_eq!(super::refresh_interval_with_inactive_devices(3600, true), 60);
+        assert_eq!(
+            super::refresh_interval_with_inactive_devices(3600, true),
+            60
+        );
         assert_eq!(super::refresh_interval_with_inactive_devices(30, true), 30);
-        assert_eq!(super::refresh_interval_with_inactive_devices(300, false), 300);
+        assert_eq!(
+            super::refresh_interval_with_inactive_devices(300, false),
+            300
+        );
     }
 
     #[test]
