@@ -974,6 +974,7 @@ fn yesterday_and_today_energy_wh_for_ains(
 
 fn menu_energy_summary(
     power_samples: impl Iterator<Item = f64>,
+    current_power_w: Option<f64>,
     yesterday_wh: Option<f64>,
     today_wh: Option<f64>,
 ) -> cosmic::Element<'static, Message> {
@@ -1013,24 +1014,26 @@ fn menu_energy_summary(
     )
     .width(cosmic::iced::Length::Fill)
     .into();
-    let energy_column = |label: &'static str, value: Option<f64>| {
-        let energy = value
-            .map(|value| format!("{value:.0} Wh"))
-            .unwrap_or_else(|| "— Wh".to_string());
+    let value_column = |label: &'static str, value: Option<f64>, unit: &'static str| {
+        let display = value
+            .filter(|value| value.is_finite())
+            .map(|value| format!("{value:.0} {unit}"))
+            .unwrap_or_else(|| format!("— {unit}"));
         widget::Column::new()
             .spacing(2)
             .align_x(cosmic::iced::Alignment::End)
-            .width(cosmic::iced::Length::Fixed(104.0))
+            .width(cosmic::iced::Length::Fixed(92.0))
             .push(widget::text::caption(label))
-            .push(widget::text::title3(keep_value_unit_together(energy)))
+            .push(widget::text::title3(keep_value_unit_together(display)))
     };
     widget::Row::new()
-        .spacing(12)
+        .spacing(10)
         .align_y(cosmic::iced::Alignment::Center)
         .width(cosmic::iced::Length::Fill)
         .push(graph)
-        .push(energy_column("YESTERDAY", yesterday_wh))
-        .push(energy_column("TODAY", today_wh))
+        .push(value_column("CURRENT", current_power_w, "W"))
+        .push(value_column("YESTERDAY", yesterday_wh, "Wh"))
+        .push(value_column("TODAY", today_wh, "Wh"))
         .into()
 }
 
@@ -2410,6 +2413,7 @@ fn total_power_overview(
     );
     let output_summary = menu_energy_summary(
         history.iter().map(|(_, value)| *value as f64),
+        Some(total_power as f64),
         output_yesterday_wh,
         output_today_wh,
     );
@@ -2505,6 +2509,7 @@ fn total_power_overview(
             input_history
                 .iter()
                 .map(|(_, value)| input_display_power_w(*value) as f64),
+            Some(input_power as f64),
             input_yesterday_wh,
             input_today_wh,
         );
@@ -6794,6 +6799,9 @@ impl cosmic::Application for AppModel {
                         device_history
                             .into_iter()
                             .flat_map(|samples| samples.iter().map(|(_, power, _)| *power as f64)),
+                        device_history
+                            .back()
+                            .map(|(_, power, _)| *power as f64),
                         device_yesterday_wh,
                         device_today_wh,
                     );
