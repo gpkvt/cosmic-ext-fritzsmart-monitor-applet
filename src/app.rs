@@ -4230,10 +4230,7 @@ impl cosmic::Application for AppModel {
                                     panel_item_label(id),
                                 ))
                                 .width(cosmic::iced::Length::Fill),
-                            )
-                            .push(widget::toggler(visible).on_toggle(move |value| {
-                                Message::TogglePanelItemVisibility(id, value)
-                            }));
+                            );
                     let show_order_controls = !self.settings.panel_multiline
                         || panel_order_group_leader(&visible_panel_order_ids, id, true);
                     if show_order_controls {
@@ -4264,6 +4261,9 @@ impl cosmic::Application for AppModel {
                             ));
                         }
                     }
+                    row = row.push(widget::toggler(visible).on_toggle(move |value| {
+                        Message::TogglePanelItemVisibility(id, value)
+                    }));
                     content = content.push(row);
 
                     // Keep options directly beneath the panel item they affect.
@@ -4576,10 +4576,7 @@ impl cosmic::Application for AppModel {
                     let mut row = widget::Row::new().width(cosmic::iced::Length::Fill)
                         .spacing(8)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::body(label).width(cosmic::iced::Length::Fill))
-                        .push(widget::toggler(visible).on_toggle(move |value| {
-                            Message::ToggleMenuElementVisibility(id, value)
-                        }));
+                        .push(widget::text::body(label).width(cosmic::iced::Length::Fill));
                     row = row.push(icon_action_button(
                         "+",
                         crate::i18n::tr(&self.settings.language, "Move up"),
@@ -4590,6 +4587,9 @@ impl cosmic::Application for AppModel {
                         crate::i18n::tr(&self.settings.language, "Move down"),
                         Message::MoveMenuElement(id, false),
                     ));
+                    row = row.push(widget::toggler(visible).on_toggle(move |value| {
+                        Message::ToggleMenuElementVisibility(id, value)
+                    }));
                     content = content.push(row);
                     if index + 1 < self.settings.menu_order.len() {
                         content = content.push(widget::divider::horizontal::default());
