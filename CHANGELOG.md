@@ -1,5 +1,7 @@
 # Changelog
 
+- Hide redundant dividers between device rows when the Devices section is collapsed, retaining separators around the section and all row dividers when expanded.
+
 - Align the collapsed Total Power Input & Output heading with other popup sections, using the same title, summary, disclosure icon, padding and copy-button placement.
 - Remove the Custom sort button from Devices while keeping existing saved device order available through Settings. Reorder device rows as name/disclosure, W, temperature, History, Copy and Toggle; keep inactive devices in the same aligned columns.
 
