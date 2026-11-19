@@ -4030,6 +4030,7 @@ impl cosmic::Application for AppModel {
         let history_window = graph_history_window(settings.graph_timespan_minutes);
         let history_storage_window = graph_history_storage_window(settings.graph_timespan_minutes);
         let (mut history, device_history) = crate::history::load(history_storage_window);
+        let hue_sensor_history = crate::history::load_hue_sensors(history_storage_window);
         history
             .retain(|(timestamp, _)| Instant::now().duration_since(*timestamp) <= history_window);
         let history_storage_diagnostics = crate::history::diagnostics(history_storage_window);
@@ -4112,6 +4113,7 @@ impl cosmic::Application for AppModel {
                 },
                 history,
                 device_history,
+                hue_sensor_history,
                 history_storage_diagnostics,
                 collapsed_menu_sections,
                 expanded_devices,
@@ -10103,6 +10105,7 @@ impl cosmic::Application for AppModel {
                     let storage_window =
                         graph_history_storage_window(self.settings.graph_timespan_minutes);
                     (self.history, self.device_history) = crate::history::load(storage_window);
+                    self.hue_sensor_history = crate::history::load_hue_sensors(storage_window);
                     let window = graph_history_window(self.settings.graph_timespan_minutes);
                     let now = Instant::now();
                     self.history
@@ -10648,6 +10651,51 @@ impl cosmic::Application for AppModel {
                 self.hue_next_refresh_at = Some(Instant::now() + Duration::from_secs(60));
                 match result {
                     Ok(snapshot) => {
+                        let now = Instant::now();
+                        let window =
+                            graph_history_storage_window(self.settings.graph_timespan_minutes);
+                        for sensor in &snapshot.sensors {
+                            record_hue_sensor_sample(
+                                &mut self.hue_sensor_history,
+                                sensor,
+                                now,
+                                window,
+                            );
+                            let key = crate::fritz::normalize_ain_for_selection(
+                                &hue_device_id("sensor", &sensor.id),
+                            );
+                            if let Some(thresholds) =
+                                self.settings.temperature_alerts.get(&key).copied()
+                            {
+                                // Offline or invalid readings must not fire alerts
+                                // or establish a fake temperature baseline.
+                                if let Some(temperature) = sensor.temperature_c
+                                    .filter(|value| sensor.reachable && value.is_finite())
+                                {
+                                    let outside = temperature_outside_limits(temperature, thresholds);
+                                    if should_notify_temperature_alert(
+                                        self.temperature_alert_state.get(&key).copied(),
+                                        outside,
+                                    ) {
+                                        notify_temperature_alert(
+                                            &sensor.name,
+                                            temperature,
+                                            thresholds,
+                                            &self.settings.language,
+                                            &self.settings.temperature_unit,
+                                        );
+                                    }
+                                    self.temperature_alert_state.insert(key, outside);
+                                }
+                            } else {
+                                self.temperature_alert_state.remove(&key);
+                            }
+                        }
+                        if let Err(error) =
+                            crate::history::save_hue_sensors(&self.hue_sensor_history)
+                        {
+                            eprintln!("Could not persist Hue sensor history: {error}");
+                        }
                         self.hue_lights = snapshot.lights;
                         self.hue_sensors = snapshot.sensors;
                         self.hue_sensor_warning = snapshot.sensor_warning;
@@ -10763,6 +10811,7 @@ impl cosmic::Application for AppModel {
                 let storage_window =
                     graph_history_storage_window(self.settings.graph_timespan_minutes);
                 (self.history, self.device_history) = crate::history::load(storage_window);
+                self.hue_sensor_history = crate::history::load_hue_sensors(storage_window);
                 let window = graph_history_window(self.settings.graph_timespan_minutes);
                 let now = Instant::now();
                 self.history
@@ -11159,20 +11208,14 @@ impl cosmic::Application for AppModel {
             }
             Message::TemperatureAlertHighChanged(ain, high_c) => {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
-                self.settings
-                    .temperature_alerts
-                    .entry(key)
-                    .or_default()
-                    .high_c = high_c.clamp(0, 40);
+                let thresholds = self.settings.temperature_alerts.entry(key).or_default();
+                thresholds.high_c = high_c.clamp(0, 40).max(thresholds.low_c + 1);
                 self.persist_settings();
             }
             Message::TemperatureAlertLowChanged(ain, low_c) => {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
-                self.settings
-                    .temperature_alerts
-                    .entry(key)
-                    .or_default()
-                    .low_c = low_c.clamp(-10, 10);
+                let thresholds = self.settings.temperature_alerts.entry(key).or_default();
+                thresholds.low_c = low_c.clamp(-10, 30).min(thresholds.high_c - 1);
                 self.persist_settings();
             }
             Message::TogglePopup => {
