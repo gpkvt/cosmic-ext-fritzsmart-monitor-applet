@@ -3,6 +3,7 @@
 ### Changed
 
 - Unify device identity handling for menu ordering and expanded/collapsed state, including Tasmota and differently formatted AINs; keep device and graph state clean on removal.
+- Remove obsolete tests referencing deleted power-energy helpers; existing graph energy tests cover integration and single-sample behavior.
 - Document current unified input/output history, 7-day energy estimates and persisted layout settings across README and website guide. Add regression coverage for ordering and disclosure toggles.
 
 - Preserve collapsible states across restarts, including Devices and diagnostics JSON; reliably restore device cards with mixed-case IDs. Existing menu and device ordering remains saved.
