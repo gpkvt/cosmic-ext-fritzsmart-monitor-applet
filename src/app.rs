@@ -1309,6 +1309,14 @@ fn weather_detail_metric(
         .into()
 }
 
+/// Input energy as a percentage of measured output energy; absent samples or
+/// zero output must not be presented as 0%.
+fn format_daily_energy_percentage(input_wh: Option<f64>, output_wh: Option<f64>) -> String {
+    energy_input_output_ratio_percent(input_wh, output_wh)
+        .map(|ratio| format!("{ratio:.1}%"))
+        .unwrap_or_else(|| "—".to_string())
+}
+
 fn daily_energy_history_section(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     input_ains: &HashSet<String>,
@@ -1317,20 +1325,29 @@ fn daily_energy_history_section(
     copy_feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
     let history = daily_energy_history(device_history, input_ains, refresh_interval_seconds);
+    // The last entry always represents today, including a missing-data day.
+    let today_percentage = history
+        .last()
+        .map(|(_, input, output)| format_daily_energy_percentage(*input, *output))
+        .unwrap_or_else(|| "—".to_string());
+    let mut heading_content = widget::Row::new()
+        .spacing(8)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(widget::text::body("DAILY ENERGY · LAST 7 DAYS"))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill));
+    if collapsed {
+        heading_content = heading_content
+            .push(widget::text::body(format!("Today · {today_percentage}")));
+    }
     let heading = widget::button::custom(
-        widget::Row::new()
-            .spacing(8)
-            .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::text::body("DAILY ENERGY · LAST 7 DAYS"))
-            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-            .push(
-                widget::icon::from_name(if collapsed {
-                    "go-next-symbolic"
-                } else {
-                    "go-down-symbolic"
-                })
-                .size(16),
-            ),
+        heading_content.push(
+            widget::icon::from_name(if collapsed {
+                "go-next-symbolic"
+            } else {
+                "go-down-symbolic"
+            })
+            .size(16),
+        ),
     )
     .on_press(Message::ToggleMenuSection("daily-energy-history".into()))
     .width(cosmic::iced::Length::Fill)
@@ -1357,7 +1374,12 @@ fn daily_energy_history_section(
             .padding([4, 12])
             .push(widget::text::caption("DAY").width(cosmic::iced::Length::Fill))
             .push(widget::text::caption("SOLAR INPUT").width(value_width))
-            .push(widget::text::caption("GRID USE").width(value_width));
+            .push(widget::text::caption("GRID USE").width(value_width))
+            .push(
+                widget::text::caption("IN / OUT %")
+                    .width(cosmic::iced::Length::Fixed(96.0))
+                    .align_x(cosmic::iced::Alignment::End),
+            );
         let mut rows = widget::Column::new()
             .spacing(2)
             .push(header)
@@ -1380,7 +1402,12 @@ fn daily_energy_history_section(
                     .padding([3, 12])
                     .push(widget::text::body(date_label).width(cosmic::iced::Length::Fill))
                     .push(widget::text::body(format_wh(solar_wh)).width(value_width))
-                    .push(widget::text::body(format_wh(grid_wh)).width(value_width)),
+                    .push(widget::text::body(format_wh(grid_wh)).width(value_width))
+                    .push(
+                        widget::text::body(format_daily_energy_percentage(solar_wh, grid_wh))
+                            .width(cosmic::iced::Length::Fixed(96.0))
+                            .align_x(cosmic::iced::Alignment::End),
+                    ),
             );
         }
         section = section.push(rows);
@@ -12727,6 +12754,16 @@ mod daily_energy_history_tests {
         assert_eq!(*date, chrono::Local::now().date_naive());
         assert!((solar_wh.unwrap() - 1000.0 / 60.0).abs() < 0.01);
         assert!((grid_wh.unwrap() - 300.0 / 60.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn daily_energy_percentages_match_overview_and_preserve_unavailable_values() {
+        assert_eq!(format_daily_energy_percentage(Some(250.0), Some(500.0)), "50.0%");
+        assert_eq!(format_daily_energy_percentage(Some(750.0), Some(500.0)), "150.0%");
+        assert_eq!(format_daily_energy_percentage(Some(0.0), Some(200.0)), "0.0%");
+        assert_eq!(format_daily_energy_percentage(None, Some(200.0)), "—");
+        assert_eq!(format_daily_energy_percentage(Some(100.0), None), "—");
+        assert_eq!(format_daily_energy_percentage(Some(100.0), Some(0.0)), "—");
     }
 
     #[test]
