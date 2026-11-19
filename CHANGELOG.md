@@ -1,5 +1,7 @@
 # Changelog
 
+- Show per-day solar input/grid use percentages in Daily Energy · Last 7 Days, and display today's percentage in its collapsed heading; missing/zero-denominator ratios remain unavailable, never silently 0%.
+
 - Restore native Wayland outside-click dismissal for the applet menu and remove hover-triggered panel tooltip popup surfaces; the panel entry opens/closes only on clicks, and explicit menu Close buttons remain available.
 
 - Add Hue sensor-specific temperature and illuminance history graphs to expanded device cards, with separate persisted sample history, configurable time range, units and independent collapse state. Do not fabricate measurements when the bridge or sensor is unavailable.
