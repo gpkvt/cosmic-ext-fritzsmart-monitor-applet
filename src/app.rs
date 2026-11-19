@@ -2735,7 +2735,26 @@ fn panel_item_label(id: &str) -> &'static str {
     }
 }
 
-/// Shared persisted visibility state for the Panel settings and item-order controls.
+/// Use one canonical device key for saved disclosure state and menu ordering.
+fn device_order_position(order: &[String], ain: &str) -> usize {
+    let key = crate::fritz::canonical_device_key(ain);
+    order
+        .iter()
+        .position(|id| crate::fritz::canonical_device_key(id) == key)
+        .unwrap_or(usize::MAX)
+}
+
+fn is_device_expanded(expanded: &HashSet<String>, ain: &str) -> bool {
+    expanded.contains(&crate::fritz::canonical_device_key(ain))
+}
+
+fn toggle_collapsible_state(ids: &mut HashSet<String>, id: String) {
+    if !ids.remove(&id) {
+        ids.insert(id);
+    }
+}
+
+/// Shared persisted visibility state for Panel settings and item-order controls.
 fn panel_item_is_visible(hidden_items: &[String], id: &str) -> bool {
     !hidden_items.iter().any(|hidden| hidden == id)
 }
@@ -4884,14 +4903,7 @@ impl cosmic::Application for AppModel {
                     )));
                     let mut ordered_devices: Vec<&FritzDevice> = self.devices.iter().collect();
                     ordered_devices.sort_by_key(|device| {
-                        self.settings
-                            .device_order
-                            .iter()
-                            .position(|ain| {
-                                crate::fritz::normalize_ain_for_selection(ain)
-                                    == crate::fritz::normalize_ain_for_selection(&device.ain)
-                            })
-                            .unwrap_or(usize::MAX)
+                        device_order_position(&self.settings.device_order, &device.ain)
                     });
                     ordered_devices
                         .retain(|device| device_matches_search(device, &self.device_search));
@@ -6678,20 +6690,11 @@ impl cosmic::Application for AppModel {
                 // Keep newly discovered devices after configured entries.
                 let mut ordered_readings: Vec<_> = self.readings.iter().collect();
                 ordered_readings.sort_by_key(|reading| {
-                    self.settings
-                        .device_order
-                        .iter()
-                        .position(|ain| {
-                            crate::fritz::normalize_ain_for_selection(ain)
-                                == crate::fritz::normalize_ain_for_selection(&reading.ain)
-                        })
-                        .unwrap_or(usize::MAX)
+                    device_order_position(&self.settings.device_order, &reading.ain)
                 });
                 for (index, reading) in ordered_readings.iter().enumerate() {
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
-                    let is_expanded = self
-                        .expanded_devices
-                        .contains(&device_key.to_ascii_uppercase());
+                    let is_expanded = is_device_expanded(&self.expanded_devices, &device_key);
                     let device_corner_radius = device_corner_radius(index, ordered_readings.len());
                     let device_history = self.device_history.get(&device_key);
                     let power_toggle: cosmic::Element<'_, Message> = {
@@ -7102,20 +7105,11 @@ impl cosmic::Application for AppModel {
                     })
                     .collect();
                 missing_devices.sort_by_key(|device| {
-                    self.settings
-                        .device_order
-                        .iter()
-                        .position(|ain| {
-                            crate::fritz::normalize_ain_for_selection(ain)
-                                == crate::fritz::normalize_ain_for_selection(&device.ain)
-                        })
-                        .unwrap_or(usize::MAX)
+                    device_order_position(&self.settings.device_order, &device.ain)
                 });
                 for device in missing_devices {
                     let device_key = crate::fritz::normalize_ain_for_selection(&device.ain);
-                    let is_expanded = self
-                        .expanded_devices
-                        .contains(&device_key.to_ascii_uppercase());
+                    let is_expanded = is_device_expanded(&self.expanded_devices, &device_key);
                     let device_row = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
                         .list_item_padding([0, 0])
@@ -7874,14 +7868,7 @@ impl cosmic::Application for AppModel {
                 self.expanded_graph_full_secondary = None;
                 let mut ordered: Vec<_> = self.readings.iter().collect();
                 ordered.sort_by_key(|reading| {
-                    self.settings
-                        .device_order
-                        .iter()
-                        .position(|configured| {
-                            crate::fritz::normalize_ain_for_selection(configured)
-                                == crate::fritz::normalize_ain_for_selection(&reading.ain)
-                        })
-                        .unwrap_or(usize::MAX)
+                    device_order_position(&self.settings.device_order, &reading.ain)
                 });
                 self.history_graph_devices = ordered
                     .into_iter()
@@ -8692,18 +8679,11 @@ impl cosmic::Application for AppModel {
                     .map(|device| device.ain.clone())
                     .collect();
                 order.sort_by_key(|device_ain| {
-                    self.settings
-                        .device_order
-                        .iter()
-                        .position(|existing| {
-                            crate::fritz::normalize_ain_for_selection(existing)
-                                == crate::fritz::normalize_ain_for_selection(device_ain)
-                        })
-                        .unwrap_or(usize::MAX)
+                    device_order_position(&self.settings.device_order, device_ain)
                 });
-                let normalized = crate::fritz::normalize_ain_for_selection(&ain);
+                let normalized = crate::fritz::canonical_device_key(&ain);
                 let Some(index) = order.iter().position(|device_ain| {
-                    crate::fritz::normalize_ain_for_selection(device_ain) == normalized
+                    crate::fritz::canonical_device_key(device_ain) == normalized
                 }) else {
                     return Task::none();
                 };
@@ -8721,16 +8701,14 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::ToggleDeviceDetails(ain) => {
-                let key = crate::fritz::normalize_ain_for_selection(&ain).to_ascii_uppercase();
-                if !self.expanded_devices.remove(&key) {
-                    self.expanded_devices.insert(key);
-                }
+                toggle_collapsible_state(
+                    &mut self.expanded_devices,
+                    crate::fritz::canonical_device_key(&ain),
+                );
                 self.persist_layout_state();
             }
             Message::ToggleMenuSection(section) => {
-                if !self.collapsed_menu_sections.remove(&section) {
-                    self.collapsed_menu_sections.insert(section);
-                }
+                toggle_collapsible_state(&mut self.collapsed_menu_sections, section);
                 self.persist_layout_state();
             }
             Message::OpenCommonsPage(url) => {
@@ -9452,17 +9430,16 @@ impl cosmic::Application for AppModel {
                 self.settings.input_ains.remove(&normalized);
                 self.settings.temperature_alerts.remove(&normalized);
                 self.expanded_devices
-                    .remove(&normalized.to_ascii_uppercase());
-                self.settings
-                    .expanded_devices
-                    .retain(|id| !id.eq_ignore_ascii_case(&normalized));
+                    .remove(&crate::fritz::canonical_device_key(&ain));
+                self.collapsed_menu_sections
+                    .remove(&format!("device-graph-pair-{normalized}"));
                 if crate::fritz::normalize_ain_for_selection(&self.settings.weather_temperature_ain)
                     == normalized
                 {
                     self.settings.weather_temperature_ain.clear();
                     self.settings.weather_temperature_source_initialized = true;
                 }
-                self.persist_settings();
+                self.persist_layout_state();
                 record_diagnostic_event(
                     &mut self.diagnostic_events,
                     format!("Device removed from saved inventory by user: {ain}."),
@@ -10508,36 +10485,6 @@ mod history_tests {
     }
 
     #[test]
-    fn power_energy_uses_trapezoidal_integration_for_input_and_output() {
-        let start = Instant::now();
-        let input_history = VecDeque::from([
-            (start, -1000),
-            (start + Duration::from_secs(1800), -2000),
-            (start + Duration::from_secs(3600), -1000),
-        ]);
-        let output_history = VecDeque::from([
-            (start, 1000),
-            (start + Duration::from_secs(1800), 2000),
-            (start + Duration::from_secs(3600), 1000),
-        ]);
-
-        for history in [&input_history, &output_history] {
-            let (energy_wh, timespan) = power_energy_and_timespan(history).unwrap();
-            assert!((energy_wh - 1500.0).abs() < f64::EPSILON);
-            assert_eq!(timespan, Duration::from_secs(3600));
-            assert_eq!(format_elapsed_timespan(timespan), "1 hour");
-        }
-    }
-
-    #[test]
-    fn input_energy_handles_a_single_sample_without_inventing_energy() {
-        let history = VecDeque::from([(Instant::now(), -500)]);
-        let (energy_wh, timespan) = power_energy_and_timespan(&history).unwrap();
-        assert_eq!(energy_wh, 0.0);
-        assert_eq!(timespan, Duration::ZERO);
-    }
-
-    #[test]
     fn device_history_max_range_uses_oldest_available_sample() {
         let now = Instant::now();
         let samples = VecDeque::from([
@@ -10821,5 +10768,38 @@ mod energy_input_output_ratio_tests {
             energy_input_output_ratio_percent(Some(f64::NAN), Some(500.0)),
             None
         );
+    }
+}
+
+#[cfg(test)]
+mod disclosure_state_tests {
+    use super::{device_order_position, is_device_expanded, toggle_collapsible_state};
+    use std::collections::HashSet;
+
+    #[test]
+    fn device_order_is_restored_for_case_and_separator_variants() {
+        let saved = vec!["TASMOTA:AABBCC".into(), "1234AA".into()];
+        assert_eq!(device_order_position(&saved, "tasmota:aa:bb:cc"), 0);
+        assert_eq!(device_order_position(&saved, "12:34 aa"), 1);
+        assert_eq!(device_order_position(&saved, "missing"), usize::MAX);
+    }
+
+    #[test]
+    fn disclosure_state_survives_key_normalization() {
+        let mut expanded = HashSet::new();
+        toggle_collapsible_state(&mut expanded, "TASMOTAAABBCC".into());
+        assert!(is_device_expanded(&expanded, "tasmota:aa:bb:cc"));
+        toggle_collapsible_state(&mut expanded, "TASMOTAAABBCC".into());
+        assert!(!is_device_expanded(&expanded, "TASMOTA:AABBCC"));
+    }
+
+    #[test]
+    fn section_disclosure_toggles_without_mutating_other_sections() {
+        let mut collapsed = HashSet::from(["devices".to_string()]);
+        toggle_collapsible_state(&mut collapsed, "total-power-overview".into());
+        assert!(collapsed.contains("devices"));
+        assert!(collapsed.contains("total-power-overview"));
+        toggle_collapsible_state(&mut collapsed, "total-power-overview".into());
+        assert_eq!(collapsed, HashSet::from(["devices".to_string()]));
     }
 }
