@@ -6799,7 +6799,7 @@ impl cosmic::Application for AppModel {
                         device_history
                             .into_iter()
                             .flat_map(|samples| samples.iter().map(|(_, power, _)| *power as f64)),
-                        device_history.back().map(|(_, power, _)| *power as f64),
+                        device_history.and_then(|samples| samples.back()).map(|(_, power, _)| *power as f64),
                         device_yesterday_wh,
                         device_today_wh,
                     );
