@@ -2831,6 +2831,59 @@ fn hue_sensor_metric_graph(
     collapsible_graph(label, section_id, collapsed, graph, copy_feedback)
 }
 
+/// Netatmo modules are read-only. Only recorded, finite measurements
+/// appear in their respective collapsible history graphs.
+fn netatmo_metric_graph(
+    history: &crate::netatmo::NetatmoHistory,
+    sensor: &NetatmoSensor,
+    metric: &'static str,
+    label: &'static str,
+    native_unit: &'static str,
+    settings: &FritzSettings,
+    collapsed_sections: &HashSet<String>,
+    copy_feedback: Option<&CopyFeedback>,
+) -> cosmic::Element<'static, Message> {
+    let section_id = format!("netatmo-sensor-graph-{metric}-{}", sensor.id);
+    let collapsed = collapsed_sections.contains(&section_id);
+    let unit = if metric == "temperature" {
+        temperature_unit_label(&settings.temperature_unit)
+    } else {
+        native_unit
+    };
+    let graph: cosmic::Element<'static, Message> = if collapsed {
+        widget::text("").into()
+    } else {
+        let full: GraphSamples = history.get(&sensor.id)
+            .and_then(|metrics| metrics.get(metric))
+            .into_iter()
+            .flat_map(|values| values.iter())
+            .map(|(time, value)| (
+                *time,
+                if metric == "temperature" {
+                    temperature_in_unit(*value, &settings.temperature_unit)
+                } else {
+                    *value
+                },
+            ))
+            .collect();
+        let values = graph_values_for_timespan(&full, settings.graph_timespan_minutes);
+        if values.len() < 2 {
+            widget::text::caption("Not enough recorded Netatmo readings to draw a graph").into()
+        } else {
+            let start = graph_axis_start_for_samples(&values, settings.graph_timespan_minutes);
+            interactive_graph_with_axis(
+                &settings.language,
+                &format!("{} · {label}", sensor.name),
+                values.into_iter(),
+                &settings.graph_style,
+                unit,
+                start,
+            )
+        }
+    };
+    collapsible_graph(label, section_id, collapsed, graph, copy_feedback)
+}
+
 /// Full-width compact plot for each actual daily metric. Missing daily
 /// readings are omitted rather than plotted as fabricated zero measurements.
 /// Each recorded daily trend owns its own persisted disclosure state.
@@ -8832,6 +8885,25 @@ impl cosmic::Application for AppModel {
                             .push(widget::text::caption(format!("Rain · {}", fmt(sensor.rain_mm, "mm"))))
                             .push(widget::text::caption(format!("Wind · {}", fmt(sensor.wind_kmh, "km/h"))))
                             .push(widget::text::caption("No wattage or power history: Netatmo Weather Stations do not measure mains power."));
+                        let mut details = details;
+                        for (metric, label, unit) in crate::netatmo::METRICS {
+                            if crate::netatmo::metric_value(sensor, metric).is_some()
+                                || self.netatmo_history.get(&sensor.id)
+                                    .and_then(|metrics| metrics.get(metric))
+                                    .is_some()
+                            {
+                                details = details.push(netatmo_metric_graph(
+                                    &self.netatmo_history,
+                                    sensor,
+                                    metric,
+                                    label,
+                                    unit,
+                                    &self.settings,
+                                    &self.collapsed_menu_sections,
+                                    self.copy_feedback.as_ref(),
+                                ));
+                            }
+                        }
                         card = card.add(widget::container(details).padding([8, 12]));
                     }
                     device_sort_metadata.insert(
