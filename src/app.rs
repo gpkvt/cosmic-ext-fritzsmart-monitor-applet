@@ -514,23 +514,26 @@ fn notify_temperature_alert(
     temperature: f64,
     thresholds: TemperatureAlertThresholds,
     language: &str,
+    unit: &str,
 ) {
     let (summary, body) = if temperature > f64::from(thresholds.high_c) {
         (
             format!("{}: {name}", crate::i18n::tr(language, "High temperature")),
             format!(
-                "{temperature:.1} °C ({}: {} °C)",
+                "{} ({}: {})",
+                format_temperature(temperature, unit),
                 crate::i18n::tr(language, "maximum"),
-                thresholds.high_c
+                format_temperature(f64::from(thresholds.high_c), unit)
             ),
         )
     } else {
         (
             format!("{}: {name}", crate::i18n::tr(language, "Low temperature")),
             format!(
-                "{temperature:.1} °C ({}: {} °C)",
+                "{} ({}: {})",
+                format_temperature(temperature, unit),
                 crate::i18n::tr(language, "minimum"),
-                thresholds.low_c
+                format_temperature(f64::from(thresholds.low_c), unit)
             ),
         )
     };
@@ -8090,6 +8093,7 @@ impl cosmic::Application for AppModel {
                                             reading.temperature_c,
                                             thresholds,
                                             &self.settings.language,
+                                            &self.settings.temperature_unit,
                                         );
                                     }
                                     // First observation establishes a baseline without
