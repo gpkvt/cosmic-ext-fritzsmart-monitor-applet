@@ -1,5 +1,7 @@
 # Changelog
 
+- Add an independent syslog watchdog for disappearing panel items: sample process liveness, UI update count and panel view count every five seconds during startup, then once per minute. The watchdog remains active if the COSMIC event loop stalls, helping distinguish UI deadlock, surface invisibility and process termination without logging device identities.
+
 - Improve disappearing-applet diagnostics: log the first panel widget tree populated with meter readings, emit periodic liveness markers with separate metered/Hue counts, and record clean COSMIC event-loop shutdowns distinctly from Rust panics or runtime errors.
 
 - Keep the COSMIC panel applet shrink-wrapped to its displayed values after device refreshes, avoiding full-width autosize claims that can push neighboring panel items off-screen. Preserve a small clickable placeholder when no live value or connection-warning entry is available, instead of rendering an invisible empty button.

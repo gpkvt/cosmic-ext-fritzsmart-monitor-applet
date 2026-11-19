@@ -227,7 +227,9 @@ On Linux, the applet writes startup, discovery, FRITZ!Box/Tasmota/Hue device-loa
 journalctl -b -t fritz-power-monitor -p debug --no-pager | tail -n 150
 ```
 
-If your account cannot read the system journal, use `sudo journalctl -b -t fritz-power-monitor -p debug --no-pager`. When a sandbox cannot access either syslog socket, diagnostics fall back to stderr, which COSMIC Panel normally captures:
+If your account cannot read the system journal, use `sudo journalctl -b -t fritz-power-monitor -p debug --no-pager`.
+
+If the applet disappears shortly after loading data, look for `first populated panel widget tree constructed` followed by `process alive (UI progress: ..., updates: ..., panel views: ...)`. The watchdog writes to syslog independently from the UI: if the process stays alive but update/view counters stop changing for more than a few seconds, its event loop may be blocked; if counters advance but the applet is invisible, investigate panel surface placement/overflow. **No heartbeat** can mean the process exited or syslog is unavailable—verify separately with `pgrep -af fritz-power-monitor` and COSMIC Panel logs. Watchdog output is every five seconds during the first minute and every minute thereafter. When a sandbox cannot access either syslog socket, diagnostics fall back to stderr, which COSMIC Panel normally captures:
 
 ```sh
 journalctl --user -b --no-pager | grep -F 'fritz-power-monitor:' | tail -n 150
