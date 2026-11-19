@@ -2261,12 +2261,12 @@ mod tests {
                 "internet-bandwidth".to_string(),
                 "total-power-output".to_string(),
                 "total-power-input".to_string(),
-                "total-power-overview".to_string(),
-                "daily-energy-history".to_string(),
                 "current-power-history".to_string(),
                 "graph-total-output-pair".to_string(),
                 "graph-total-input-pair".to_string(),
                 "graph-bandwidth-pair".to_string(),
+                "total-power-overview".to_string(),
+                "daily-energy-history".to_string(),
                 "device-graph-pair-0876101234567890".to_string(),
             ]
         );

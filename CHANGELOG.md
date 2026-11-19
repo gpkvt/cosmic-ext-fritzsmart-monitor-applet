@@ -1,5 +1,8 @@
 # Changelog
 
+- Unify Philips Hue light and motion/environment sensor rows with the sortable popup Devices list. Preserve their own disclosure, copy, switches, °C/°F and lux display, keep unsupported W and history empty, and show Hue devices unavailable without stale measurements during bridge outages. Remove the duplicate standalone Hue section.
+- Fix three quality-test expectations: preserve saved collapsed-section order, correct the 158° compass boundary, and allow native translations that exactly match English spelling while retaining translation coverage checks.
+
 - Read Philips Hue motion/proximity sensor temperature, ambient light level (converted to lux) and motion state from CLIP v2; group service resources by physical device, filter invalid/disabled/offline readings, and show sensors alongside Hue lights without fabricating power measurements. Refresh both together and add parser regression tests.
 
 - Find Hue Bridges automatically via local mDNS on startup and when opening Connection settings, with a manual rescan and selection when multiple bridges are discovered; never overwrite a configured bridge silently.

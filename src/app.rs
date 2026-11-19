@@ -2798,6 +2798,31 @@ fn toggle_collapsible_state(ids: &mut HashSet<String>, id: String) {
     }
 }
 
+/// Compare available numeric device readings, keeping unsupported Hue measurements last
+/// in both ascending and descending sort order.
+fn compare_optional_device_values(
+    left: Option<f64>,
+    right: Option<f64>,
+    descending: bool,
+) -> std::cmp::Ordering {
+    match (left, right) {
+        (Some(left), Some(right)) => {
+            if descending {
+                right.total_cmp(&left)
+            } else {
+                left.total_cmp(&right)
+            }
+        }
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (None, None) => std::cmp::Ordering::Equal,
+    }
+}
+
+fn hue_device_list_key(kind: &str, id: &str) -> String {
+    format!("2-hue-{kind}-{id}")
+}
+
 /// Apply live name/power/temperature sorting without overwriting custom device order.
 fn sorted_device_readings<'a>(
     readings: &'a [FritzReading],
@@ -6863,8 +6888,11 @@ impl cosmic::Application for AppModel {
                 weather_menu_card = Some(weather_section.into());
             }
 
-            if self.error.is_none()
-                && (!self.readings.is_empty() || !self.missing_device_ains.is_empty())
+            // Hue devices remain visible even if the router connection is down or
+            // there are no selected metered devices.
+            if (self.error.is_none()
+                && (!self.readings.is_empty() || !self.missing_device_ains.is_empty()))
+                || !self.settings.hue_bridge_ip.trim().is_empty()
             {
                 let energy_flow = energy_flow_overview(
                     &self.readings,
@@ -6935,7 +6963,11 @@ impl cosmic::Application for AppModel {
                 );
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
-                menu_cards.push(("0-summary".to_string(), summary_card));
+                if self.error.is_none()
+                    && (!self.readings.is_empty() || !self.missing_device_ains.is_empty())
+                {
+                    menu_cards.push(("0-summary".to_string(), summary_card));
+                }
                 if let Some(weather_card) = weather_menu_card.take() {
                     menu_cards.push(("1-weather".to_string(), weather_card));
                 }
@@ -7032,6 +7064,12 @@ impl cosmic::Application for AppModel {
                         ))
                 };
                 menu_cards.push(("bandwidth".to_string(), bandwidth_card.into()));
+                // Live sort keys also cover Hue rows without treating missing
+                // metering data as 0 W or writing Hue values into power history.
+                let mut device_sort_metadata: HashMap<
+                    String,
+                    (String, Option<f64>, Option<f64>),
+                > = HashMap::new();
                 // Custom order remains the default; column sort overrides it only in this list.
                 let ordered_readings = sorted_device_readings(
                     &self.readings,
@@ -7410,7 +7448,16 @@ impl cosmic::Application for AppModel {
                                 ..Default::default()
                             }
                         });
-                    menu_cards.push((format!("2-{device_key}"), device_card.into()));
+                    let row_key = format!("2-{device_key}");
+                    device_sort_metadata.insert(
+                        row_key.clone(),
+                        (
+                            reading.name.to_lowercase(),
+                            Some(reading.power_w as f64),
+                            reading.temperature_c.is_finite().then_some(reading.temperature_c),
+                        ),
+                    );
+                    menu_cards.push((row_key, device_card.into()));
                 }
 
                 // Keep every selected device visible in the popup even when its
@@ -7532,7 +7579,171 @@ impl cosmic::Application for AppModel {
                                 ..Default::default()
                             }
                         });
-                    menu_cards.push((format!("2-inactive-{device_key}"), device_card.into()));
+                    let row_key = format!("2-inactive-{device_key}");
+                    device_sort_metadata.insert(row_key.clone(), (device.name.to_lowercase(), None, None));
+                    menu_cards.push((row_key, device_card.into()));
+                }
+
+                // Hue lights are independently refreshed, switchable devices, but
+                // do not publish measured watts or device temperatures.
+                for light in &self.hue_lights {
+                    let device_key = format!("hue-light-{}", light.id);
+                    let row_key = hue_device_list_key("light", &light.id);
+                    let expanded = is_device_expanded(&self.expanded_devices, &device_key);
+                    let toggle: cosmic::Element<'_, Message> = if light.reachable
+                        && light.on.is_some()
+                        && !self.hue_pending.contains(&light.id)
+                    {
+                        let id = light.id.clone();
+                        widget::toggler(light.on.unwrap_or(false))
+                            .on_toggle(move |enabled| Message::SetHueLightPower(id.clone(), enabled))
+                            .into()
+                    } else {
+                        widget::toggler(light.on.unwrap_or(false)).into()
+                    };
+                    let heading = widget::Row::new()
+                        .spacing(8)
+                        .width(cosmic::iced::Length::Fill)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(
+                            widget::button::custom(
+                                widget::Row::new()
+                                    .spacing(8)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(
+                                        widget::Column::new()
+                                            .spacing(2)
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::text::body(light.name.clone()))
+                                            .push(widget::text::caption("Hue · Light")),
+                                    )
+                                    .push(widget::icon::from_name(if expanded {
+                                        "go-up-symbolic"
+                                    } else {
+                                        "go-down-symbolic"
+                                    }).size(16)),
+                            )
+                            .on_press(Message::ToggleDeviceDetails(device_key))
+                            .padding([8, 12])
+                            .width(cosmic::iced::Length::Fill)
+                            .class(cosmic::theme::Button::Text),
+                        )
+                        .push(widget::text::body("—").width(cosmic::iced::Length::Fixed(76.0))
+                            .align_x(cosmic::iced::Alignment::End))
+                        .push(widget::text::body("—").width(cosmic::iced::Length::Fixed(90.0))
+                            .align_x(cosmic::iced::Alignment::End))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(108.0)))
+                        .push(copy_menu_title_button(light.name.clone(), self.copy_feedback.as_ref()))
+                        .push(widget::container(toggle).width(cosmic::iced::Length::Fixed(52.0)));
+                    let mut card = widget::list::list_column()
+                        .style(cosmic::theme::Container::Transparent)
+                        .list_item_padding([0, 0])
+                        .add(heading);
+                    if expanded {
+                        card = card.add(
+                            widget::container(widget::text::caption(if !light.reachable
+                                || light.on.is_none() {
+                                "Hue Bridge · Light unavailable"
+                            } else if light.on == Some(true) {
+                                "Hue Bridge · Light on · No power meter"
+                            } else {
+                                "Hue Bridge · Light off · No power meter"
+                            })).padding([8, 12]),
+                        );
+                    }
+                    device_sort_metadata.insert(row_key.clone(), (light.name.to_lowercase(), None, None));
+                    menu_cards.push((row_key, widget::container(card)
+                        .width(cosmic::iced::Length::Fill).into()));
+                }
+
+                // Hue motion sensors share the same device-list columns. Lux
+                // uses the spare history column, not a fabricated power graph.
+                for sensor in &self.hue_sensors {
+                    let device_key = format!("hue-sensor-{}", sensor.id);
+                    let row_key = hue_device_list_key("sensor", &sensor.id);
+                    let expanded = is_device_expanded(&self.expanded_devices, &device_key);
+                    let temperature = sensor.temperature_c
+                        .filter(|_| sensor.reachable)
+                        .map(|value| format_temperature(value, &self.settings.temperature_unit))
+                        .unwrap_or_else(|| "—".into());
+                    let lux = sensor.illuminance_lux
+                        .filter(|_| sensor.reachable)
+                        .map(|value| if value >= 100.0 {
+                            format!("{value:.0} lx")
+                        } else {
+                            format!("{value:.1} lx")
+                        })
+                        .unwrap_or_else(|| "—".into());
+                    let motion = if !sensor.reachable {
+                        "Unavailable"
+                    } else {
+                        match sensor.motion {
+                            Some(true) => "Motion detected",
+                            Some(false) => "No motion",
+                            None => "Motion unavailable",
+                        }
+                    };
+                    let heading = widget::Row::new()
+                        .spacing(8)
+                        .width(cosmic::iced::Length::Fill)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(
+                            widget::button::custom(
+                                widget::Row::new()
+                                    .spacing(8)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(
+                                        widget::Column::new()
+                                            .spacing(2)
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::text::body(sensor.name.clone()))
+                                            .push(widget::text::caption("Hue · Sensor")),
+                                    )
+                                    .push(widget::icon::from_name(if expanded {
+                                        "go-up-symbolic"
+                                    } else {
+                                        "go-down-symbolic"
+                                    }).size(16)),
+                            )
+                            .on_press(Message::ToggleDeviceDetails(device_key))
+                            .padding([8, 12])
+                            .width(cosmic::iced::Length::Fill)
+                            .class(cosmic::theme::Button::Text),
+                        )
+                        .push(widget::text::body("—").width(cosmic::iced::Length::Fixed(76.0))
+                            .align_x(cosmic::iced::Alignment::End))
+                        .push(widget::text::body(keep_value_unit_together(temperature))
+                            .width(cosmic::iced::Length::Fixed(90.0))
+                            .align_x(cosmic::iced::Alignment::End))
+                        .push(widget::text::caption(keep_value_unit_together(lux.clone()))
+                            .width(cosmic::iced::Length::Fixed(108.0))
+                            .align_x(cosmic::iced::Alignment::End))
+                        .push(copy_menu_title_button(sensor.name.clone(), self.copy_feedback.as_ref()))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(52.0)));
+                    let mut card = widget::list::list_column()
+                        .style(cosmic::theme::Container::Transparent)
+                        .list_item_padding([0, 0])
+                        .add(heading);
+                    if expanded {
+                        card = card.add(
+                            widget::container(
+                                widget::Column::new()
+                                    .spacing(4)
+                                    .push(widget::text::caption(format!("Motion · {motion}")))
+                                    .push(widget::text::caption(format!("Illuminance · {lux}")))
+                                    .push(widget::text::caption(
+                                        "Hue Bridge · Sensor · No measured W or power history"
+                                    )),
+                            )
+                            .padding([8, 12]),
+                        );
+                    }
+                    device_sort_metadata.insert(
+                        row_key.clone(),
+                        (sensor.name.to_lowercase(), None, sensor.temperature_c.filter(|_| sensor.reachable)),
+                    );
+                    menu_cards.push((row_key, widget::container(card)
+                        .width(cosmic::iced::Length::Fill).into()));
                 }
 
                 if let Some(power_sections) = total_power_overview(
@@ -7556,6 +7767,25 @@ impl cosmic::Application for AppModel {
                         self.copy_feedback.as_ref(),
                     ),
                 ));
+                // The configured bridge is a device source even before its first
+                // snapshot; expose setup/connection state inside Devices.
+                if !self.settings.hue_bridge_ip.trim().is_empty()
+                    && self.hue_lights.is_empty()
+                    && self.hue_sensors.is_empty()
+                {
+                    let note = if self.hue_loading {
+                        "Loading Hue lights and sensors…".to_string()
+                    } else if let Some(error) = &self.hue_error {
+                        format!("Hue Bridge unavailable: {error}")
+                    } else {
+                        "No Hue devices found. Pair and refresh in Connection settings.".to_string()
+                    };
+                    menu_cards.push((
+                        "2-hue-bridge-placeholder".into(),
+                        widget::container(widget::text::caption(note))
+                            .padding([8, 12]).width(cosmic::iced::Length::Fill).into(),
+                    ));
+                }
                 menu_cards.retain(|(key, _)| {
                     let element = if key == "0-summary" {
                         "summary"
@@ -7578,32 +7808,67 @@ impl cosmic::Application for AppModel {
                         .iter()
                         .any(|hidden| hidden == element)
                 });
-                // Sort popup sections by the user's saved order while preserving device order.
-                menu_cards.sort_by_key(|(key, _)| {
-                    let element = if key == "0-summary" {
-                        "summary"
-                    } else if key == "1-weather" {
-                        "weather"
-                    } else if key == "bandwidth" {
-                        "internet-bandwidth"
-                    } else if key.starts_with("2-") {
-                        "devices"
-                    } else if key.starts_with("3-") {
-                        "total-power-output"
-                    } else if key.starts_with("5-") {
-                        "history"
-                    } else {
-                        "devices"
+                // Sort all device types in one list; numeric sorting keeps
+                // unsupported/missing measurements at the end in either direction.
+                menu_cards.sort_by(|(left, _), (right, _)| {
+                    let section = |key: &str| {
+                        if key == "0-summary" {
+                            "summary"
+                        } else if key == "1-weather" {
+                            "weather"
+                        } else if key == "bandwidth" {
+                            "internet-bandwidth"
+                        } else if key.starts_with("2-") {
+                            "devices"
+                        } else if key.starts_with("3-") {
+                            "total-power-output"
+                        } else if key.starts_with("5-") {
+                            "history"
+                        } else {
+                            "devices"
+                        }
                     };
-                    self.settings
-                        .menu_order
-                        .iter()
-                        .position(|candidate| candidate == element)
-                        .unwrap_or(usize::MAX)
+                    let section_position = |key: &str| {
+                        self.settings.menu_order.iter()
+                            .position(|candidate| candidate == section(key))
+                            .unwrap_or(usize::MAX)
+                    };
+                    section_position(left).cmp(&section_position(right))
+                        .then_with(|| {
+                            if !left.starts_with("2-") || !right.starts_with("2-") {
+                                return std::cmp::Ordering::Equal;
+                            }
+                            let inactive = |key: &str| key.starts_with("2-inactive-");
+                            let inactive_cmp = inactive(left).cmp(&inactive(right));
+                            if inactive_cmp != std::cmp::Ordering::Equal {
+                                return inactive_cmp;
+                            }
+                            let (Some((left_name, left_power, left_temperature)),
+                                 Some((right_name, right_power, right_temperature))) =
+                                (device_sort_metadata.get(left), device_sort_metadata.get(right))
+                            else {
+                                return std::cmp::Ordering::Equal;
+                            };
+                            let descending = self.settings.device_sort_descending;
+                            match self.settings.device_sort.as_str() {
+                                "name" => {
+                                    let cmp = left_name.cmp(right_name);
+                                    if descending { cmp.reverse() } else { cmp }
+                                }
+                                "power" => compare_optional_device_values(
+                                    *left_power, *right_power, descending
+                                ).then_with(|| left_name.cmp(right_name)),
+                                "temperature" => compare_optional_device_values(
+                                    *left_temperature, *right_temperature, descending
+                                ).then_with(|| left_name.cmp(right_name)),
+                                _ => std::cmp::Ordering::Equal,
+                            }
+                        })
                 });
                 let device_count = menu_cards
                     .iter()
-                    .filter(|(key, _)| key.starts_with("2-"))
+                    .filter(|(key, _)| key.starts_with("2-")
+                        && key != "2-hue-bridge-placeholder")
                     .count();
                 let inactive_count = menu_cards
                     .iter()
@@ -7666,6 +7931,18 @@ impl cosmic::Application for AppModel {
                                     &self.settings.temperature_unit,
                                     &self.settings.language,
                                 ));
+                                if let Some(error) = &self.hue_error {
+                                    device_cards = device_cards.push(
+                                        widget::container(widget::text::caption(format!(
+                                            "Hue Bridge: {error}"
+                                        ))).padding([4, 12]),
+                                    );
+                                } else if let Some(warning) = &self.hue_sensor_warning {
+                                    device_cards = device_cards.push(
+                                        widget::container(widget::text::caption(warning.clone()))
+                                            .padding([4, 12]),
+                                    );
+                                }
                             }
                             device_section_started = true;
                         }
@@ -7917,208 +8194,6 @@ impl cosmic::Application for AppModel {
 
             if let Some(weather_card) = weather_menu_card.take() {
                 content = content.push(weather_card);
-            }
-
-            // Hue lights are switches; Hue motion sensors provide read-only
-            // environmental readings. Neither contributes fictitious watts
-            // or energy samples to the power-monitoring totals.
-            if !self.settings.hue_bridge_ip.trim().is_empty() {
-                let collapsed = self.collapsed_menu_sections.contains("hue-lights");
-                let heading = widget::button::custom(
-                    widget::Row::new()
-                        .spacing(8)
-                        .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::body("PHILIPS HUE"))
-                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                        .push(widget::text::caption(
-                            (self.hue_lights.len() + self.hue_sensors.len()).to_string(),
-                        ))
-                        .push(
-                            widget::icon::from_name(if collapsed {
-                                "go-next-symbolic"
-                            } else {
-                                "go-down-symbolic"
-                            })
-                            .size(16),
-                        ),
-                )
-                .on_press(Message::ToggleMenuSection("hue-lights".into()))
-                .width(cosmic::iced::Length::Fill)
-                .padding([8, 12])
-                .class(cosmic::theme::Button::Text);
-                let mut hue_section = widget::Column::new()
-                    .spacing(0)
-                    .width(cosmic::iced::Length::Fill)
-                    .push(
-                        widget::Row::new()
-                            .width(cosmic::iced::Length::Fill)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(heading)
-                            .push(copy_menu_title_button(
-                                "PHILIPS HUE".to_string(),
-                                self.copy_feedback.as_ref(),
-                            )),
-                    );
-                if !collapsed {
-                    hue_section = hue_section.push(
-                        widget::container(widget::text::caption(
-                            "Lights · on/off  |  Motion sensors · °C and lx  |  No measured W",
-                        ))
-                        .padding([4, 12]),
-                    );
-                    if self.hue_loading {
-                        hue_section = hue_section.push(
-                            widget::container(widget::text::caption("Refreshing Hue devices…"))
-                                .padding([4, 12]),
-                        );
-                    }
-                    if let Some(error) = &self.hue_error {
-                        hue_section = hue_section.push(
-                            widget::container(widget::text::caption(format!(
-                                "Hue Bridge: {error}"
-                            )))
-                            .padding([4, 12]),
-                        );
-                    }
-                    if self.hue_lights.is_empty()
-                        && self.hue_sensors.is_empty()
-                        && !self.hue_loading
-                        && self.hue_error.is_none()
-                    {
-                        hue_section = hue_section.push(
-                            widget::container(widget::text::caption(
-                                "No Hue lights or sensors found. Pair and refresh from Connection settings.",
-                            ))
-                            .padding([4, 12]),
-                        );
-                    }
-                    if let Some(warning) = &self.hue_sensor_warning {
-                        hue_section = hue_section.push(
-                            widget::container(widget::text::caption(warning.clone()))
-                                .padding([4, 12]),
-                        );
-                    }
-                    if !self.hue_lights.is_empty() {
-                        hue_section = hue_section.push(
-                            widget::container(widget::text::caption("LIGHTS")).padding([6, 12]),
-                        );
-                    }
-                    for light in &self.hue_lights {
-                        let state: cosmic::Element<'_, Message> = if light.reachable
-                            && light.on.is_some()
-                            && !self.hue_pending.contains(&light.id)
-                        {
-                            let id = light.id.clone();
-                            widget::toggler(light.on.unwrap_or(false))
-                                .on_toggle(move |enabled| {
-                                    Message::SetHueLightPower(id.clone(), enabled)
-                                })
-                                .into()
-                        } else {
-                            widget::toggler(light.on.unwrap_or(false)).into()
-                        };
-                        hue_section = hue_section
-                            .push(widget::divider::horizontal::default())
-                            .push(
-                                widget::Row::new()
-                                    .spacing(8)
-                                    .width(cosmic::iced::Length::Fill)
-                                    .align_y(cosmic::iced::Alignment::Center)
-                                    .padding([6, 12])
-                                    .push(
-                                        widget::Column::new()
-                                            .spacing(2)
-                                            .width(cosmic::iced::Length::Fill)
-                                            .push(widget::text::body(light.name.clone()))
-                                            .push(widget::text::caption(if light.on.is_none() {
-                                                "Unavailable"
-                                            } else if light.on == Some(true) {
-                                                "On"
-                                            } else {
-                                                "Off"
-                                            })),
-                                    )
-                                    .push(copy_menu_title_button(
-                                        light.name.clone(),
-                                        self.copy_feedback.as_ref(),
-                                    ))
-                                    .push(state),
-                            );
-                    }
-                    if !self.hue_sensors.is_empty() {
-                        hue_section = hue_section
-                            .push(widget::divider::horizontal::default())
-                            .push(
-                                widget::container(widget::text::caption(
-                                    "MOTION & ENVIRONMENT SENSORS",
-                                ))
-                                .padding([8, 12]),
-                            );
-                    }
-                    for sensor in &self.hue_sensors {
-                        let temperature = sensor
-                            .temperature_c
-                            .map(|value| format_temperature(value, &self.settings.temperature_unit))
-                            .unwrap_or_else(|| "—".to_string());
-                        let illuminance = sensor
-                            .illuminance_lux
-                            .map(|lux| {
-                                if lux >= 100.0 {
-                                    format!("{lux:.0} lx")
-                                } else {
-                                    format!("{lux:.1} lx")
-                                }
-                            })
-                            .unwrap_or_else(|| "—".to_string());
-                        let motion = match sensor.motion {
-                            Some(true) => "Motion",
-                            Some(false) => "No motion",
-                            None => "—",
-                        };
-                        hue_section = hue_section
-                            .push(widget::divider::horizontal::default())
-                            .push(
-                                widget::Row::new()
-                                    .spacing(8)
-                                    .width(cosmic::iced::Length::Fill)
-                                    .align_y(cosmic::iced::Alignment::Center)
-                                    .padding([6, 12])
-                                    .push(
-                                        widget::Column::new()
-                                            .spacing(2)
-                                            .width(cosmic::iced::Length::Fill)
-                                            .push(widget::text::body(sensor.name.clone()))
-                                            .push(widget::text::caption(if sensor.reachable {
-                                                "Sensor"
-                                            } else {
-                                                "Unavailable"
-                                            })),
-                                    )
-                                    .push(
-                                        widget::text::body(keep_value_unit_together(temperature))
-                                            .width(cosmic::iced::Length::Fixed(86.0))
-                                            .align_x(cosmic::iced::Alignment::End),
-                                    )
-                                    .push(
-                                        widget::text::body(keep_value_unit_together(illuminance))
-                                            .width(cosmic::iced::Length::Fixed(90.0))
-                                            .align_x(cosmic::iced::Alignment::End),
-                                    )
-                                    .push(
-                                        widget::text::caption(motion)
-                                            .width(cosmic::iced::Length::Fixed(74.0))
-                                            .align_x(cosmic::iced::Alignment::End),
-                                    )
-                                    .push(copy_menu_title_button(
-                                        sensor.name.clone(),
-                                        self.copy_feedback.as_ref(),
-                                    )),
-                            );
-                    }
-                }
-                content = content
-                    .push(widget::divider::horizontal::default())
-                    .push(hue_section);
             }
 
             content = content.push(
@@ -9995,10 +10070,19 @@ impl cosmic::Application for AppModel {
                         self.hue_error = None;
                     }
                     Err(error) => {
-                        // A bridge outage never leaves stale light/sensor states
-                        // on-screen or invalidate FRITZ!/Tasmota power readings.
-                        self.hue_lights.clear();
-                        self.hue_sensors.clear();
+                        // Keep known Hue identities visible as unavailable in
+                        // Devices, but discard every stale sensor/switch value.
+                        // FRITZ!/Tasmota power monitoring stays independent.
+                        for light in &mut self.hue_lights {
+                            light.reachable = false;
+                            light.on = None;
+                        }
+                        for sensor in &mut self.hue_sensors {
+                            sensor.reachable = false;
+                            sensor.temperature_c = None;
+                            sensor.illuminance_lux = None;
+                            sensor.motion = None;
+                        }
                         self.hue_sensor_warning = None;
                         self.hue_error = Some(error);
                     }
@@ -10675,6 +10759,30 @@ mod history_tests {
         assert_eq!(energy_flow_animation_glyph(1, true), "← · ● ·");
         assert_eq!(energy_flow_animation_glyph(2, true), "← ● · ·");
         assert_eq!(energy_flow_animation_glyph(3, true), "← · · ·");
+    }
+
+    #[test]
+    fn hue_device_rows_have_distinct_stable_identities() {
+        assert_eq!(
+            hue_device_list_key("light", "00112233-4455-6677-8899-aabbccddeeff"),
+            "2-hue-light-00112233-4455-6677-8899-aabbccddeeff"
+        );
+        assert_eq!(
+            hue_device_list_key("sensor", "00112233-4455-6677-8899-aabbccddeeff"),
+            "2-hue-sensor-00112233-4455-6677-8899-aabbccddeeff"
+        );
+    }
+
+    #[test]
+    fn device_sort_places_unmetered_hue_values_after_metered_values() {
+        use std::cmp::Ordering;
+        for descending in [false, true] {
+            assert_eq!(compare_optional_device_values(Some(16.0), None, descending), Ordering::Less);
+            assert_eq!(compare_optional_device_values(None, Some(16.0), descending), Ordering::Greater);
+            assert_eq!(compare_optional_device_values(None, None, descending), Ordering::Equal);
+        }
+        assert_eq!(compare_optional_device_values(Some(1.0), Some(2.0), false), Ordering::Less);
+        assert_eq!(compare_optional_device_values(Some(1.0), Some(2.0), true), Ordering::Greater);
     }
 
     #[test]
