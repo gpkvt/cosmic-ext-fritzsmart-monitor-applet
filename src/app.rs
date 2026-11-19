@@ -7462,17 +7462,12 @@ impl cosmic::Application for AppModel {
                         widget::Row::new()
                             .spacing(6)
                             .align_y(cosmic::iced::Alignment::Center)
-                            .push(
-                                widget::icon::from_name("image-x-generic-symbolic")
-                                    .size(14),
-                            )
+                            .push(widget::icon::from_name("image-x-generic-symbolic").size(14))
                             .push(
                                 widget::button::custom(widget::text::caption(
                                     "Wikimedia Commons ↗",
                                 ))
-                                .on_press(Message::OpenCommonsPage(
-                                    first_credit.page_url.clone(),
-                                ))
+                                .on_press(Message::OpenCommonsPage(first_credit.page_url.clone()))
                                 .padding([2, 6])
                                 .class(cosmic::theme::Button::Text),
                             ),
@@ -7498,10 +7493,12 @@ impl cosmic::Application for AppModel {
                             );
                             if let Some(license_url) = &credit.license_url {
                                 weather_section = weather_section.push(
-                                    widget::button::custom(widget::text::caption("License terms ↗"))
-                                        .on_press(Message::OpenCommonsPage(license_url.clone()))
-                                        .padding([2, 6])
-                                        .class(cosmic::theme::Button::Text),
+                                    widget::button::custom(widget::text::caption(
+                                        "License terms ↗",
+                                    ))
+                                    .on_press(Message::OpenCommonsPage(license_url.clone()))
+                                    .padding([2, 6])
+                                    .class(cosmic::theme::Button::Text),
                                 );
                             }
                         }
@@ -11627,13 +11624,10 @@ impl cosmic::Application for AppModel {
                 // The monitor query reports the entire display, not its
                 // usable work area. Build the popup positioner first to get
                 // the real anchor rectangle of the source panel.
-                let mut settings = self.core.applet.get_popup_settings(
-                    main_window_id,
-                    id,
-                    None,
-                    None,
-                    None,
-                );
+                let mut settings =
+                    self.core
+                        .applet
+                        .get_popup_settings(main_window_id, id, None, None, None);
                 let source_panel_height = if self.core.applet.is_horizontal() {
                     (settings.positioner.anchor_rect.height.max(0)
                         + settings.positioner.offset.1.abs()) as f32
@@ -11642,10 +11636,8 @@ impl cosmic::Application for AppModel {
                 };
                 let max_height = popup_available_height(monitor_height, source_panel_height);
                 self.popup_max_height = Some(max_height);
-                settings.positioner.size = Some((
-                    720,
-                    max_height.ceil().clamp(1.0, u32::MAX as f32) as u32,
-                ));
+                settings.positioner.size =
+                    Some((720, max_height.ceil().clamp(1.0, u32::MAX as f32) as u32));
                 settings.positioner.size_limits = Limits::NONE
                     .max_width(720.0)
                     .min_width(720.0)
