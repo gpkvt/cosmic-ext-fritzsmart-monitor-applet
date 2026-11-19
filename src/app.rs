@@ -1406,30 +1406,6 @@ fn netatmo_weather_extra_metrics(
     metrics
 }
 
-/// Keep non-temperature Netatmo measurements visible when a device row is
-/// collapsed. Temperature and humidity already occupy the aligned value columns.
-/// Never show cached metrics from unreachable or stale modules.
-fn netatmo_collapsed_readings(sensor: &NetatmoSensor) -> String {
-    if !sensor.reachable {
-        return "Netatmo · Unavailable".to_string();
-    }
-    let mut readings = Vec::new();
-    for (metric, label, unit) in crate::netatmo::METRICS {
-        if matches!(metric, "temperature" | "humidity") {
-            continue;
-        }
-        if let Some(value) = crate::netatmo::metric_value(sensor, metric) {
-            let precision = if matches!(metric, "rain" | "wind") { 1 } else { 0 };
-            readings.push(format!("{label} {value:.precision$} {unit}"));
-        }
-    }
-    if readings.is_empty() {
-        "Netatmo · Weather Station".to_string()
-    } else {
-        format!("Netatmo · {}", readings.join(" · "))
-    }
-}
-
 fn weather_detail_metric_label(label: String, value: String) -> cosmic::Element<'static, Message> {
     widget::Column::new()
         .spacing(2)
@@ -2845,21 +2821,39 @@ fn collapsible_graph(
     graph: cosmic::Element<'static, Message>,
     copy_feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
+    collapsible_graph_with_current_value(title, section_id, collapsed, graph, copy_feedback, None)
+}
+
+/// The value is part of the disclosure header only when the graph is collapsed.
+/// Other graph sections keep their existing header layout.
+fn collapsible_graph_with_current_value(
+    title: &'static str,
+    section_id: impl Into<String>,
+    collapsed: bool,
+    graph: cosmic::Element<'static, Message>,
+    copy_feedback: Option<&CopyFeedback>,
+    current_value: Option<String>,
+) -> cosmic::Element<'static, Message> {
     let section_id = section_id.into();
+    let mut heading_content = widget::Row::new()
+        .spacing(8)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(widget::text::caption(title))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill));
+    if collapsed {
+        if let Some(value) = current_value {
+            heading_content = heading_content.push(widget::text::body(value));
+        }
+    }
     let heading = widget::button::custom(
-        widget::Row::new()
-            .spacing(8)
-            .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::text::caption(title))
-            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-            .push(
-                widget::icon::from_name(if collapsed {
-                    "go-next-symbolic"
-                } else {
-                    "go-down-symbolic"
-                })
-                .size(16),
-            ),
+        heading_content.push(
+            widget::icon::from_name(if collapsed {
+                "go-next-symbolic"
+            } else {
+                "go-down-symbolic"
+            })
+            .size(16),
+        ),
     )
     .on_press(Message::ToggleMenuSection(section_id))
     .width(cosmic::iced::Length::Fill)
@@ -2933,6 +2927,28 @@ fn hue_sensor_metric_graph(
     collapsible_graph(label, section_id, collapsed, graph, copy_feedback)
 }
 
+/// Report only live, finite sensor readings in collapsed Netatmo graph
+/// headings. Do not use history as a fallback for stale/offline modules.
+fn netatmo_graph_current_value(
+    sensor: &NetatmoSensor,
+    metric: &str,
+    settings: &FritzSettings,
+) -> String {
+    let Some(value) = crate::netatmo::metric_value(sensor, metric) else {
+        return "—".to_string();
+    };
+    match metric {
+        "temperature" => format_temperature(value, &settings.temperature_unit),
+        "humidity" => format!("{value:.0} %"),
+        "co2" => format!("{value:.0} ppm"),
+        "pressure" => format!("{value:.0} hPa"),
+        "noise" => format!("{value:.0} dB"),
+        "rain" => format!("{value:.1} mm"),
+        "wind" => format!("{value:.1} km/h"),
+        _ => "—".to_string(),
+    }
+}
+
 /// Netatmo modules are read-only. Only recorded, finite measurements
 /// appear in their respective collapsible history graphs.
 fn netatmo_metric_graph(
@@ -2983,7 +2999,14 @@ fn netatmo_metric_graph(
             )
         }
     };
-    collapsible_graph(label, section_id, collapsed, graph, copy_feedback)
+    collapsible_graph_with_current_value(
+        label,
+        section_id,
+        collapsed,
+        graph,
+        copy_feedback,
+        collapsed.then(|| netatmo_graph_current_value(sensor, metric, settings)),
+    )
 }
 
 /// Full-width compact plot for each actual daily metric. Missing daily
@@ -9077,10 +9100,12 @@ impl cosmic::Application for AppModel {
                     let id = format!("NETATMO:{}", sensor.id);
                     let row_key = format!("2-{id}");
                     let expanded = is_device_expanded(&self.expanded_devices, &id);
-                    let temperature = crate::netatmo::metric_value(sensor, "temperature")
-                        .map(|value| format_temperature(value, &self.settings.temperature_unit))
+                    let temperature = sensor
+                        .temperature_c
+                        .filter(|_| sensor.reachable)
+                        .map(|temperature| format_temperature(temperature, &self.settings.temperature_unit))
                         .unwrap_or_else(|| "—".into());
-                    let humidity = crate::netatmo::metric_value(sensor, "humidity")
+                    let humidity = sensor.humidity_percent
                         .map(|value| format!("{value:.0} %"))
                         .unwrap_or_else(|| "—".into());
                     let heading = widget::Row::new()
@@ -9095,11 +9120,7 @@ impl cosmic::Application for AppModel {
                                     .spacing(2)
                                     .width(cosmic::iced::Length::Fill)
                                     .push(widget::text::body(sensor.name.clone()))
-                                    .push(widget::text::caption(if expanded {
-                                        "Netatmo · Weather Station".to_string()
-                                    } else {
-                                        netatmo_collapsed_readings(sensor)
-                                    })))
+                                    .push(widget::text::caption("Netatmo · Weather Station")))
                                 .push(widget::icon::from_name(if expanded {
                                     "go-up-symbolic"
                                 } else {
@@ -9128,9 +9149,8 @@ impl cosmic::Application for AppModel {
                         .list_item_padding([0, 0])
                         .add(heading);
                     if expanded {
-                        let fmt = |key: &str, unit: &str| -> String {
-                            crate::netatmo::metric_value(sensor, key)
-                                .map(|value| format!("{value:.1} {unit}"))
+                        let fmt = |v: Option<f64>, unit: &str| -> String {
+                            v.map(|value| format!("{value:.1} {unit}"))
                                 .unwrap_or_else(|| "—".into())
                         };
                         let mut details = widget::Column::new()
@@ -9141,12 +9161,12 @@ impl cosmic::Application for AppModel {
                             } else {
                                 "Netatmo Weather Station · offline or stale data"
                             }))
-                            .push(widget::text::caption(format!("Humidity · {}", fmt("humidity", "%"))))
-                            .push(widget::text::caption(format!("CO₂ · {}", fmt("co2", "ppm"))))
-                            .push(widget::text::caption(format!("Pressure · {}", fmt("pressure", "hPa"))))
-                            .push(widget::text::caption(format!("Noise · {}", fmt("noise", "dB"))))
-                            .push(widget::text::caption(format!("Rain · {}", fmt("rain", "mm"))))
-                            .push(widget::text::caption(format!("Wind · {}", fmt("wind", "km/h"))))
+                            .push(widget::text::caption(format!("Humidity · {}", fmt(sensor.humidity_percent, "%"))))
+                            .push(widget::text::caption(format!("CO₂ · {}", fmt(sensor.co2_ppm, "ppm"))))
+                            .push(widget::text::caption(format!("Pressure · {}", fmt(sensor.pressure_hpa, "hPa"))))
+                            .push(widget::text::caption(format!("Noise · {}", fmt(sensor.noise_db, "dB"))))
+                            .push(widget::text::caption(format!("Rain · {}", fmt(sensor.rain_mm, "mm"))))
+                            .push(widget::text::caption(format!("Wind · {}", fmt(sensor.wind_kmh, "km/h"))))
                             .push(widget::text::caption("No wattage or power history: Netatmo Weather Stations do not measure mains power."));
                         for (metric, label, unit) in crate::netatmo::METRICS {
                             if crate::netatmo::metric_value(sensor, metric).is_some()
@@ -9171,7 +9191,7 @@ impl cosmic::Application for AppModel {
                     device_sort_metadata.insert(
                         row_key.clone(),
                         (sensor.name.to_lowercase(), None,
-                            crate::netatmo::metric_value(sensor, "temperature")),
+                            sensor.temperature_c.filter(|_| sensor.reachable)),
                     );
                     menu_cards.push((row_key, widget::container(card)
                         .width(cosmic::iced::Length::Fill).into()));
@@ -13502,53 +13522,42 @@ mod history_tests {
     }
 
     #[test]
-    fn collapsed_netatmo_rows_show_all_available_live_secondary_values() {
+    fn collapsed_netatmo_graph_headings_show_live_values_in_correct_units() {
         let sensor = NetatmoSensor {
-            id: "office".into(),
+            id: "indoor-1".into(),
             name: "Office".into(),
             is_outdoor: false,
-            temperature_c: Some(21.5),
-            humidity_percent: Some(49.0),
+            temperature_c: Some(20.0),
+            humidity_percent: Some(51.0),
             co2_ppm: Some(1250.0),
             pressure_hpa: Some(1013.0),
             noise_db: Some(43.0),
-            rain_mm: None,
-            wind_kmh: None,
-            reachable: true,
-        };
-        assert_eq!(
-            netatmo_collapsed_readings(&sensor),
-            "Netatmo · CO₂ 1250 ppm · Pressure 1013 hPa · Noise 43 dB"
-        );
-        let rain = NetatmoSensor {
-            temperature_c: None,
-            humidity_percent: None,
-            co2_ppm: None,
-            pressure_hpa: None,
-            noise_db: None,
             rain_mm: Some(1.25),
             wind_kmh: Some(12.5),
-            ..sensor.clone()
+            reachable: true,
         };
+        let mut settings = FritzSettings::default();
+        settings.temperature_unit = "F".into();
+        assert_eq!(netatmo_graph_current_value(&sensor, "temperature", &settings), "68 °F");
+        assert_eq!(netatmo_graph_current_value(&sensor, "humidity", &settings), "51 %");
+        assert_eq!(netatmo_graph_current_value(&sensor, "co2", &settings), "1250 ppm");
+        assert_eq!(netatmo_graph_current_value(&sensor, "pressure", &settings), "1013 hPa");
+        assert_eq!(netatmo_graph_current_value(&sensor, "noise", &settings), "43 dB");
+        assert_eq!(netatmo_graph_current_value(&sensor, "rain", &settings), "1.2 mm");
+        assert_eq!(netatmo_graph_current_value(&sensor, "wind", &settings), "12.5 km/h");
         assert_eq!(
-            netatmo_collapsed_readings(&rain),
-            "Netatmo · Rain 1.2 mm · Wind 12.5 km/h"
-        );
-        assert_eq!(
-            netatmo_collapsed_readings(&NetatmoSensor {
+            netatmo_graph_current_value(&NetatmoSensor {
                 reachable: false,
                 ..sensor.clone()
-            }),
-            "Netatmo · Unavailable"
+            }, "co2", &settings),
+            "—"
         );
         assert_eq!(
-            netatmo_collapsed_readings(&NetatmoSensor {
+            netatmo_graph_current_value(&NetatmoSensor {
                 co2_ppm: Some(f64::NAN),
-                pressure_hpa: None,
-                noise_db: None,
                 ..sensor
-            }),
-            "Netatmo · Weather Station"
+            }, "co2", &settings),
+            "—"
         );
     }
 
