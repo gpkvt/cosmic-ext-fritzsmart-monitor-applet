@@ -994,7 +994,8 @@ fn output_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i6
     readings
         .iter()
         .filter(|reading| {
-            !input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+            reading.has_power_meter
+                && !input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
         })
         .map(|reading| reading.power_w)
         .sum()
@@ -2090,7 +2091,8 @@ fn input_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64
     readings
         .iter()
         .filter(|reading| {
-            input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+            reading.has_power_meter
+                && input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
         })
         .map(|reading| signed_device_power(reading.power_w, true))
         .sum()
@@ -2271,6 +2273,10 @@ fn record_device_sample(
     now: Instant,
     window: Duration,
 ) {
+    // Never write a fabricated 0 W history sample for a sensor or thermostat.
+    if !reading.has_power_meter {
+        return;
+    }
     let samples = history
         .entry(crate::fritz::normalize_ain_for_selection(&reading.ain))
         .or_default();
@@ -2457,6 +2463,7 @@ fn displayed_power_w(readings: &[FritzReading], selected_ains: &[String]) -> Opt
             })
         })
         .or_else(|| readings.first())
+        .filter(|reading| reading.has_power_meter)
         .map(|reading| reading.power_w)
 }
 
@@ -2474,7 +2481,8 @@ fn energy_flow_values(
     input_ains: &HashSet<String>,
 ) -> Option<EnergyFlow> {
     let has_solar_reading = readings.iter().any(|reading| {
-        input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+        reading.has_power_meter
+            && input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
     });
     if !has_solar_reading {
         return None;
@@ -13946,6 +13954,7 @@ mod device_list_sort_tests {
             ain: ain.into(),
             name: name.into(),
             power_w,
+            has_power_meter: true,
             temperature_c,
             power_state: None,
             power_controllable: false,
