@@ -2625,6 +2625,58 @@ fn collapsible_graph(
     section.into()
 }
 
+/// Temperature and illuminance have independent histories and disclosures.
+/// Only actual samples are drawn; a collapsed graph is never constructed.
+fn hue_sensor_metric_graph(
+    history: &crate::history::HueSensorHistory,
+    sensor: &HueSensor,
+    temperature: bool,
+    language: &str,
+    unit: &str,
+    style: &str,
+    timespan_minutes: u32,
+    collapsed_sections: &HashSet<String>,
+    copy_feedback: Option<&CopyFeedback>,
+) -> cosmic::Element<'static, Message> {
+    let kind = if temperature { "temperature" } else { "lux" };
+    let section_id = format!("hue-sensor-graph-{kind}-{}", sensor.id);
+    let collapsed = collapsed_sections.contains(&section_id);
+    let label = if temperature {
+        if unit == "F" {
+            "TEMPERATURE (°F)"
+        } else {
+            "TEMPERATURE (°C)"
+        }
+    } else {
+        "ILLUMINANCE (lx)"
+    };
+    let measurement_unit = if temperature {
+        if unit == "F" { "°F" } else { "°C" }
+    } else {
+        "lx"
+    };
+    let graph: cosmic::Element<'static, Message> = if collapsed {
+        widget::text("").into()
+    } else {
+        let full = hue_sensor_graph_samples(history, &sensor.id, temperature, unit == "F");
+        let samples = graph_values_for_timespan(&full, timespan_minutes);
+        if samples.len() < 2 {
+            widget::text::caption("Not enough recorded sensor readings to draw a graph").into()
+        } else {
+            let start = graph_axis_start_for_samples(&samples, timespan_minutes);
+            interactive_graph_with_axis(
+                language,
+                &format!("{} · {label}", sensor.name),
+                samples.into_iter(),
+                style,
+                measurement_unit,
+                start,
+            )
+        }
+    };
+    collapsible_graph(label, section_id, collapsed, graph, copy_feedback)
+}
+
 /// Full-width compact plot for each actual daily metric. Missing daily
 /// readings are omitted rather than plotted as fabricated zero measurements.
 /// Each recorded daily trend owns its own persisted disclosure state.
@@ -8269,18 +8321,37 @@ impl cosmic::Application for AppModel {
                         .list_item_padding([0, 0])
                         .add(heading);
                     if expanded {
-                        card = card.add(
-                            widget::container(
-                                widget::Column::new()
-                                    .spacing(4)
-                                    .push(widget::text::caption(format!("Motion · {motion}")))
-                                    .push(widget::text::caption(format!("Illuminance · {lux}")))
-                                    .push(widget::text::caption(
-                                        "Hue Bridge · Sensor · No measured W or power history",
-                                    )),
-                            )
-                            .padding([8, 12]),
-                        );
+                        let details = widget::Column::new()
+                            .spacing(10)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::caption(format!("Motion · {motion}")))
+                            .push(widget::text::caption(format!("Illuminance · {lux}")))
+                            .push(widget::text::caption(
+                                "Hue Bridge · Sensor · No measured W or power history",
+                            ))
+                            .push(hue_sensor_metric_graph(
+                                &self.hue_sensor_history,
+                                sensor,
+                                true,
+                                &self.settings.language,
+                                &self.settings.temperature_unit,
+                                &self.settings.graph_style,
+                                self.settings.graph_timespan_minutes,
+                                &self.collapsed_menu_sections,
+                                self.copy_feedback.as_ref(),
+                            ))
+                            .push(hue_sensor_metric_graph(
+                                &self.hue_sensor_history,
+                                sensor,
+                                false,
+                                &self.settings.language,
+                                &self.settings.temperature_unit,
+                                &self.settings.graph_style,
+                                self.settings.graph_timespan_minutes,
+                                &self.collapsed_menu_sections,
+                                self.copy_feedback.as_ref(),
+                            ));
+                        card = card.add(widget::container(details).padding([8, 12]));
                     }
                     device_sort_metadata.insert(
                         row_key.clone(),
