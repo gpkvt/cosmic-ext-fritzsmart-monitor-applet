@@ -134,11 +134,11 @@ Use a router hostname that resolves on your local network. HTTPS is supported an
 
 The popup provides a live overview and individual cards for selected devices. Power readings are grouped into independent views:
 
-- **Total power out** — generated/output power.
-- **Total power in** — signed input power from devices configured as inputs.
-- **Power difference** — the combined net value.
+- **Total power output** — current output power and its recorded history.
+- **Total power input** — current input power and its recorded history, shown alongside output in a shared graph.
+- **Today and yesterday** — separate input/output energy readings in Wh and their input-to-output percentage when both readings are available.
 
-Input devices do not silently alter the output total. Configure the **Input** option for each device according to what it measures. Devices with “solar” in their name are initially suggested as inputs when discovered; manual choices are retained.
+Input and output totals are displayed independently; the applet does not subtract one from the other in the shared overview. Set each device's **Input** option according to what it measures. Devices with “solar” in their name are initially suggested as inputs when discovered; manual choices are retained.
 
 Depending on the device and firmware, the popup can also provide a supported power switch. The control is verified against the router and refreshed device state.
 
@@ -151,19 +151,22 @@ Panel settings control the displayed text size and optional metrics:
 - Exclude devices whose names contain “solar” from that average.
 - Optionally combine consumption and solar generation into a net panel value.
 
-The popup sections can be arranged in Settings and collapsed independently. Device cards show their current power and temperature values and can expose individual history graphs.
+The popup's section order and device order can be changed separately in Settings. Sections, individual device cards and their graphs can be collapsed independently. Their expanded/collapsed states, Quick Settings disclosure, weather forecast/attribution disclosure and diagnostics history JSON disclosure are saved in the local configuration and restored on restart. The scroll position is not saved. Device cards show live power and temperature when available, and support individual history graphs. Click the copy icon next to a menu heading to copy its title without expanding the section.
 
 ### Refresh and history
 
 Power monitoring and weather use independent refresh schedules. Power refresh can be configured from 30 seconds to one hour (default: 60 seconds); weather refresh can be configured from 5 to 60 minutes (default: 10 minutes).
 
-Graph history retention is configurable from 5 minutes up to 4 years. Samples are stored locally and restored after restarting the applet. Sampling adapts to the selected retention period and is bounded to keep storage manageable. Graphs visualize recorded readings; they do not calculate daily energy yield or provide forecasts.
+Graph history retention is configurable from 5 minutes up to 4 years. Samples are stored locally and restored after restarting the applet. Sampling adapts to the selected retention period and is bounded to keep storage manageable. The popup also estimates solar-input and grid-consumption energy in Wh per day for the most recent 7 days from available samples; this is historical estimation, not an inverter yield forecast.
 
-History is stored at:
+History and settings are stored separately:
 
 ```text
-~/.local/share/fritz-power-monitor/history.json
+~/.local/share/fritz-power-monitor/history.json  # recorded samples
+~/.config/fritz_solar.cfg                     # settings and disclosure state
 ```
+
+Configuration is written atomically with owner-only file permissions. An unreadable or invalid setting may fall back to its safe default; unsupported section identifiers are filtered. Back up the configuration file before manually editing it.
 
 ### Temperature alerts
 
@@ -202,7 +205,9 @@ Run the basic project checks locally:
 
 ```sh
 cargo fmt --all -- --check
-cargo test
+cargo check --locked --all-targets
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked --all-targets
 cargo build --release
 ```
 
