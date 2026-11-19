@@ -207,7 +207,7 @@ Weather is optional and requires an [OpenWeatherMap API key](https://openweather
 
 To replace OpenWeatherMap's outdoor temperature, open **Devices** settings and enable **Outdoor temperature source** on the desired device. Only one device can be selected; the first device whose name contains “solar” is selected by default. Selecting a source automatically includes that device in monitored readings. Disable the option on that device to return to OpenWeatherMap.
 
-The weather card can show current conditions, feels-like temperature, humidity, wind, pressure, cloud cover, visibility, sunrise and sunset, and the forecast. Its illustrative background image is selected to match the reported weather condition and is sourced from Wikimedia Commons; it is not a live camera view of the configured location. If image lookup is unavailable, the card falls back to its normal appearance.
+The weather card can show current conditions, feels-like temperature, humidity, wind, pressure, cloud cover, visibility, sunrise and sunset, and the forecast. When a Wikimedia Commons background has an attributed source, the source file link stays visible immediately below the photograph and opens that file's page. The attribution expander reveals photo credits, individual source links (for combined frames) and license terms below the clipped image rather than hiding them behind it. Its illustrative background image is selected to match the reported weather condition and is sourced from Wikimedia Commons; it is not a live camera view of the configured location. If image lookup is unavailable, the card falls back to its normal appearance.
 
 Weather is optional. Weather service failures are independent of FRITZ!Box monitoring.
 
