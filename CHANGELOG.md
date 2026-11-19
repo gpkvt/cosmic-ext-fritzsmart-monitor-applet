@@ -1,5 +1,9 @@
 # Changelog
 
+### Changed
+
+- Simplify large graph time-axis labels to whole-hour intervals (for example, `6h ago`) instead of showing minute-level elapsed durations.
+
 ### Added
 
 - Give total power input its own historical graph, matching the total power output graph, with independent history samples and input low/high readings.
