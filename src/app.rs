@@ -7529,6 +7529,7 @@ impl cosmic::Application for AppModel {
                             widget::Row::new()
                                 .spacing(8)
                                 .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                                 .push(widget::text::caption(crate::i18n::tr(
                                     &self.settings.language,
                                     "QUICK SETTINGS",
