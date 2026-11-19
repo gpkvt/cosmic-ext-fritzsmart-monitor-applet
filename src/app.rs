@@ -715,10 +715,6 @@ fn format_temperature(temperature_c: f64, unit: &str) -> String {
     }
 }
 
-fn format_panel_temperature(temperature_c: f64) -> String {
-    format_temperature(temperature_c, "C")
-}
-
 fn format_countdown(seconds: u64) -> String {
     let hours = seconds / 3600;
     let minutes = (seconds % 3600) / 60;
@@ -2471,8 +2467,8 @@ fn total_power_overview(
     let input_values: GraphSamples = input_history.iter().map(|(timestamp, value)| (*timestamp, input_display_power_w(*value) as f64)).collect();
     let graph_title = format!(
         "{} & {}",
-        crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
-        crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT")
+        crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
+        crate::i18n::tr(&settings.language, "TOTAL POWER INPUT")
     );
     let graph = if has_input_readings {
         let (output_aligned, input_aligned) = aligned_power_series(
@@ -9926,9 +9922,9 @@ mod history_tests {
 
     #[test]
     fn panel_temperature_omits_trailing_decimal_zero() {
-        assert_eq!(format_panel_temperature(20.0), "20 °C");
-        assert_eq!(format_panel_temperature(20.5), "20.5 °C");
-        assert_eq!(format_panel_temperature(-3.0), "-3 °C");
+        assert_eq!(format_temperature(20.0, "C"), "20 °C");
+        assert_eq!(format_temperature(20.5, "C"), "20.5 °C");
+        assert_eq!(format_temperature(-3.0, "C"), "-3 °C");
     }
 
     #[test]
