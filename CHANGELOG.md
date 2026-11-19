@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- Show daily input-to-output energy percentages for today and yesterday in Current Power History; omit the ratio when output energy is unavailable or zero.
+
 ### Fixed
 
 - Treat paired readings as single ordering units in two-line panel mode, and hide movement controls that cannot change the visible group order.
