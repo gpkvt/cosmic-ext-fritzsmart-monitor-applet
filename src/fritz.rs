@@ -197,6 +197,8 @@ pub struct FritzSettings {
     pub input_ains: HashSet<String>,
     pub input_defaults_initialized: bool,
     pub weather_enabled: bool,
+    /// Show unique Netatmo measurements below the OpenWeatherMap weather card.
+    pub weather_netatmo_extra_metrics: bool,
     pub openweathermap_api_key: String,
     pub weather_location: String,
     pub weather_temperature_ain: String,
@@ -262,6 +264,7 @@ impl Default for FritzSettings {
             input_ains: HashSet::new(),
             input_defaults_initialized: false,
             weather_enabled: false,
+            weather_netatmo_extra_metrics: false,
             openweathermap_api_key: String::new(),
             weather_location: String::new(),
             weather_temperature_ain: String::new(),
@@ -711,6 +714,7 @@ impl FritzSettings {
             input_defaults_initialized: get("INPUT_DEFAULTS_INITIALIZED")
                 .eq_ignore_ascii_case("true"),
             weather_enabled: get("WEATHER_ENABLED").eq_ignore_ascii_case("true"),
+            weather_netatmo_extra_metrics: get("WEATHER_NETATMO_EXTRA_METRICS").eq_ignore_ascii_case("true"),
             openweathermap_api_key: get("OPENWEATHERMAP_API_KEY"),
             weather_location: get("WEATHER_LOCATION"),
             weather_temperature_ain: get("WEATHER_TEMPERATURE_AIN"),
@@ -997,6 +1001,10 @@ impl FritzSettings {
         );
         // Keep rotating Netatmo OAuth refresh tokens in the same owner-only
         // atomic settings file as the existing Hue and router credentials.
+        contents.push_str(&format!(
+            "WEATHER_NETATMO_EXTRA_METRICS={}\n",
+            if self.weather_netatmo_extra_metrics { "true" } else { "false" },
+        ));
         contents.push_str(&format!(
             "NETATMO_CLIENT_ID={}\nNETATMO_CLIENT_SECRET={}\nNETATMO_REFRESH_TOKEN={}\nNETATMO_HIDDEN_DEVICES={}\nNETATMO_CO2_ALERTS={}\n",
             self.netatmo_client_id,
