@@ -6604,7 +6604,7 @@ impl cosmic::Application for AppModel {
                                         format!(
                                             "{} W · {}",
                                             reading.power_w,
-                                            format_panel_temperature(reading.temperature_c)
+                                            format_temperature(reading.temperature_c, &self.settings.temperature_unit)
                                         )
                                     })),
                             )
@@ -9922,6 +9922,15 @@ mod history_tests {
         assert_eq!(format_panel_temperature(20.0), "20 °C");
         assert_eq!(format_panel_temperature(20.5), "20.5 °C");
         assert_eq!(format_panel_temperature(-3.0), "-3 °C");
+    }
+
+    #[test]
+    fn temperature_conversion_supports_fahrenheit_without_rounding_source_data() {
+        assert_eq!(temperature_in_unit(0.0, "F"), 32.0);
+        assert_eq!(temperature_in_unit(100.0, "F"), 212.0);
+        assert_eq!(temperature_in_unit(20.0, "C"), 20.0);
+        assert_eq!(format_temperature(20.0, "F"), "68 °F");
+        assert_eq!(format_temperature(-3.0, "F"), "26.6 °F");
     }
 
     #[test]
