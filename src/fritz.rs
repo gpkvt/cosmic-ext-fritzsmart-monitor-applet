@@ -2573,6 +2573,7 @@ mod tests {
     #[test]
     fn weather_settings_have_safe_defaults_and_clamped_refresh_interval() {
         let settings = FritzSettings::default();
+        assert!(settings.tasmota_subnet_scan);
         assert!(!settings.weather_enabled);
         assert!(!settings.panel_exclude_solar_temperature);
         assert!(!settings.panel_internet_bandwidth);
