@@ -3467,15 +3467,16 @@ impl cosmic::Application for AppModel {
                 })
             })
             .or_else(|| self.readings.first());
-        let power = if self.settings.panel_net_power {
+        // Keep import and export as separate panel readings. Do not net
+        // them against each other: the two rows show the actual IN and OUT
+        // flows independently.
+        let power = if self.error.is_none() {
             format!(
                 "{} W",
-                net_power_w(&self.readings, &self.settings.input_ains)
+                output_power_w(&self.readings, &self.settings.input_ains)
             )
         } else {
-            primary_reading
-                .map(|reading| format!("{} W", reading.power_w))
-                .unwrap_or_else(|| "-- W".to_string())
+            "-- W".to_string()
         };
         let temperature = if self.settings.panel_average_temperature {
             average_selected_temperature_c(
@@ -3500,7 +3501,10 @@ impl cosmic::Application for AppModel {
             .then(|| {
                 format!(
                     "{} W",
-                    input_power_w(&self.readings, &self.settings.input_ains)
+                    input_display_power_w(input_power_w(
+                        &self.readings,
+                        &self.settings.input_ains,
+                    ))
                 )
             });
 
@@ -3715,11 +3719,7 @@ impl cosmic::Application for AppModel {
                 panel_items.push((
                     "power-consumption",
                     panel_item(
-                        if self.settings.panel_net_power && input_power.is_some() {
-                            "Net power"
-                        } else {
-                            "Power consumption"
-                        },
+                        "Watt OUT",
                         Some(
                             widget::svg(widget::svg::Handle::from_memory(
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5M16 3v5"/><path d="M6 8h12v3a6 6 0 0 1-6 6h0a6 6 0 0 1-6-6V8Z"/><path d="M12 17v2a3 3 0 0 0 3 3h1"/></svg>"#.to_vec(),
@@ -3743,7 +3743,7 @@ impl cosmic::Application for AppModel {
                 panel_items.push((
                     "solar-power",
                     panel_item(
-                        "Solar power",
+                        "Watt IN",
                         Some(
                             widget::svg(widget::svg::Handle::from_memory(
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2-5h14l2 5H3Z"/><path d="M4 9h16l-2 11H6L4 9Z"/><path d="M8 9l1 11M16 9l-1 11M5 13h14M6 17h12"/><path d="M12 1v2M2 5l2 1M22 5l-2 1"/></svg>"#.to_vec(),
