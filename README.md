@@ -23,7 +23,7 @@ FRITZ!Power Monitor connects directly to your router. It brings household power 
 ## At a glance
 
 - Live power and temperature readings from selected FRITZ!Box Smart Home devices.
-- Separate power input, output and net-difference summaries, with device-level history.
+- Separate power input and output summaries, with independent device-level history and no automatic subtraction.
 - Optional internet download and upload rates in the COSMIC panel.
 - Optional OpenWeatherMap conditions, forecast and weather-matched Wikimedia Commons imagery.
 - Configurable refresh intervals, graph retention, panel display and popup layout.
@@ -173,7 +173,7 @@ Panel settings control the displayed text size and optional metrics:
 - Show internet download and upload rates separately.
 - Show an average temperature across selected devices.
 - Exclude devices whose names contain “solar” from that average.
-- Optionally combine consumption and solar generation into a net panel value.
+- Show measured power inputs and outputs separately; enable solar/input options only when at least one input device is configured.
 
 The popup's section order and device order can be changed separately in Settings. Each device row now keeps the name and expand arrow together, followed by aligned wattage, temperature, History, Copy and power-toggle controls. Select the **Name**, **W**, or **°C/°F** column heading to sort ascending or descending; the saved manual order remains the default and can be adjusted in Settings. The selected sort persists across restarts. The popup uses the available monitor height rather than a fixed 85% cap. It is anchored outside the COSMIC panel, and Wayland can resize it vertically to fit the remaining area around the panel and dock; the title bar and footer remain visible while the menu or settings body scrolls. Sections, individual device cards and their graphs can be collapsed independently. Their expanded/collapsed states, Quick Settings disclosure, weather forecast/attribution disclosure and diagnostics history JSON disclosure are saved in the local configuration and restored on restart. The scroll position is not saved. Device cards show live power and temperature when available, and support individual history graphs. Click the copy icon next to a menu heading to copy its title without expanding the section.
 
@@ -249,7 +249,7 @@ The interface supports English, German, Spanish, Dutch, French, Italian, Swedish
 
 ## Checks
 
-Run the basic project checks locally:
+Run the basic project checks locally (GitHub Actions workflows are disabled):
 
 ```sh
 cargo fmt --all -- --check
@@ -259,7 +259,7 @@ cargo test --locked --all-targets
 cargo build --release
 ```
 
-**Automation status:** All GitHub Actions workflow definitions were intentionally removed from `.github/workflows/` in [PR #835](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/835). The neutral **GitHub Actions: disabled** badge above reflects that state; it is not a passing build or security result. The release and license badges reflect repository metadata independently of CI. Run the checks above locally; automatic builds, tests, security scans, package releases and Pages deployments are currently unavailable.
+**Automation status:** All repository GitHub Actions workflow definitions were intentionally removed from `.github/workflows/` in [PR #835](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/835). GitHub's separately managed **CodeQL default setup** may still create checks; its Actions-language analysis cannot extract deleted workflow files. Disable that analysis language in **Settings → Code security → Code scanning → CodeQL default setup**, or restore workflows if CI is wanted again. The neutral **GitHub Actions: disabled** badge above reflects that state; it is not a passing build or security result. The release and license badges reflect repository metadata independently of CI. Run the checks above locally; automatic builds, tests, security scans, package releases and Pages deployments are currently unavailable.
 
 ## Request changes with ChatGPT
 
@@ -282,7 +282,7 @@ The local checkout includes a command-line helper for development:
 | `make build` | Compile the application in release mode locally. |
 | `make install` | Build and install the applet to your user profile, then reload COSMIC Panel. |
 
-The scripts still contain commands such as `make publish-pages`, `make publish-release` and `make build-release`, but **these cannot dispatch a job while the corresponding GitHub Actions workflows are absent**. Historical releases and Actions results remain accessible; they do not represent current CI status. Packaging can still be performed locally using `packaging/build-linux-packages.sh` with its native dependencies installed.
+The scripts still contain commands such as `make publish-pages`, `make publish-release` and `make build-release`, but **these cannot dispatch a job while the corresponding GitHub Actions workflows are absent**. They now report a clear local error before requiring GitHub authentication. Historical releases and Actions results remain accessible; they do not represent current CI status. Packaging can still be performed locally using `packaging/build-linux-packages.sh` with its native dependencies installed.
 
 ## Data, security and privacy
 
