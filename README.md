@@ -179,6 +179,8 @@ A failed device reading is retried up to three times before its entry appears un
 
 Power monitoring and weather use independent refresh schedules. Power refresh can be configured from 30 seconds to one hour (default: 60 seconds); weather refresh can be configured from 5 to 60 minutes (default: 10 minutes).
 
+The **Daily Energy · Last 7 Days** list shows recorded solar input (Wh), grid usage (Wh), and their **input/output percentage** for each day. The collapsed heading shows **today's percentage**. Percentages use solar input ÷ grid usage × 100 and can exceed 100%; missing input, missing output, or zero output is displayed as **—**, not 0%.
+
 Graph history retention is configurable from 5 minutes up to 4 years. Samples are stored locally and restored after restarting the applet. Sampling adapts to the selected retention period and is bounded to keep storage manageable. The popup also estimates solar-input and grid-consumption energy in Wh per day for the most recent 7 days from available samples; this is historical estimation, not an inverter yield forecast.
 
 History and settings are stored separately:
