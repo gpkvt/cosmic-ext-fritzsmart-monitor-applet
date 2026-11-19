@@ -8707,6 +8707,7 @@ impl cosmic::Application for AppModel {
                     }
                     Err(error) => {
                         self.internet_bandwidth = None;
+                        self.fritzbox_system_info = None;
                         // A failed global refresh must not leave old measurements
                         // visible as if they were live readings.
                         self.readings.clear();
