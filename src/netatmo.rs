@@ -64,7 +64,11 @@ fn parse_module(module: &Value, fallback_name: &str, now_epoch: i64) -> Option<N
         .to_owned();
     let dashboard = module.get("dashboard_data").unwrap_or(&Value::Null);
     let time = dashboard.get("time_utc").and_then(Value::as_i64);
-    let fresh = time.is_some_and(|t| (0..=MAX_READING_AGE_SECONDS).contains(&(now_epoch - t)));
+    // A malformed or future API timestamp must not overflow arithmetic or
+    // turn an old measurement into a seemingly live value.
+    let fresh = time
+        .and_then(|stamp| now_epoch.checked_sub(stamp))
+        .is_some_and(|age| (0..=MAX_READING_AGE_SECONDS).contains(&age));
     let reachable = module.get("reachable").and_then(Value::as_bool).unwrap_or(true)
         && fresh && dashboard.is_object();
     let measured = |key: &str| reachable.then(|| finite(dashboard, key)).flatten();
@@ -339,6 +343,45 @@ mod tests {
         assert!(!sensors[1].reachable);
         assert_eq!(sensors[0].temperature_c, None);
         assert_eq!(sensors[1].temperature_c, None);
+    }
+
+    #[test]
+    fn malformed_future_or_overflow_timestamps_are_not_live() {
+        let response = json!({"body":{"devices":[
+            {"_id":"min","dashboard_data":{"time_utc":i64::MIN,"Temperature":24.0}},
+            {"_id":"future","dashboard_data":{"time_utc":1060,"Temperature":19.0}},
+            {"_id":"recent","dashboard_data":{"time_utc":980,"Temperature":20.0}}
+        ]}});
+        let sensors = parse_stations(&response, 1000).unwrap();
+        assert!(sensors.iter().take(2).all(|s| s.temperature_c.is_none()));
+        assert_eq!(sensors[2].temperature_c, Some(20.0));
+    }
+
+    #[test]
+    fn metric_history_only_records_live_finite_samples() {
+        let mut history = NetatmoHistory::new();
+        let now = std::time::Instant::now();
+        let mut sensor = NetatmoSensor {
+            id: "70:ee:50:11:22:33".into(),
+            name: "Indoor".into(),
+            temperature_c: Some(22.0),
+            humidity_percent: Some(45.0),
+            co2_ppm: Some(900.0),
+            pressure_hpa: None,
+            noise_db: None,
+            rain_mm: None,
+            wind_kmh: None,
+            reachable: true,
+        };
+        record_history(&mut history, &sensor, now, Duration::from_secs(3600));
+        assert_eq!(history[&sensor.id]["temperature"].len(), 1);
+        sensor.reachable = false;
+        sensor.temperature_c = Some(99.0);
+        record_history(&mut history, &sensor, now + Duration::from_secs(300), Duration::from_secs(3600));
+        assert_eq!(history[&sensor.id]["temperature"].len(), 1);
+        sensor.reachable = true;
+        record_history(&mut history, &sensor, now + Duration::from_secs(600), Duration::from_secs(3600));
+        assert_eq!(history[&sensor.id]["temperature"].len(), 2);
     }
 
     #[test]
