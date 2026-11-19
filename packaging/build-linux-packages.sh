@@ -50,6 +50,19 @@ export APP_RELEASE_VERSION
 cargo build --release --locked
 test -x "$BINARY"
 
+# Distribute a portable archive matching the documented user-local install
+# layout. This is an archive rather than a package with installation hooks.
+PORTABLE_NAME="fritz-power-monitor-v${APP_VERSION}-x86_64-unknown-linux-gnu"
+PORTABLE_ROOT="$TEMP_DIR/$PORTABLE_NAME"
+PORTABLE_FILE="$OUTPUT_DIR/$PORTABLE_NAME.tar.gz"
+install -Dm0755 "$BINARY" "$PORTABLE_ROOT/bin/fritz-power-monitor"
+install -Dm0644 "$DESKTOP" "$PORTABLE_ROOT/share/applications/$APP_ID.desktop"
+install -Dm0644 "$ICON" "$PORTABLE_ROOT/share/icons/hicolor/scalable/apps/$APP_ID.svg"
+tar -C "$TEMP_DIR" -czf "$PORTABLE_FILE" "$PORTABLE_NAME"
+tar -tzf "$PORTABLE_FILE" | grep -Fx "$PORTABLE_NAME/bin/fritz-power-monitor" >/dev/null
+tar -tzf "$PORTABLE_FILE" | grep -Fx "$PORTABLE_NAME/share/applications/$APP_ID.desktop" >/dev/null
+tar -tzf "$PORTABLE_FILE" | grep -Fx "$PORTABLE_NAME/share/icons/hicolor/scalable/apps/$APP_ID.svg" >/dev/null
+
 # Build a Debian package and derive runtime dependencies from ELF metadata.
 DEB_ROOT="$TEMP_DIR/deb-package"
 install -Dm0755 "$BINARY" "$DEB_ROOT/usr/bin/fritz-power-monitor"
@@ -193,9 +206,10 @@ test -s "$FLATPAK_FILE"
     cd "$OUTPUT_DIR"
     sha256sum "$(basename "$DEB_FILE")" \
         "$(basename "$APPIMAGE_FILE")" \
-        "$(basename "$FLATPAK_FILE")" > SHA256SUMS
+        "$(basename "$FLATPAK_FILE")" \
+        "$(basename "$PORTABLE_FILE")" > SHA256SUMS
 )
 
 echo "Built packages:"
-printf '  %s\n' "$DEB_FILE" "$APPIMAGE_FILE" "$FLATPAK_FILE"
+printf '  %s\n' "$DEB_FILE" "$APPIMAGE_FILE" "$FLATPAK_FILE" "$PORTABLE_FILE"
 echo "Checksums: $OUTPUT_DIR/SHA256SUMS"
