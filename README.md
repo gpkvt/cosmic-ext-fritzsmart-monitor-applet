@@ -135,7 +135,7 @@ Use a router hostname that resolves on your local network. HTTPS is supported an
 The popup provides a live overview and individual cards for selected devices. Power readings are grouped into independent views:
 
 - **Total power output** — current output power and its recorded history.
-- **Total power input** — current input power and its recorded history, shown alongside output in the **Current Power History** graph. The separate **Total Power Input & Output** section combines the large daily IN/OUT/percentage readings and input/output LOW/HIGH values in one layout, with the current NOW readings at the bottom and no duplicated graph. The input tiles remain visible if a device disconnects; missing history is displayed as `— W`, not zero.
+- **Total power input** — current input power and its recorded history, shown alongside output in the **Current Power History** graph. The separate **Total Power Input & Output** section combines the large daily IN/OUT/percentage readings and input/output LOW/HIGH values in one layout, with LOW, HIGH and NOW as three equal columns for output and input at the bottom, without duplicating the graph. The input tiles remain visible if a device disconnects; missing history is displayed as `— W`, not zero.
 - **Today and yesterday** — two rows of three large values: input energy (Wh), output energy (Wh), and the input/output percentage. Missing readings display a dash, not a zero.
 
 Input and output totals are displayed independently; the applet does not subtract one from the other in the shared overview. Set each device's **Input** option according to what it measures. Devices with “solar” in their name are initially suggested as inputs when discovered; manual choices are retained.
