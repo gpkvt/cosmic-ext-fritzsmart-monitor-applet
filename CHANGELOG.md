@@ -8,6 +8,10 @@
 
 ### Added
 
+- Add an opt-in **Settings → Weather** toggle for additional live Netatmo weather details: module-labeled CO₂ / air quality (ppm), noise (dB) and rainfall (mm). Hide stale/unreachable and hidden sensors, without duplicating OpenWeatherMap values.
+
+### Added
+
 - Add per-Netatmo CO₂ threshold notifications, off by default, with adjustable 600–5,000 ppm limit (1,200 ppm default), saved preferences and safe-range re-arming. Missing and stale measurements do not fire notifications.
 
 ### Automation
