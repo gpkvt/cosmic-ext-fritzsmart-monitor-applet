@@ -2,6 +2,10 @@
 
 ### Changed
 
+- Keep live total input and output power readings visible in the collapsed Current Power History section.
+
+### Changed
+
 - Simplify large graph time-axis labels to whole-hour intervals (for example, `6h ago`) instead of showing minute-level elapsed durations.
 
 ### Added
