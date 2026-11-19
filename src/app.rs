@@ -2631,13 +2631,14 @@ fn hue_sensor_metric_graph(
     history: &crate::history::HueSensorHistory,
     sensor: &HueSensor,
     temperature: bool,
-    language: &str,
-    unit: &str,
-    style: &str,
-    timespan_minutes: u32,
+    settings: &FritzSettings,
     collapsed_sections: &HashSet<String>,
     copy_feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
+    let language = &settings.language;
+    let unit = settings.temperature_unit.as_str();
+    let style = settings.graph_style.as_str();
+    let timespan_minutes = settings.graph_timespan_minutes;
     let kind = if temperature { "temperature" } else { "lux" };
     let section_id = format!("hue-sensor-graph-{kind}-{}", sensor.id);
     let collapsed = collapsed_sections.contains(&section_id);
@@ -8333,10 +8334,7 @@ impl cosmic::Application for AppModel {
                                 &self.hue_sensor_history,
                                 sensor,
                                 true,
-                                &self.settings.language,
-                                &self.settings.temperature_unit,
-                                &self.settings.graph_style,
-                                self.settings.graph_timespan_minutes,
+                                &self.settings,
                                 &self.collapsed_menu_sections,
                                 self.copy_feedback.as_ref(),
                             ))
@@ -8344,10 +8342,7 @@ impl cosmic::Application for AppModel {
                                 &self.hue_sensor_history,
                                 sensor,
                                 false,
-                                &self.settings.language,
-                                &self.settings.temperature_unit,
-                                &self.settings.graph_style,
-                                self.settings.graph_timespan_minutes,
+                                &self.settings,
                                 &self.collapsed_menu_sections,
                                 self.copy_feedback.as_ref(),
                             ));
