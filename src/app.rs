@@ -7784,51 +7784,60 @@ impl cosmic::Application for AppModel {
                 // Link to the current image's file page even while the full
                 // credits remain collapsed.
                 if let Some(first_credit) = current_attributions.first() {
-                    weather_section = weather_section.push(
-                        widget::Row::new()
-                            .spacing(6)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::icon::from_name("image-x-generic-symbolic").size(14))
-                            .push(
-                                widget::button::custom(widget::text::caption(
-                                    "Wikimedia Commons ↗",
-                                ))
-                                .on_press(Message::OpenCommonsPage(first_credit.page_url.clone()))
-                                .padding([2, 6])
-                                .class(cosmic::theme::Button::Text),
-                            ),
-                    );
+                    // Attribution belongs below the clipped photo but shares
+                    // the same horizontal inset as the weather image content.
+                    let mut commons_info = widget::Column::new()
+                        .spacing(6)
+                        .width(cosmic::iced::Length::Fill)
+                        .push(
+                            widget::Row::new()
+                                .spacing(6)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::icon::from_name("image-x-generic-symbolic").size(14))
+                                .push(
+                                    widget::button::custom(widget::text::caption(
+                                        "Wikimedia Commons ↗",
+                                    ))
+                                    .on_press(Message::OpenCommonsPage(first_credit.page_url.clone()))
+                                    .padding([2, 0])
+                                    .class(cosmic::theme::Button::Text),
+                                ),
+                        );
                     if self.weather_attribution_expanded {
                         for credit in &current_attributions {
-                            weather_section = weather_section.push(widget::text::caption(format!(
-                                "{} {} · {} · {}",
-                                crate::i18n::tr(&self.settings.language, "Photo"),
-                                credit.title,
-                                credit.artist,
-                                credit.license
-                            )));
-                            // Every source in a cross-faded image must remain
-                            // individually attributable, not just the first.
-                            weather_section = weather_section.push(
-                                widget::button::custom(widget::text::caption(
-                                    "Wikimedia Commons file page ↗",
-                                ))
-                                .on_press(Message::OpenCommonsPage(credit.page_url.clone()))
-                                .padding([2, 6])
-                                .class(cosmic::theme::Button::Text),
-                            );
+                            commons_info = commons_info
+                                .push(widget::text::caption(format!(
+                                    "{} {} · {} · {}",
+                                    crate::i18n::tr(&self.settings.language, "Photo"),
+                                    credit.title,
+                                    credit.artist,
+                                    credit.license
+                                )))
+                                .push(
+                                    widget::button::custom(widget::text::caption(
+                                        "Wikimedia Commons file page ↗",
+                                    ))
+                                    .on_press(Message::OpenCommonsPage(credit.page_url.clone()))
+                                    .padding([2, 0])
+                                    .class(cosmic::theme::Button::Text),
+                                );
                             if let Some(license_url) = &credit.license_url {
-                                weather_section = weather_section.push(
+                                commons_info = commons_info.push(
                                     widget::button::custom(widget::text::caption(
                                         "License terms ↗",
                                     ))
                                     .on_press(Message::OpenCommonsPage(license_url.clone()))
-                                    .padding([2, 6])
+                                    .padding([2, 0])
                                     .class(cosmic::theme::Button::Text),
                                 );
                             }
                         }
                     }
+                    weather_section = weather_section.push(
+                        widget::container(commons_info)
+                            .width(cosmic::iced::Length::Fill)
+                            .padding([6, 10]),
+                    );
                 }
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
