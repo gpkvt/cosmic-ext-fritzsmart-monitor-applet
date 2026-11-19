@@ -5988,7 +5988,10 @@ impl cosmic::Application for AppModel {
                                         &self.settings.language,
                                         "Visibility",
                                         if weather.visibility_m >= 1000 {
-                                            format!("{:.1} km", weather.visibility_m as f64 / 1000.0)
+                                            format!(
+                                                "{:.1} km",
+                                                weather.visibility_m as f64 / 1000.0
+                                            )
                                         } else {
                                             format!("{} m", weather.visibility_m)
                                         },
