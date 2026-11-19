@@ -2651,13 +2651,17 @@ fn total_power_overview(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     collapsed_sections: &HashSet<String>,
     copy_feedback: Option<&CopyFeedback>,
-) -> Option<Vec<(String, cosmic::Element<'static, Message>)>> {
-    let (output_low, output_high) = {
-        let mut values = history.iter().map(|(_, value)| *value);
-        let first = values.next()?;
-        values.fold((first, first), |(low, high), value| {
-            (low.min(value), high.max(value))
-        })
+) -> Vec<(String, cosmic::Element<'static, Message>)> {
+    let (output_low_label, output_high_label) = if let Some((_, first)) = history.front() {
+        let (low, high) = history
+            .iter()
+            .map(|(_, value)| *value)
+            .fold((*first, *first), |(low, high), value| {
+                (low.min(value), high.max(value))
+            });
+        (format!("{low} W"), format!("{high} W"))
+    } else {
+        ("— W".into(), "— W".into())
     };
     let input_history = rebuild_input_power_history(device_history, &settings.input_ains);
     let has_input_readings = readings.iter().any(|reading| {
@@ -2690,6 +2694,11 @@ fn total_power_overview(
     // low/high values visible here, even if an input device is now offline.
     let (input_low_label, input_high_label) = input_range_labels(&input_history);
     let current_value = |value: i64| format!("{value} W");
+    let current_output = if readings.is_empty() {
+        "— W".to_string()
+    } else {
+        current_value(total_output_w)
+    };
     let current_input = if has_input_readings {
         current_value(total_input_w)
     } else {
@@ -2697,7 +2706,10 @@ fn total_power_overview(
     };
     // One consistent large-value layout: daily energy first, then two
     // three-column rows combining historical range with current power.
-    let content = widget::Column::new()
+    let collapsed = collapsed_sections.contains("total-power-overview");
+    // Construct graphs only when this section is visible. This also avoids
+    // rebuilding expensive SVGs while the entire overview is collapsed.
+    let content = (!collapsed).then(|| widget::Column::new()
         .spacing(10)
         .width(cosmic::iced::Length::Fill)
         .push(daily_power_metrics_grid(
@@ -2711,9 +2723,9 @@ fn total_power_overview(
             "OUTPUT LOW",
             "OUTPUT HIGH",
             "NOW OUTPUT",
-            format!("{output_low} W"),
-            format!("{output_high} W"),
-            current_value(total_output_w),
+            output_low_label,
+            output_high_label,
+            current_output.clone(),
         ))
         .push(power_metrics_row(
             "INPUT LOW",
@@ -2797,8 +2809,7 @@ fn total_power_overview(
             &settings.graph_style,
             collapsed_sections,
             copy_feedback,
-        ));
-    let collapsed = collapsed_sections.contains("total-power-overview");
+        )));
     // Match the other collapsed popup sections: one full-width disclosure
     // button containing the title, trailing live summary, and chevron.
     let mut heading_content = widget::Row::new()
@@ -2814,7 +2825,7 @@ fn total_power_overview(
             )))
             .push(widget::text::body(format!(
                 "OUT {}",
-                keep_value_unit_together(current_value(total_output_w))
+                keep_value_unit_together(current_output)
             )));
     }
     let heading = widget::button::custom(
@@ -2843,10 +2854,10 @@ fn total_power_overview(
         .spacing(0)
         .width(cosmic::iced::Length::Fill)
         .push(heading_row);
-    if !collapsed {
+    if let Some(content) = content {
         section = section.push(widget::container(content).padding([8, 12]));
     }
-    Some(vec![("3-total-power-overview".to_string(), section.into())])
+    vec![("3-total-power-overview".to_string(), section.into())]
 }
 
 fn panel_order_group_key(id: &str, multiline: bool) -> &str {
@@ -8222,16 +8233,14 @@ impl cosmic::Application for AppModel {
                     ));
                 }
 
-                if let Some(power_sections) = total_power_overview(
+                menu_cards.extend(total_power_overview(
                     &self.readings,
                     &self.settings,
                     &self.history,
                     &self.device_history,
                     &self.collapsed_menu_sections,
                     self.copy_feedback.as_ref(),
-                ) {
-                    menu_cards.extend(power_sections);
-                }
+                ));
                 menu_cards.push((
                     "5-history".to_string(),
                     daily_energy_history_section(
@@ -11318,6 +11327,20 @@ mod history_tests {
             hue_device_list_key("sensor", "00112233-4455-6677-8899-aabbccddeeff"),
             "2-hue-sensor-00112233-4455-6677-8899-aabbccddeeff"
         );
+    }
+
+    #[test]
+    fn power_overview_does_not_disappear_before_first_history_sample() {
+        let sections = total_power_overview(
+            &[],
+            &FritzSettings::default(),
+            &VecDeque::new(),
+            &HashMap::new(),
+            &HashSet::new(),
+            None,
+        );
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].0, "3-total-power-overview");
     }
 
     #[test]
