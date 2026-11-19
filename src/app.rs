@@ -1405,17 +1405,21 @@ fn netatmo_weather_extra_metrics(
     metrics
 }
 
+fn weather_detail_metric_label(label: String, value: String) -> cosmic::Element<'static, Message> {
+    widget::Column::new()
+        .spacing(2)
+        .width(cosmic::iced::Length::Fill)
+        .push(widget::text::caption(label))
+        .push(widget::text::body(value))
+        .into()
+}
+
 fn weather_detail_metric(
     language: &str,
     label: &'static str,
     value: String,
 ) -> cosmic::Element<'static, Message> {
-    widget::Column::new()
-        .spacing(2)
-        .width(cosmic::iced::Length::Fill)
-        .push(widget::text::caption(crate::i18n::tr(language, label)))
-        .push(widget::text::body(value))
-        .into()
+    weather_detail_metric_label(crate::i18n::tr(language, label).to_string(), value)
 }
 
 /// Input energy as a percentage of measured output energy; absent samples or
@@ -7547,130 +7551,100 @@ impl cosmic::Application for AppModel {
                         .class(cosmic::theme::Button::Standard),
                     );
                 }
-                // Separate the condition summary from the detailed readings for clearer scanning.
-                let mut weather_details = widget::Column::new()
-                    .spacing(8)
-                    .height(cosmic::iced::Length::Fill)
-                    .push(date_row);
-                weather_details = weather_details
-                    .push(
-                        widget::Row::new()
-                            .spacing(10)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::icon::from_name(weather.icon_name()).size(36))
-                            .push(
-                                widget::Column::new()
-                                    .spacing(2)
-                                    .push(widget::text::body(weather.description.clone()))
-                                    .push(widget::text::caption(format!(
-                                        "{} {}",
-                                        crate::i18n::tr(&self.settings.language, "Feels like"),
-                                        format_temperature(
-                                            weather.feels_like_c,
-                                            &self.settings.temperature_unit
-                                        )
-                                    ))),
-                            ),
-                    )
-                    .push(widget::Space::new().height(cosmic::iced::Length::Fill))
+                // The photograph is only the middle weather section. Its overlay
+                // contains the condition summary, not the heading or metric table.
+                let weather_summary = widget::Row::new()
+                    .spacing(10)
+                    .align_y(cosmic::iced::Alignment::Center)
+                    .push(widget::icon::from_name(weather.icon_name()).size(36))
                     .push(
                         widget::Column::new()
-                            .spacing(8)
-                            .push(
-                                widget::Row::new()
-                                    .spacing(12)
-                                    .push(weather_detail_metric(
-                                        &self.settings.language,
-                                        "Humidity",
-                                        format!("{}%", weather.humidity_percent),
-                                    ))
-                                    .push(weather_detail_metric(
-                                        &self.settings.language,
-                                        "Clouds",
-                                        format!("{}%", weather.cloudiness_percent),
-                                    ))
-                                    .push(weather_detail_metric(
-                                        &self.settings.language,
-                                        "Visibility",
-                                        if weather.visibility_m >= 1000 {
-                                            format!(
-                                                "{:.1} km",
-                                                weather.visibility_m as f64 / 1000.0
-                                            )
-                                        } else {
-                                            format!("{} m", weather.visibility_m)
-                                        },
-                                    ))
-                                    .push(weather_detail_metric(
-                                        &self.settings.language,
-                                        "Pressure",
-                                        format!("{} hPa", weather.pressure_hpa),
-                                    )),
-                            )
-                            .push(
-                                widget::Row::new()
-                                    .spacing(12)
-                                    .push(weather_detail_metric(
-                                        &self.settings.language,
-                                        "Wind",
-                                        format!("{:.1} m/s", weather.wind_speed_mps),
-                                    ))
-                                    .push(weather_detail_metric(
-                                        &self.settings.language,
-                                        "Wind direction",
-                                        crate::weather::wind_direction_compass(
-                                            weather.wind_direction_degrees,
-                                        )
-                                        .unwrap_or("—")
-                                        .to_string(),
-                                    ))
-                                    .push(weather_detail_metric(
-                                        &self.settings.language,
-                                        "Sunrise",
-                                        sunrise,
-                                    ))
-                                    .push(weather_detail_metric(
-                                        &self.settings.language,
-                                        "Sunset",
-                                        sunset,
-                                    )),
-                            ),
+                            .spacing(2)
+                            .push(widget::text::body(weather.description.clone()))
+                            .push(widget::text::caption(format!(
+                                "{} {}",
+                                crate::i18n::tr(&self.settings.language, "Feels like"),
+                                format_temperature(
+                                    weather.feels_like_c,
+                                    &self.settings.temperature_unit
+                                )
+                            ))),
                     );
-                // Extra Netatmo readings belong inside the photographed weather
-                // information area, not in a separate card below the slideshow.
-                let netatmo_metrics = if self.settings.weather_netatmo_extra_metrics {
-                    netatmo_weather_extra_metrics(
+                // OpenWeatherMap and optional Netatmo measurements share one
+                // four-column metric grid with identical text and spacing.
+                let mut weather_metric_tiles = vec![
+                    weather_detail_metric(
+                        &self.settings.language,
+                        "Humidity",
+                        format!("{}%", weather.humidity_percent),
+                    ),
+                    weather_detail_metric(
+                        &self.settings.language,
+                        "Clouds",
+                        format!("{}%", weather.cloudiness_percent),
+                    ),
+                    weather_detail_metric(
+                        &self.settings.language,
+                        "Visibility",
+                        if weather.visibility_m >= 1000 {
+                            format!("{:.1} km", weather.visibility_m as f64 / 1000.0)
+                        } else {
+                            format!("{} m", weather.visibility_m)
+                        },
+                    ),
+                    weather_detail_metric(
+                        &self.settings.language,
+                        "Pressure",
+                        format!("{} hPa", weather.pressure_hpa),
+                    ),
+                    weather_detail_metric(
+                        &self.settings.language,
+                        "Wind",
+                        format!("{:.1} m/s", weather.wind_speed_mps),
+                    ),
+                    weather_detail_metric(
+                        &self.settings.language,
+                        "Wind direction",
+                        crate::weather::wind_direction_compass(
+                            weather.wind_direction_degrees,
+                        )
+                        .unwrap_or("—")
+                        .to_string(),
+                    ),
+                    weather_detail_metric(&self.settings.language, "Sunrise", sunrise),
+                    weather_detail_metric(&self.settings.language, "Sunset", sunset),
+                ];
+                if self.settings.weather_netatmo_extra_metrics {
+                    for (label, value) in netatmo_weather_extra_metrics(
                         &self.netatmo_sensors,
                         &self.settings.hidden_netatmo_devices,
-                    )
-                } else {
-                    Vec::new()
-                };
-                // Keep the original photo size regardless of Netatmo module count.
-                // The extra readings scroll inside the existing weather image.
-                let weather_card_height = 260.0;
-                if !netatmo_metrics.is_empty() {
-                    let mut extra = widget::Column::new()
-                        .spacing(8)
-                        .width(cosmic::iced::Length::Fill)
-                        .push(widget::text::caption("NETATMO · ADDITIONAL READINGS"));
-                    for pair in netatmo_metrics.chunks(2) {
-                        let mut row = widget::Row::new()
+                    ) {
+                        weather_metric_tiles.push(weather_detail_metric_label(label, value));
+                    }
+                }
+                let metric_count = weather_metric_tiles.len();
+                let mut weather_metric_grid = widget::Column::new()
+                    .spacing(8)
+                    .width(cosmic::iced::Length::Fill);
+                let mut metric_row = widget::Row::new()
+                    .spacing(12)
+                    .width(cosmic::iced::Length::Fill);
+                for (index, metric) in weather_metric_tiles.into_iter().enumerate() {
+                    if index > 0 && index % 4 == 0 {
+                        weather_metric_grid = weather_metric_grid.push(metric_row);
+                        metric_row = widget::Row::new()
                             .spacing(12)
                             .width(cosmic::iced::Length::Fill);
-                        for (label, value) in pair {
-                            row = row.push(
-                                widget::Column::new()
-                                    .spacing(2)
-                                    .width(cosmic::iced::Length::Fill)
-                                    .push(widget::text::caption(label.clone()))
-                                    .push(widget::text::body(value.clone())),
-                            );
-                        }
-                        extra = extra.push(row);
                     }
-                    weather_details = weather_details.push(extra);
+                    metric_row = metric_row.push(metric);
                 }
+                // Pad a short final row to keep every metric aligned to the
+                // same four grid columns.
+                for _ in 0..((4 - metric_count % 4) % 4) {
+                    metric_row = metric_row.push(widget::Space::new().width(cosmic::iced::Length::Fill));
+                }
+                weather_metric_grid = weather_metric_grid.push(metric_row);
+                let weather_card_height = 260.0;
                 let weather_heading = widget::button::custom(
                     widget::Row::new()
                         .spacing(8)
@@ -7708,17 +7682,9 @@ impl cosmic::Application for AppModel {
                 .padding([4, 0])
                 .width(cosmic::iced::Length::Fill)
                 .class(cosmic::theme::Button::Text);
-                // Keep the city/temperature header inside the same full-width
-                // surface as the weather content so the photo starts directly
-                // behind it, with identical left and right alignment.
-                // Give the overlay's content an explicit height matching the
-                // inner area of the 260px photo card. Without a bounded height,
-                // Fill spacers inside weather_details can collapse to zero and
-                // leave the lower weather metrics outside the visible card.
-                let weather_content = widget::Column::new()
-                    .spacing(8)
+                let weather_header = widget::Column::new()
+                    .spacing(4)
                     .width(cosmic::iced::Length::Fill)
-                    .height(cosmic::iced::Length::Fixed(weather_card_height - 20.0))
                     .push(
                         widget::Row::new()
                             .width(cosmic::iced::Length::Fill)
@@ -7729,10 +7695,19 @@ impl cosmic::Application for AppModel {
                                 self.copy_feedback.as_ref(),
                             )),
                     )
-                    .push(
-                        widget::scrollable(weather_details)
-                            .height(cosmic::iced::Length::Fill),
-                    );
+                    .push(date_row);
+                weather_section = weather_section.push(
+                    widget::container(weather_header)
+                        .width(cosmic::iced::Length::Fill)
+                        .padding([4, 10]),
+                );
+                // The image height is fixed. Only the condition summary is
+                // rendered on top of the photo; the metrics sit beneath it.
+                let weather_content = widget::Column::new()
+                    .width(cosmic::iced::Length::Fill)
+                    .height(cosmic::iced::Length::Fixed(weather_card_height - 20.0))
+                    .push(widget::Space::new().height(cosmic::iced::Length::Fill))
+                    .push(weather_summary);
                 let current_image_handle = weather
                     .slideshow_sequence
                     .get(self.weather_slideshow_index)
@@ -7796,6 +7771,8 @@ impl cosmic::Application for AppModel {
                             .into()
                     } else {
                         widget::container(weather_content)
+                            .width(cosmic::iced::Length::Fill)
+                            .height(cosmic::iced::Length::Fixed(weather_card_height))
                             .padding(10)
                             .style(|theme| {
                                 let cosmic = theme.cosmic();
@@ -7904,6 +7881,11 @@ impl cosmic::Application for AppModel {
                             .padding([6, 10]),
                     );
                 }
+                weather_section = weather_section.push(
+                    widget::container(weather_metric_grid)
+                        .width(cosmic::iced::Length::Fill)
+                        .padding([6, 10]),
+                );
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
                     let forecast_range_selector = widget::Row::new()

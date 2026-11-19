@@ -4,13 +4,13 @@
 
 ### Improved
 
-- Show an indicative CO₂-based air quality category (Good, Moderate, Elevated or Very high) alongside Netatmo ppm readings inside the expanded weather image area; omit readings when the sensor is hidden or stale. CO₂ is a ventilation indicator, not a complete air quality index.
+- Show an indicative CO₂-based air quality category (Good, Moderate, Elevated or Very high) alongside optional Netatmo ppm readings in the shared weather metrics grid; omit readings when the sensor is hidden or stale. CO₂ is a ventilation indicator, not a complete air quality index.
 
 
 ### Added
 
 - Add an opt-in localhost-only Prometheus `/metrics` exporter for live FRITZ!Box, Tasmota, Hue, Netatmo, weather, router and WAN monitoring, with safe labels, unavailable-value handling and no network request per scrape.
-- Move optional Netatmo CO₂, noise and rainfall details inside the weather photograph overlay and expand its height to accommodate the extra rows, retaining Wikimedia Commons attribution outside the image.
+- Keep the weather photograph confined to its fixed-height middle section, with the header above and a unified four-column OpenWeatherMap/Netatmo readings grid below. Keep Wikimedia Commons attribution beside the photo rather than overlaying its contents.
 
 
 ### Added
