@@ -7033,11 +7033,14 @@ impl cosmic::Application for AppModel {
                                                 "No live reading available",
                                             ))),
                                     )
-                                    .push(widget::icon::from_name(if is_expanded {
-                                        "go-up-symbolic"
-                                    } else {
-                                        "go-down-symbolic"
-                                    }).size(16)),
+                                    .push(
+                                        widget::icon::from_name(if is_expanded {
+                                            "go-up-symbolic"
+                                        } else {
+                                            "go-down-symbolic"
+                                        })
+                                        .size(16),
+                                    ),
                             )
                             .on_press(Message::ToggleDeviceDetails(device.ain.clone()))
                             .width(cosmic::iced::Length::Fill)
@@ -7045,9 +7048,13 @@ impl cosmic::Application for AppModel {
                             .class(cosmic::theme::Button::Text),
                         );
                     let device_row = if is_expanded {
-                        device_row.add(widget::container(widget::text::caption(
-                            crate::i18n::tr(&self.settings.language, "No live reading available"),
-                        )).padding([8, 12]))
+                        device_row.add(
+                            widget::container(widget::text::caption(crate::i18n::tr(
+                                &self.settings.language,
+                                "No live reading available",
+                            )))
+                            .padding([8, 12]),
+                        )
                     } else {
                         device_row
                     };
