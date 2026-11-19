@@ -1,5 +1,7 @@
 # Changelog
 
+- Fix unexpected hover-triggered menu actions in COSMIC Panel: remove `X-CosmicHoverPopup` from the installed desktop entry (COSMIC synthesizes pointer clicks whenever this key is present), keep the menu click-only and add a packaging CI regression check. Shrink-wrap every multiline panel item instead of requesting nested `Fill` widths during live device refreshes, preventing conflicting autosize constraints.
+
 - Add an independent syslog watchdog for disappearing panel items: sample process liveness, UI update count and panel view count every five seconds during startup, then once per minute. The watchdog remains active if the COSMIC event loop stalls, helping distinguish UI deadlock, surface invisibility and process termination without logging device identities.
 
 - Improve disappearing-applet diagnostics: log the first panel widget tree populated with meter readings, emit periodic liveness markers with separate metered/Hue counts, and record clean COSMIC event-loop shutdowns distinctly from Rust panics or runtime errors.
