@@ -1,5 +1,9 @@
 # Changelog
 
+- Integrate Hue lights and environment sensors into Settings → Devices with visibility controls, searchable unified inventory, per-light switches, and persistent +/− ordering shared with FRITZ!Box and Tasmota devices; refresh the paired Hue Bridge during device discovery.
+- Include measured temperatures from visible, reachable Hue sensors in the panel average, excluding invalid and offline readings.
+- Add full-width input/output watt history and recorded seven-day input, output and input/output percentage trends inside Total Power Input & Output without fabricating missing data. Show the installed version in the popup title bar.
+
 - Unify Philips Hue light and motion/environment sensor rows with the sortable popup Devices list. Preserve their own disclosure, copy, switches, °C/°F and lux display, keep unsupported W and history empty, and show Hue devices unavailable without stale measurements during bridge outages. Remove the duplicate standalone Hue section.
 - Fix three quality-test expectations: preserve saved collapsed-section order, correct the 158° compass boundary, and allow native translations that exactly match English spelling while retaining translation coverage checks.
 

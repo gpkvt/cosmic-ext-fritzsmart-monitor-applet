@@ -182,6 +182,7 @@ pub enum Message {
     RemoveDevice(String),
     DeviceSearchChanged(String),
     ToggleDevice(String, bool),
+    ToggleHueDeviceVisible(String, bool),
     MoveDevice(String, bool),
     SortDeviceList(&'static str),
     ToggleDeviceInput(String, bool),
@@ -1985,6 +1986,38 @@ fn average_selected_temperature_c(
     average_temperature_c(&selected_readings, exclude_solar)
 }
 
+/// Average only selected live temperature sources, including visible Hue
+/// environmental sensors. Missing/offline/invalid Hue values never count as 0.
+fn average_temperature_with_hue_c(
+    readings: &[FritzReading],
+    selected_ains: &[String],
+    sensors: &[HueSensor],
+    hidden_hue_devices: &[String],
+    exclude_solar: bool,
+) -> Option<f64> {
+    if sensors.is_empty() {
+        return average_selected_temperature_c(readings, selected_ains, exclude_solar);
+    }
+    let selected_metered = readings.iter().filter(|reading| {
+        reading.temperature_c.is_finite()
+            && selected_ains.iter().any(|ain| {
+                crate::fritz::canonical_device_key(ain)
+                    == crate::fritz::canonical_device_key(&reading.ain)
+            })
+            && (!exclude_solar || !reading.name.to_lowercase().contains("solar"))
+    }).map(|reading| reading.temperature_c);
+    let selected_hue = sensors.iter().filter(|sensor| {
+        sensor.reachable
+            && hue_device_is_visible(hidden_hue_devices, &hue_device_id("sensor", &sensor.id))
+            && (!exclude_solar || !sensor.name.to_lowercase().contains("solar"))
+    }).filter_map(|sensor| sensor.temperature_c.filter(|temperature| temperature.is_finite()));
+    let (sum, count) = selected_metered.chain(selected_hue)
+        .fold((0.0_f64, 0_usize), |(sum, count), temperature| {
+            (sum + temperature, count + 1)
+        });
+    (count > 0).then(|| sum / count as f64)
+}
+
 fn aligned_power_series(
     output_history: &VecDeque<(Instant, i64)>,
     input_history: &VecDeque<(Instant, i64)>,
@@ -2517,6 +2550,62 @@ fn collapsible_graph(
     section.into()
 }
 
+/// Full-width compact plot for each actual daily metric. Missing daily
+/// readings are omitted rather than plotted as fabricated zero measurements.
+fn daily_metric_trend(
+    label: &'static str,
+    values: &[f64],
+    unit: &'static str,
+    style: &str,
+) -> cosmic::Element<'static, Message> {
+    let mut column = widget::Column::new()
+        .spacing(4)
+        .width(cosmic::iced::Length::Fill)
+        .push(widget::text::caption(label));
+    if values.len() >= 2 {
+        column = column.push(graph_visual_with_dimensions(
+            values.iter().copied(),
+            style,
+            unit,
+            120.0,
+            cosmic::iced::Length::Fixed(120.0),
+            Some("6d ago".into()),
+            None,
+        ));
+    } else {
+        column = column.push(widget::text::caption(
+            "Not enough recorded days to draw a trend",
+        ));
+    }
+    column.into()
+}
+
+/// These three histories represent all TODAY/Y'DAY energy metrics in the
+/// overview (IN, OUT, and IN/OUT %) without inventing energy for missing days.
+fn daily_power_metric_trends(
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    input_ains: &HashSet<String>,
+    refresh_interval_seconds: u32,
+    style: &str,
+) -> cosmic::Element<'static, Message> {
+    let daily = daily_energy_history(device_history, input_ains, refresh_interval_seconds);
+    let input: Vec<f64> = daily.iter().filter_map(|(_, input, _)| *input).collect();
+    let output: Vec<f64> = daily.iter().filter_map(|(_, _, output)| *output).collect();
+    let ratio: Vec<f64> = daily.iter().filter_map(|(_, input, output)| {
+        energy_input_output_ratio_percent(*input, *output)
+    }).collect();
+    widget::Column::new()
+        .spacing(12)
+        .width(cosmic::iced::Length::Fill)
+        .push(widget::text::caption(
+            "DAILY ENERGY TRENDS · LAST 7 DAYS (RECORDED DAYS ONLY)",
+        ))
+        .push(daily_metric_trend("INPUT · Wh", &input, "Wh", style))
+        .push(daily_metric_trend("OUTPUT · Wh", &output, "Wh", style))
+        .push(daily_metric_trend("INPUT / OUTPUT · %", &ratio, "%", style))
+        .into()
+}
+
 fn total_power_overview(
     readings: &[FritzReading],
     settings: &FritzSettings,
@@ -2595,6 +2684,51 @@ fn total_power_overview(
             input_low_label,
             input_high_label,
             current_input.clone(),
+        ))
+        .push(widget::divider::horizontal::default())
+        // Current/low/high are derived from the exact same recorded W series.
+        // Give input and output their own full-width, zoomable graphs.
+        .push(widget::text::caption(
+            "LIVE POWER · LOW, HIGH & NOW IN RECORDED W HISTORY",
+        ))
+        .push(interactive_graph_with_axis(
+            &settings.language,
+            "OUTPUT POWER HISTORY",
+            history.iter().map(|(time, watts)| (*time, *watts as f64)),
+            &settings.graph_style,
+            "W",
+            format_graph_axis_start(
+                settings.graph_timespan_minutes,
+                history.front().map(|(timestamp, _)| {
+                    Instant::now().saturating_duration_since(*timestamp).as_secs().div_ceil(60)
+                }),
+            ),
+        ))
+        .push(if input_history.is_empty() {
+            widget::text::caption("INPUT POWER HISTORY · No measured input samples").into()
+        } else {
+            interactive_graph_with_axis(
+                &settings.language,
+                "INPUT POWER HISTORY",
+                input_history.iter().map(|(time, watts)| {
+                    (*time, input_display_power_w(*watts) as f64)
+                }),
+                &settings.graph_style,
+                "W",
+                format_graph_axis_start(
+                    settings.graph_timespan_minutes,
+                    input_history.front().map(|(timestamp, _)| {
+                        Instant::now().saturating_duration_since(*timestamp).as_secs().div_ceil(60)
+                    }),
+                ),
+            )
+        })
+        .push(widget::divider::horizontal::default())
+        .push(daily_power_metric_trends(
+            device_history,
+            &settings.input_ains,
+            settings.refresh_interval_seconds,
+            &settings.graph_style,
         ));
     let collapsed = collapsed_sections.contains("total-power-overview");
     // Match the other collapsed popup sections: one full-width disclosure
@@ -2819,8 +2953,103 @@ fn compare_optional_device_values(
     }
 }
 
+fn hue_device_id(kind: &str, id: &str) -> String {
+    format!("hue-{kind}-{id}")
+}
+
 fn hue_device_list_key(kind: &str, id: &str) -> String {
-    format!("2-hue-{kind}-{id}")
+    format!("2-{}", hue_device_id(kind, id))
+}
+
+fn hue_device_is_visible(hidden: &[String], id: &str) -> bool {
+    let key = crate::fritz::canonical_device_key(id);
+    !hidden
+        .iter()
+        .any(|item| crate::fritz::canonical_device_key(item) == key)
+}
+
+fn hue_settings_card(
+    id: String,
+    name: String,
+    visible: bool,
+    details: String,
+    language: &str,
+    light_control: Option<cosmic::Element<'static, Message>>,
+) -> cosmic::Element<'static, Message> {
+    let selection_id = id.clone();
+    let header = widget::Row::new()
+        .spacing(6)
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(
+            widget::checkbox(visible)
+                .label(name)
+                .on_toggle(move |checked| {
+                    Message::ToggleHueDeviceVisible(selection_id.clone(), checked)
+                }),
+        )
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+        .push(icon_action_button(
+            "+",
+            crate::i18n::tr(language, "Move device up"),
+            Message::MoveDevice(id.clone(), true),
+        ))
+        .push(icon_action_button(
+            "−",
+            crate::i18n::tr(language, "Move device down"),
+            Message::MoveDevice(id, false),
+        ));
+    let mut content = widget::Column::new()
+        .spacing(6)
+        .push(header)
+        .push(widget::text::caption(details));
+    if let Some(control) = light_control {
+        content = content.push(
+            widget::Row::new()
+                .width(cosmic::iced::Length::Fill)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(widget::text::caption("Light power"))
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(control),
+        );
+    }
+    surface_card(content.into(), 8)
+}
+
+enum SettingsDeviceEntry<'a> {
+    Metered(&'a FritzDevice),
+    HueLight(&'a HueLight),
+    HueSensor(&'a HueSensor),
+}
+
+impl SettingsDeviceEntry<'_> {
+    fn device_id(&self) -> String {
+        match self {
+            Self::Metered(device) => device.ain.clone(),
+            Self::HueLight(light) => hue_device_id("light", &light.id),
+            Self::HueSensor(sensor) => hue_device_id("sensor", &sensor.id),
+        }
+    }
+
+    fn matches_search(&self, query: &str) -> bool {
+        let query = query.trim().to_lowercase();
+        if query.is_empty() {
+            return true;
+        }
+        match self {
+            Self::Metered(device) => device_matches_search(device, &query),
+            Self::HueLight(light) => {
+                light.name.to_lowercase().contains(query.as_str())
+                    || light.id.to_lowercase().contains(query.as_str())
+                    || "hue light".contains(query.as_str())
+            }
+            Self::HueSensor(sensor) => {
+                sensor.name.to_lowercase().contains(query.as_str())
+                    || sensor.id.to_lowercase().contains(query.as_str())
+                    || "hue sensor motion temperature lux".contains(query.as_str())
+            }
+        }
+    }
 }
 
 /// Apply live name/power/temperature sorting without overwriting custom device order.
@@ -3757,9 +3986,11 @@ impl cosmic::Application for AppModel {
             "-- W".to_string()
         };
         let temperature = if self.settings.panel_average_temperature {
-            average_selected_temperature_c(
+            average_temperature_with_hue_c(
                 &self.readings,
                 &self.selected_ains,
+                &self.hue_sensors,
+                &self.settings.hidden_hue_devices,
                 self.settings.panel_exclude_solar_temperature,
             )
             .map(|temperature| format_temperature(temperature, &self.settings.temperature_unit))
@@ -4838,7 +5069,7 @@ impl cosmic::Application for AppModel {
                                                 "Average temperature",
                                             )))
                                             .push(widget::text::caption(
-                                                "When enabled, the panel shows the mean temperature across selected devices instead of a single device's temperature.",
+                                                "When enabled, the panel averages selected device temperatures and visible Hue sensor readings instead of showing a single device's temperature.",
                                             )),
                                     )
                                     .push(
@@ -5214,10 +5445,10 @@ impl cosmic::Application for AppModel {
                 content = content
                     .push(widget::text::body(crate::i18n::tr(
                         &self.settings.language,
-                        "Discover and select power-meter devices",
+                        "Manage connected devices",
                     )))
                     .push(widget::text::caption(
-                        "Searches the FRITZ!Box and the local network for compatible Tasmota devices. Both appear in the same list below.",
+                        "Discover FRITZ!Box and Tasmota power meters plus paired Hue lights and sensors. Devices are managed together.",
                     ))
                     .push(
                         widget::Row::new().width(cosmic::iced::Length::Fill)
@@ -5241,7 +5472,7 @@ impl cosmic::Application for AppModel {
                 ));
                 if self.devices_loading {
                     content = content.push(widget::text::caption(
-                        "Searching FRITZ!Box and scanning the local network for Tasmota devices…",
+                        "Searching FRITZ!Box, Tasmota and configured Hue Bridge…",
                     ));
                 }
                 if let Some(status) = &self.settings_status {
@@ -5251,24 +5482,33 @@ impl cosmic::Application for AppModel {
                     widget::text_input("Search devices by name or ID", &self.device_search)
                         .on_input(Message::DeviceSearchChanged),
                 );
-                if !self.devices.is_empty() {
-                    content = content.push(widget::text::caption(crate::i18n::tr(
-                        &self.settings.language,
-                        "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
-                    )));
-                    let mut ordered_devices: Vec<&FritzDevice> = self.devices.iter().collect();
-                    ordered_devices.sort_by_key(|device| {
-                        device_order_position(&self.settings.device_order, &device.ain)
+                if !self.devices.is_empty()
+                    || !self.hue_lights.is_empty()
+                    || !self.hue_sensors.is_empty()
+                {
+                    content = content.push(widget::text::caption(
+                        "Select visible devices and use +/− to arrange their saved order. Power-meter input and temperature alerts are only available where supported.",
+                    ));
+                    let mut ordered_devices: Vec<SettingsDeviceEntry<'_>> = self
+                        .devices
+                        .iter()
+                        .map(SettingsDeviceEntry::Metered)
+                        .chain(self.hue_lights.iter().map(SettingsDeviceEntry::HueLight))
+                        .chain(self.hue_sensors.iter().map(SettingsDeviceEntry::HueSensor))
+                        .collect();
+                    ordered_devices.sort_by_key(|entry| {
+                        device_order_position(&self.settings.device_order, &entry.device_id())
                     });
-                    ordered_devices
-                        .retain(|device| device_matches_search(device, &self.device_search));
+                    ordered_devices.retain(|entry| entry.matches_search(&self.device_search));
                     if ordered_devices.is_empty() {
                         content = content.push(widget::text::caption(crate::i18n::tr(
                             &self.settings.language,
                             "No devices match your search",
                         )));
                     }
-                    for device in ordered_devices.iter() {
+                    for entry in ordered_devices {
+                        match entry {
+                        SettingsDeviceEntry::Metered(device) => {
                         let selected = self.selected_ains.iter().any(|selected_ain| {
                             crate::fritz::normalize_ain_for_selection(selected_ain)
                                 == crate::fritz::normalize_ain_for_selection(&device.ain)
@@ -5477,10 +5717,106 @@ impl cosmic::Application for AppModel {
                                 ));
                         }
                         content = content.push(surface_card(device_row.into(), 8));
+                        }
+                        SettingsDeviceEntry::HueLight(light) => {
+                            let id = hue_device_id("light", &light.id);
+                            let visible = hue_device_is_visible(
+                                &self.settings.hidden_hue_devices, &id
+                            );
+                            let status = if !light.reachable || light.on.is_none() {
+                                "Unavailable"
+                            } else if light.on == Some(true) {
+                                "On"
+                            } else {
+                                "Off"
+                            };
+                            let light_control: cosmic::Element<'static, Message> =
+                                if light.reachable
+                                    && light.on.is_some()
+                                    && !self.hue_pending.contains(&light.id)
+                                {
+                                    let light_id = light.id.clone();
+                                    widget::toggler(light.on.unwrap_or(false))
+                                        .on_toggle(move |enabled| {
+                                            Message::SetHueLightPower(light_id.clone(), enabled)
+                                        })
+                                        .into()
+                                } else {
+                                    widget::toggler(light.on.unwrap_or(false)).into()
+                                };
+                            content = content.push(hue_settings_card(
+                                id,
+                                light.name.clone(),
+                                visible,
+                                format!("Hue Bridge · Light · {status} · No measured W"),
+                                &self.settings.language,
+                                Some(light_control),
+                            ));
+                        }
+                        SettingsDeviceEntry::HueSensor(sensor) => {
+                            let id = hue_device_id("sensor", &sensor.id);
+                            let visible = hue_device_is_visible(
+                                &self.settings.hidden_hue_devices, &id
+                            );
+                            let temperature = sensor.temperature_c
+                                .filter(|_| sensor.reachable)
+                                .map(|value| format_temperature(value, &self.settings.temperature_unit))
+                                .unwrap_or_else(|| "—".to_string());
+                            let lux = sensor.illuminance_lux
+                                .filter(|_| sensor.reachable)
+                                .map(|value| if value >= 100.0 {
+                                    format!("{value:.0} lx")
+                                } else {
+                                    format!("{value:.1} lx")
+                                })
+                                .unwrap_or_else(|| "—".to_string());
+                            let motion = if !sensor.reachable {
+                                "Unavailable"
+                            } else {
+                                match sensor.motion {
+                                    Some(true) => "Motion detected",
+                                    Some(false) => "No motion",
+                                    None => "Motion unavailable",
+                                }
+                            };
+                            content = content.push(hue_settings_card(
+                                id,
+                                sensor.name.clone(),
+                                visible,
+                                format!("Hue Bridge · Sensor · {temperature} · {lux} · {motion} · No measured W"),
+                                &self.settings.language,
+                                None,
+                            ));
+                        }
+                        }
                     }
                 } else if self.devices_loaded {
                     content = content.push(widget::text::caption(
-                        "No compatible devices found. Check the FRITZ!Box connection and Tasmota credentials in Connection, then search again.",
+                        "No devices found. Check the connections and scan again.",
+                    ));
+                }
+                if !self.settings.hue_bridge_ip.trim().is_empty() {
+                    content = content.push(widget::divider::horizontal::default());
+                    if let Some(error) = &self.hue_error {
+                        content = content.push(widget::text::caption(format!(
+                            "Hue Bridge: {error}"
+                        )));
+                    } else if self.hue_lights.is_empty() && self.hue_sensors.is_empty() {
+                        content = content.push(widget::text::caption(
+                            if self.hue_loading {
+                                "Loading Hue devices from the bridge…"
+                            } else {
+                                "No Hue devices discovered. Pair the bridge in Connection and scan again."
+                            },
+                        ));
+                    }
+                    if let Some(warning) = &self.hue_sensor_warning {
+                        content = content.push(widget::text::caption(warning.clone()));
+                    }
+                    content = content.push(action_button(
+                        "view-refresh-symbolic",
+                        "Refresh Hue lights",
+                        Message::RefreshHueLights,
                     ));
                 }
             }
@@ -7589,7 +7925,10 @@ impl cosmic::Application for AppModel {
                 // Hue lights are independently refreshed, switchable devices, but
                 // do not publish measured watts or device temperatures.
                 for light in &self.hue_lights {
-                    let device_key = format!("hue-light-{}", light.id);
+                    let device_key = hue_device_id("light", &light.id);
+                    if !hue_device_is_visible(&self.settings.hidden_hue_devices, &device_key) {
+                        continue;
+                    }
                     let row_key = hue_device_list_key("light", &light.id);
                     let expanded = is_device_expanded(&self.expanded_devices, &device_key);
                     let toggle: cosmic::Element<'_, Message> = if light.reachable
@@ -7682,7 +8021,10 @@ impl cosmic::Application for AppModel {
                 // Hue motion sensors share the same device-list columns. Lux
                 // uses the spare history column, not a fabricated power graph.
                 for sensor in &self.hue_sensors {
-                    let device_key = format!("hue-sensor-{}", sensor.id);
+                    let device_key = hue_device_id("sensor", &sensor.id);
+                    if !hue_device_is_visible(&self.settings.hidden_hue_devices, &device_key) {
+                        continue;
+                    }
                     let row_key = hue_device_list_key("sensor", &sensor.id);
                     let expanded = is_device_expanded(&self.expanded_devices, &device_key);
                     let temperature = sensor
@@ -7924,7 +8266,14 @@ impl cosmic::Application for AppModel {
                                     descending,
                                 )
                                 .then_with(|| left_name.cmp(right_name)),
-                                _ => std::cmp::Ordering::Equal,
+                                _ => device_order_position(
+                                    &self.settings.device_order,
+                                    left.strip_prefix("2-").unwrap_or(left),
+                                )
+                                .cmp(&device_order_position(
+                                    &self.settings.device_order,
+                                    right.strip_prefix("2-").unwrap_or(right),
+                                )),
                             }
                         })
                 });
@@ -8446,11 +8795,16 @@ impl cosmic::Application for AppModel {
                         .center_y(36),
                     )
                     .push(
-                        widget::text::body(crate::i18n::tr(
-                            &self.settings.language,
-                            "FRITZ!Power Monitor",
-                        ))
-                        .width(cosmic::iced::Length::Fill),
+                        widget::Column::new()
+                            .spacing(2)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::body(crate::i18n::tr(
+                                &self.settings.language,
+                                "FRITZ!Power Monitor",
+                            )))
+                            .push(widget::text::caption(format!(
+                                "v{}", env!("APP_VERSION")
+                            ))),
                     )
                     .push(if self.refresh_started_at.is_some() {
                         icon_action_button(
@@ -9497,10 +9851,13 @@ impl cosmic::Application for AppModel {
                 self.schedule_settings_save();
             }
             Message::MoveDevice(ain, move_up) => {
+                // One saved ordering for FRITZ!Box, Tasmota and Hue.
                 let mut order: Vec<String> = self
                     .devices
                     .iter()
                     .map(|device| device.ain.clone())
+                    .chain(self.hue_lights.iter().map(|light| hue_device_id("light", &light.id)))
+                    .chain(self.hue_sensors.iter().map(|sensor| hue_device_id("sensor", &sensor.id)))
                     .collect();
                 order.sort_by_key(|device_ain| {
                     device_order_position(&self.settings.device_order, device_ain)
@@ -10323,9 +10680,23 @@ impl cosmic::Application for AppModel {
                     format!("Device discovery started against {}.", self.settings.url),
                 );
                 self.settings_status = Some("Connecting and loading devices…".into());
-                return Task::perform(discover_devices(settings), |result| {
+                let mut tasks = vec![Task::perform(discover_devices(settings), |result| {
                     cosmic::Action::App(Message::DevicesLoaded(result))
-                });
+                })];
+                if !self.hue_loading
+                    && !self.settings.hue_bridge_ip.trim().is_empty()
+                    && !self.settings.hue_application_key.trim().is_empty()
+                {
+                    self.hue_loading = true;
+                    tasks.push(Task::perform(
+                        crate::hue::fetch_snapshot(
+                            self.settings.hue_bridge_ip.clone(),
+                            self.settings.hue_application_key.clone(),
+                        ),
+                        |result| cosmic::Action::App(Message::HueSnapshotLoaded(result)),
+                    ));
+                }
+                return Task::batch(tasks);
             }
             Message::DeviceSearchChanged(value) => {
                 self.device_search = value;
@@ -10529,6 +10900,24 @@ impl cosmic::Application for AppModel {
                     &mut self.diagnostic_events,
                     format!("Device removed from saved inventory by user: {ain}."),
                 );
+            }
+            Message::ToggleHueDeviceVisible(id, visible) => {
+                let known = self.hue_lights.iter().any(|light| {
+                    hue_device_id("light", &light.id) == id
+                }) || self.hue_sensors.iter().any(|sensor| {
+                    hue_device_id("sensor", &sensor.id) == id
+                });
+                if !known {
+                    return Task::none();
+                }
+                self.settings.hidden_hue_devices.retain(|hidden| {
+                    crate::fritz::canonical_device_key(hidden)
+                        != crate::fritz::canonical_device_key(&id)
+                });
+                if !visible {
+                    self.settings.hidden_hue_devices.push(id);
+                }
+                self.persist_settings();
             }
             Message::ToggleDevice(ain, selected) => {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
@@ -10834,6 +11223,18 @@ mod history_tests {
             hue_device_list_key("sensor", "00112233-4455-6677-8899-aabbccddeeff"),
             "2-hue-sensor-00112233-4455-6677-8899-aabbccddeeff"
         );
+    }
+
+    #[test]
+    fn hue_visibility_is_scoped_to_each_resource_and_defaults_to_shown() {
+        let light = hue_device_id("light", "00112233-4455-6677-8899-aabbccddeeff");
+        let sensor = hue_device_id("sensor", "00112233-4455-6677-8899-aabbccddeeff");
+        let hidden = vec![light.clone()];
+        assert!(!hue_device_is_visible(&hidden, &light));
+        assert!(hue_device_is_visible(&hidden, &sensor));
+        assert!(hue_device_is_visible(&[], &light));
+        assert_eq!(hue_device_list_key("light", "00112233-4455-6677-8899-aabbccddeeff"),
+            format!("2-{light}"));
     }
 
     #[test]
@@ -11372,6 +11773,48 @@ mod history_tests {
         assert_eq!(average_temperature_c(&readings, false), Some(110.0 / 3.0));
         assert_eq!(average_temperature_c(&readings, true), Some(20.0));
         assert_eq!(average_temperature_c(&readings[1..], true), None);
+    }
+
+    #[test]
+    fn hue_sensor_temperatures_contribute_only_when_visible_and_reachable() {
+        let sensor = HueSensor {
+            id: "00112233-4455-6677-8899-aabbccddeeff".into(),
+            name: "Hallway motion".into(),
+            temperature_c: Some(24.0),
+            illuminance_lux: Some(100.0),
+            motion: Some(false),
+            reachable: true,
+        };
+        let reading = FritzReading {
+            ain: "111111".into(),
+            name: "Living room".into(),
+            power_w: 150,
+            temperature_c: 20.0,
+            power_state: None,
+            power_controllable: false,
+            power_toggle_allowed: false,
+        };
+        let selected = vec!["111111".into()];
+        let sensors = vec![sensor.clone()];
+        assert_eq!(average_temperature_with_hue_c(
+            &[reading.clone()], &selected, &sensors, &[], false,
+        ), Some(22.0));
+        let hidden = vec![hue_device_id("sensor", &sensor.id)];
+        assert_eq!(average_temperature_with_hue_c(
+            &[reading.clone()], &selected, &sensors, &hidden, false,
+        ), Some(20.0));
+        let offline = HueSensor { reachable: false, ..sensor.clone() };
+        assert_eq!(average_temperature_with_hue_c(
+            &[reading], &selected, &[offline], &[], false,
+        ), Some(20.0));
+        let invalid = HueSensor { temperature_c: Some(f64::NAN), ..sensor.clone() };
+        assert_eq!(average_temperature_with_hue_c(
+            &[], &[], &[invalid], &[], false,
+        ), None);
+        let solar = HueSensor { name: "Solar roof".into(), ..sensor };
+        assert_eq!(average_temperature_with_hue_c(
+            &[], &[], &[solar], &[], true,
+        ), None);
     }
 
     #[test]

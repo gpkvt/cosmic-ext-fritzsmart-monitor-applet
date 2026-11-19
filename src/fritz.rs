@@ -146,6 +146,8 @@ pub struct FritzSettings {
     pub tasmota_password: String,
     pub hue_bridge_ip: String,
     pub hue_application_key: String,
+    /// Hue devices hidden from the unified Devices list; other services are unaffected.
+    pub hidden_hue_devices: Vec<String>,
     pub tasmota_subnet_scan: bool,
     pub ain: String,
     pub ains: Vec<String>,
@@ -206,6 +208,7 @@ impl Default for FritzSettings {
             tasmota_password: String::new(),
             hue_bridge_ip: String::new(),
             hue_application_key: String::new(),
+            hidden_hue_devices: Vec::new(),
             tasmota_subnet_scan: true,
             ain: String::new(),
             ains: Vec::new(),
@@ -413,6 +416,33 @@ fn parse_panel_order(value: &str) -> Vec<String> {
     order
 }
 
+fn parse_hidden_hue_devices(value: &str) -> Vec<String> {
+    unique_strings(
+        value
+            .split(',')
+            .map(str::trim)
+            .filter(|value| {
+                // Only accept namespaced Hue resource identifiers, never
+                // arbitrary power-meter AINs or configuration delimiters.
+                let resource = value
+                    .strip_prefix("hue-light-")
+                    .or_else(|| value.strip_prefix("hue-sensor-"));
+                resource.is_some_and(|id| {
+                    id.len() == 36
+                        && id.bytes().enumerate().all(|(index, byte)| {
+                            if matches!(index, 8 | 13 | 18 | 23) {
+                                byte == b'-'
+                            } else {
+                                byte.is_ascii_hexdigit()
+                            }
+                        })
+                })
+            })
+            .map(str::to_string)
+            .collect::<Vec<_>>(),
+    )
+}
+
 fn parse_device_order(value: &str) -> Vec<String> {
     unique_strings(
         value
@@ -539,6 +569,7 @@ impl FritzSettings {
             tasmota_password: get("TASMOTA_PASSWORD"),
             hue_bridge_ip: get("HUE_BRIDGE_IP"),
             hue_application_key: get("HUE_APPLICATION_KEY"),
+            hidden_hue_devices: parse_hidden_hue_devices(&get("HUE_HIDDEN_DEVICES")),
             tasmota_subnet_scan: !values.contains_key("TASMOTA_SUBNET_SCAN")
                 || get("TASMOTA_SUBNET_SCAN").eq_ignore_ascii_case("true"),
             ain: get("AIN"),
@@ -720,11 +751,13 @@ impl FritzSettings {
             parse_hidden_panel_items(&self.hidden_panel_items.join(",")).join(",");
         let panel_order = parse_panel_order(&self.panel_order.join(",")).join(",");
         let device_order = parse_device_order(&self.device_order.join(",")).join(",");
+        let hidden_hue_devices =
+            parse_hidden_hue_devices(&self.hidden_hue_devices.join(",")).join(",");
         let collapsed_menu_sections =
             parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
         let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
-            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nHUE_BRIDGE_IP={}\nHUE_APPLICATION_KEY={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nTEMPERATURE_UNIT={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nDEVICE_SORT={}\nDEVICE_SORT_DESCENDING={}\nCOLLAPSED_MENU_SECTIONS={}\nDAILY_ENERGY_HISTORY_DEFAULT_APPLIED={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nGRAPH_HISTORY_DIAGNOSTICS_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nHUE_BRIDGE_IP={}\nHUE_APPLICATION_KEY={}\nHUE_HIDDEN_DEVICES={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nTEMPERATURE_UNIT={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nDEVICE_SORT={}\nDEVICE_SORT_DESCENDING={}\nCOLLAPSED_MENU_SECTIONS={}\nDAILY_ENERGY_HISTORY_DEFAULT_APPLIED={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nGRAPH_HISTORY_DIAGNOSTICS_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
             match self.language.as_str() {
                 "de" => "de",
                 "en" => "en",
@@ -737,6 +770,7 @@ impl FritzSettings {
             self.tasmota_password,
             self.hue_bridge_ip,
             self.hue_application_key,
+            hidden_hue_devices,
             if self.tasmota_subnet_scan {
                 "true"
             } else {
@@ -2246,6 +2280,16 @@ mod tests {
                 "daily-energy-history".to_string()
             ]
         );
+    }
+
+    #[test]
+    fn hue_visibility_settings_are_scoped_to_valid_hue_resource_ids() {
+        let light = "hue-light-00112233-4455-6677-8899-aabbccddeeff";
+        let sensor = "hue-sensor-11112233-4455-6677-8899-aabbccddeeff";
+        let value = format!("{light},{sensor},{light},hue-light-invalid,TASMOTA:1122");
+        assert_eq!(parse_hidden_hue_devices(&value), vec![light, sensor]);
+        assert!(parse_hidden_hue_devices("").is_empty());
+        assert!(FritzSettings::default().hidden_hue_devices.is_empty());
     }
 
     #[test]
