@@ -4,6 +4,7 @@ use crate::fritz::{
     fetch_fritz_data,
 };
 use crate::hue::{HueLight, HueSensor, HueSnapshot};
+use crate::netatmo::{NetatmoSensor, NetatmoSnapshot};
 use crate::weather::{
     WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather,
     fetch_weather_forecast, starry_night_overlay,
@@ -57,6 +58,12 @@ pub struct AppModel {
     hue_discovery_note: Option<String>,
     hue_pending: HashSet<String>,
     hue_next_refresh_at: Option<Instant>,
+    netatmo_sensors: Vec<NetatmoSensor>,
+    netatmo_history: crate::netatmo::NetatmoHistory,
+    netatmo_error: Option<String>,
+    netatmo_loading: bool,
+    netatmo_next_refresh_at: Option<Instant>,
+    netatmo_generation: u64,
     internet_bandwidth: Option<FritzInternetBandwidth>,
     fritzbox_system_info: Option<FritzBoxSystemInfo>,
     bandwidth_history: VecDeque<(Instant, u64, u64)>,
@@ -163,6 +170,12 @@ pub enum Message {
     HueSnapshotLoaded(Result<HueSnapshot, String>),
     SetHueLightPower(String, bool),
     HueLightPowerFinished(String, Result<(), String>),
+    NetatmoClientIdChanged(String),
+    NetatmoClientSecretChanged(String),
+    NetatmoRefreshTokenChanged(String),
+    RefreshNetatmo,
+    NetatmoLoaded(u64, Result<NetatmoSnapshot, String>),
+    ToggleNetatmoVisible(String, bool),
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
@@ -2097,9 +2110,11 @@ fn average_temperature_with_hue_c(
     selected_ains: &[String],
     sensors: &[HueSensor],
     hidden_hue_devices: &[String],
+    netatmo_sensors: &[NetatmoSensor],
+    hidden_netatmo_devices: &[String],
     exclude_solar: bool,
 ) -> Option<f64> {
-    if sensors.is_empty() {
+    if sensors.is_empty() && netatmo_sensors.is_empty() {
         return average_selected_temperature_c(readings, selected_ains, exclude_solar);
     }
     let selected_metered = readings
@@ -2125,8 +2140,17 @@ fn average_temperature_with_hue_c(
                 .temperature_c
                 .filter(|temperature| temperature.is_finite())
         });
+    let selected_netatmo = netatmo_sensors
+        .iter()
+        .filter(|sensor| {
+            sensor.reachable
+                && !hidden_netatmo_devices.contains(&sensor.id)
+                && (!exclude_solar || !sensor.name.to_lowercase().contains("solar"))
+        })
+        .filter_map(|sensor| sensor.temperature_c.filter(|value| value.is_finite()));
     let (sum, count) = selected_metered
         .chain(selected_hue)
+        .chain(selected_netatmo)
         .fold((0.0_f64, 0_usize), |(sum, count), temperature| {
             (sum + temperature, count + 1)
         });
@@ -2807,6 +2831,59 @@ fn hue_sensor_metric_graph(
     collapsible_graph(label, section_id, collapsed, graph, copy_feedback)
 }
 
+/// Netatmo modules are read-only. Only recorded, finite measurements
+/// appear in their respective collapsible history graphs.
+fn netatmo_metric_graph(
+    history: &crate::netatmo::NetatmoHistory,
+    sensor: &NetatmoSensor,
+    metric: &'static str,
+    label: &'static str,
+    native_unit: &'static str,
+    settings: &FritzSettings,
+    collapsed_sections: &HashSet<String>,
+    copy_feedback: Option<&CopyFeedback>,
+) -> cosmic::Element<'static, Message> {
+    let section_id = format!("netatmo-sensor-graph-{metric}-{}", sensor.id);
+    let collapsed = collapsed_sections.contains(&section_id);
+    let unit = if metric == "temperature" {
+        temperature_unit_label(&settings.temperature_unit)
+    } else {
+        native_unit
+    };
+    let graph: cosmic::Element<'static, Message> = if collapsed {
+        widget::text("").into()
+    } else {
+        let full: GraphSamples = history.get(&sensor.id)
+            .and_then(|metrics| metrics.get(metric))
+            .into_iter()
+            .flat_map(|values| values.iter())
+            .map(|(time, value)| (
+                *time,
+                if metric == "temperature" {
+                    temperature_in_unit(*value, &settings.temperature_unit)
+                } else {
+                    *value
+                },
+            ))
+            .collect();
+        let values = graph_values_for_timespan(&full, settings.graph_timespan_minutes);
+        if values.len() < 2 {
+            widget::text::caption("Not enough recorded Netatmo readings to draw a graph").into()
+        } else {
+            let start = graph_axis_start_for_samples(&values, settings.graph_timespan_minutes);
+            interactive_graph_with_axis(
+                &settings.language,
+                &format!("{} · {label}", sensor.name),
+                values.into_iter(),
+                &settings.graph_style,
+                unit,
+                start,
+            )
+        }
+    };
+    collapsible_graph(label, section_id, collapsed, graph, copy_feedback)
+}
+
 /// Full-width compact plot for each actual daily metric. Missing daily
 /// readings are omitted rather than plotted as fabricated zero measurements.
 /// Each recorded daily trend owns its own persisted disclosure state.
@@ -3455,6 +3532,7 @@ enum SettingsDeviceEntry<'a> {
     Metered(&'a FritzDevice),
     HueLight(&'a HueLight),
     HueSensor(&'a HueSensor),
+    Netatmo(&'a NetatmoSensor),
 }
 
 impl SettingsDeviceEntry<'_> {
@@ -3463,6 +3541,7 @@ impl SettingsDeviceEntry<'_> {
             Self::Metered(device) => device.ain.clone(),
             Self::HueLight(light) => hue_device_id("light", &light.id),
             Self::HueSensor(sensor) => hue_device_id("sensor", &sensor.id),
+            Self::Netatmo(sensor) => format!("NETATMO:{}", sensor.id),
         }
     }
 
@@ -3482,6 +3561,11 @@ impl SettingsDeviceEntry<'_> {
                 sensor.name.to_lowercase().contains(query.as_str())
                     || sensor.id.to_lowercase().contains(query.as_str())
                     || "hue sensor motion temperature lux".contains(query.as_str())
+            }
+            Self::Netatmo(sensor) => {
+                sensor.name.to_lowercase().contains(query.as_str())
+                    || sensor.id.to_lowercase().contains(query.as_str())
+                    || "netatmo weather station temperature humidity co2 pressure".contains(query.as_str())
             }
         }
     }
@@ -4255,6 +4339,7 @@ impl cosmic::Application for AppModel {
         let history_storage_window = graph_history_storage_window(settings.graph_timespan_minutes);
         let (mut history, device_history) = crate::history::load(history_storage_window);
         let hue_sensor_history = crate::history::load_hue_sensors(history_storage_window);
+        let netatmo_history = crate::netatmo::load_history(history_storage_window);
         crate::diagnostics::debug(format!(
             "saved history restored (power samples: {}, metered devices: {}, Hue sensors: {})",
             history.len(),
@@ -4313,6 +4398,19 @@ impl cosmic::Application for AppModel {
                 cosmic::Action::App(Message::HueBridgesDiscovered(result))
             }));
         }
+        let netatmo_configured = !settings.netatmo_client_id.trim().is_empty()
+            && !settings.netatmo_client_secret.trim().is_empty()
+            && !settings.netatmo_refresh_token.trim().is_empty();
+        if netatmo_configured {
+            tasks.push(Task::perform(
+                crate::netatmo::fetch_stations(
+                    settings.netatmo_client_id.clone(),
+                    settings.netatmo_client_secret.clone(),
+                    settings.netatmo_refresh_token.clone(),
+                ),
+                |result| cosmic::Action::App(Message::NetatmoLoaded(0, result)),
+            ));
+        }
         if hue_configured {
             tasks.push(Task::perform(
                 crate::hue::fetch_snapshot(
@@ -4334,6 +4432,7 @@ impl cosmic::Application for AppModel {
                 selected_ains: initial_device_selection(&settings),
                 devices: known_devices,
                 hue_loading: hue_configured,
+                netatmo_loading: netatmo_configured,
                 hue_discovering: hue_auto_discover,
                 devices_loaded: saved_devices_loaded,
                 devices_loading: false,
@@ -4349,6 +4448,7 @@ impl cosmic::Application for AppModel {
                 history,
                 device_history,
                 hue_sensor_history,
+                netatmo_history,
                 history_storage_diagnostics,
                 collapsed_menu_sections,
                 expanded_devices,
@@ -4383,6 +4483,10 @@ impl cosmic::Application for AppModel {
             })
             || self.devices_loading
             || self.hue_loading
+            || self.netatmo_loading
+            || self.netatmo_next_refresh_at.is_some_and(|deadline| {
+                deadline.saturating_duration_since(now) <= Duration::from_secs(15)
+            })
             || self.hue_pairing
             || self.hue_discovering
             || self.hue_next_refresh_at.is_some_and(|deadline| {
@@ -4461,6 +4565,8 @@ impl cosmic::Application for AppModel {
                 &self.selected_ains,
                 &self.hue_sensors,
                 &self.settings.hidden_hue_devices,
+                &self.netatmo_sensors,
+                &self.settings.hidden_netatmo_devices,
                 self.settings.panel_exclude_solar_temperature,
             )
             .map(|temperature| format_temperature(temperature, &self.settings.temperature_unit))
@@ -5885,6 +5991,45 @@ impl cosmic::Application for AppModel {
                         "Hue's bridge certificate uses a bridge ID instead of its IP. The Hue-only LAN connection skips TLS certificate checks; use a trusted local network.",
                     ))
                     .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3("Netatmo Weather Stations"))
+                    .push(widget::text::caption(
+                        "Read-only Netatmo cloud API. Create an application and generate a refresh token with read_station scope at dev.netatmo.com. These credentials are saved locally (owner-only); readings are refreshed every five minutes.",
+                    ))
+                    .push(widget::text::body("Netatmo application client ID"))
+                    .push(widget::text_input(
+                        "Client ID",
+                        &self.settings.netatmo_client_id,
+                    ).on_input(Message::NetatmoClientIdChanged))
+                    .push(widget::text::body("Netatmo client secret"))
+                    .push(widget::secure_input(
+                        "Client secret",
+                        &self.settings.netatmo_client_secret,
+                        None,
+                        true,
+                    ).on_input(Message::NetatmoClientSecretChanged))
+                    .push(widget::text::body("Netatmo OAuth refresh token (read_station)"))
+                    .push(widget::secure_input(
+                        "Refresh token",
+                        &self.settings.netatmo_refresh_token,
+                        None,
+                        true,
+                    ).on_input(Message::NetatmoRefreshTokenChanged))
+                    .push(widget::button::text(if self.netatmo_loading {
+                        "Loading Netatmo stations…"
+                    } else {
+                        "Connect / Refresh Netatmo"
+                    }).on_press(Message::RefreshNetatmo))
+                    .push(widget::text::caption(if let Some(error) = &self.netatmo_error {
+                        format!("Netatmo: {error}")
+                    } else if self.netatmo_loading {
+                        "Contacting Netatmo's OAuth and Weather Station API…".to_owned()
+                    } else {
+                        format!("Netatmo · {} station/module(s) loaded", self.netatmo_sensors.len())
+                    }))
+                    .push(widget::text::caption(
+                        "Netatmo requires internet access. This applet supports read-only Weather Station modules, not Netatmo thermostats or cameras."
+                    ))
+                    .push(widget::divider::horizontal::default())
                     .push(
                         widget::Row::new().width(cosmic::iced::Length::Fill)
                             .width(cosmic::iced::Length::Fill)
@@ -5963,7 +6108,7 @@ impl cosmic::Application for AppModel {
                         "Manage connected devices",
                     )))
                     .push(widget::text::caption(
-                        "Discover FRITZ!Box and Tasmota power meters plus paired Hue lights and sensors. Devices are managed together.",
+                        "Manage FRITZ!Box and Tasmota power meters, Hue lights/sensors, and Netatmo Weather Station modules together.",
                     ))
                     .push(
                         widget::Row::new().width(cosmic::iced::Length::Fill)
@@ -6000,6 +6145,7 @@ impl cosmic::Application for AppModel {
                 if !self.devices.is_empty()
                     || !self.hue_lights.is_empty()
                     || !self.hue_sensors.is_empty()
+                    || !self.netatmo_sensors.is_empty()
                 {
                     content = content.push(widget::text::caption(
                         "Select visible devices and use +/− to arrange their saved order. Power-meter input and temperature alerts are only available where supported.",
@@ -6010,6 +6156,7 @@ impl cosmic::Application for AppModel {
                         .map(SettingsDeviceEntry::Metered)
                         .chain(self.hue_lights.iter().map(SettingsDeviceEntry::HueLight))
                         .chain(self.hue_sensors.iter().map(SettingsDeviceEntry::HueSensor))
+                        .chain(self.netatmo_sensors.iter().map(SettingsDeviceEntry::Netatmo))
                         .collect();
                     ordered_devices.sort_by_key(|entry| {
                         device_order_position(&self.settings.device_order, &entry.device_id())
@@ -6181,6 +6328,39 @@ impl cosmic::Application for AppModel {
                                     Some(light_control),
                                     None,
                                 ));
+                            }
+                            SettingsDeviceEntry::Netatmo(sensor) => {
+                                let id = format!("NETATMO:{}", sensor.id);
+                                let visible = !self.settings.hidden_netatmo_devices.contains(&sensor.id);
+                                let check_id = sensor.id.clone();
+                                let row = widget::Row::new()
+                                    .width(cosmic::iced::Length::Fill)
+                                    .spacing(8)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(widget::checkbox(visible)
+                                        .label(sensor.name.clone())
+                                        .on_toggle(move |value| Message::ToggleNetatmoVisible(check_id.clone(), value)))
+                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                    .push(icon_action_button("+", "Move device up", Message::MoveDevice(id.clone(), true)))
+                                    .push(icon_action_button("−", "Move device down", Message::MoveDevice(id.clone(), false)));
+                                let mut details = widget::Column::new()
+                                    .spacing(8)
+                                    .push(row)
+                                    .push(widget::text::caption(if sensor.reachable {
+                                        "Netatmo · Weather Station · Read-only cloud sensor"
+                                    } else {
+                                        "Netatmo · Weather Station · Unavailable / stale"
+                                    }));
+                                if sensor.temperature_c.is_some() {
+                                    let key = crate::fritz::normalize_ain_for_selection(&id);
+                                    details = details.push(temperature_alert_controls(
+                                        id,
+                                        self.settings.temperature_alerts.get(&key).copied(),
+                                        &self.settings.language,
+                                        &self.settings.temperature_unit,
+                                    ));
+                                }
+                                content = content.push(surface_card(details.into(), 8));
                             }
                             SettingsDeviceEntry::HueSensor(sensor) => {
                                 let id = hue_device_id("sensor", &sensor.id);
@@ -8628,6 +8808,112 @@ impl cosmic::Application for AppModel {
                     ));
                 }
 
+                // Netatmo is a read-only cloud Weather Station source,
+                // not a power meter. Keep missing/stale values unavailable.
+                for sensor in &self.netatmo_sensors {
+                    if self.settings.hidden_netatmo_devices.contains(&sensor.id) {
+                        continue;
+                    }
+                    let id = format!("NETATMO:{}", sensor.id);
+                    let row_key = format!("2-{id}");
+                    let expanded = is_device_expanded(&self.expanded_devices, &id);
+                    let temperature = sensor
+                        .temperature_c
+                        .filter(|_| sensor.reachable)
+                        .map(|temperature| format_temperature(temperature, &self.settings.temperature_unit))
+                        .unwrap_or_else(|| "—".into());
+                    let humidity = sensor.humidity_percent
+                        .map(|value| format!("{value:.0} %"))
+                        .unwrap_or_else(|| "—".into());
+                    let heading = widget::Row::new()
+                        .spacing(8)
+                        .width(cosmic::iced::Length::Fill)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::button::custom(
+                            widget::Row::new()
+                                .spacing(8)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::Column::new()
+                                    .spacing(2)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::body(sensor.name.clone()))
+                                    .push(widget::text::caption("Netatmo · Weather Station")))
+                                .push(widget::icon::from_name(if expanded {
+                                    "go-up-symbolic"
+                                } else {
+                                    "go-down-symbolic"
+                                }).size(16))
+                        )
+                        .on_press(Message::ToggleDeviceDetails(id))
+                        .padding([8, 12])
+                        .width(cosmic::iced::Length::Fill)
+                        .class(cosmic::theme::Button::Text))
+                        .push(widget::text::body("—")
+                            .width(cosmic::iced::Length::Fixed(76.0))
+                            .align_x(cosmic::iced::Alignment::End))
+                        .push(widget::text::body(keep_value_unit_together(temperature))
+                            .width(cosmic::iced::Length::Fixed(90.0))
+                            .align_x(cosmic::iced::Alignment::End))
+                        .push(widget::text::caption(humidity)
+                            .width(cosmic::iced::Length::Fixed(108.0))
+                            .align_x(cosmic::iced::Alignment::End))
+                        .push(copy_menu_title_button(
+                            sensor.name.clone(), self.copy_feedback.as_ref()))
+                        .push(widget::Space::new()
+                            .width(cosmic::iced::Length::Fixed(52.0)));
+                    let mut card = widget::list::list_column()
+                        .style(cosmic::theme::Container::Transparent)
+                        .list_item_padding([0, 0])
+                        .add(heading);
+                    if expanded {
+                        let fmt = |v: Option<f64>, unit: &str| -> String {
+                            v.map(|value| format!("{value:.1} {unit}"))
+                                .unwrap_or_else(|| "—".into())
+                        };
+                        let details = widget::Column::new()
+                            .spacing(7)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::caption(if sensor.reachable {
+                                "Netatmo Weather Station · live read-only measurements"
+                            } else {
+                                "Netatmo Weather Station · offline or stale data"
+                            }))
+                            .push(widget::text::caption(format!("Humidity · {}", fmt(sensor.humidity_percent, "%"))))
+                            .push(widget::text::caption(format!("CO₂ · {}", fmt(sensor.co2_ppm, "ppm"))))
+                            .push(widget::text::caption(format!("Pressure · {}", fmt(sensor.pressure_hpa, "hPa"))))
+                            .push(widget::text::caption(format!("Noise · {}", fmt(sensor.noise_db, "dB"))))
+                            .push(widget::text::caption(format!("Rain · {}", fmt(sensor.rain_mm, "mm"))))
+                            .push(widget::text::caption(format!("Wind · {}", fmt(sensor.wind_kmh, "km/h"))))
+                            .push(widget::text::caption("No wattage or power history: Netatmo Weather Stations do not measure mains power."));
+                        for (metric, label, unit) in crate::netatmo::METRICS {
+                            if crate::netatmo::metric_value(sensor, metric).is_some()
+                                || self.netatmo_history.get(&sensor.id)
+                                    .and_then(|metrics| metrics.get(metric))
+                                    .is_some()
+                            {
+                                details = details.push(netatmo_metric_graph(
+                                    &self.netatmo_history,
+                                    sensor,
+                                    metric,
+                                    label,
+                                    unit,
+                                    &self.settings,
+                                    &self.collapsed_menu_sections,
+                                    self.copy_feedback.as_ref(),
+                                ));
+                            }
+                        }
+                        card = card.add(widget::container(details).padding([8, 12]));
+                    }
+                    device_sort_metadata.insert(
+                        row_key.clone(),
+                        (sensor.name.to_lowercase(), None,
+                            sensor.temperature_c.filter(|_| sensor.reachable)),
+                    );
+                    menu_cards.push((row_key, widget::container(card)
+                        .width(cosmic::iced::Length::Fill).into()));
+                }
+
                 menu_cards.extend(total_power_overview(
                     &self.readings,
                     &self.settings,
@@ -9271,12 +9557,7 @@ impl cosmic::Application for AppModel {
                 .width(cosmic::iced::Length::Fill)
                 .height(cosmic::iced::Length::Fill)
                 .push(
-                    widget::container(sticky_header.push(icon_action_button(
-                        "window-close-symbolic",
-                        "Close menu",
-                        Message::TogglePopup,
-                    )))
-                    .padding([8, 12]),
+                    widget::container(sticky_header).padding([8, 12]),
                 )
                 .push(widget::divider::horizontal::default())
                 .push(scrollable_content)
@@ -9323,11 +9604,6 @@ impl cosmic::Application for AppModel {
                         "preferences-system-symbolic",
                         crate::i18n::tr(&self.settings.language, "Settings"),
                         Message::ToggleSettings,
-                    ))
-                    .push(icon_action_button(
-                        "window-close-symbolic",
-                        "Close menu",
-                        Message::TogglePopup,
                     )),
             )
             .padding([8, 12])
@@ -9646,6 +9922,23 @@ impl cosmic::Application for AppModel {
                     cosmic::Action::App(Message::Updated(Box::new(result)))
                 })];
 
+                if !self.netatmo_loading
+                    && !self.settings.netatmo_client_id.trim().is_empty()
+                    && !self.settings.netatmo_client_secret.trim().is_empty()
+                    && !self.settings.netatmo_refresh_token.trim().is_empty()
+                {
+                    self.netatmo_loading = true;
+                    self.netatmo_next_refresh_at = None;
+                    let generation = self.netatmo_generation;
+                    tasks.push(Task::perform(
+                        crate::netatmo::fetch_stations(
+                            self.settings.netatmo_client_id.clone(),
+                            self.settings.netatmo_client_secret.clone(),
+                            self.settings.netatmo_refresh_token.clone(),
+                        ),
+                        move |result| cosmic::Action::App(Message::NetatmoLoaded(generation, result)),
+                    ));
+                }
                 if !self.settings.hue_bridge_ip.trim().is_empty()
                     && !self.settings.hue_application_key.trim().is_empty()
                     && !self.hue_loading
@@ -9749,6 +10042,24 @@ impl cosmic::Application for AppModel {
                     .is_some_and(|deadline| Instant::now() >= deadline)
                 {
                     self.settings_saved_until = None;
+                }
+                if !self.netatmo_loading
+                    && self.netatmo_next_refresh_at.is_some_and(|at| now >= at)
+                    && !self.settings.netatmo_client_id.trim().is_empty()
+                    && !self.settings.netatmo_client_secret.trim().is_empty()
+                    && !self.settings.netatmo_refresh_token.trim().is_empty()
+                {
+                    self.netatmo_loading = true;
+                    self.netatmo_next_refresh_at = None;
+                    let generation = self.netatmo_generation;
+                    return Task::perform(
+                        crate::netatmo::fetch_stations(
+                            self.settings.netatmo_client_id.clone(),
+                            self.settings.netatmo_client_secret.clone(),
+                            self.settings.netatmo_refresh_token.clone(),
+                        ),
+                        move |result| cosmic::Action::App(Message::NetatmoLoaded(generation, result)),
+                    );
                 }
                 if !self.hue_loading
                     && !self.settings.hue_application_key.trim().is_empty()
@@ -10067,8 +10378,11 @@ impl cosmic::Application for AppModel {
                             format!("FRITZ!Box refresh failed: {error}"),
                         );
                         self.error = if self.selected_ains.is_empty()
-                            && !self.settings.hue_application_key.is_empty()
-                            && !self.settings.hue_bridge_ip.is_empty()
+                            && ((!self.settings.hue_application_key.is_empty()
+                                && !self.settings.hue_bridge_ip.is_empty())
+                                || (!self.settings.netatmo_client_id.is_empty()
+                                    && !self.settings.netatmo_client_secret.is_empty()
+                                    && !self.settings.netatmo_refresh_token.is_empty()))
                         {
                             None
                         } else {
@@ -10388,6 +10702,7 @@ impl cosmic::Application for AppModel {
                             .iter()
                             .map(|sensor| hue_device_id("sensor", &sensor.id)),
                     )
+                    .chain(self.netatmo_sensors.iter().map(|sensor| format!("NETATMO:{}", sensor.id)))
                     .collect();
                 order.sort_by_key(|device_ain| {
                     device_order_position(&self.settings.device_order, device_ain)
@@ -10470,6 +10785,7 @@ impl cosmic::Application for AppModel {
                         graph_history_storage_window(self.settings.graph_timespan_minutes);
                     (self.history, self.device_history) = crate::history::load(storage_window);
                     self.hue_sensor_history = crate::history::load_hue_sensors(storage_window);
+                self.netatmo_history = crate::netatmo::load_history(storage_window);
                     let window = graph_history_window(self.settings.graph_timespan_minutes);
                     let now = Instant::now();
                     self.history
@@ -10824,6 +11140,157 @@ impl cosmic::Application for AppModel {
             }
             Message::PasswordChanged(value) => {
                 self.settings.password = value;
+                self.persist_settings();
+            }
+            Message::NetatmoClientIdChanged(value) => {
+                self.settings.netatmo_client_id = value;
+                self.netatmo_generation = self.netatmo_generation.wrapping_add(1);
+                self.netatmo_loading = false;
+                self.netatmo_sensors.clear();
+                self.netatmo_error = None;
+                self.netatmo_next_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::NetatmoClientSecretChanged(value) => {
+                self.settings.netatmo_client_secret = value;
+                self.netatmo_generation = self.netatmo_generation.wrapping_add(1);
+                self.netatmo_loading = false;
+                self.netatmo_sensors.clear();
+                self.netatmo_error = None;
+                self.netatmo_next_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::NetatmoRefreshTokenChanged(value) => {
+                self.settings.netatmo_refresh_token = value;
+                self.netatmo_generation = self.netatmo_generation.wrapping_add(1);
+                self.netatmo_loading = false;
+                self.netatmo_sensors.clear();
+                self.netatmo_error = None;
+                self.netatmo_next_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::RefreshNetatmo => {
+                if self.netatmo_loading {
+                    return Task::none();
+                }
+                if self.settings.netatmo_client_id.trim().is_empty()
+                    || self.settings.netatmo_client_secret.trim().is_empty()
+                    || self.settings.netatmo_refresh_token.trim().is_empty()
+                {
+                    self.netatmo_error = Some("Enter the Netatmo client ID, client secret and refresh token first".into());
+                    return Task::none();
+                }
+                self.netatmo_loading = true;
+                self.netatmo_next_refresh_at = None;
+                let generation = self.netatmo_generation;
+                return Task::perform(
+                    crate::netatmo::fetch_stations(
+                        self.settings.netatmo_client_id.clone(),
+                        self.settings.netatmo_client_secret.clone(),
+                        self.settings.netatmo_refresh_token.clone(),
+                    ),
+                    move |result| cosmic::Action::App(Message::NetatmoLoaded(generation, result)),
+                );
+            }
+            Message::NetatmoLoaded(generation, result) => {
+                if generation != self.netatmo_generation {
+                    return Task::none();
+                }
+                self.netatmo_loading = false;
+                // Slow down cloud polling to a five-minute interval.
+                self.netatmo_next_refresh_at = Some(Instant::now() + Duration::from_secs(300));
+                match result {
+                    Ok(snapshot) => {
+                        // Netatmo rotates refresh tokens. Save a newly returned
+                        // token even when the separate station request fails.
+                        if snapshot.refresh_token != self.settings.netatmo_refresh_token {
+                            self.settings.netatmo_refresh_token = snapshot.refresh_token;
+                            self.persist_settings();
+                        }
+                        match snapshot.stations {
+                            Ok(sensors) => {
+                                let window = graph_history_storage_window(self.settings.graph_timespan_minutes);
+                                let now = Instant::now();
+                                for sensor in &sensors {
+                                    crate::netatmo::record_history(&mut self.netatmo_history, sensor, now, window);
+                                    let key = crate::fritz::normalize_ain_for_selection(
+                                        &format!("NETATMO:{}", sensor.id));
+                                    if let Some(thresholds) =
+                                        self.settings.temperature_alerts.get(&key).copied()
+                                    {
+                                        if let Some(temperature) = sensor
+                                            .temperature_c
+                                            .filter(|value| sensor.reachable && value.is_finite())
+                                        {
+                                            let outside = temperature_outside_limits(temperature, thresholds);
+                                            if should_notify_temperature_alert(
+                                                self.temperature_alert_state.get(&key).copied(),
+                                                outside,
+                                            ) {
+                                                notify_temperature_alert(
+                                                    &sensor.name,
+                                                    temperature,
+                                                    thresholds,
+                                                    &self.settings.language,
+                                                    &self.settings.temperature_unit,
+                                                );
+                                            }
+                                            self.temperature_alert_state.insert(key, outside);
+                                        }
+                                    } else {
+                                        self.temperature_alert_state.remove(&key);
+                                    }
+                                }
+                                if let Err(error) = crate::netatmo::save_history(&self.netatmo_history) {
+                                    eprintln!("Could not save Netatmo sensor history: {error}");
+                                }
+                                self.netatmo_sensors = sensors;
+                                self.netatmo_error = None;
+                            }
+                            Err(error) => {
+                                for sensor in &mut self.netatmo_sensors {
+                                    sensor.reachable = false;
+                                    sensor.temperature_c = None;
+                                    sensor.humidity_percent = None;
+                                    sensor.co2_ppm = None;
+                                    sensor.pressure_hpa = None;
+                                    sensor.noise_db = None;
+                                    sensor.rain_mm = None;
+                                    sensor.wind_kmh = None;
+                                }
+                                self.netatmo_error = Some(error);
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        for sensor in &mut self.netatmo_sensors {
+                            sensor.reachable = false;
+                            sensor.temperature_c = None;
+                            sensor.humidity_percent = None;
+                            sensor.co2_ppm = None;
+                            sensor.pressure_hpa = None;
+                            sensor.noise_db = None;
+                            sensor.rain_mm = None;
+                            sensor.wind_kmh = None;
+                        }
+                        self.netatmo_error = Some(error);
+                    }
+                }
+                crate::diagnostics::debug(format!(
+                    "Netatmo station refresh finished (modules: {}, available: {}, failed: {})",
+                    self.netatmo_sensors.len(),
+                    self.netatmo_sensors.iter().filter(|sensor| sensor.reachable).count(),
+                    self.netatmo_error.is_some()
+                ));
+            }
+            Message::ToggleNetatmoVisible(id, visible) => {
+                if !self.netatmo_sensors.iter().any(|sensor| sensor.id == id) {
+                    return Task::none();
+                }
+                self.settings.hidden_netatmo_devices.retain(|entry| entry != &id);
+                if !visible {
+                    self.settings.hidden_netatmo_devices.push(id);
+                }
                 self.persist_settings();
             }
             Message::HueBridgeIpChanged(value) => {
@@ -11187,6 +11654,7 @@ impl cosmic::Application for AppModel {
                     graph_history_storage_window(self.settings.graph_timespan_minutes);
                 (self.history, self.device_history) = crate::history::load(storage_window);
                 self.hue_sensor_history = crate::history::load_hue_sensors(storage_window);
+                self.netatmo_history = crate::netatmo::load_history(storage_window);
                 let window = graph_history_window(self.settings.graph_timespan_minutes);
                 let now = Instant::now();
                 self.history
@@ -11272,6 +11740,23 @@ impl cosmic::Application for AppModel {
                 let mut tasks = vec![Task::perform(discover_devices(settings), |result| {
                     cosmic::Action::App(Message::DevicesLoaded(result))
                 })];
+                if !self.netatmo_loading
+                    && !self.settings.netatmo_client_id.trim().is_empty()
+                    && !self.settings.netatmo_client_secret.trim().is_empty()
+                    && !self.settings.netatmo_refresh_token.trim().is_empty()
+                {
+                    self.netatmo_loading = true;
+                    self.netatmo_next_refresh_at = None;
+                    let generation = self.netatmo_generation;
+                    tasks.push(Task::perform(
+                        crate::netatmo::fetch_stations(
+                            self.settings.netatmo_client_id.clone(),
+                            self.settings.netatmo_client_secret.clone(),
+                            self.settings.netatmo_refresh_token.clone(),
+                        ),
+                        move |result| cosmic::Action::App(Message::NetatmoLoaded(generation, result)),
+                    ));
+                }
                 if !self.hue_loading
                     && !self.settings.hue_bridge_ip.trim().is_empty()
                     && !self.settings.hue_application_key.trim().is_empty()
@@ -12577,6 +13062,8 @@ mod history_tests {
                 &selected,
                 &sensors,
                 &[],
+                &[],
+                &[],
                 false,
             ),
             Some(22.0)
@@ -12588,6 +13075,8 @@ mod history_tests {
                 &selected,
                 &sensors,
                 &hidden,
+                &[],
+                &[],
                 false,
             ),
             Some(20.0)
@@ -12597,7 +13086,7 @@ mod history_tests {
             ..sensor.clone()
         };
         assert_eq!(
-            average_temperature_with_hue_c(&[reading], &selected, &[offline], &[], false,),
+            average_temperature_with_hue_c(&[reading], &selected, &[offline], &[], &[], &[], false,),
             Some(20.0)
         );
         let invalid = HueSensor {
@@ -12605,7 +13094,7 @@ mod history_tests {
             ..sensor.clone()
         };
         assert_eq!(
-            average_temperature_with_hue_c(&[], &[], &[invalid], &[], false,),
+            average_temperature_with_hue_c(&[], &[], &[invalid], &[], &[], &[], false,),
             None
         );
         let solar = HueSensor {
@@ -12613,7 +13102,41 @@ mod history_tests {
             ..sensor
         };
         assert_eq!(
-            average_temperature_with_hue_c(&[], &[], &[solar], &[], true,),
+            average_temperature_with_hue_c(&[], &[], &[solar], &[], &[], &[], true,),
+            None
+        );
+    }
+
+    #[test]
+    fn netatmo_temperature_average_excludes_hidden_and_unreachable_modules() {
+        let station = NetatmoSensor {
+            id: "70:ee:50:11:22:33".into(),
+            name: "Living room".into(),
+            temperature_c: Some(20.0),
+            humidity_percent: Some(50.0),
+            co2_ppm: None,
+            pressure_hpa: None,
+            noise_db: None,
+            rain_mm: None,
+            wind_kmh: None,
+            reachable: true,
+        };
+        assert_eq!(
+            average_temperature_with_hue_c(&[], &[], &[], &[], &[station.clone()], &[], false),
+            Some(20.0)
+        );
+        assert_eq!(
+            average_temperature_with_hue_c(
+                &[], &[], &[], &[], &[station.clone()], &[station.id.clone()], false
+            ),
+            None
+        );
+        let disconnected = NetatmoSensor {
+            reachable: false,
+            ..station
+        };
+        assert_eq!(
+            average_temperature_with_hue_c(&[], &[], &[], &[], &[disconnected], &[], false),
             None
         );
     }

@@ -88,6 +88,13 @@ OpenWeatherMap and retrieve illustrative weather images.
 
 - The applet needs network access to reach the configured FRITZ!Box and any
   selected Tasmota devices or optional Hue Bridge.
+- Netatmo Weather Station support uses the external Netatmo cloud API over
+  HTTPS. It needs an application client ID, client secret and OAuth refresh
+  token with `read_station` scope. These are stored in the user configuration
+  with owner-only filesystem permissions, **not encrypted at rest**. The applet
+  automatically stores rotated refresh tokens; restrict access to the
+  configuration file. Readings remain unavailable if authentication fails.
+  The Netatmo API is not a local or offline integration.
 - Philips Hue Bridge support operates on the local network. The Hue-specific
   HTTPS client currently **does not validate the bridge certificate or
   hostname** because the certificate is tied to the bridge ID, not its local

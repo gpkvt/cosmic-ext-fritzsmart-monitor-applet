@@ -3,6 +3,7 @@ mod diagnostics;
 mod fritz;
 mod history;
 mod hue;
+mod netatmo;
 mod i18n;
 mod tasmota;
 mod updater;
