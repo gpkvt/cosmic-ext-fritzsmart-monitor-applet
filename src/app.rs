@@ -2745,6 +2745,17 @@ fn panel_item_label(id: &str) -> &'static str {
 }
 
 /// Use one canonical device key for saved disclosure state and menu ordering.
+/// A collapsed Devices group renders one heading regardless of device count.
+/// Omit dividers that would otherwise separate its hidden device cards.
+fn menu_card_needs_divider(
+    index: usize,
+    key: &str,
+    device_section_started: bool,
+    devices_collapsed: bool,
+) -> bool {
+    index > 0 && !(devices_collapsed && device_section_started && key.starts_with("2-"))
+}
+
 fn device_order_position(order: &[String], ain: &str) -> usize {
     let key = crate::fritz::canonical_device_key(ain);
     order
@@ -7476,8 +7487,14 @@ impl cosmic::Application for AppModel {
                 let mut device_section_started = false;
                 let mut inactive_section_started = false;
                 let mut device_cards = widget::Column::new().spacing(0);
+                let devices_collapsed = self.collapsed_menu_sections.contains("devices");
                 for (index, (key, card)) in menu_cards.into_iter().enumerate() {
-                    if index > 0 {
+                    if menu_card_needs_divider(
+                        index,
+                        &key,
+                        device_section_started,
+                        devices_collapsed,
+                    ) {
                         device_cards = device_cards.push(widget::divider::horizontal::default());
                     }
                     if key.starts_with("2-") {
@@ -11221,7 +11238,10 @@ mod device_list_sort_tests {
 
 #[cfg(test)]
 mod disclosure_state_tests {
-    use super::{device_order_position, is_device_expanded, toggle_collapsible_state};
+    use super::{
+        device_order_position, is_device_expanded, menu_card_needs_divider,
+        toggle_collapsible_state,
+    };
     use std::collections::HashSet;
 
     #[test]
@@ -11278,6 +11298,16 @@ mod disclosure_state_tests {
             super::refresh_interval_with_inactive_devices(300, false),
             300
         );
+    }
+
+    #[test]
+    fn collapsed_devices_do_not_leave_dividers_between_hidden_rows() {
+        assert!(!menu_card_needs_divider(0, "2-device-a", false, true));
+        assert!(menu_card_needs_divider(1, "2-device-a", false, true));
+        assert!(!menu_card_needs_divider(2, "2-device-b", true, true));
+        assert!(!menu_card_needs_divider(3, "2-inactive-device", true, true));
+        assert!(menu_card_needs_divider(4, "3-total-power-overview", true, true));
+        assert!(menu_card_needs_divider(2, "2-device-b", true, false));
     }
 
     #[test]
