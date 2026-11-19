@@ -1044,6 +1044,19 @@ fn menu_energy_summary(
         .into()
 }
 
+fn weather_detail_metric(
+    language: &str,
+    label: &str,
+    value: String,
+) -> cosmic::Element<'static, Message> {
+    widget::Column::new()
+        .spacing(2)
+        .width(cosmic::iced::Length::Fill)
+        .push(widget::text::caption(crate::i18n::tr(language, label)))
+        .push(widget::text::body(value))
+        .into()
+}
+
 fn daily_energy_history_section(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     input_ains: &HashSet<String>,
@@ -5957,69 +5970,67 @@ impl cosmic::Application for AppModel {
                     .push(widget::Space::new().height(cosmic::iced::Length::Fill))
                     .push(
                         widget::Column::new()
-                            .spacing(6)
+                            .spacing(8)
                             .push(
                                 widget::Row::new()
                                     .spacing(12)
-                                    .push(
-                                        widget::text::body(format!(
-                                            "{}  {}%",
-                                            crate::i18n::tr(&self.settings.language, "Humidity"),
-                                            weather.humidity_percent
-                                        ))
-                                        .width(cosmic::iced::Length::Fill),
-                                    )
-                                    .push(
-                                        widget::text::body(format!(
-                                            "{}  {}%",
-                                            crate::i18n::tr(&self.settings.language, "Clouds"),
-                                            weather.cloudiness_percent
-                                        ))
-                                        .width(cosmic::iced::Length::Fill),
-                                    ),
+                                    .push(weather_detail_metric(
+                                        &self.settings.language,
+                                        "Humidity",
+                                        format!("{}%", weather.humidity_percent),
+                                    ))
+                                    .push(weather_detail_metric(
+                                        &self.settings.language,
+                                        "Clouds",
+                                        format!("{}%", weather.cloudiness_percent),
+                                    ))
+                                    .push(weather_detail_metric(
+                                        &self.settings.language,
+                                        "Visibility",
+                                        if weather.visibility_m >= 1000 {
+                                            format!("{:.1} km", weather.visibility_m as f64 / 1000.0)
+                                        } else {
+                                            format!("{} m", weather.visibility_m)
+                                        },
+                                    )),
                             )
                             .push(
                                 widget::Row::new()
                                     .spacing(12)
-                                    .push(
-                                        widget::text::body(format!(
-                                            "{}  {} hPa",
-                                            crate::i18n::tr(&self.settings.language, "Pressure"),
-                                            weather.pressure_hpa
-                                        ))
-                                        .width(cosmic::iced::Length::Fill),
-                                    )
-                                    .push(
-                                        widget::text::body(format!(
-                                            "{}  {:.1} m/s{}",
-                                            crate::i18n::tr(&self.settings.language, "Wind"),
-                                            weather.wind_speed_mps,
-                                            crate::weather::wind_direction_compass(
-                                                weather.wind_direction_degrees
-                                            )
-                                            .map(|direction| format!(" · {direction}"))
-                                            .unwrap_or_default()
-                                        ))
-                                        .width(cosmic::iced::Length::Fill),
-                                    ),
+                                    .push(weather_detail_metric(
+                                        &self.settings.language,
+                                        "Pressure",
+                                        format!("{} hPa", weather.pressure_hpa),
+                                    ))
+                                    .push(weather_detail_metric(
+                                        &self.settings.language,
+                                        "Wind",
+                                        format!("{:.1} m/s", weather.wind_speed_mps),
+                                    ))
+                                    .push(weather_detail_metric(
+                                        &self.settings.language,
+                                        "Wind direction",
+                                        crate::weather::wind_direction_compass(
+                                            weather.wind_direction_degrees,
+                                        )
+                                        .unwrap_or("—")
+                                        .to_string(),
+                                    )),
                             )
                             .push(
                                 widget::Row::new()
                                     .spacing(12)
-                                    .push(
-                                        widget::text::body(format!(
-                                            "{}  {sunrise}",
-                                            crate::i18n::tr(&self.settings.language, "Sunrise")
-                                        ))
-                                        .width(cosmic::iced::Length::Fill),
-                                    )
-                                    .push(
-                                        widget::text::body(format!(
-                                            "{}  {sunset}",
-                                            crate::i18n::tr(&self.settings.language, "Sunset")
-                                        ))
-                                        .width(cosmic::iced::Length::Fill),
-                                    ),
+                                    .push(weather_detail_metric(
+                                        &self.settings.language,
+                                        "Sunrise",
+                                        sunrise,
+                                    ))
+                                    .push(weather_detail_metric(
+                                        &self.settings.language,
+                                        "Sunset",
+                                        sunset,
+                                    ))
+                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill)),
                             ),
                     );
                 let weather_heading = widget::button::custom(
