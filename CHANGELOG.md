@@ -1,5 +1,7 @@
 # Changelog
 
+- Keep the COSMIC panel applet shrink-wrapped to its displayed values after device refreshes, avoiding full-width autosize claims that can push neighboring panel items off-screen. Preserve a small clickable placeholder when no live value or connection-warning entry is available, instead of rendering an invisible empty button.
+
 - Route privacy-safe device-loading debug checkpoints to Linux syslog/systemd journal under the `fritz-power-monitor` tag, including startup, FRITZ!Box and Tasmota device refreshes, Hue CLIP v2 resource status, discovery, and Rust panic locations. Fall back to captured stderr if syslog is unavailable; document `journalctl` commands.
 
 - Harden device-information loading: cap FRITZ!Box XML, Tasmota status and Hue resource bodies to avoid unbounded memory allocation; parse FRITZ!Box device XML once per refresh while keeping broken devices inactive independently. Add regression coverage and privacy-safe journal checkpoints for each device refresh stage to help diagnose panel restarts.
