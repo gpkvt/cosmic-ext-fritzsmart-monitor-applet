@@ -6010,16 +6010,16 @@ impl cosmic::Application for AppModel {
                                         } else {
                                             format!("{} m", weather.visibility_m)
                                         },
+                                    ))
+                                    .push(weather_detail_metric(
+                                        &self.settings.language,
+                                        "Pressure",
+                                        format!("{} hPa", weather.pressure_hpa),
                                     )),
                             )
                             .push(
                                 widget::Row::new()
                                     .spacing(12)
-                                    .push(weather_detail_metric(
-                                        &self.settings.language,
-                                        "Pressure",
-                                        format!("{} hPa", weather.pressure_hpa),
-                                    ))
                                     .push(weather_detail_metric(
                                         &self.settings.language,
                                         "Wind",
@@ -6033,11 +6033,7 @@ impl cosmic::Application for AppModel {
                                         )
                                         .unwrap_or("—")
                                         .to_string(),
-                                    )),
-                            )
-                            .push(
-                                widget::Row::new()
-                                    .spacing(12)
+                                    ))
                                     .push(weather_detail_metric(
                                         &self.settings.language,
                                         "Sunrise",
@@ -6047,8 +6043,7 @@ impl cosmic::Application for AppModel {
                                         &self.settings.language,
                                         "Sunset",
                                         sunset,
-                                    ))
-                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill)),
+                                    )),
                             ),
                     );
                 let weather_heading = widget::button::custom(

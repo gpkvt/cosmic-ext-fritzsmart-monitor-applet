@@ -1,5 +1,9 @@
 # Changelog
 
+### Changed
+
+- Arrange weather details in four evenly spaced information columns, grouping humidity, cloud cover, visibility and pressure above wind, direction, sunrise and sunset.
+
 ### Fixed
 
 - Remove obsolete, unused power-history helper functions reported by the release compiler.
