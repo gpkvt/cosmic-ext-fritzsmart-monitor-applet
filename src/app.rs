@@ -1198,7 +1198,9 @@ fn daily_energy_history_section(
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
         .push(heading)
-        .push(copy_menu_title_button("DAILY ENERGY · LAST 7 DAYS".to_string()));
+        .push(copy_menu_title_button(
+            "DAILY ENERGY · LAST 7 DAYS".to_string(),
+        ));
     let mut section = widget::Column::new()
         .spacing(0)
         .width(cosmic::iced::Length::Fill)
@@ -2596,7 +2598,9 @@ fn total_power_overview(
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
         .push(heading)
-        .push(copy_menu_title_button("TOTAL POWER INPUT & OUTPUT".to_string()));
+        .push(copy_menu_title_button(
+            "TOTAL POWER INPUT & OUTPUT".to_string(),
+        ));
     let mut section = widget::Column::new()
         .spacing(4)
         .width(cosmic::iced::Length::Fill)
@@ -7402,8 +7406,7 @@ impl cosmic::Application for AppModel {
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(heading)
                         .push(copy_menu_title_button(section.1.to_string()));
-                    let mut section_column =
-                        widget::Column::new().spacing(0).push(heading_row);
+                    let mut section_column = widget::Column::new().spacing(0).push(heading_row);
                     if !collapsed {
                         section_column = section_column.push(card);
                     }
