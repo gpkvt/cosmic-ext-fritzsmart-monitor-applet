@@ -4092,7 +4092,9 @@ impl cosmic::Application for AppModel {
                         vec![("Diagnostics", "diagnostics")],
                     ),
                 ] {
-                    content = content
+                    let category_label = widget::Column::new()
+                        .spacing(4)
+                        .width(cosmic::iced::Length::Fixed(176.0))
                         .push(widget::text::title3(crate::i18n::tr(
                             &self.settings.language,
                             category,
@@ -4101,15 +4103,23 @@ impl cosmic::Application for AppModel {
                             &self.settings.language,
                             description,
                         )));
-                    let mut category_content = widget::Column::new().spacing(2);
+                    let mut category_settings = widget::Column::new()
+                        .spacing(2)
+                        .width(cosmic::iced::Length::Fill);
                     for (title, section) in sections {
-                        category_content = category_content.push(settings_section_header(
+                        category_settings = category_settings.push(settings_section_header(
                             title,
                             section,
                             &self.settings.language,
                         ));
                     }
-                    content = content.push(surface_card(category_content.into(), 8));
+                    let category_row = widget::Row::new()
+                        .spacing(16)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .width(cosmic::iced::Length::Fill)
+                        .push(category_label)
+                        .push(category_settings);
+                    content = content.push(surface_card(category_row.into(), 8));
                 }
             }
 
