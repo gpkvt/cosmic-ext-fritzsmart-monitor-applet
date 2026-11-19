@@ -7641,9 +7641,7 @@ impl cosmic::Application for AppModel {
                 // Pad a short final row to keep every metric aligned to the
                 // same four grid columns.
                 for _ in 0..((4 - metric_count % 4) % 4) {
-                    metric_row = metric_row.push(
-                        widget::Space::new().width(cosmic::iced::Length::Fill),
-                    );
+                    metric_row = metric_row.push(widget::Space::new().width(cosmic::iced::Length::Fill));
                 }
                 weather_metric_grid = weather_metric_grid.push(metric_row);
                 let weather_card_height = 260.0;
