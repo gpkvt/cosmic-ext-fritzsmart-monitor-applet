@@ -208,6 +208,16 @@ cargo build --release
 
 GitHub Actions runs the project checks and validates release artifacts.
 
+## Request changes with ChatGPT
+
+Prepare a change request from your local checkout without an API key or paid API usage:
+
+```bash
+make chatgpt-change REQUEST="Describe the change you want"
+```
+
+The helper gathers the current branch, working-tree status, recent commits and a bounded diff, copies a ready-to-use implementation prompt to your clipboard, and opens ChatGPT in your browser. Review the prompt before sharing it. Nothing is sent automatically; you choose what to paste into ChatGPT. It uses `wl-copy` on Wayland or `xclip`/`xsel` on X11.
+
 ## Repository maintenance
 
 The repository includes a small command-line helper for common development and
