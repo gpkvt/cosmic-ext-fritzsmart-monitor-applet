@@ -4,9 +4,7 @@
 
 ### Improved
 
-- Show current Netatmo CO₂, pressure, noise, rain and wind readings in collapsed device rows while keeping temperature and humidity in their aligned columns. Offline, stale and invalid measurements remain unavailable.
-
-### Improved
+- Show current values and native units in each collapsed Netatmo device **graph heading**, including temperature, humidity, CO₂, pressure, noise, rain and wind. Restore the device rows from PR #859; offline and invalid graph values appear as unavailable.
 
 - Allow a configurable Prometheus exporter bind address (`IP:port`), including loopback, specific LAN interfaces and wildcard listeners. Preserve disabled-by-default, loopback-default behavior; validate the address, rebind without restarting and document unauthenticated network access risks.
 
