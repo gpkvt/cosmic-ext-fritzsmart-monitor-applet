@@ -11537,6 +11537,66 @@ mod history_tests {
     }
 
     #[test]
+    fn hue_sensor_history_ignores_offline_and_missing_values() {
+        let mut history = crate::history::HueSensorHistory::new();
+        let now = Instant::now();
+        let sensor = HueSensor {
+            id: "11112222-3333-4444-5555-aabbccddeeff".into(),
+            name: "Hallway motion".into(),
+            temperature_c: Some(22.0),
+            illuminance_lux: Some(120.0),
+            motion: Some(false),
+            reachable: true,
+        };
+        let window = Duration::from_secs(120);
+        record_hue_sensor_sample(&mut history, &sensor, now, window);
+        assert_eq!(history[&sensor.id].len(), 1);
+        let mut offline = sensor.clone();
+        offline.reachable = false;
+        offline.temperature_c = Some(99.0);
+        offline.illuminance_lux = Some(0.0);
+        record_hue_sensor_sample(
+            &mut history,
+            &offline,
+            now + Duration::from_secs(60),
+            window,
+        );
+        assert_eq!(history[&sensor.id].len(), 1);
+        let mut unavailable = sensor.clone();
+        unavailable.temperature_c = None;
+        unavailable.illuminance_lux = None;
+        record_hue_sensor_sample(
+            &mut history,
+            &unavailable,
+            now + Duration::from_secs(60),
+            window,
+        );
+        assert_eq!(history[&sensor.id].len(), 1);
+        let trace = hue_sensor_graph_samples(&history, &sensor.id, true, false);
+        assert_eq!(trace.len(), 1);
+        assert!((trace[0].1 - 22.0).abs() < f64::EPSILON);
+        let fahrenheit = hue_sensor_graph_samples(&history, &sensor.id, true, true);
+        assert!((fahrenheit[0].1 - 71.6).abs() < 0.001);
+        let lux = hue_sensor_graph_samples(&history, &sensor.id, false, false);
+        assert_eq!(lux[0].1, 120.0);
+    }
+
+    #[test]
+    fn hue_alerts_use_standard_threshold_transitions() {
+        let thresholds = TemperatureAlertThresholds {
+            high_c: 28,
+            low_c: 18,
+        };
+        assert!(!temperature_outside_limits(23.0, thresholds));
+        assert!(temperature_outside_limits(29.0, thresholds));
+        assert!(temperature_outside_limits(17.0, thresholds));
+        assert!(!should_notify_temperature_alert(None, true));
+        assert!(should_notify_temperature_alert(Some(false), true));
+        assert!(!should_notify_temperature_alert(Some(true), true));
+        assert!(!should_notify_temperature_alert(Some(true), false));
+    }
+
+    #[test]
     fn overview_graph_disclosures_toggle_independently_of_parent() {
         let mut collapsed = HashSet::new();
         toggle_collapsible_state(&mut collapsed, "graph-overview-output-power".into());
