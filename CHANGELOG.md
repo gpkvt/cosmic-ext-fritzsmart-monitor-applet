@@ -1,5 +1,7 @@
 # Changelog
 
+- Restore native Wayland outside-click dismissal for the applet menu and remove hover-triggered panel tooltip popup surfaces; the panel entry opens/closes only on clicks, and explicit menu Close buttons remain available.
+
 - Add Hue sensor-specific temperature and illuminance history graphs to expanded device cards, with separate persisted sample history, configurable time range, units and independent collapse state. Do not fabricate measurements when the bridge or sensor is unavailable.
 - Add per-Hue-sensor temperature alarms under Settings → Devices using the shared COSMIC temperature-alert controls, independent high/low limits and crossing notifications.
 - Keep the main applet popup open when window focus changes by disabling its implicit Wayland grab; add explicit Close buttons to the menu and settings headers while preserving panel click-to-close.
