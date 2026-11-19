@@ -2394,11 +2394,6 @@ fn total_power_overview(
         .iter()
         .map(|(timestamp, value)| (*timestamp, input_display_power_w(*value) as f64))
         .collect();
-    let graph_title = format!(
-        "{} & {}",
-        crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-        crate::i18n::tr(&settings.language, "TOTAL POWER INPUT")
-    );
     let output_graph = interactive_graph_with_axis(
         &settings.language,
         &crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
