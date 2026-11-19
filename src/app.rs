@@ -2547,6 +2547,62 @@ fn collapsible_graph(
     section.into()
 }
 
+/// Full-width compact plot for each actual daily metric. Missing daily
+/// readings are omitted rather than plotted as fabricated zero measurements.
+fn daily_metric_trend(
+    label: &'static str,
+    values: &[f64],
+    unit: &'static str,
+    style: &str,
+) -> cosmic::Element<'static, Message> {
+    let mut column = widget::Column::new()
+        .spacing(4)
+        .width(cosmic::iced::Length::Fill)
+        .push(widget::text::caption(label));
+    if values.len() >= 2 {
+        column = column.push(graph_visual_with_dimensions(
+            values.iter().copied(),
+            style,
+            unit,
+            120.0,
+            cosmic::iced::Length::Fixed(120.0),
+            Some("6d ago".into()),
+            None,
+        ));
+    } else {
+        column = column.push(widget::text::caption(
+            "Not enough recorded days to draw a trend",
+        ));
+    }
+    column.into()
+}
+
+/// These three histories represent all TODAY/Y'DAY energy metrics in the
+/// overview (IN, OUT, and IN/OUT %) without inventing energy for missing days.
+fn daily_power_metric_trends(
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    input_ains: &HashSet<String>,
+    refresh_interval_seconds: u32,
+    style: &str,
+) -> cosmic::Element<'static, Message> {
+    let daily = daily_energy_history(device_history, input_ains, refresh_interval_seconds);
+    let input: Vec<f64> = daily.iter().filter_map(|(_, input, _)| *input).collect();
+    let output: Vec<f64> = daily.iter().filter_map(|(_, _, output)| *output).collect();
+    let ratio: Vec<f64> = daily.iter().filter_map(|(_, input, output)| {
+        energy_input_output_ratio_percent(*input, *output)
+    }).collect();
+    widget::Column::new()
+        .spacing(12)
+        .width(cosmic::iced::Length::Fill)
+        .push(widget::text::caption(
+            "DAILY ENERGY TRENDS · LAST 7 DAYS (RECORDED DAYS ONLY)",
+        ))
+        .push(daily_metric_trend("INPUT · Wh", &input, "Wh", style))
+        .push(daily_metric_trend("OUTPUT · Wh", &output, "Wh", style))
+        .push(daily_metric_trend("INPUT / OUTPUT · %", &ratio, "%", style))
+        .into()
+}
+
 fn total_power_overview(
     readings: &[FritzReading],
     settings: &FritzSettings,
@@ -2625,6 +2681,51 @@ fn total_power_overview(
             input_low_label,
             input_high_label,
             current_input.clone(),
+        ))
+        .push(widget::divider::horizontal::default())
+        // Current/low/high are derived from the exact same recorded W series.
+        // Give input and output their own full-width, zoomable graphs.
+        .push(widget::text::caption(
+            "LIVE POWER · LOW, HIGH & NOW IN RECORDED W HISTORY",
+        ))
+        .push(interactive_graph_with_axis(
+            &settings.language,
+            "OUTPUT POWER HISTORY",
+            history.iter().map(|(time, watts)| (*time, *watts as f64)),
+            &settings.graph_style,
+            "W",
+            format_graph_axis_start(
+                settings.graph_timespan_minutes,
+                history.front().map(|(timestamp, _)| {
+                    Instant::now().saturating_duration_since(*timestamp).as_secs().div_ceil(60)
+                }),
+            ),
+        ))
+        .push(if input_history.is_empty() {
+            widget::text::caption("INPUT POWER HISTORY · No measured input samples").into()
+        } else {
+            interactive_graph_with_axis(
+                &settings.language,
+                "INPUT POWER HISTORY",
+                input_history.iter().map(|(time, watts)| {
+                    (*time, input_display_power_w(*watts) as f64)
+                }),
+                &settings.graph_style,
+                "W",
+                format_graph_axis_start(
+                    settings.graph_timespan_minutes,
+                    input_history.front().map(|(timestamp, _)| {
+                        Instant::now().saturating_duration_since(*timestamp).as_secs().div_ceil(60)
+                    }),
+                ),
+            )
+        })
+        .push(widget::divider::horizontal::default())
+        .push(daily_power_metric_trends(
+            device_history,
+            &settings.input_ains,
+            settings.refresh_interval_seconds,
+            &settings.graph_style,
         ));
     let collapsed = collapsed_sections.contains("total-power-overview");
     // Match the other collapsed popup sections: one full-width disclosure
@@ -8691,11 +8792,16 @@ impl cosmic::Application for AppModel {
                         .center_y(36),
                     )
                     .push(
-                        widget::text::body(crate::i18n::tr(
-                            &self.settings.language,
-                            "FRITZ!Power Monitor",
-                        ))
-                        .width(cosmic::iced::Length::Fill),
+                        widget::Column::new()
+                            .spacing(2)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::body(crate::i18n::tr(
+                                &self.settings.language,
+                                "FRITZ!Power Monitor",
+                            )))
+                            .push(widget::text::caption(format!(
+                                "v{}", env!("APP_VERSION")
+                            ))),
                     )
                     .push(if self.refresh_started_at.is_some() {
                         icon_action_button(
