@@ -593,6 +593,56 @@ pub async fn fetch_readings(
     (readings, errors)
 }
 
+/// When a cached address stops answering, try a short mDNS rediscovery.
+/// Preserve old records for devices currently offline and refresh any changed IPs.
+pub async fn refresh_addresses_for_recovery(
+    username: String,
+    password: String,
+    fritzbox_url: String,
+) {
+    static LAST_RECOVERY_SCAN: LazyLock<Mutex<Option<Instant>>> =
+        LazyLock::new(|| Mutex::new(None));
+    {
+        let mut last = LAST_RECOVERY_SCAN
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if last.is_some_and(|time| time.elapsed() < Duration::from_secs(60)) {
+            return;
+        }
+        *last = Some(Instant::now());
+    }
+    let saved = known_devices(username.clone(), password.clone(), fritzbox_url.clone())
+        .await
+        .unwrap_or_default();
+    let Ok(rediscovered) = discover_devices_with_options(
+        username,
+        password,
+        fritzbox_url,
+        false,
+        Duration::from_secs(2),
+    )
+    .await
+    else {
+        return;
+    };
+    let mut merged = saved;
+    for device in rediscovered {
+        if let Some(known) = merged
+            .iter_mut()
+            .find(|known| known.id.eq_ignore_ascii_case(&device.id))
+        {
+            *known = device;
+        } else {
+            merged.push(device);
+        }
+    }
+    *device_cache()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) =
+        Some((Instant::now(), merged.clone()));
+    persist_devices(&merged);
+}
+
 pub async fn set_power(
     device: &TasmotaDevice,
     on: bool,
