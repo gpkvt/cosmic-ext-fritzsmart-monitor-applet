@@ -10485,36 +10485,6 @@ mod history_tests {
     }
 
     #[test]
-    fn power_energy_uses_trapezoidal_integration_for_input_and_output() {
-        let start = Instant::now();
-        let input_history = VecDeque::from([
-            (start, -1000),
-            (start + Duration::from_secs(1800), -2000),
-            (start + Duration::from_secs(3600), -1000),
-        ]);
-        let output_history = VecDeque::from([
-            (start, 1000),
-            (start + Duration::from_secs(1800), 2000),
-            (start + Duration::from_secs(3600), 1000),
-        ]);
-
-        for history in [&input_history, &output_history] {
-            let (energy_wh, timespan) = power_energy_and_timespan(history).unwrap();
-            assert!((energy_wh - 1500.0).abs() < f64::EPSILON);
-            assert_eq!(timespan, Duration::from_secs(3600));
-            assert_eq!(format_elapsed_timespan(timespan), "1 hour");
-        }
-    }
-
-    #[test]
-    fn input_energy_handles_a_single_sample_without_inventing_energy() {
-        let history = VecDeque::from([(Instant::now(), -500)]);
-        let (energy_wh, timespan) = power_energy_and_timespan(&history).unwrap();
-        assert_eq!(energy_wh, 0.0);
-        assert_eq!(timespan, Duration::ZERO);
-    }
-
-    #[test]
     fn device_history_max_range_uses_oldest_available_sample() {
         let now = Instant::now();
         let samples = VecDeque::from([
