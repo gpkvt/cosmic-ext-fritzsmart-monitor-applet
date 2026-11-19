@@ -4,6 +4,12 @@
 
 ### Added
 
+- Add an opt-in localhost-only Prometheus `/metrics` exporter for live FRITZ!Box, Tasmota, Hue, Netatmo, weather, router and WAN monitoring, with safe labels, unavailable-value handling and no network request per scrape.
+- Move optional Netatmo CO₂, noise and rainfall details inside the weather photograph overlay and expand its height to accommodate the extra rows, retaining Wikimedia Commons attribution outside the image.
+
+
+### Added
+
 - Discover more FRITZ!Box Smart Home devices, including switch-only, temperature-only, thermostat and simple on/off modules. Show available readings without inventing wattage, restrict switching to explicitly unlocked switch interfaces, and exclude non-meter devices from power totals and history.
 
 ### Added

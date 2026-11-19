@@ -4,6 +4,7 @@ mod fritz;
 mod history;
 mod hue;
 mod netatmo;
+mod prometheus;
 mod i18n;
 mod tasmota;
 mod updater;
@@ -55,6 +56,10 @@ fn main() -> cosmic::iced::Result {
                 iteration = iteration.saturating_add(1);
             }
         });
+    // The listener only binds 127.0.0.1 while the explicit setting is on.
+    let _exporter = std::thread::Builder::new()
+        .name("fritz-monitor-prometheus".to_string())
+        .spawn(prometheus::serve);
     let result = cosmic::applet::run::<app::AppModel>(());
     if result.is_err() {
         diagnostics::error("COSMIC applet runtime exited with an error");

@@ -181,6 +181,7 @@ pub enum Message {
     ToggleNetatmoVisible(String, bool),
     ToggleNetatmoCo2Alert(String, bool),
     NetatmoCo2ThresholdChanged(String, u16),
+    PrometheusEnabledChanged(bool),
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
@@ -4594,6 +4595,24 @@ impl cosmic::Application for AppModel {
 
     fn view(&self) -> Element<'_, Self::Message> {
         PANEL_VIEW_COUNT.fetch_add(1, Ordering::Relaxed);
+        if self.settings.prometheus_enabled {
+            crate::prometheus::publish(true, Some(crate::prometheus::LiveData {
+                settings: &self.settings,
+                devices: &self.readings,
+                hue_lights: &self.hue_lights,
+                hue_sensors: &self.hue_sensors,
+                netatmo_sensors: &self.netatmo_sensors,
+                weather: self.weather.as_ref(),
+                bandwidth: self.internet_bandwidth.as_ref(),
+                router: self.fritzbox_system_info.as_ref(),
+                fritz_error: self.error.is_some(),
+                hue_error: self.hue_error.is_some(),
+                netatmo_error: self.netatmo_error.is_some(),
+                weather_error: self.weather_error.is_some(),
+            }));
+        } else {
+            crate::prometheus::publish(false, None);
+        }
         let primary_reading = self
             .selected_ains
             .first()
@@ -6118,6 +6137,18 @@ impl cosmic::Application for AppModel {
                         "Netatmo requires internet access. This applet supports read-only Weather Station modules, not Netatmo thermostats or cameras."
                     ))
                     .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3("Prometheus exporter"))
+                    .push(widget::Row::new()
+                        .width(cosmic::iced::Length::Fill)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::body("Enable local /metrics endpoint"))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(widget::toggler(self.settings.prometheus_enabled)
+                            .on_toggle(Message::PrometheusEnabledChanged)))
+                    .push(widget::text::caption(
+                        format!("{} · disabled by default. Read-only, no API requests on scrape. Device IDs and names are exposed to local clients. Never expose or proxy this endpoint to an untrusted network.", crate::prometheus::ENDPOINT)
+                    ))
+                    .push(widget::divider::horizontal::default())
             }
             if self.active_settings_section == Some("menu-order") {
                 content = content
@@ -7589,6 +7620,43 @@ impl cosmic::Application for AppModel {
                                     )),
                             ),
                     );
+                // Extra Netatmo readings belong inside the photographed weather
+                // information area, not in a separate card below the slideshow.
+                let netatmo_metrics = if self.settings.weather_netatmo_extra_metrics {
+                    netatmo_weather_extra_metrics(
+                        &self.netatmo_sensors,
+                        &self.settings.hidden_netatmo_devices,
+                    )
+                } else {
+                    Vec::new()
+                };
+                let extra_rows = netatmo_metrics.len().div_ceil(2);
+                // The fixed photo previously clipped content at 260 px.
+                // Expand all layers together, including the night overlay.
+                let weather_card_height = 260.0 + extra_rows as f32 * 68.0
+                    + if extra_rows > 0 { 34.0 } else { 0.0 };
+                if !netatmo_metrics.is_empty() {
+                    let mut extra = widget::Column::new()
+                        .spacing(8)
+                        .width(cosmic::iced::Length::Fill)
+                        .push(widget::text::caption("NETATMO · ADDITIONAL READINGS"));
+                    for pair in netatmo_metrics.chunks(2) {
+                        let mut row = widget::Row::new()
+                            .spacing(12)
+                            .width(cosmic::iced::Length::Fill);
+                        for (label, value) in pair {
+                            row = row.push(
+                                widget::Column::new()
+                                    .spacing(2)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::caption(label.clone()))
+                                    .push(widget::text::body(value.clone())),
+                            );
+                        }
+                        extra = extra.push(row);
+                    }
+                    weather_details = weather_details.push(extra);
+                }
                 let weather_heading = widget::button::custom(
                     widget::Row::new()
                         .spacing(8)
@@ -7636,7 +7704,7 @@ impl cosmic::Application for AppModel {
                 let weather_content = widget::Column::new()
                     .spacing(8)
                     .width(cosmic::iced::Length::Fill)
-                    .height(cosmic::iced::Length::Fixed(240.0))
+                    .height(cosmic::iced::Length::Fixed(weather_card_height - 20.0))
                     .push(
                         widget::Row::new()
                             .width(cosmic::iced::Length::Fill)
@@ -7659,11 +7727,11 @@ impl cosmic::Application for AppModel {
                     if let Some(image_handle) = current_image_handle {
                         let photo = widget::image::Image::new(image_handle)
                             .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(260.0))
-                            .content_fit(cosmic::iced::ContentFit::Fill);
+                            .height(cosmic::iced::Length::Fixed(weather_card_height))
+                            .content_fit(cosmic::iced::ContentFit::Cover);
                         let details = widget::container(weather_content)
                             .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .height(cosmic::iced::Length::Fixed(weather_card_height))
                             .padding(10)
                             .clip(true)
                             .style(|_| cosmic::iced::widget::container::Style {
@@ -7681,11 +7749,11 @@ impl cosmic::Application for AppModel {
                         // forecast or menu content when the popup is resized.
                         let image_layer = widget::container(photo)
                             .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .height(cosmic::iced::Length::Fixed(weather_card_height))
                             .clip(true);
                         let mut weather_layers = cosmic::iced::widget::Stack::new()
                             .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .height(cosmic::iced::Length::Fixed(weather_card_height))
                             .push(image_layer);
                         // Add a subtle transparent star field to nighttime
                         // weather scenes without replacing the condition-matched
@@ -7696,17 +7764,17 @@ impl cosmic::Application for AppModel {
                             let star_layer = widget::container(
                                 widget::image::Image::new(stars)
                                     .width(cosmic::iced::Length::Fill)
-                                    .height(cosmic::iced::Length::Fixed(260.0))
+                                    .height(cosmic::iced::Length::Fixed(weather_card_height))
                                     .content_fit(cosmic::iced::ContentFit::Fill),
                             )
                             .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .height(cosmic::iced::Length::Fixed(weather_card_height))
                             .clip(true);
                             weather_layers = weather_layers.push(star_layer);
                         }
                         widget::container(weather_layers.push(details))
                             .width(cosmic::iced::Length::Fill)
-                            .height(cosmic::iced::Length::Fixed(260.0))
+                            .height(cosmic::iced::Length::Fixed(weather_card_height))
                             .clip(true)
                             .into()
                     } else {
@@ -7757,34 +7825,6 @@ impl cosmic::Application for AppModel {
                     );
                 }
                 weather_section = weather_section.push(weather_visual);
-                if self.settings.weather_netatmo_extra_metrics {
-                    let metrics = netatmo_weather_extra_metrics(
-                        &self.netatmo_sensors,
-                        &self.settings.hidden_netatmo_devices,
-                    );
-                    if !metrics.is_empty() {
-                        let mut extra = widget::Column::new()
-                            .spacing(10)
-                            .width(cosmic::iced::Length::Fill)
-                            .push(widget::text::caption("NETATMO · ADDITIONAL READINGS"));
-                        for pair in metrics.chunks(2) {
-                            let mut row = widget::Row::new()
-                                .spacing(12)
-                                .width(cosmic::iced::Length::Fill);
-                            for (label, value) in pair {
-                                row = row.push(
-                                    widget::Column::new()
-                                        .spacing(2)
-                                        .width(cosmic::iced::Length::Fill)
-                                        .push(widget::text::caption(label.clone()))
-                                        .push(widget::text::body(value.clone())),
-                                );
-                            }
-                            extra = extra.push(row);
-                        }
-                        weather_section = weather_section.push(surface_card(extra.into(), 10));
-                    }
-                }
                 // Keep the source link OUTSIDE the fixed-height, clipped
                 // photograph. The old attribution expander placed its buttons
                 // inside the 260px overlay, where they disappeared below the
@@ -11166,6 +11206,13 @@ impl cosmic::Application for AppModel {
                             ),
                     );
                 }
+            }
+            Message::PrometheusEnabledChanged(enabled) => {
+                self.settings.prometheus_enabled = enabled;
+                if !enabled {
+                    crate::prometheus::publish(false, None);
+                }
+                self.persist_settings();
             }
             Message::WeatherNetatmoExtraMetricsChanged(enabled) => {
                 self.settings.weather_netatmo_extra_metrics = enabled;
