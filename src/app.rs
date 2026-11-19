@@ -1026,7 +1026,7 @@ fn menu_energy_summary(
             .push(
                 widget::text::title3(keep_value_unit_together(display))
                     .width(cosmic::iced::Length::Fixed(92.0))
-                    .horizontal_alignment(cosmic::iced::alignment::Horizontal::Right),
+                    .align_x(cosmic::iced::Alignment::End),
             )
     };
     let values = widget::Column::new()
@@ -1046,7 +1046,7 @@ fn menu_energy_summary(
 
 fn weather_detail_metric(
     language: &str,
-    label: &str,
+    label: &'static str,
     value: String,
 ) -> cosmic::Element<'static, Message> {
     widget::Column::new()
