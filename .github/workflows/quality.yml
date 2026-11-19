@@ -70,22 +70,8 @@ jobs:
             git diff --check "$BASE_SHA" "$GITHUB_SHA"
           fi
 
-      - name: Check formatting for changed Rust sources
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -z "${BASE_SHA:-}" || "$BASE_SHA" =~ ^0+$ ]]; then
-            changed_files="$(git diff-tree --no-commit-id --name-only -r HEAD)"
-          else
-            changed_files="$(git diff --name-only "$BASE_SHA" "$GITHUB_SHA")"
-          fi
-          if [[ "$changed_files" == *".rs"* || "$changed_files" == *"build.rs"* ]]; then
-            cargo fmt --all -- --check
-          else
-            echo "No Rust sources changed; formatting check not required."
-          fi
+      - name: Check formatting for all Rust sources
+        run: cargo fmt --all -- --check
 
       - name: Check all targets compile
         run: cargo check --locked --all-targets
