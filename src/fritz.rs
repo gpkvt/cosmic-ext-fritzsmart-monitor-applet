@@ -2058,6 +2058,20 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
                         power_toggle_allowed: true,
                     }));
                 result.missing_devices.extend(errors);
+                if result.missing_devices.iter().any(|(ain, _)| {
+                    selected_tasmota
+                        .iter()
+                        .any(|selected| normalize_ain_for_selection(selected) == normalize_ain_for_selection(ain))
+                }) {
+                    // Refresh mDNS addresses for the next minute's retry, while
+                    // retaining cached identities for currently unreachable plugs.
+                    crate::tasmota::refresh_addresses_for_recovery(
+                        settings.tasmota_username.clone(),
+                        settings.tasmota_password.clone(),
+                        settings.url.clone(),
+                    )
+                    .await;
+                }
             }
             Err(error) => {
                 if selected_fritz.is_empty() {
