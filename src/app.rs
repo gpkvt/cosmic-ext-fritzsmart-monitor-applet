@@ -2423,7 +2423,6 @@ fn total_power_overview(
             .input_ains
             .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
     });
-    let (input_low, input_high) = input_display_range(&input_history);
     let total_output_w = output_power_w(readings, &settings.input_ains);
     let total_input_w = input_display_power_w(input_power_w(readings, &settings.input_ains));
     let output_ains: HashSet<String> = device_history
