@@ -952,7 +952,7 @@ impl FritzSettings {
         // Keep rotating Netatmo OAuth refresh tokens in the same owner-only
         // atomic settings file as the existing Hue and router credentials.
         contents.push_str(&format!(
-            "NETATMO_CLIENT_ID={}\\nNETATMO_CLIENT_SECRET={}\\nNETATMO_REFRESH_TOKEN={}\\nNETATMO_HIDDEN_DEVICES={}\\n",
+            "NETATMO_CLIENT_ID={}\nNETATMO_CLIENT_SECRET={}\nNETATMO_REFRESH_TOKEN={}\nNETATMO_HIDDEN_DEVICES={}\n",
             self.netatmo_client_id,
             self.netatmo_client_secret,
             self.netatmo_refresh_token,
