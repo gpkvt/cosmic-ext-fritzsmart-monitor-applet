@@ -2938,8 +2938,9 @@ fn total_power_overview(
     let collapsed = collapsed_sections.contains("total-power-overview");
     // Construct graphs only when this section is visible. This also avoids
     // rebuilding expensive SVGs while the entire overview is collapsed.
+    let has_input = has_input_device(settings);
     let content = (!collapsed).then(|| {
-        widget::Column::new()
+        let mut content = widget::Column::new()
             .spacing(10)
             .width(cosmic::iced::Length::Fill)
             .push(daily_power_metrics_grid(
@@ -2947,6 +2948,7 @@ fn total_power_overview(
                 output_today_wh,
                 input_yesterday_wh,
                 output_yesterday_wh,
+                has_input,
             ))
             .push(widget::divider::horizontal::default())
             .push(power_metrics_row(
@@ -2956,18 +2958,19 @@ fn total_power_overview(
                 output_low_label,
                 output_high_label,
                 current_output.clone(),
-            ))
-            .push(power_metrics_row(
+            ));
+        if has_input {
+            content = content.push(power_metrics_row(
                 "INPUT LOW",
                 "INPUT HIGH",
                 "NOW INPUT",
                 input_low_label,
                 input_high_label,
                 current_input.clone(),
-            ))
+            ));
+        }
+        content = content
             .push(widget::divider::horizontal::default())
-            // Current/low/high are derived from the exact same recorded W series.
-            // Give input and output their own full-width, zoomable graphs.
             .push(widget::text::caption(
                 "LIVE POWER · LOW, HIGH & NOW IN RECORDED W HISTORY",
             ))
@@ -2975,9 +2978,7 @@ fn total_power_overview(
                 "OUTPUT POWER HISTORY",
                 "graph-overview-output-power",
                 collapsed_sections.contains("graph-overview-output-power"),
-                if collapsed_sections.contains("graph-overview-output-power")
-                    || collapsed_sections.contains("total-power-overview")
-                {
+                if collapsed_sections.contains("graph-overview-output-power") {
                     widget::text("").into()
                 } else {
                     interactive_graph_with_axis(
@@ -2998,14 +2999,13 @@ fn total_power_overview(
                     )
                 },
                 copy_feedback,
-            ))
-            .push(collapsible_graph(
+            ));
+        if has_input {
+            content = content.push(collapsible_graph(
                 "INPUT POWER HISTORY",
                 "graph-overview-input-power",
                 collapsed_sections.contains("graph-overview-input-power"),
-                if collapsed_sections.contains("graph-overview-input-power")
-                    || collapsed_sections.contains("total-power-overview")
-                {
+                if collapsed_sections.contains("graph-overview-input-power") {
                     widget::text("").into()
                 } else if input_history.is_empty() {
                     widget::text::caption("No measured input samples").into()
@@ -3030,7 +3030,9 @@ fn total_power_overview(
                     )
                 },
                 copy_feedback,
-            ))
+            ));
+        }
+        content
             .push(widget::divider::horizontal::default())
             .push(daily_power_metric_trends(
                 device_history,
@@ -3038,6 +3040,7 @@ fn total_power_overview(
                 settings.refresh_interval_seconds,
                 &settings.graph_style,
                 collapsed_sections,
+                has_input,
                 copy_feedback,
             ))
     });
@@ -3046,18 +3049,23 @@ fn total_power_overview(
     let mut heading_content = widget::Row::new()
         .spacing(8)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::text::body("TOTAL POWER INPUT & OUTPUT"))
+        .push(widget::text::body(if has_input {
+            "TOTAL POWER INPUT & OUTPUT"
+        } else {
+            "TOTAL POWER OUTPUT"
+        }))
         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
     if collapsed {
-        heading_content = heading_content
-            .push(widget::text::body(format!(
+        if has_input {
+            heading_content = heading_content.push(widget::text::body(format!(
                 "IN {}",
                 keep_value_unit_together(current_input)
-            )))
-            .push(widget::text::body(format!(
-                "OUT {}",
-                keep_value_unit_together(current_output)
             )));
+        }
+        heading_content = heading_content.push(widget::text::body(format!(
+            "OUT {}",
+            keep_value_unit_together(current_output)
+        )));
     }
     let heading = widget::button::custom(
         heading_content.push(
@@ -3078,7 +3086,12 @@ fn total_power_overview(
         .align_y(cosmic::iced::Alignment::Center)
         .push(heading)
         .push(copy_menu_title_button(
-            "TOTAL POWER INPUT & OUTPUT".to_string(),
+            if has_input {
+                "TOTAL POWER INPUT & OUTPUT"
+            } else {
+                "TOTAL POWER OUTPUT"
+            }
+            .to_string(),
             copy_feedback,
         ));
     let mut section = widget::Column::new()
@@ -3608,13 +3621,17 @@ fn format_bandwidth(bits_per_second: u64) -> String {
     format!("{} Mb/s", format_compact_decimal(megabits_per_second))
 }
 
-fn menu_element_label(id: &str) -> &'static str {
+fn menu_element_label(id: &str, has_input: bool) -> &'static str {
     match id {
         "summary" => "Live power summary",
         "weather" => "Weather",
         "internet-bandwidth" => "Internet bandwidth",
         "devices" => "Devices",
-        "total-power-output" => "Total power input & output",
+        "total-power-output" => if has_input {
+            "Total power input & output"
+        } else {
+            "Total power output"
+        },
         _ => "Unknown element",
     }
 }
@@ -5836,7 +5853,7 @@ impl cosmic::Application for AppModel {
                         "total-power-output" => "total-power-output",
                         _ => continue,
                     };
-                    let label = crate::i18n::tr(&self.settings.language, menu_element_label(id));
+                    let label = crate::i18n::tr(&self.settings.language, menu_element_label(id, has_input_device));
                     let visible = !self
                         .settings
                         .hidden_menu_elements
@@ -7648,6 +7665,7 @@ impl cosmic::Application for AppModel {
                         history_collapsed: self
                             .collapsed_menu_sections
                             .contains("current-power-history"),
+                        has_input_device: has_input_device(&self.settings),
                     },
                     self.copy_feedback.as_ref(),
                 );
@@ -8519,6 +8537,7 @@ impl cosmic::Application for AppModel {
                         self.settings.refresh_interval_seconds,
                         self.collapsed_menu_sections
                             .contains("daily-energy-history"),
+                        has_input_device(&self.settings),
                         self.copy_feedback.as_ref(),
                     ),
                 ));
