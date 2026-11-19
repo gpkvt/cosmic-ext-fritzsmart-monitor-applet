@@ -136,6 +136,7 @@ services should normally be reported to their respective maintainers. If this
 project introduces a practical way to exploit such an upstream issue, that
 project-specific impact is in scope.</p>
 <p>This project does not currently operate a bug bounty programme.</p>
+<h2 id="netatmo-cloud-security">Netatmo cloud security</h2><p>The optional Netatmo Weather Station integration uses an independent HTTPS client with certificate verification and the Netatmo OAuth <code>read_station</code> permission. The applet stores its client secret and automatically rotated refresh token with owner-only file permissions in <code>~/.config/fritz_solar.cfg</code>; these credentials are <strong>not encrypted at rest</strong>. Do not share them. The <strong>Allow invalid TLS certificates (FRITZ!Box only)</strong> setting affects the FRITZ!Box client only, not Netatmo. Netatmo history remains local. See <a href="guide.html#netatmo">Netatmo setup and privacy</a> and the <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/blob/main/SECURITY.md">current security policy</a>.</p>
 <div class="page-foot"><a href="index.html">← Back to project overview</a></div>
 </article></main>
 </body>
