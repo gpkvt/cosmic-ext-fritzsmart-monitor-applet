@@ -161,6 +161,7 @@ pub struct FritzSettings {
     pub panel_net_power: bool,
     pub graph_timespan_minutes: u32,
     pub graph_style: String,
+    pub temperature_unit: String,
     pub refresh_interval_seconds: u32,
     pub temperature_alerts: HashMap<String, TemperatureAlertThresholds>,
     pub input_ains: HashSet<String>,
@@ -213,6 +214,7 @@ impl Default for FritzSettings {
             panel_net_power: false,
             graph_timespan_minutes: 15,
             graph_style: "line".into(),
+            temperature_unit: "C".into(),
             refresh_interval_seconds: 60,
             temperature_alerts: HashMap::new(),
             input_ains: HashSet::new(),
@@ -272,13 +274,12 @@ fn parse_u16_setting(value: &str, default: u16, min: u16, max: u16) -> u16 {
     parse_clamped(value, default, min, max)
 }
 
-const MENU_ELEMENT_IDS: [&str; 6] = [
+const MENU_ELEMENT_IDS: [&str; 5] = [
     "summary",
     "weather",
     "internet-bandwidth",
     "devices",
     "total-power-output",
-    "total-power-input",
 ];
 
 fn default_menu_order() -> Vec<String> {
@@ -308,9 +309,8 @@ fn parse_menu_order(value: &str) -> Vec<String> {
         .map(str::trim)
         .filter(|id| !id.is_empty())
         .map(|id| match id {
-            // Migrate the former shared entry to output; input gets its own
-            // adjacent position so existing custom ordering remains stable.
-            "total-power" => "total-power-output",
+            // Merge legacy input/output entries into the unified power section.
+            "total-power" | "total-power-input" => "total-power-output",
             other => other,
         })
         .filter(|id| MENU_ELEMENT_IDS.contains(id))
@@ -323,15 +323,6 @@ fn parse_menu_order(value: &str) -> Vec<String> {
             .position(|id| id == "devices")
             .unwrap_or(order.len());
         order.insert(insert_at, "internet-bandwidth".to_string());
-    }
-    if order.iter().any(|id| id == "total-power-output")
-        && !order.iter().any(|id| id == "total-power-input")
-    {
-        let output_index = order
-            .iter()
-            .position(|id| id == "total-power-output")
-            .unwrap_or(order.len() - 1);
-        order.insert(output_index + 1, "total-power-input".to_string());
     }
     for id in MENU_ELEMENT_IDS {
         if !order.iter().any(|existing| existing == id) {
@@ -364,7 +355,10 @@ fn parse_unique_known_ids(value: &str, allowed: &[&str]) -> Vec<String> {
 }
 
 fn parse_hidden_menu_elements(value: &str) -> Vec<String> {
-    parse_unique_known_ids(value, &MENU_ELEMENT_IDS)
+    let migrated = value.split(',').map(str::trim).map(|id| {
+        if id == "total-power-input" || id == "total-power" { "total-power-output" } else { id }
+    }).collect::<Vec<_>>().join(",");
+    parse_unique_known_ids(&migrated, &MENU_ELEMENT_IDS)
 }
 
 fn parse_hidden_panel_items(value: &str) -> Vec<String> {
@@ -409,12 +403,13 @@ fn parse_settings_section(value: &str) -> String {
 }
 
 fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
-    const SECTION_IDS: [&str; 9] = [
+    const SECTION_IDS: [&str; 10] = [
         "summary",
         "weather",
         "internet-bandwidth",
         "total-power-output",
         "total-power-input",
+        "total-power-overview",
         "current-power-history",
         "graph-total-output-pair",
         "graph-total-input-pair",
@@ -425,6 +420,7 @@ fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
         .map(str::trim)
         .filter(|id| {
             SECTION_IDS.contains(id)
+                || id == "daily-energy-history"
                 || id.strip_prefix("device-graph-pair-").is_some_and(|ain| {
                     !ain.is_empty()
                         && ain
@@ -556,6 +552,7 @@ impl FritzSettings {
             } else {
                 "line".into()
             },
+            temperature_unit: if get("TEMPERATURE_UNIT").eq_ignore_ascii_case("F") { "F".into() } else { "C".into() },
             refresh_interval_seconds: parse_refresh_interval_seconds(&get(
                 "REFRESH_INTERVAL_SECONDS",
             )),
@@ -686,7 +683,7 @@ impl FritzSettings {
             parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
         let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
-            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nDAILY_ENERGY_HISTORY_DEFAULT_APPLIED={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nTEMPERATURE_UNIT={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nDAILY_ENERGY_HISTORY_DEFAULT_APPLIED={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
             match self.language.as_str() {
                 "de" => "de",
                 "en" => "en",
@@ -749,6 +746,7 @@ impl FritzSettings {
             } else {
                 "line"
             },
+            if self.temperature_unit.eq_ignore_ascii_case("F") { "F" } else { "C" },
             self.refresh_interval_seconds.clamp(30, 3600),
             temperature_alerts,
             if self.weather_enabled {
@@ -2107,7 +2105,7 @@ mod tests {
     fn internet_bandwidth_is_collapsed_by_default() {
         assert_eq!(
             FritzSettings::default().collapsed_menu_sections,
-            vec!["internet-bandwidth".to_string()]
+            vec!["internet-bandwidth".to_string(), "daily-energy-history".to_string()]
         );
     }
 
@@ -2115,7 +2113,7 @@ mod tests {
     fn parses_persisted_collapsed_menu_sections_safely() {
         assert_eq!(
             parse_collapsed_menu_sections(
-                "weather,unknown,summary,weather,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature,graph-total-output-pair,graph-total-input-pair,graph-bandwidth-pair,device-graph-pair-0876101234567890,device-graph-pair-invalid!"
+                "weather,unknown,summary,weather,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature,graph-total-output-pair,graph-total-input-pair,graph-bandwidth-pair,total-power-overview,daily-energy-history,device-graph-pair-0876101234567890,device-graph-pair-invalid!"
             ),
             vec![
                 "weather".to_string(),
@@ -2123,6 +2121,8 @@ mod tests {
                 "internet-bandwidth".to_string(),
                 "total-power-output".to_string(),
                 "total-power-input".to_string(),
+                "total-power-overview".to_string(),
+                "daily-energy-history".to_string(),
                 "current-power-history".to_string(),
                 "graph-total-output-pair".to_string(),
                 "graph-total-input-pair".to_string(),
@@ -2682,8 +2682,7 @@ mod tests {
                 "weather",
                 "internet-bandwidth",
                 "devices",
-                "total-power-output",
-                "total-power-input"
+                "total-power-output"
             ]
             .into_iter()
             .map(str::to_string)
@@ -2700,8 +2699,7 @@ mod tests {
                 "devices",
                 "summary",
                 "weather",
-                "total-power-output",
-                "total-power-input"
+                "total-power-output"
             ]
             .into_iter()
             .map(str::to_string)
@@ -2714,7 +2712,6 @@ mod tests {
                 "internet-bandwidth",
                 "devices",
                 "total-power-output",
-                "total-power-input",
                 "summary",
                 "weather",
             ]
@@ -2725,9 +2722,8 @@ mod tests {
         assert_eq!(
             parse_menu_order("total-power-input,summary,total-power-output"),
             vec![
-                "total-power-input",
-                "summary",
                 "total-power-output",
+                "summary",
                 "internet-bandwidth",
                 "weather",
                 "devices",
