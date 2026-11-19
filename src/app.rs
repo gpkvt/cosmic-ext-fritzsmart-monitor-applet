@@ -2735,8 +2735,7 @@ fn panel_item_label(id: &str) -> &'static str {
     }
 }
 
-/// Shared persisted visibility state for the Panel settings and item-order controls.
-/// Use one canonical device key for both saved disclosure state and menu ordering.
+/// Use one canonical device key for saved disclosure state and menu ordering.
 fn device_order_position(order: &[String], ain: &str) -> usize {
     let key = crate::fritz::canonical_device_key(ain);
     order
@@ -2755,6 +2754,7 @@ fn toggle_collapsible_state(ids: &mut HashSet<String>, id: String) {
     }
 }
 
+/// Shared persisted visibility state for Panel settings and item-order controls.
 fn panel_item_is_visible(hidden_items: &[String], id: &str) -> bool {
     !hidden_items.iter().any(|hidden| hidden == id)
 }
