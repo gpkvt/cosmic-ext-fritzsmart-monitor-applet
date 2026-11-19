@@ -117,6 +117,7 @@ pub enum Message {
     TogglePopup,
     PopupClosed(Id),
     PopupMonitorSize(Id, Option<f32>),
+    TooltipSurfaceAction(cosmic::surface::Action<Message>),
     Refresh,
     ClockTick,
     CopyFeedbackTick,
@@ -1969,6 +1970,33 @@ fn interactive_graph_inner(
         Message::ShowGraph(title.to_string(), values, unit.to_string(), axis_start),
     )
 }
+/// Device roles are saved independently of reachability. A configured input
+/// keeps the solar UI visible when its readings are temporarily unavailable.
+fn has_input_device(settings: &FritzSettings) -> bool {
+    !settings.input_ains.is_empty()
+}
+
+/// Tooltip on a panel power value names its contributing devices. An
+/// aggregate sum is labelled as a total, never as an average.
+fn panel_power_source_label(
+    readings: &[FritzReading],
+    input_ains: &HashSet<String>,
+    input: bool,
+) -> String {
+    let names: Vec<&str> = readings
+        .iter()
+        .filter(|reading| {
+            input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain)) == input
+        })
+        .map(|reading| reading.name.as_str())
+        .collect();
+    match names.as_slice() {
+        [name] => (*name).to_string(),
+        [] => if input { "Power input" } else { "Power output" }.to_string(),
+        _ => format!("Total {}: {}", if input { "input" } else { "output" }, names.join(", ")),
+    }
+}
+
 fn input_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
     readings
         .iter()
@@ -4424,7 +4452,7 @@ impl cosmic::Application for AppModel {
 
         // Keep every reading at its intrinsic width. Expanding each child to
         // Fill inside the horizontal panel row pushes later readings off-screen.
-        let panel_item = |_label: &'static str,
+        let panel_item = |tooltip_label: String,
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>,
                           icon_at_top: bool|
@@ -4471,7 +4499,16 @@ impl cosmic::Application for AppModel {
             // to the left. In paired rows this creates a shared left edge;
             // standalone rows retain their intrinsic width because the row
             // itself remains shrink-wrapped.
-            let mut value = widget::container(value)
+            // Use COSMIC's dedicated tooltip surface on the *value* only.
+            // Hover never sends TogglePopup: the main menu remains click-only.
+            let tooltip_value = self.core.applet.applet_tooltip(
+                value,
+                tooltip_label,
+                false,
+                Message::TooltipSurfaceAction,
+                self.core.main_window_id(),
+            );
+            let mut value = widget::container(tooltip_value)
                 .width(if align_value_column {
                     cosmic::iced::Length::Fill
                 } else {
@@ -4501,7 +4538,17 @@ impl cosmic::Application for AppModel {
             panel_items.push((
                 "weather",
                 panel_item(
-                    "Weather",
+                    self.readings
+                        .iter()
+                        .find(|reading| {
+                            crate::fritz::normalize_ain_for_selection(&reading.ain)
+                                == crate::fritz::normalize_ain_for_selection(
+                                    &self.settings.weather_temperature_ain,
+                                )
+                                && reading.temperature_c.is_finite()
+                        })
+                        .map(|reading| reading.name.clone())
+                        .unwrap_or_else(|| "Outdoor weather".to_string()),
                     Some(
                         widget::icon::from_name(weather.icon_name())
                             .size(
@@ -4550,7 +4597,11 @@ impl cosmic::Application for AppModel {
                 panel_items.push((
                     "power-consumption",
                     panel_item(
-                        "Power OUT",
+                        panel_power_source_label(
+                            &self.readings,
+                            &self.settings.input_ains,
+                            false,
+                        ),
                         Some(
                             widget::svg(widget::svg::Handle::from_memory(
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5M16 3v5"/><path d="M6 8h12v3a6 6 0 0 1-6 6h0a6 6 0 0 1-6-6V8Z"/><path d="M12 17v2a3 3 0 0 0 3 3h1"/></svg>"#.to_vec(),
@@ -4568,13 +4619,18 @@ impl cosmic::Application for AppModel {
                     .into(),
                 ));
             }
-            if panel_item_is_enabled(&self.settings, "solar-power")
+            if has_input_device(&self.settings)
+                && panel_item_is_enabled(&self.settings, "solar-power")
                 && let Some(input_power) = input_power
             {
                 panel_items.push((
                     "solar-power",
                     panel_item(
-                        "Power IN",
+                        panel_power_source_label(
+                            &self.readings,
+                            &self.settings.input_ains,
+                            true,
+                        ),
                         Some(
                             widget::svg(widget::svg::Handle::from_memory(
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2-5h14l2 5H3Z"/><path d="M4 9h16l-2 11H6L4 9Z"/><path d="M8 9l1 11M16 9l-1 11M5 13h14M6 17h12"/><path d="M12 1v2M2 5l2 1M22 5l-2 1"/></svg>"#.to_vec(),
@@ -4610,7 +4666,7 @@ impl cosmic::Application for AppModel {
                 // layout used by every other reading.
                 let bandwidth_row = |label: &'static str, icon: &'static str, value: String| {
                     panel_item(
-                        label,
+                        label.to_string(),
                         Some(widget::icon::from_name(icon).size(10).into()),
                         panel_value(keep_value_unit_together(value)),
                         false,
@@ -4640,7 +4696,13 @@ impl cosmic::Application for AppModel {
                 panel_items.push((
                     "temperature",
                     panel_item(
-                        "Temperature",
+                        if self.settings.panel_average_temperature {
+                            "Average temperature".to_string()
+                        } else {
+                            primary_reading
+                                .map(|reading| reading.name.clone())
+                                .unwrap_or_else(|| "Temperature".to_string())
+                        },
                         Some(
                             widget::svg(widget::svg::Handle::from_memory(
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z"/><path d="M12 11v6"/></svg>"#.to_vec(),
@@ -4739,7 +4801,7 @@ impl cosmic::Application for AppModel {
         // Keep connection health visible even when the popup is closed.
         if self.error.is_some() {
             content = content.push(panel_item(
-                "Connection error",
+                "Connection error".to_string(),
                 Some(
                     widget::icon::from_name("dialog-warning-symbolic")
                         .size(self.settings.panel_text_size.into())
@@ -4751,7 +4813,7 @@ impl cosmic::Application for AppModel {
         }
         if self.weather_error.is_some() {
             content = content.push(panel_item(
-                "Weather unavailable",
+                "Weather unavailable".to_string(),
                 Some(
                     widget::icon::from_name("weather-severe-alert-symbolic")
                         .size(self.settings.panel_text_size.into())
@@ -4971,11 +5033,7 @@ impl cosmic::Application for AppModel {
 
         // The applet popup keeps its compact layout; expanded graphs use the
         // dedicated native window above.
-        let has_input_device = self.readings.iter().any(|reading| {
-            self.settings
-                .input_ains
-                .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
-        });
+        let has_input_device = has_input_device(&self.settings);
         let mut content = widget::Column::new()
             .spacing(10)
             .padding(12)
@@ -5279,10 +5337,7 @@ impl cosmic::Application for AppModel {
                     .settings
                     .panel_order
                     .iter()
-                    .filter(|item| {
-                        item.as_str() != "solar-power"
-                            || (has_input_device && !self.settings.panel_net_power)
-                    })
+                    .filter(|item| item.as_str() != "solar-power" || has_input_device)
                     .collect();
                 let visible_panel_order_ids: Vec<String> = visible_panel_order
                     .iter()
@@ -9136,6 +9191,9 @@ impl cosmic::Application for AppModel {
 
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
+            Message::TooltipSurfaceAction(action) => {
+                return Task::done(cosmic::Action::Surface(action));
+            }
             Message::ShowGraph(title, values, unit, _axis_start) => {
                 self.history_graph_devices.clear();
                 self.history_graph_index = None;
