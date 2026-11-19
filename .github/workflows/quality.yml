@@ -143,6 +143,17 @@ jobs:
           sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
           sudo apt-get install --yes -o Acquire::Retries=3 shellcheck
 
+      - name: Reject panel-generated hover clicks
+        # COSMIC Panel treats the *presence* of X-CosmicHoverPopup as an
+        # instruction to synthesize pointer presses; even "false" or "None"
+        # is parsed to the Auto fallback. Menus are click-only in this applet.
+        run: |
+          set -euo pipefail
+          if grep -qE '^[[:space:]]*X-CosmicHoverPopup[[:space:]]*=' data/com.gpkvt.FritzPowerMonitor.desktop; then
+            echo 'Remove X-CosmicHoverPopup: COSMIC interprets this key as hover-to-click.' >&2
+            exit 1
+          fi
+
       - name: Check shell syntax
         run: |
           bash -n packaging/build-linux-packages.sh
