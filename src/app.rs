@@ -7638,11 +7638,21 @@ impl cosmic::Application for AppModel {
                             aligned_power_series(&self.history, &input).1
                         },
                         output_history: {
-                            let input = rebuild_input_power_history(
-                                &self.device_history,
-                                &self.settings.input_ains,
-                            );
-                            aligned_power_series(&self.history, &input).0
+                            if has_input_device {
+                                let input = rebuild_input_power_history(
+                                    &self.device_history,
+                                    &self.settings.input_ains,
+                                );
+                                aligned_power_series(&self.history, &input).0
+                            } else {
+                                // Without an input device there is nothing to
+                                // align against. Use the measured output series
+                                // directly rather than producing an empty graph.
+                                self.history
+                                    .iter()
+                                    .map(|(time, watts)| (*time, *watts as f64))
+                                    .collect()
+                            }
                         },
                         current_input_w: input_display_power_w(input_power_w(
                             &self.readings,
@@ -12158,6 +12168,61 @@ mod history_tests {
 
         set_panel_item_visibility(&mut hidden, "temperature", false);
         assert!(!panel_item_is_visible(&hidden, "temperature"));
+    }
+
+    #[test]
+    fn solar_ui_depends_on_configured_input_not_live_reachability() {
+        let mut settings = FritzSettings::default();
+        assert!(!has_input_device(&settings));
+        // The only way to enable the solar UI is to designate an input role.
+        settings.input_ains.insert("123456".to_string());
+        assert!(has_input_device(&settings));
+        // No currently reachable readings: retain controls and historical data.
+        let offline_readings: Vec<FritzReading> = Vec::new();
+        assert!(offline_readings.is_empty());
+        assert!(has_input_device(&settings));
+        settings.input_ains.clear();
+        assert!(!has_input_device(&settings));
+        assert_eq!(menu_element_label("total-power-output", false), "Total power output");
+        assert_eq!(
+            menu_element_label("total-power-output", true),
+            "Total power input & output"
+        );
+    }
+
+    #[test]
+    fn panel_power_tooltips_name_one_device_and_label_multiple_as_totals() {
+        let reading = |ain: &str, name: &str| FritzReading {
+            ain: ain.to_string(),
+            name: name.to_string(),
+            power_w: 100,
+            temperature_c: 20.0,
+            power_state: None,
+            power_controllable: false,
+            power_toggle_allowed: false,
+        };
+        let readings = [
+            reading("11:11-11", "Living room"),
+            reading("22:22-22", "Solar roof"),
+            reading("33:33-33", "Solar garage"),
+        ];
+        let inputs = HashSet::from(["222222".to_string(), "333333".to_string()]);
+        assert_eq!(
+            panel_power_source_label(&readings, &inputs, false),
+            "Living room"
+        );
+        assert_eq!(
+            panel_power_source_label(&readings, &inputs, true),
+            "Total input: Solar roof, Solar garage"
+        );
+        assert_eq!(
+            panel_power_source_label(&readings, &HashSet::new(), false),
+            "Total output: Living room, Solar roof, Solar garage"
+        );
+        assert_eq!(
+            panel_power_source_label(&[], &inputs, true),
+            "Power input"
+        );
     }
 
     #[test]
