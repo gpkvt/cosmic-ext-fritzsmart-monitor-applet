@@ -184,7 +184,7 @@ pub fn metric_value(sensor: &NetatmoSensor, key: &str) -> Option<f64> {
     }.filter(|value| value.is_finite())
 }
 
-fn valid_id(id: &str) -> bool {
+pub(crate) fn valid_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 128
         && id.bytes().all(|byte| byte.is_ascii_alphanumeric()
             || matches!(byte, b':' | b'-' | b'_'))
