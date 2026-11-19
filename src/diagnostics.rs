@@ -96,7 +96,10 @@ mod tests {
         let record = format_record(ERROR, &oversized, 7);
         assert_eq!(
             record,
-            format!("<11>fritz-power-monitor[7]: {}", "x".repeat(MAX_LOG_CHARACTERS))
+            format!(
+                "<11>fritz-power-monitor[7]: {}",
+                "x".repeat(MAX_LOG_CHARACTERS)
+            )
         );
     }
 }
