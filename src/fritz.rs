@@ -2910,28 +2910,54 @@ mod tests {
     }
 
     #[test]
-    fn discovers_only_devices_with_power_and_temperature() {
-        let xml = r#"
-            <devicelist>
-              <device identifier="111111111111">
-                <name>Solar inverter</name>
+    fn discovers_switches_temperature_sensors_and_thermostats_without_a_meter() {
+        let xml = r#"<devicelist>
+            <device identifier="1111"><name>Power meter</name>
                 <powermeter><power>123000</power></powermeter>
-                <temperature><celsius>215</celsius></temperature>
-              </device>
-              <device identifier="222222222222">
-                <name>Simple switch</name>
-                <switch><state>1</state></switch>
-              </device>
-            </devicelist>
-        "#;
+                <temperature><celsius>215</celsius></temperature></device>
+            <device identifier="2222"><name>Simple switch</name>
+                <switch><state>1</state><lock>0</lock></switch></device>
+            <device identifier="3333"><name>Room sensor</name>
+                <temperature><celsius>198</celsius></temperature></device>
+            <device identifier="4444"><name>Radiator</name>
+                <hkr><tist>41</tist><tsoll>42</tsoll></hkr></device>
+            <device identifier="5555"><name>Button</name><button /></device>
+            <device identifier="6666"><name>Basic light</name>
+                <simpleonoff><state>1</state></simpleonoff></device>
+        </devicelist>"#;
         let devices = parse_devices_xml(xml).unwrap();
-        assert_eq!(
-            devices,
-            vec![FritzDevice {
-                name: "Solar inverter".into(),
-                ain: "111111111111".into(),
-            }]
-        );
+        assert_eq!(devices.len(), 5);
+        assert!(!devices.iter().any(|device| device.ain == "5555"));
+        let results = parse_fetch_result_xml(xml, &devices.iter().map(|device| device.ain.clone()).collect::<Vec<_>>()).unwrap();
+        assert_eq!(results.readings.len(), 5);
+        let switch = results.readings.iter().find(|reading| reading.ain == "2222").unwrap();
+        assert!(!switch.has_power_meter);
+        assert!(switch.temperature_c.is_nan());
+        assert_eq!(switch.power_state, Some(true));
+        assert!(switch.power_toggle_allowed);
+        let sensor = results.readings.iter().find(|reading| reading.ain == "3333").unwrap();
+        assert!(!sensor.has_power_meter);
+        assert_eq!(sensor.temperature_c, 19.8);
+        let radiator = results.readings.iter().find(|reading| reading.ain == "4444").unwrap();
+        assert!(!radiator.has_power_meter);
+        assert_eq!(radiator.temperature_c, 20.5);
+        assert!(!radiator.power_controllable);
+        let light = results.readings.iter().find(|reading| reading.ain == "6666").unwrap();
+        assert_eq!(light.power_state, Some(true));
+        assert!(!light.has_power_meter);
+        assert!(!light.power_controllable);
+    }
+
+    #[test]
+    fn skips_invalid_thermostat_sentinels_without_fake_temperatures() {
+        let xml = r#"<devicelist>
+            <device identifier="off"><hkr><tist>253</tist></hkr></device>
+            <device identifier="on"><hkr><tist>254</tist></hkr></device>
+        </devicelist>"#;
+        for reading in parse_fetch_result_xml(xml, &["off".into(), "on".into()]).unwrap().readings {
+            assert!(reading.temperature_c.is_nan());
+            assert!(!reading.has_power_meter);
+        }
     }
 
     #[test]
