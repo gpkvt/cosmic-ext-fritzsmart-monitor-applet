@@ -10243,6 +10243,7 @@ mod daily_energy_history_tests {
         let input_ains = HashSet::from(["solar-ain".to_string()]);
 
         let history = daily_energy_history(&devices, &input_ains, 60);
+        assert_eq!(history.len(), 7);
         let (date, solar_wh, grid_wh) = history.last().unwrap();
 
         assert_eq!(*date, chrono::Local::now().date_naive());
