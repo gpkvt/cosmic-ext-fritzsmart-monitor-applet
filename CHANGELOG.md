@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- Optional **Netatmo Weather Station API** integration with OAuth2 refresh-token authentication (read_station), independently refreshed station and module readings for temperature, humidity, CO₂, pressure, noise, rain and wind, read-only device cards, searchable/ordered visibility controls, per-device temperature alerts, panel-average temperatures and persisted collapsible metric history graphs. Missing and stale measurements are never presented as current data, and Netatmo does not contribute W or Wh to power totals.
+- Netatmo developer credentials and automatically rotated refresh tokens are saved with owner-only permissions. Document cloud/API requirements, the independent connection, limitations and Netatmo data security in the README, user guide, compatibility page and SECURITY.md.
+
+### Fixed
+
+- Remove the separate menu/header **Close** icon (previously shown as truncated `win-` on some systems). The menu continues to toggle from its panel entry and closes when clicking outside it, as COSMIC normally does.
+
+
 ### Fixed
 
 - Render symbolic toolbar icons as actual COSMIC icons instead of their literal identifier text; the close-menu action no longer appears as a truncated `win-` button. Use the native settings icon alongside it.
