@@ -1,5 +1,7 @@
 # Changelog
 
+- Remove the unused `graph_panel` helper left behind after deduplicating the power history graph, eliminating the release-build dead-code warning.
+
 - Remove the redundant graph from Total Power Input & Output; keep the combined graph under Current Power History and preserve the numeric readings, low/high values, and energy summaries.
 
 - Move the Total Power Input & Output copy icon beside its heading and animate copy buttons with a brief pulsing checkmark, without moving the button hit targets.
