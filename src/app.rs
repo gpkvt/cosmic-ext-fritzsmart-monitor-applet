@@ -2841,7 +2841,7 @@ fn device_sort_button(
     )
     .on_press(Message::SortDeviceList(column))
     .width(width)
-    .padding([4, 2])
+    .padding([4, if column == "name" { 12 } else { 2 }])
     .class(cosmic::theme::Button::Text)
     .into()
 }
@@ -2855,9 +2855,8 @@ fn device_sort_header(
     widget::Row::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
-        .padding([2, 12])
+        .padding([2, 0])
         .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(40.0)))
         .push(device_sort_button(
             crate::i18n::tr(language, "NAME"),
             "name",
@@ -2883,10 +2882,10 @@ fn device_sort_header(
             descending,
             cosmic::iced::Length::Fixed(90.0),
         ))
-        // Match the disclosure chevron and the copy/history/power controls
-        // to keep the numeric headings aligned with their device columns.
-        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(16.0)))
-        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(168.0)))
+        // Reserve the same widths as History, Copy, and Toggle in device rows.
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(108.0)))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(32.0)))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(52.0)))
         .into()
 }
 
@@ -6949,48 +6948,16 @@ impl cosmic::Application for AppModel {
                             device_corner_radius.bottom_left
                         },
                     ];
-                    let mut device_title = widget::Column::new()
-                        .spacing(3)
-                        .width(cosmic::iced::Length::Fill)
-                        .push(
-                            widget::text::body(reading.name.clone())
-                                .class(cosmic::theme::Text::Accent),
-                        );
-                    if is_expanded {
-                        device_title = device_title.push(widget::text::caption(format!(
-                            "{} {}",
-                            crate::i18n::tr(&self.settings.language, "LAST"),
-                            format_graph_timespan(self.settings.graph_timespan_minutes)
-                                .to_uppercase()
-                        )));
-                    }
+                    // Only the name and disclosure chevron are clickable here.
+                    // Live readings and the remaining actions are sibling columns.
                     let device_heading_button = widget::button::custom(
                         widget::Row::new()
                             .spacing(8)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(
-                                widget::container(
-                                    widget::icon::from_name("computer-symbolic").size(20),
-                                )
-                                .center_x(32)
-                                .center_y(36),
-                            )
-                            .push(device_title)
-                            .push(
-                                widget::text::body(keep_value_unit_together(format!(
-                                    "{} W",
-                                    reading.power_w
-                                )))
-                                .width(cosmic::iced::Length::Fixed(76.0))
-                                .align_x(cosmic::iced::Alignment::End),
-                            )
-                            .push(
-                                widget::text::body(keep_value_unit_together(format_temperature(
-                                    reading.temperature_c,
-                                    &self.settings.temperature_unit,
-                                )))
-                                .width(cosmic::iced::Length::Fixed(90.0))
-                                .align_x(cosmic::iced::Alignment::End),
+                                widget::text::body(reading.name.clone())
+                                    .class(cosmic::theme::Text::Accent)
+                                    .width(cosmic::iced::Length::Fill),
                             )
                             .push(
                                 widget::icon::from_name(if is_expanded {
@@ -7022,24 +6989,48 @@ impl cosmic::Application for AppModel {
                                 ))),
                         )
                         .on_press(Message::ShowDeviceHistoryGraph(reading.ain.clone()))
+                        .width(cosmic::iced::Length::Fixed(108.0))
                         .padding([8, 8])
                         .class(cosmic::theme::Button::Text)
                         .into()
                     } else {
                         widget::Space::new()
-                            .width(cosmic::iced::Length::Fixed(32.0))
+                            .width(cosmic::iced::Length::Fixed(108.0))
                             .into()
                     };
+                    // Requested column order: name/disclosure | W | °C |
+                    // history | copy | power. Fixed numeric/action widths
+                    // keep readings aligned across active devices.
                     let device_heading = widget::Row::new()
+                        .spacing(8)
                         .width(cosmic::iced::Length::Fill)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(device_heading_button)
+                        .push(
+                            widget::text::body(keep_value_unit_together(format!(
+                                "{} W",
+                                reading.power_w
+                            )))
+                            .width(cosmic::iced::Length::Fixed(76.0))
+                            .align_x(cosmic::iced::Alignment::End),
+                        )
+                        .push(
+                            widget::text::body(keep_value_unit_together(format_temperature(
+                                reading.temperature_c,
+                                &self.settings.temperature_unit,
+                            )))
+                            .width(cosmic::iced::Length::Fixed(90.0))
+                            .align_x(cosmic::iced::Alignment::End),
+                        )
+                        .push(history_button)
                         .push(copy_menu_title_button(
                             reading.name.clone(),
                             self.copy_feedback.as_ref(),
                         ))
-                        .push(history_button)
-                        .push(power_toggle);
+                        .push(
+                            widget::container(power_toggle)
+                                .width(cosmic::iced::Length::Fixed(52.0)),
+                        );
                     let device_axis_start = format_graph_axis_start(
                         self.settings.graph_timespan_minutes,
                         device_history.and_then(|samples| {
