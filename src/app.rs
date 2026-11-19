@@ -9754,6 +9754,7 @@ impl cosmic::Application for AppModel {
             }
             Message::RemoveDevice(ain) => {
                 let normalized = crate::fritz::normalize_ain_for_selection(&ain);
+                self.missing_device_ains.remove(&crate::fritz::canonical_device_key(&ain));
                 self.devices.retain(|device| {
                     crate::fritz::normalize_ain_for_selection(&device.ain) != normalized
                 });
@@ -9797,6 +9798,10 @@ impl cosmic::Application for AppModel {
                 {
                     self.settings.weather_temperature_ain.clear();
                     self.settings.weather_temperature_source_initialized = true;
+                }
+                if !selected {
+                    self.missing_device_ains
+                        .remove(&crate::fritz::canonical_device_key(&ain));
                 }
                 self.settings.ains = self.selected_ains.clone();
                 self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
