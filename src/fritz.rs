@@ -523,6 +523,20 @@ fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
                         id.strip_prefix(prefix)
                             .is_some_and(crate::hue::valid_sensor_id)
                     })
+                || [
+                    "netatmo-sensor-graph-temperature-",
+                    "netatmo-sensor-graph-humidity-",
+                    "netatmo-sensor-graph-co2-",
+                    "netatmo-sensor-graph-pressure-",
+                    "netatmo-sensor-graph-noise-",
+                    "netatmo-sensor-graph-rain-",
+                    "netatmo-sensor-graph-wind-",
+                ]
+                .iter()
+                .any(|prefix| {
+                    id.strip_prefix(prefix)
+                        .is_some_and(crate::netatmo::valid_id)
+                })
         })
         .map(str::to_string)
         .collect::<Vec<_>>();
