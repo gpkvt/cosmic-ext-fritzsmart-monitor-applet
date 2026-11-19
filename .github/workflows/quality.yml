@@ -120,7 +120,11 @@ jobs:
           sudo apt-get install --yes -o Acquire::Retries=3 shellcheck
 
       - name: Check shell syntax
-        run: bash -n packaging/build-linux-packages.sh
+        run: |
+          bash -n packaging/build-linux-packages.sh
+          sh -n packaging/deb-postinst packaging/deb-prerm
 
-      - name: Lint packaging script
-        run: shellcheck --severity=warning packaging/build-linux-packages.sh
+      - name: Lint packaging scripts
+        run: |
+          shellcheck --severity=warning packaging/build-linux-packages.sh
+          shellcheck --severity=warning --shell=sh packaging/deb-postinst packaging/deb-prerm
