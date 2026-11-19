@@ -2,6 +2,10 @@
 
 ### Fixed
 
+- Scope the safeguard-icon check to the details section so compatibility-card icons are validated separately instead of being counted twice.
+
+### Fixed
+
 - Convert the total power overview section to a COSMIC element before wrapping it in the shared surface card, fixing the release build type mismatch.
 
 ### Changed
