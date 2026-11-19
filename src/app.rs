@@ -8752,6 +8752,94 @@ impl cosmic::Application for AppModel {
                     ));
                 }
 
+                // Netatmo is a read-only cloud Weather Station source,
+                // not a power meter. Keep missing/stale values unavailable.
+                for sensor in &self.netatmo_sensors {
+                    if self.settings.hidden_netatmo_devices.contains(&sensor.id) {
+                        continue;
+                    }
+                    let id = format!("NETATMO:{}", sensor.id);
+                    let row_key = format!("2-{id}");
+                    let expanded = is_device_expanded(&self.expanded_devices, &id);
+                    let temperature = sensor
+                        .temperature_c
+                        .filter(|_| sensor.reachable)
+                        .map(|temperature| format_temperature(temperature, &self.settings.temperature_unit))
+                        .unwrap_or_else(|| "—".into());
+                    let humidity = sensor.humidity_percent
+                        .map(|value| format!("{value:.0} %"))
+                        .unwrap_or_else(|| "—".into());
+                    let heading = widget::Row::new()
+                        .spacing(8)
+                        .width(cosmic::iced::Length::Fill)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::button::custom(
+                            widget::Row::new()
+                                .spacing(8)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::Column::new()
+                                    .spacing(2)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::body(sensor.name.clone()))
+                                    .push(widget::text::caption("Netatmo · Weather Station")))
+                                .push(widget::icon::from_name(if expanded {
+                                    "go-up-symbolic"
+                                } else {
+                                    "go-down-symbolic"
+                                }).size(16))
+                        )
+                        .on_press(Message::ToggleDeviceDetails(id))
+                        .padding([8, 12])
+                        .width(cosmic::iced::Length::Fill)
+                        .class(cosmic::theme::Button::Text))
+                        .push(widget::text::body("—")
+                            .width(cosmic::iced::Length::Fixed(76.0))
+                            .align_x(cosmic::iced::Alignment::End))
+                        .push(widget::text::body(keep_value_unit_together(temperature))
+                            .width(cosmic::iced::Length::Fixed(90.0))
+                            .align_x(cosmic::iced::Alignment::End))
+                        .push(widget::text::caption(humidity)
+                            .width(cosmic::iced::Length::Fixed(108.0))
+                            .align_x(cosmic::iced::Alignment::End))
+                        .push(copy_menu_title_button(
+                            sensor.name.clone(), self.copy_feedback.as_ref()))
+                        .push(widget::Space::new()
+                            .width(cosmic::iced::Length::Fixed(52.0)));
+                    let mut card = widget::list::list_column()
+                        .style(cosmic::theme::Container::Transparent)
+                        .list_item_padding([0, 0])
+                        .add(heading);
+                    if expanded {
+                        let fmt = |v: Option<f64>, unit: &str| -> String {
+                            v.map(|value| format!("{value:.1} {unit}"))
+                                .unwrap_or_else(|| "—".into())
+                        };
+                        let details = widget::Column::new()
+                            .spacing(7)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::caption(if sensor.reachable {
+                                "Netatmo Weather Station · live read-only measurements"
+                            } else {
+                                "Netatmo Weather Station · offline or stale data"
+                            }))
+                            .push(widget::text::caption(format!("Humidity · {}", fmt(sensor.humidity_percent, "%"))))
+                            .push(widget::text::caption(format!("CO₂ · {}", fmt(sensor.co2_ppm, "ppm"))))
+                            .push(widget::text::caption(format!("Pressure · {}", fmt(sensor.pressure_hpa, "hPa"))))
+                            .push(widget::text::caption(format!("Noise · {}", fmt(sensor.noise_db, "dB"))))
+                            .push(widget::text::caption(format!("Rain · {}", fmt(sensor.rain_mm, "mm"))))
+                            .push(widget::text::caption(format!("Wind · {}", fmt(sensor.wind_kmh, "km/h"))))
+                            .push(widget::text::caption("No wattage or power history: Netatmo Weather Stations do not measure mains power."));
+                        card = card.add(widget::container(details).padding([8, 12]));
+                    }
+                    device_sort_metadata.insert(
+                        row_key.clone(),
+                        (sensor.name.to_lowercase(), None,
+                            sensor.temperature_c.filter(|_| sensor.reachable)),
+                    );
+                    menu_cards.push((row_key, widget::container(card)
+                        .width(cosmic::iced::Length::Fill).into()));
+                }
+
                 menu_cards.extend(total_power_overview(
                     &self.readings,
                     &self.settings,
