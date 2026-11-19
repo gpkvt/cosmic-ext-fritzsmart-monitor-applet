@@ -2061,11 +2061,11 @@ fn panel_power_source_label(
     match names.as_slice() {
         [name] => (*name).to_string(),
         [] => if input { "Power input" } else { "Power output" }.to_string(),
-        _ => format!(
-            "Total {}: {}",
-            if input { "input" } else { "output" },
-            names.join(", ")
-        ),
+        _ => if input {
+            format!("Total input: {}", names.join(", "))
+        } else {
+            format!("Grid: {}", names.join(", "))
+        },
     }
 }
 
@@ -12913,7 +12913,7 @@ mod history_tests {
         );
         assert_eq!(
             panel_power_source_label(&readings, &HashSet::new(), false),
-            "Total output: Living room, Solar roof, Solar garage"
+            "Grid: Living room, Solar roof, Solar garage"
         );
         assert_eq!(panel_power_source_label(&[], &inputs, true), "Power input");
     }
