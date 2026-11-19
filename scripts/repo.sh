@@ -20,13 +20,12 @@ Usage:
       Manually dispatch the GitHub Pages build, validation, and gh-pages publication workflow.
 
   ./scripts/repo.sh publish-release [patch|minor|major]
-      Dispatch a release (unavailable without release.yml).
+      Run release.yml on main: bump the stable version, check and package the
+      application, then publish the tag and assets on GitHub Releases.
 
   ./scripts/repo.sh build-release [ref]
-      Dispatch package generation (unavailable without its workflow).
-
-      Release and packaging workflows remain disabled; their commands report that clearly.
-      Local checks and packaging/build-linux-packages.sh remain available.
+      Run generate-linux-packages.yml for a branch, commit or tag without
+      tagging or publishing a GitHub Release. Download files from Actions.
 
   ./scripts/repo.sh workflows
       List repository workflows.
@@ -54,7 +53,7 @@ dispatch() {
   shift
   # Fail early with a useful error when a particular workflow is absent.
   [[ -f "$REPO_ROOT/.github/workflows/$workflow" ]] ||
-    die "GitHub Actions is disabled: .github/workflows/$workflow does not exist. Restore the workflow before using this command; use make check for local validation."
+    die "Missing .github/workflows/$workflow. Update your checkout or check the branch."
   require_gh
   printf 'Dispatching %s in %s...\n' "$workflow" "$REPO"
   "${GH[@]}" workflow run "$workflow" --repo "$REPO" --ref main "$@"

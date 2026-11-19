@@ -4,6 +4,8 @@
 
 ### Added
 
+- Restore manual GitHub Releases and Linux package workflows for checked semantic version bumps, Debian, AppImage, Flatpak and portable archive artifacts with SHA256 checksums. Release tags and source versions are published only after checks and packaging succeed.
+
 - Display actual outdoor ambient air pollution from OpenWeatherMap's Air Pollution API in the weather photo metric grid: 1–5 AQI plus PM2.5, PM10, NO₂ and O₃ in µg/m³. Keep this source clearly separate from indoor Netatmo CO₂ (ppm), ignore stale or invalid values, and leave normal weather functioning independently if pollution lookup fails. Export available pollution values to Prometheus.
 
 ### Improved
@@ -18,7 +20,7 @@
 ### Added
 
 - Add an opt-in localhost-only Prometheus `/metrics` exporter for live FRITZ!Box, Tasmota, Hue, Netatmo, weather, router and WAN monitoring, with safe labels, unavailable-value handling and no network request per scrape.
-- Keep the weather photograph confined to its fixed-height middle section, with the header above and a unified four-column OpenWeatherMap/Netatmo readings grid inside the photo. Additional readings scroll within the image; Wikimedia Commons attribution remains outside the image.
+- Keep the weather photograph confined to its middle section with the header above and a unified four-column OpenWeatherMap/Netatmo readings grid inside the photo. Grow that section only when more weather/pollution/Netatmo rows are present, removing the inner table scrollbar; Wikimedia Commons attribution remains outside the image.
 
 
 ### Added

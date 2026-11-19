@@ -1,0 +1,85 @@
+name: Build Linux packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit SHA to package without publishing a release
+        type: string
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-packages-${{ github.ref }}-${{ inputs.ref }}
+  cancel-in-progress: false
+
+jobs:
+  packages:
+    name: Build and validate Linux packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout selected revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Install Linux packaging dependencies
+        run: bash packaging/install-ci-deps.sh
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Validate release helper
+        run: python3 -m unittest discover -s packaging -p 'test_version.py'
+
+      - name: Read source version
+        id: version
+        shell: bash
+        run: |
+          echo "version=$(python3 packaging/version.py current)" >> "$GITHUB_OUTPUT"
+
+      - name: Format, compile, lint and test
+        run: |
+          cargo fmt --all -- --check
+          cargo check --locked --all-targets
+          cargo clippy --locked --all-targets -- -D warnings
+          cargo test --locked --all-targets
+
+      - name: Build Debian, AppImage, Flatpak and portable archive
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+          APP_RELEASE_VERSION: v${{ steps.version.outputs.version }}
+          OUTPUT_DIR: dist
+        run: bash packaging/build-linux-packages.sh
+
+      - name: Verify package checksums and expected artifacts
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum -c SHA256SUMS
+          test -s "fritz-power-monitor_${VERSION}_amd64.deb"
+          test -s "fritz-power-monitor-${VERSION}-x86_64.AppImage"
+          test -s "fritz-power-monitor-${VERSION}.flatpak"
+          test -s "fritz-power-monitor-v${VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+
+      - name: Upload packages for download
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fritz-power-monitor-linux-packages
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
