@@ -4841,15 +4841,16 @@ impl cosmic::Application for AppModel {
         // Even when all configured data is unavailable or every panel metric
         // has been hidden, keep a small clickable applet entry. Otherwise the
         // autosized content becomes empty and looks as if the applet crashed.
-        if ordered_panel_items.is_empty()
-            && self.error.is_none()
-            && self.weather_error.is_none()
-        {
+        if ordered_panel_items.is_empty() && self.error.is_none() && self.weather_error.is_none() {
             ordered_panel_items.push((
                 "no-live-readings",
                 panel_item(
                     "No live readings; click to open settings".to_string(),
-                    Some(widget::icon::from_name("view-refresh-symbolic").size(14).into()),
+                    Some(
+                        widget::icon::from_name("view-refresh-symbolic")
+                            .size(14)
+                            .into(),
+                    ),
                     panel_value("—".to_string()),
                     false,
                 ),
