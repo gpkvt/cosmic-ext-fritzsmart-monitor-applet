@@ -4276,33 +4276,27 @@ impl AppModel {
     /// references. Called once per device for both individual and bulk removal;
     /// callers persist after their entire operation is complete.
     fn forget_saved_device(&mut self, ain: &str) {
-        let normalized = crate::fritz::normalize_ain_for_selection(ain);
         let canonical = crate::fritz::canonical_device_key(ain);
+        let same_device = |id: &str| crate::fritz::canonical_device_key(id) == canonical;
         self.missing_device_ains.remove(&canonical);
-        self.devices.retain(|device| {
-            crate::fritz::normalize_ain_for_selection(&device.ain) != normalized
-        });
-        self.selected_ains.retain(|selected| {
-            crate::fritz::normalize_ain_for_selection(selected) != normalized
-        });
+        self.devices.retain(|device| !same_device(&device.ain));
+        self.selected_ains.retain(|selected| !same_device(selected));
         self.settings.known_devices = self.devices.clone();
         self.settings.ains = self.selected_ains.clone();
         self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
         self.settings.device_selection_initialized = true;
-        self.settings.device_order.retain(|id| {
-            crate::fritz::normalize_ain_for_selection(id) != normalized
-        });
-        self.settings.input_ains.remove(&normalized);
-        self.settings.temperature_alerts.remove(&normalized);
-        self.temperature_alert_state.remove(&normalized);
-        self.pending_power_changes.remove(&normalized);
-        self.pending_power_targets.remove(&normalized);
+        self.settings.device_order.retain(|id| !same_device(id));
+        self.settings.input_ains.retain(|id| !same_device(id));
+        self.settings.temperature_alerts.retain(|id, _| !same_device(id));
+        self.temperature_alert_state.retain(|id, _| !same_device(id));
+        self.pending_power_changes.retain(|id| !same_device(id));
+        self.pending_power_targets.retain(|id, _| !same_device(id));
         self.expanded_devices.remove(&canonical);
-        self.collapsed_menu_sections
-            .remove(&format!("device-graph-pair-{normalized}"));
-        if crate::fritz::normalize_ain_for_selection(
-            &self.settings.weather_temperature_ain,
-        ) == normalized {
+        self.collapsed_menu_sections.retain(|id| {
+            id.strip_prefix("device-graph-pair-")
+                .is_none_or(|device_id| !same_device(device_id))
+        });
+        if same_device(&self.settings.weather_temperature_ain) {
             self.settings.weather_temperature_ain.clear();
             self.settings.weather_temperature_source_initialized = true;
         }
@@ -13110,6 +13104,37 @@ mod history_tests {
             FritzReading { ain: "TASMOTA:AABB".into(), ..live[0].clone() },
             FritzReading { ain: "123456".into(), ..live[0].clone() },
         ]).is_empty());
+    }
+
+    #[test]
+    fn forgetting_saved_device_clears_related_configuration_by_canonical_id() {
+        let stale = FritzDevice { ain: "TASMOTA:AA:BB".into(), name: "Old plug".into() };
+        let active = FritzDevice { ain: "12:34-56".into(), name: "Active plug".into() };
+        let mut app = AppModel::default();
+        app.devices = vec![stale.clone(), active.clone()];
+        app.selected_ains = vec!["tasmota:aabb".into(), active.ain.clone()];
+        app.settings.device_order = vec![stale.ain.clone(), active.ain.clone()];
+        app.settings.input_ains.insert("TASMOTAAABB".into());
+        app.settings.temperature_alerts.insert(
+            "TASMOTAAABB".into(),
+            TemperatureAlertThresholds::default(),
+        );
+        app.settings.weather_temperature_ain = stale.ain.clone();
+        app.missing_device_ains.insert("TASMOTAAABB".into());
+        app.expanded_devices.insert("TASMOTAAABB".into());
+        app.collapsed_menu_sections.insert("device-graph-pair-TASMOTAAABB".into());
+        app.forget_saved_device(&stale.ain);
+        assert_eq!(app.devices, vec![active.clone()]);
+        assert_eq!(app.settings.known_devices, vec![active.clone()]);
+        assert_eq!(app.selected_ains, vec![active.ain.clone()]);
+        assert_eq!(app.settings.ains, vec![active.ain.clone()]);
+        assert_eq!(app.settings.device_order, vec![active.ain]);
+        assert!(app.missing_device_ains.is_empty());
+        assert!(app.settings.input_ains.is_empty());
+        assert!(app.settings.temperature_alerts.is_empty());
+        assert!(app.settings.weather_temperature_ain.is_empty());
+        assert!(app.expanded_devices.is_empty());
+        assert!(app.collapsed_menu_sections.is_empty());
     }
 
     #[test]
