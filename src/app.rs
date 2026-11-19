@@ -7919,8 +7919,9 @@ impl cosmic::Application for AppModel {
                 content = content.push(weather_card);
             }
 
-            // Hue is a separate light-control section: it must not contribute
-            // fictitious wattage, temperature or historical energy samples.
+            // Hue lights are switches; Hue motion sensors provide read-only
+            // environmental readings. Neither contributes fictitious watts
+            // or energy samples to the power-monitoring totals.
             if !self.settings.hue_bridge_ip.trim().is_empty() {
                 let collapsed = self.collapsed_menu_sections.contains("hue-lights");
                 let heading = widget::button::custom(
@@ -7929,7 +7930,9 @@ impl cosmic::Application for AppModel {
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(widget::text::body("PHILIPS HUE"))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                        .push(widget::text::caption(self.hue_lights.len().to_string()))
+                        .push(widget::text::caption(
+                            (self.hue_lights.len() + self.hue_sensors.len()).to_string(),
+                        ))
                         .push(
                             widget::icon::from_name(if collapsed {
                                 "go-next-symbolic"
@@ -7959,13 +7962,13 @@ impl cosmic::Application for AppModel {
                 if !collapsed {
                     hue_section = hue_section.push(
                         widget::container(widget::text::caption(
-                            "Lights and switches · on/off state only · no measured W",
+                            "Lights · on/off  |  Motion sensors · °C and lx  |  No measured W",
                         ))
                         .padding([4, 12]),
                     );
                     if self.hue_loading {
                         hue_section = hue_section.push(
-                            widget::container(widget::text::caption("Refreshing Hue lights…"))
+                            widget::container(widget::text::caption("Refreshing Hue devices…"))
                                 .padding([4, 12]),
                         );
                     }
@@ -7977,12 +7980,28 @@ impl cosmic::Application for AppModel {
                             .padding([4, 12]),
                         );
                     }
-                    if self.hue_lights.is_empty() && !self.hue_loading && self.hue_error.is_none() {
+                    if self.hue_lights.is_empty()
+                        && self.hue_sensors.is_empty()
+                        && !self.hue_loading
+                        && self.hue_error.is_none()
+                    {
                         hue_section = hue_section.push(
                             widget::container(widget::text::caption(
-                                "No Hue lights found. Pair and refresh from Connection settings.",
+                                "No Hue lights or sensors found. Pair and refresh from Connection settings.",
                             ))
                             .padding([4, 12]),
+                        );
+                    }
+                    if let Some(warning) = &self.hue_sensor_warning {
+                        hue_section = hue_section.push(
+                            widget::container(widget::text::caption(warning.clone()))
+                                .padding([4, 12]),
+                        );
+                    }
+                    if !self.hue_lights.is_empty() {
+                        hue_section = hue_section.push(
+                            widget::container(widget::text::caption("LIGHTS"))
+                                .padding([6, 12]),
                         );
                     }
                     for light in &self.hue_lights {
@@ -8025,6 +8044,70 @@ impl cosmic::Application for AppModel {
                                         self.copy_feedback.as_ref(),
                                     ))
                                     .push(state),
+                            );
+                    }
+                    if !self.hue_sensors.is_empty() {
+                        hue_section = hue_section
+                            .push(widget::divider::horizontal::default())
+                            .push(widget::container(widget::text::caption("MOTION & ENVIRONMENT SENSORS"))
+                                .padding([8, 12]));
+                    }
+                    for sensor in &self.hue_sensors {
+                        let temperature = sensor
+                            .temperature_c
+                            .map(|value| format_temperature(value, &self.settings.temperature_unit))
+                            .unwrap_or_else(|| "—".to_string());
+                        let illuminance = sensor
+                            .illuminance_lux
+                            .map(|lux| {
+                                if lux >= 100.0 {
+                                    format!("{lux:.0} lx")
+                                } else {
+                                    format!("{lux:.1} lx")
+                                }
+                            })
+                            .unwrap_or_else(|| "—".to_string());
+                        let motion = match sensor.motion {
+                            Some(true) => "Motion",
+                            Some(false) => "No motion",
+                            None => "—",
+                        };
+                        hue_section = hue_section
+                            .push(widget::divider::horizontal::default())
+                            .push(
+                                widget::Row::new()
+                                    .spacing(8)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .padding([6, 12])
+                                    .push(
+                                        widget::Column::new()
+                                            .spacing(2)
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::text::body(sensor.name.clone()))
+                                            .push(widget::text::caption(if sensor.reachable {
+                                                "Sensor"
+                                            } else {
+                                                "Unavailable"
+                                            })),
+                                    )
+                                    .push(
+                                        widget::text::body(keep_value_unit_together(temperature))
+                                            .width(cosmic::iced::Length::Fixed(86.0))
+                                            .align_x(cosmic::iced::Alignment::End),
+                                    )
+                                    .push(
+                                        widget::text::body(keep_value_unit_together(illuminance))
+                                            .width(cosmic::iced::Length::Fixed(90.0))
+                                            .align_x(cosmic::iced::Alignment::End),
+                                    )
+                                    .push(widget::text::caption(motion)
+                                        .width(cosmic::iced::Length::Fixed(74.0))
+                                        .align_x(cosmic::iced::Alignment::End))
+                                    .push(copy_menu_title_button(
+                                        sensor.name.clone(),
+                                        self.copy_feedback.as_ref(),
+                                    )),
                             );
                     }
                 }
@@ -9795,6 +9878,8 @@ impl cosmic::Application for AppModel {
                 if self.settings.hue_bridge_ip != ip {
                     self.settings.hue_application_key.clear();
                     self.hue_lights.clear();
+                    self.hue_sensors.clear();
+                    self.hue_sensor_warning = None;
                     self.hue_next_refresh_at = None;
                 }
                 self.settings.hue_bridge_ip = ip.clone();
@@ -9807,8 +9892,8 @@ impl cosmic::Application for AppModel {
             Message::HueApplicationKeyChanged(value) => {
                 self.settings.hue_application_key = value;
                 self.hue_lights.clear();
-                    self.hue_sensors.clear();
-                    self.hue_sensor_warning = None;
+                self.hue_sensors.clear();
+                self.hue_sensor_warning = None;
                 self.hue_error = None;
                 self.hue_next_refresh_at = None;
                 self.persist_settings();
@@ -9861,7 +9946,7 @@ impl cosmic::Application for AppModel {
                         self.hue_next_refresh_at = None;
                         self.hue_error = None;
                         self.hue_discovery_note =
-                            Some("Hue Bridge paired successfully. Loading lights…".into());
+                            Some("Hue Bridge paired successfully. Loading lights and sensors…".into());
                         return Task::perform(
                             crate::hue::fetch_snapshot(
                                 self.settings.hue_bridge_ip.clone(),
