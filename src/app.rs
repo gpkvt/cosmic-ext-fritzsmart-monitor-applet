@@ -9754,9 +9754,11 @@ impl cosmic::Application for AppModel {
                         if self.hue_pair_after_discovery {
                             self.hue_pair_after_discovery = false;
                             if self.settings.hue_bridge_ip.trim().is_empty() {
-                                self.hue_error = Some(
-                                    "Choose one of the discovered bridges or enter its IP, then press Pair again.".into()
-                                );
+                                self.hue_error = Some(if self.hue_bridges.is_empty() {
+                                    "No Hue Bridge found via mDNS. Enter its local IP in Connection settings and press Pair.".into()
+                                } else {
+                                    "More than one Hue Bridge found. Select the correct bridge and press Pair again.".into()
+                                });
                             } else {
                                 self.hue_pairing = true;
                                 self.hue_error = None;
