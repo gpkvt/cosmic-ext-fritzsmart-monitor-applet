@@ -2573,71 +2573,56 @@ fn total_power_overview(
             current_input.clone(),
         ));
     let collapsed = collapsed_sections.contains("total-power-overview");
-    let collapsed_summary = widget::Row::new()
+    // Match the other collapsed popup sections: one full-width disclosure
+    // button containing the title, trailing live summary, and chevron.
+    let mut heading_content = widget::Row::new()
         .spacing(8)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(
-            widget::text::caption(format!("IN {}", keep_value_unit_together(current_input)))
-                .align_x(cosmic::iced::Alignment::End),
-        )
-        .push(
-            widget::text::caption(format!(
+        .push(widget::text::body("TOTAL POWER INPUT & OUTPUT"))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill));
+    if collapsed {
+        heading_content = heading_content
+            .push(widget::text::body(format!(
+                "IN {}",
+                keep_value_unit_together(current_input)
+            )))
+            .push(widget::text::body(format!(
                 "OUT {}",
                 keep_value_unit_together(current_value(total_output_w))
-            ))
-            .align_x(cosmic::iced::Alignment::End),
-        );
-    let collapsed_summary_element: cosmic::Element<'static, Message> = if collapsed {
-        collapsed_summary.into()
-    } else {
-        widget::Space::new()
-            .width(cosmic::iced::Length::Shrink)
-            .into()
-    };
-    // Keep the disclosure area flexible and anchor the copy action at the far right.
-    let title_button = widget::button::custom(widget::text::caption("TOTAL POWER INPUT & OUTPUT"))
-        .on_press(Message::ToggleMenuSection("total-power-overview".into()))
-        .padding([4, 0])
-        .class(cosmic::theme::Button::Text);
-    let disclosure_button = widget::button::custom(
-        widget::Row::new()
-            .spacing(8)
-            .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-            .push(collapsed_summary_element)
-            .push(
-                widget::icon::from_name(if collapsed {
-                    "go-next-symbolic"
-                } else {
-                    "go-down-symbolic"
-                })
-                .size(16),
-            ),
+            )));
+    }
+    let heading = widget::button::custom(
+        heading_content.push(
+            widget::icon::from_name(if collapsed {
+                "go-next-symbolic"
+            } else {
+                "go-down-symbolic"
+            })
+            .size(16),
+        ),
     )
     .on_press(Message::ToggleMenuSection("total-power-overview".into()))
     .width(cosmic::iced::Length::Fill)
-    .padding([4, 0])
+    .padding([8, 12])
     .class(cosmic::theme::Button::Text);
     let heading_row = widget::Row::new()
-        .spacing(4)
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(title_button)
-        .push(disclosure_button)
+        .push(heading)
         .push(copy_menu_title_button(
             "TOTAL POWER INPUT & OUTPUT".to_string(),
             copy_feedback,
         ));
     let mut section = widget::Column::new()
-        .spacing(4)
+        .spacing(0)
         .width(cosmic::iced::Length::Fill)
         .push(heading_row);
     if !collapsed {
-        section = section.push(content);
+        section = section.push(widget::container(content).padding([8, 12]));
     }
     Some(vec![(
         "3-total-power-overview".to_string(),
-        surface_card(section.into(), 14),
+        section.into(),
     )])
 }
 
@@ -7526,13 +7511,6 @@ impl cosmic::Application for AppModel {
                                     .width(cosmic::iced::Length::Fill)
                                     .align_y(cosmic::iced::Alignment::Center)
                                     .push(heading)
-                                    .push(device_sort_button(
-                                        crate::i18n::tr(&self.settings.language, "CUSTOM"),
-                                        "saved",
-                                        &self.settings.device_sort,
-                                        self.settings.device_sort_descending,
-                                        cosmic::iced::Length::Fixed(82.0),
-                                    ))
                                     .push(copy_menu_title_button(
                                         crate::i18n::tr(&self.settings.language, "DEVICES")
                                             .to_string(),
