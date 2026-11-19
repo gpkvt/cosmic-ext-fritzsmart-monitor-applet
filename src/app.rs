@@ -5721,11 +5721,14 @@ impl cosmic::Application for AppModel {
                         &auth.0,
                         auth.1,
                     ))
-                    .push(diagnostic_url_button(if endpoint.is_empty() {
-                        "/login_sid.lua".to_string()
-                    } else {
-                        format!("{fritz_base}/login_sid.lua")
-                    }, self.copy_feedback.as_ref()));
+                    .push(diagnostic_url_button(
+                        if endpoint.is_empty() {
+                            "/login_sid.lua".to_string()
+                        } else {
+                            format!("{fritz_base}/login_sid.lua")
+                        },
+                        self.copy_feedback.as_ref(),
+                    ));
 
                 let device_list = fritz_endpoint_status(
                     "/webservices/homeautoswitch.lua?switchcmd=getdevicelistinfos",
@@ -6642,44 +6645,47 @@ impl cosmic::Application for AppModel {
                     self.settings.refresh_interval_seconds,
                     false,
                 );
-                let summary_card = live_power_summary(LivePowerSummaryData {
-                    energy_flow,
-                    input_history: {
-                        let input = rebuild_input_power_history(
-                            &self.device_history,
+                let summary_card = live_power_summary(
+                    LivePowerSummaryData {
+                        energy_flow,
+                        input_history: {
+                            let input = rebuild_input_power_history(
+                                &self.device_history,
+                                &self.settings.input_ains,
+                            );
+                            aligned_power_series(&self.history, &input).1
+                        },
+                        output_history: {
+                            let input = rebuild_input_power_history(
+                                &self.device_history,
+                                &self.settings.input_ains,
+                            );
+                            aligned_power_series(&self.history, &input).0
+                        },
+                        current_input_w: input_display_power_w(input_power_w(
+                            &self.readings,
                             &self.settings.input_ains,
-                        );
-                        aligned_power_series(&self.history, &input).1
+                        )) as f64,
+                        current_output_w: output_power_w(&self.readings, &self.settings.input_ains)
+                            as f64,
+                        today_input_wh,
+                        today_output_wh,
+                        yesterday_input_wh,
+                        yesterday_output_wh,
+                        graph_style: self.settings.graph_style.clone(),
+                        language: self.settings.language.clone(),
+                        axis_start: format_graph_axis_start(
+                            self.settings.graph_timespan_minutes,
+                            self.history.front().map(|(timestamp, _)| {
+                                Instant::now().duration_since(*timestamp).as_secs() / 60
+                            }),
+                        ),
+                        history_collapsed: self
+                            .collapsed_menu_sections
+                            .contains("current-power-history"),
                     },
-                    output_history: {
-                        let input = rebuild_input_power_history(
-                            &self.device_history,
-                            &self.settings.input_ains,
-                        );
-                        aligned_power_series(&self.history, &input).0
-                    },
-                    current_input_w: input_display_power_w(input_power_w(
-                        &self.readings,
-                        &self.settings.input_ains,
-                    )) as f64,
-                    current_output_w: output_power_w(&self.readings, &self.settings.input_ains)
-                        as f64,
-                    today_input_wh,
-                    today_output_wh,
-                    yesterday_input_wh,
-                    yesterday_output_wh,
-                    graph_style: self.settings.graph_style.clone(),
-                    language: self.settings.language.clone(),
-                    axis_start: format_graph_axis_start(
-                        self.settings.graph_timespan_minutes,
-                        self.history.front().map(|(timestamp, _)| {
-                            Instant::now().duration_since(*timestamp).as_secs() / 60
-                        }),
-                    ),
-                    history_collapsed: self
-                        .collapsed_menu_sections
-                        .contains("current-power-history"),
-                }, self.copy_feedback.as_ref());
+                    self.copy_feedback.as_ref(),
+                );
 
                 let mut menu_cards: Vec<(String, cosmic::Element<'_, Message>)> = Vec::new();
                 menu_cards.push(("0-summary".to_string(), summary_card));
