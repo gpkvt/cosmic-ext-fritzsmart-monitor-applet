@@ -6663,10 +6663,25 @@ impl cosmic::Application for AppModel {
                         .push(device_graphs);
                     // Use COSMIC's list-column disclosure pattern so the
                     // header, separator, and expanded content share native list spacing.
+                    let device_ains = HashSet::from([device_key.clone()]);
+                    let device_today_wh = today_energy_wh_for_ains(
+                        &self.device_history,
+                        &device_ains,
+                        &self.settings.input_ains,
+                        self.settings.refresh_interval_seconds,
+                        self.settings.input_ains.contains(&device_key),
+                    );
+                    let device_summary = menu_energy_summary(
+                        device_history.into_iter().flat_map(|samples| {
+                            samples.iter().map(|(_, power, _)| *power as f64)
+                        }),
+                        device_today_wh,
+                    );
                     let mut card_column = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
                         .list_item_padding([0, 0])
-                        .add(device_heading);
+                        .add(device_heading)
+                        .add(widget::container(device_summary).padding([0, 12]));
                     if is_expanded {
                         card_column = card_column.add(
                             widget::container(device_content)
