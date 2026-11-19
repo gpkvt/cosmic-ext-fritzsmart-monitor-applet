@@ -10990,6 +10990,89 @@ mod copy_feedback_tests {
 }
 
 #[cfg(test)]
+mod device_list_sort_tests {
+    use super::sorted_device_readings;
+    use crate::fritz::FritzReading;
+
+    fn reading(ain: &str, name: &str, power_w: i64, temperature_c: f64) -> FritzReading {
+        FritzReading {
+            ain: ain.into(),
+            name: name.into(),
+            power_w,
+            temperature_c,
+            power_state: None,
+            power_controllable: false,
+            power_toggle_allowed: false,
+        }
+    }
+
+    fn ids(readings: &[&FritzReading]) -> Vec<&str> {
+        readings.iter().map(|reading| reading.ain.as_str()).collect()
+    }
+
+    #[test]
+    fn custom_order_is_default_and_used_as_stable_tiebreaker() {
+        let readings = vec![
+            reading("B", "Beta", 20, 12.0),
+            reading("A", "Alpha", 20, 12.0),
+            reading("C", "Gamma", 10, 5.0),
+        ];
+        let saved = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &saved, "saved", false)),
+            vec!["A", "B", "C"]
+        );
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &saved, "power", true)),
+            vec!["A", "B", "C"]
+        );
+        assert_eq!(readings[0].ain, "B"); // Sorting must not mutate source readings.
+    }
+
+    #[test]
+    fn name_and_power_columns_toggle_sort_direction() {
+        let readings = vec![
+            reading("B", "zeta", 200, 24.0),
+            reading("A", "Alpha", 10, 18.0),
+            reading("C", "bravo", 50, 21.0),
+        ];
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &[], "name", false)),
+            vec!["A", "C", "B"]
+        );
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &[], "name", true)),
+            vec!["B", "C", "A"]
+        );
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &[], "power", false)),
+            vec!["A", "C", "B"]
+        );
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &[], "power", true)),
+            vec!["B", "C", "A"]
+        );
+    }
+
+    #[test]
+    fn temperature_sort_keeps_unavailable_readings_last() {
+        let readings = vec![
+            reading("B", "No temperature", 10, f64::NAN),
+            reading("A", "Cold", 10, 13.0),
+            reading("C", "Warm", 10, 23.0),
+        ];
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &[], "temperature", false)),
+            vec!["A", "C", "B"]
+        );
+        assert_eq!(
+            ids(&sorted_device_readings(&readings, &[], "temperature", true)),
+            vec!["C", "A", "B"]
+        );
+    }
+}
+
+#[cfg(test)]
 mod disclosure_state_tests {
     use super::{device_order_position, is_device_expanded, toggle_collapsible_state};
     use std::collections::HashSet;
