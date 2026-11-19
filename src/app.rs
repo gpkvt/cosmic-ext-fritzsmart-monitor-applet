@@ -1061,6 +1061,12 @@ fn menu_temperature_values(
         .into()
 }
 
+fn energy_input_output_ratio_percent(input_wh: Option<f64>, output_wh: Option<f64>) -> Option<f64> {
+    let input = input_wh.filter(|value| value.is_finite())?;
+    let output = output_wh.filter(|value| value.is_finite() && *value > 0.0)?;
+    Some(input / output * 100.0)
+}
+
 fn menu_power_flow_summary(
     current_input_w: f64,
     current_output_w: f64,
@@ -1081,6 +1087,20 @@ fn menu_power_flow_summary(
             .filter(|value| value.is_finite())
             .map(|value| format!("{value:.0} Wh"))
             .unwrap_or_else(|| "— Wh".to_string())
+    };
+    let ratio_row = |label: &'static str, input: Option<f64>, output: Option<f64>| {
+        let ratio = energy_input_output_ratio_percent(input, output)
+            .map(|value| format!("{value:.1}%"))
+            .unwrap_or_else(|| "—".to_string());
+        widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::text::caption(label).width(cosmic::iced::Length::Fill))
+            .push(
+                widget::text::caption(ratio)
+                    .width(cosmic::iced::Length::Fixed(184.0))
+                    .align_x(cosmic::iced::Alignment::End),
+            )
     };
     let heading = widget::Row::new()
         .spacing(8)
@@ -1130,6 +1150,12 @@ fn menu_power_flow_summary(
             "Y'DAY",
             energy_display(yesterday_input_wh),
             energy_display(yesterday_output_wh),
+        ))
+        .push(ratio_row("TODAY IN / OUT", today_input_wh, today_output_wh))
+        .push(ratio_row(
+            "Y'DAY IN / OUT",
+            yesterday_input_wh,
+            yesterday_output_wh,
         ))
         .into()
 }
@@ -10621,5 +10647,35 @@ mod daily_energy_history_tests {
 
         let history = daily_energy_history(&devices, &input_ains, 60);
         assert!(history.last().unwrap().1.is_none());
+    }
+}
+
+
+#[cfg(test)]
+mod energy_input_output_ratio_tests {
+    use super::energy_input_output_ratio_percent;
+
+    #[test]
+    fn energy_ratio_is_input_as_a_percentage_of_output() {
+        assert_eq!(
+            energy_input_output_ratio_percent(Some(250.0), Some(500.0)),
+            Some(50.0)
+        );
+        assert_eq!(
+            energy_input_output_ratio_percent(Some(750.0), Some(500.0)),
+            Some(150.0)
+        );
+    }
+
+    #[test]
+    fn energy_ratio_requires_valid_input_and_positive_output() {
+        assert_eq!(energy_input_output_ratio_percent(None, Some(500.0)), None);
+        assert_eq!(energy_input_output_ratio_percent(Some(250.0), None), None);
+        assert_eq!(energy_input_output_ratio_percent(Some(250.0), Some(0.0)), None);
+        assert_eq!(energy_input_output_ratio_percent(Some(250.0), Some(-1.0)), None);
+        assert_eq!(
+            energy_input_output_ratio_percent(Some(f64::NAN), Some(500.0)),
+            None
+        );
     }
 }
