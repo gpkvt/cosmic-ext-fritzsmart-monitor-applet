@@ -133,6 +133,7 @@ pub enum Message {
     PanelNetPowerChanged(bool),
     GraphTimespanChanged(u32),
     GraphStyleChanged(String),
+    TemperatureUnitChanged(String),
     ShowGraph(String, GraphSamples, String, Option<String>),
     ShowCombinedGraph(
         String,
@@ -251,7 +252,7 @@ fn build_debug_report(app: &AppModel, fritzbox_dump: &str) -> String {
                     "- {} (AIN {masked_ain}): {} W, {}, power state {:?}",
                     reading.name,
                     reading.power_w,
-                    format_panel_temperature(reading.temperature_c),
+                    format_temperature(reading.temperature_c, &settings.temperature_unit),
                     reading.power_state
                 )
             })
@@ -695,12 +696,24 @@ fn selected_weather_temperature(
         .unwrap_or(fallback_c)
 }
 
-fn format_panel_temperature(temperature_c: f64) -> String {
+fn temperature_in_unit(temperature_c: f64, unit: &str) -> f64 {
+    if unit.eq_ignore_ascii_case("F") { temperature_c * 9.0 / 5.0 + 32.0 } else { temperature_c }
+}
+
+fn temperature_unit_label(unit: &str) -> &'static str {
+    if unit.eq_ignore_ascii_case("F") { "°F" } else { "°C" }
+}
+
+fn format_temperature(temperature_c: f64, unit: &str) -> String {
     if temperature_c.is_finite() {
-        format!("{} °C", format_compact_decimal(temperature_c))
+        format!("{} {}", format_compact_decimal(temperature_in_unit(temperature_c, unit)), temperature_unit_label(unit))
     } else {
-        "-- °C".into()
+        format!("-- {}", temperature_unit_label(unit))
     }
+}
+
+fn format_panel_temperature(temperature_c: f64) -> String {
+    format_temperature(temperature_c, "C")
 }
 
 fn format_countdown(seconds: u64) -> String {
@@ -1059,12 +1072,13 @@ fn menu_temperature_values(
     current_c: Option<f64>,
     minimum_c: Option<f64>,
     maximum_c: Option<f64>,
+    unit: &str,
 ) -> cosmic::Element<'static, Message> {
     let value_row = |label: &'static str, value: Option<f64>| {
         let display = value
             .filter(|value| value.is_finite())
-            .map(|value| format!("{value:.1} °C"))
-            .unwrap_or_else(|| "— °C".to_string());
+            .map(|value| format!("{:.1} {}", temperature_in_unit(value, unit), temperature_unit_label(unit)))
+            .unwrap_or_else(|| format!("— {}", temperature_unit_label(unit)));
         widget::Row::new()
             .spacing(8)
             .align_y(cosmic::iced::Alignment::Center)
@@ -3486,11 +3500,11 @@ impl cosmic::Application for AppModel {
                 &self.selected_ains,
                 self.settings.panel_exclude_solar_temperature,
             )
-            .map(format_panel_temperature)
+            .map(|temperature| format_temperature(temperature, &self.settings.temperature_unit))
         } else {
             primary_reading
                 .filter(|reading| reading.temperature_c.is_finite())
-                .map(|reading| format_panel_temperature(reading.temperature_c))
+                .map(|reading| format_temperature(reading.temperature_c, &self.settings.temperature_unit))
         };
         let input_power = self
             .readings
@@ -4635,6 +4649,15 @@ impl cosmic::Application for AppModel {
                             ),
                     )
                     .push(widget::divider::horizontal::default())
+                    .push(widget::text::caption("TEMPERATURE UNIT"))
+                    .push(widget::Row::new().spacing(8).push(
+                        widget::button::text(if self.settings.temperature_unit == "C" { "✓ °C" } else { "°C" })
+                            .on_press(Message::TemperatureUnitChanged("C".into())),
+                    ).push(
+                        widget::button::text(if self.settings.temperature_unit == "F" { "✓ °F" } else { "°F" })
+                            .on_press(Message::TemperatureUnitChanged("F".into())),
+                    ))
+                    .push(widget::divider::horizontal::default())
                     .push(widget::text::caption(format!(
                         "{}: {}",
                         crate::i18n::tr(&self.settings.language, "GRAPH HISTORY"),
@@ -5679,7 +5702,7 @@ impl cosmic::Application for AppModel {
                                 .push(if reading.temperature_c.is_finite() {
                                     widget::text::caption(format!(
                                         "{} · {state}",
-                                        format_panel_temperature(reading.temperature_c)
+                                        format_temperature(reading.temperature_c, &self.settings.temperature_unit)
                                     ))
                                 } else {
                                     widget::text::caption(state)
@@ -6944,6 +6967,7 @@ impl cosmic::Application for AppModel {
                                         current_temperature,
                                         minimum_temperature,
                                         maximum_temperature,
+                                        &self.settings.temperature_unit,
                                     ))
                                     .width(cosmic::iced::Length::FillPortion(2)),
                                 ),
@@ -9116,11 +9140,11 @@ impl cosmic::Application for AppModel {
                 self.persist_settings();
             }
             Message::GraphStyleChanged(value) => {
-                self.settings.graph_style = if value == "bar" {
-                    "bar".into()
-                } else {
-                    "line".into()
-                };
+                self.settings.graph_style = if value == "bar" { "bar".into() } else { "line".into() };
+                self.persist_settings();
+            }
+            Message::TemperatureUnitChanged(value) => {
+                self.settings.temperature_unit = if value.eq_ignore_ascii_case("F") { "F".into() } else { "C".into() };
                 self.persist_settings();
             }
             Message::RefreshIntervalChanged(value) => {
