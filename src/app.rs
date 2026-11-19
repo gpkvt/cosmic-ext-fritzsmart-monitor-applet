@@ -8870,7 +8870,7 @@ impl cosmic::Application for AppModel {
                             v.map(|value| format!("{value:.1} {unit}"))
                                 .unwrap_or_else(|| "—".into())
                         };
-                        let details = widget::Column::new()
+                        let mut details = widget::Column::new()
                             .spacing(7)
                             .width(cosmic::iced::Length::Fill)
                             .push(widget::text::caption(if sensor.reachable {
