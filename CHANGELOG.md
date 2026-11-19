@@ -1,6 +1,9 @@
 # Changelog
 
-- Give each of the five graphs in Total Power Input & Output its own COSMIC-style disclosure control. Persist their individual expanded/collapsed states without affecting the parent section, and avoid drawing graphs while collapsed.
+- Give each of the five graphs in Total Power Input & Output its own COSMIC-style disclosure control. Persist their independent states without affecting the parent section, avoid rendering hidden graphs, and keep the overview visible before the first history sample.
+- Fix persisted power-only device history (including Tasmota): JSON null/missing temperatures no longer discard valid watt readings on restart; add round-trip regression coverage.
+- Harden Debian install/remove maintainer scripts by dropping root privileges before touching paths beneath the installing user's home directory, and lint these scripts in CI.
+- Fix Clippy warnings in the Hue temperature-average regression tests (`std::slice::from_ref` instead of redundant clones).
 
 - Integrate Hue lights and environment sensors into Settings → Devices with visibility controls, searchable unified inventory, per-light switches, and persistent +/− ordering shared with FRITZ!Box and Tasmota devices; refresh the paired Hue Bridge during device discovery.
 - Include measured temperatures from visible, reachable Hue sensors in the panel average, excluding invalid and offline readings.
