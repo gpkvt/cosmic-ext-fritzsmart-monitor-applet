@@ -8,7 +8,6 @@
 
 <p align="center">
   <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/latest"><img src="https://img.shields.io/github/v/release/gpkvt/cosmic-ext-fritzsmart-monitor-applet?label=release" alt="Latest GitHub release"></a>
-  <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/actions/workflows/gh-pages.yml"><img src="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/actions/workflows/gh-pages.yml/badge.svg" alt="Manual GitHub Pages publication workflow status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/gpkvt/cosmic-ext-fritzsmart-monitor-applet" alt="MIT license"></a>
 </p>
 
@@ -32,14 +31,14 @@ FRITZ!Power Monitor is an independent, native [COSMIC](https://system76.com/cosm
 - **Useful histories.** Collapsible power and sensor graphs, selectable retention, seven-day energy summaries and temperature alerts.
 - **More than power.** Temperature from supported devices; Hue light level and motion; Netatmo humidity, CO₂, pressure, noise, rain and wind where supplied. Optional CO₂ threshold notifications for Netatmo modules.
 - **COSMIC-native behavior.** Click-to-open panel popup, configurable panel metrics, scrollable details, saved disclosure states and accessible tooltips.
-- **Optional outdoor weather.** OpenWeatherMap conditions and forecast with credited Wikimedia Commons imagery; optional internet upload/download statistics.
+- **Optional outdoor weather.** OpenWeatherMap conditions, outdoor air pollution (1–5 AQI and PM2.5/PM10, NO₂, O₃ concentrations where available), and forecasts with credited Wikimedia Commons imagery; optional internet upload/download statistics.
 - **Independent connections.** An unavailable integration does not have to interrupt the others. Missing or offline sensor values are not presented as fresh measurements.
 
 > **Know the difference:** FRITZ!Box and compatible Tasmota meters supply electricity measurements. Hue lights and Netatmo weather stations **do not** measure watts or contribute to energy totals. Solar/input summaries appear when at least one meter is designated as an input.
 
 ## Screenshots
 
-These are actual applet screenshots from this repository, not mockups.
+These are real screenshots of the applet.
 
 | Power and devices | Weather |
 | :---: | :---: |
@@ -57,7 +56,7 @@ These are actual applet screenshots from this repository, not mockups.
 | **Tasmota** | Power readings and supported switching; mDNS discovery and targeted LAN scanning | Local HTTP |
 | **Philips Hue Bridge** | Light switching; compatible sensor temperature, illuminance and motion; sensor history | Local CLIP v2 API |
 | **Netatmo Weather Stations** | Read-only station/module readings and sensor graphs; no power data | Netatmo cloud HTTPS API, OAuth `read_station` |
-| **OpenWeatherMap** | Conditions and forecast | Internet API key |
+| **OpenWeatherMap** | Conditions, outdoor pollutant concentrations and 1–5 air pollution index, plus forecast | Internet API key |
 | **Wikimedia Commons** | Attributed, weather-related background images | Internet |
 
 Actual measurements depend on each device and its firmware/API. Hue scenes, dimming, rooms and groups are not implemented. The Netatmo integration is limited to Weather Stations and their supported modules, not thermostats, cameras or other Netatmo product families.
@@ -118,6 +117,8 @@ scrape_configs:
 
 When Prometheus runs in Docker or on another machine, `127.0.0.1` refers to that service, not the desktop applet. For remote scraping, bind to the applet machine's trusted LAN IP (or `0.0.0.0`), then set the scrape target to that machine's **actual reachable IP and selected port**, not `0.0.0.0`. Limit inbound access to your Prometheus host through a firewall or authenticated proxy; never make this unauthenticated endpoint internet-facing. Prometheus stores historical samples itself; this endpoint exports only the latest applet readings, not the saved graph history. The bind address is stored as `PROMETHEUS_BIND_ADDRESS` in `~/.config/fritz_solar.cfg`.
 
+**Outdoor air pollution:** The Weather section also shows outdoor air quality data from OpenWeatherMap where the configured weather location supports it: AQI on OpenWeatherMap's 1–5 scale, plus PM2.5, PM10, NO₂ and O₃ in µg/m³. These are location-based air pollution estimates, **not** measurements from Netatmo's hardware and **not** CO₂ concentrations in ppm. Netatmo's app obtains its outdoor AQI from a separate third-party provider; that data is not available through the station's `read_station` sensor API. If the air pollution service is unavailable, regular weather continues to work.
+
 **Optional Netatmo weather details:** Under **Settings → Weather**, enable **Show additional Netatmo weather readings** to add CO₂-based air quality (Good / Moderate / Elevated / Very high, with measured ppm), sound level (dB), and rainfall (mm) to the Weather details, each labeled with its Netatmo module. It is off by default; only visible, reachable modules contribute, and humidity, wind and pressure are not duplicated from OpenWeatherMap.
 
 **CO₂ notifications:** In **Settings → Devices**, a Netatmo module with CO₂ measurements exposes a toggle and an adjustable high threshold (600–5,000 ppm; default 1,200 ppm). Alerts are disabled by default, notify only when a valid reading rises from safe to above the limit, and re-arm after returning to the safe range. Missing or stale readings do not notify. Threshold changes reset the alarm baseline.
@@ -159,26 +160,7 @@ pgrep -af 'fritz-power-monitor|cosmic-panel'
 
 The known COSMIC hover-popup/size regression was corrected in v2.0.45, but an outdated local desktop entry can override a newer system installation. See the [troubleshooting guide](https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/guide.html#troubleshooting) before sharing logs.
 
-## Develop and contribute
-
-```bash
-make check                # Formatting, compilation, Clippy and tests
-make build                # Release build
-make install UPDATE=0     # Local install without git pull
-make uninstall            # Remove source-installed user files
-```
-
-**Automation status:** GitHub Pages has a **manual-only** publishing workflow; its badge reports the last run, not continuous testing. No push/schedule-triggered CI or release workflow is enabled. Run `make check` locally before opening a PR.
-
-To publish the website, open **Actions → Publish GitHub Pages → Run workflow** on `main`, or run:
-
-```bash
-make publish-pages
-```
-
-The workflow builds `docs/` from the repository README and security policy, validates links and assets, and publishes to the `gh-pages` branch. GitHub Pages must be configured under **Settings → Pages** to deploy from **gh-pages / (root)**. Publishing is intentionally not triggered by regular pushes. The workflow updates the site only when explicitly dispatched.
-
-See [CHANGELOG.md](CHANGELOG.md) for changes, [SECURITY.md](SECURITY.md) for vulnerability reporting, and [Issues](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues) for bugs and feature requests. When reporting a bug, include the applet version, COSMIC version, FRITZ!OS version (if relevant) and redacted diagnostics.
+For updates and help, see [release notes](CHANGELOG.md), the [user guide](https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/guide.html), and [report an issue](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues). Include relevant versions and redacted diagnostics when reporting a problem.
 
 ## License and trademarks
 
