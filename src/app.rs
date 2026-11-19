@@ -10304,8 +10304,11 @@ impl cosmic::Application for AppModel {
                             format!("FRITZ!Box refresh failed: {error}"),
                         );
                         self.error = if self.selected_ains.is_empty()
-                            && !self.settings.hue_application_key.is_empty()
-                            && !self.settings.hue_bridge_ip.is_empty()
+                            && ((!self.settings.hue_application_key.is_empty()
+                                && !self.settings.hue_bridge_ip.is_empty())
+                                || (!self.settings.netatmo_client_id.is_empty()
+                                    && !self.settings.netatmo_client_secret.is_empty()
+                                    && !self.settings.netatmo_refresh_token.is_empty()))
                         {
                             None
                         } else {
@@ -11131,6 +11134,35 @@ impl cosmic::Application for AppModel {
                         }
                         match snapshot.stations {
                             Ok(sensors) => {
+                                for sensor in &sensors {
+                                    let key = crate::fritz::normalize_ain_for_selection(
+                                        &format!("NETATMO:{}", sensor.id));
+                                    if let Some(thresholds) =
+                                        self.settings.temperature_alerts.get(&key).copied()
+                                    {
+                                        if let Some(temperature) = sensor
+                                            .temperature_c
+                                            .filter(|value| sensor.reachable && value.is_finite())
+                                        {
+                                            let outside = temperature_outside_limits(temperature, thresholds);
+                                            if should_notify_temperature_alert(
+                                                self.temperature_alert_state.get(&key).copied(),
+                                                outside,
+                                            ) {
+                                                notify_temperature_alert(
+                                                    &sensor.name,
+                                                    temperature,
+                                                    thresholds,
+                                                    &self.settings.language,
+                                                    &self.settings.temperature_unit,
+                                                );
+                                            }
+                                            self.temperature_alert_state.insert(key, outside);
+                                        }
+                                    } else {
+                                        self.temperature_alert_state.remove(&key);
+                                    }
+                                }
                                 self.netatmo_sensors = sensors;
                                 self.netatmo_error = None;
                             }
@@ -11626,6 +11658,23 @@ impl cosmic::Application for AppModel {
                 let mut tasks = vec![Task::perform(discover_devices(settings), |result| {
                     cosmic::Action::App(Message::DevicesLoaded(result))
                 })];
+                if !self.netatmo_loading
+                    && !self.settings.netatmo_client_id.trim().is_empty()
+                    && !self.settings.netatmo_client_secret.trim().is_empty()
+                    && !self.settings.netatmo_refresh_token.trim().is_empty()
+                {
+                    self.netatmo_loading = true;
+                    self.netatmo_next_refresh_at = None;
+                    let generation = self.netatmo_generation;
+                    tasks.push(Task::perform(
+                        crate::netatmo::fetch_stations(
+                            self.settings.netatmo_client_id.clone(),
+                            self.settings.netatmo_client_secret.clone(),
+                            self.settings.netatmo_refresh_token.clone(),
+                        ),
+                        move |result| cosmic::Action::App(Message::NetatmoLoaded(generation, result)),
+                    ));
+                }
                 if !self.hue_loading
                     && !self.settings.hue_bridge_ip.trim().is_empty()
                     && !self.settings.hue_application_key.trim().is_empty()
