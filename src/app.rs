@@ -2866,7 +2866,15 @@ fn device_sort_button(
     } else {
         ""
     };
-    widget::button::custom(widget::text::caption(format!("{label}{indicator}")))
+    widget::button::custom(
+        widget::text::caption(format!("{label}{indicator}")).align_x(
+            if column == "name" {
+                cosmic::iced::Alignment::Start
+            } else {
+                cosmic::iced::Alignment::End
+            },
+        ),
+    )
         .on_press(Message::SortDeviceList(column))
         .width(width)
         .padding([4, 2])
@@ -2878,14 +2886,16 @@ fn device_sort_header(
     current_column: &str,
     descending: bool,
     temperature_unit: &str,
+    language: &str,
 ) -> cosmic::Element<'static, Message> {
     widget::Row::new()
         .spacing(8)
         .width(cosmic::iced::Length::Fill)
         .padding([2, 12])
         .align_y(cosmic::iced::Alignment::Center)
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(40.0)))
         .push(device_sort_button(
-            "NAME",
+            crate::i18n::tr(language, "NAME"),
             "name",
             current_column,
             descending,
@@ -2905,13 +2915,10 @@ fn device_sort_header(
             descending,
             cosmic::iced::Length::Fixed(90.0),
         ))
-        .push(device_sort_button(
-            "CUSTOM",
-            "saved",
-            current_column,
-            descending,
-            cosmic::iced::Length::Fixed(82.0),
-        ))
+        // Match the disclosure chevron and the copy/history/power controls
+        // to keep the numeric headings aligned with their device columns.
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(16.0)))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(168.0)))
         .into()
 }
 
@@ -7537,6 +7544,13 @@ impl cosmic::Application for AppModel {
                                     .width(cosmic::iced::Length::Fill)
                                     .align_y(cosmic::iced::Alignment::Center)
                                     .push(heading)
+                                    .push(device_sort_button(
+                                        crate::i18n::tr(&self.settings.language, "CUSTOM"),
+                                        "saved",
+                                        &self.settings.device_sort,
+                                        self.settings.device_sort_descending,
+                                        cosmic::iced::Length::Fixed(82.0),
+                                    ))
                                     .push(copy_menu_title_button(
                                         crate::i18n::tr(&self.settings.language, "DEVICES")
                                             .to_string(),
@@ -7548,6 +7562,7 @@ impl cosmic::Application for AppModel {
                                     &self.settings.device_sort,
                                     self.settings.device_sort_descending,
                                     &self.settings.temperature_unit,
+                                    &self.settings.language,
                                 ));
                             }
                             device_section_started = true;
@@ -7562,7 +7577,10 @@ impl cosmic::Application for AppModel {
                                             .padding([8, 12])
                                             .width(cosmic::iced::Length::Fill)
                                             .push(widget::icon::from_name("dialog-warning-symbolic").size(16))
-                                            .push(widget::text::caption("INACTIVE DEVICES"))
+                                            .push(widget::text::caption(crate::i18n::tr(
+                                                &self.settings.language,
+                                                "INACTIVE DEVICES",
+                                            )))
                                             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                                             .push(widget::text::caption(inactive_count.to_string())),
                                     );
@@ -8703,7 +8721,7 @@ impl cosmic::Application for AppModel {
                     Instant::now()
                         + Duration::from_secs(refresh_interval_with_inactive_devices(
                             self.settings.refresh_interval_seconds,
-                            !self.missing_device_ains.is_empty(),
+                            !self.missing_device_ains.is_empty() || self.error.is_some(),
                         )),
                 );
             }
