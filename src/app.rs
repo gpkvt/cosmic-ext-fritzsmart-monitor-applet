@@ -3579,13 +3579,13 @@ impl cosmic::Application for AppModel {
                             .into(),
                     ),
                     panel_value(panel_value_with_unit(
-                        format!(
-                            "{:.0} °C",
+                        format_temperature(
                             selected_weather_temperature(
                                 &self.readings,
                                 &self.settings.weather_temperature_ain,
                                 weather.temperature_c,
-                            )
+                            ),
+                            &self.settings.temperature_unit,
                         ),
                         self.settings.panel_multiline
                             && self
@@ -6049,13 +6049,13 @@ impl cosmic::Application for AppModel {
                                 )))
                                 .push(widget::text::caption(weather.location_name.clone())),
                         )
-                        .push(widget::text::title2(format!(
-                            "{:.0} °C",
+                        .push(widget::text::title2(format_temperature(
                             selected_weather_temperature(
                                 &self.readings,
                                 &self.settings.weather_temperature_ain,
                                 weather.temperature_c,
-                            )
+                            ),
+                            &self.settings.temperature_unit,
                         )))
                         .push(
                             widget::icon::from_name(if self.weather_forecast_expanded {
