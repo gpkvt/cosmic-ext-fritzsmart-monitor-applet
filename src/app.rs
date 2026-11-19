@@ -2573,7 +2573,9 @@ fn daily_metric_trend(
     style: &str,
     copy_feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
-    let graph = if values.len() >= 2 {
+    let graph = if collapsed {
+        widget::text("").into()
+    } else if values.len() >= 2 {
         graph_visual_with_dimensions(
             values.iter().copied(),
             style,
@@ -2731,50 +2733,60 @@ fn total_power_overview(
             "OUTPUT POWER HISTORY",
             "graph-overview-output-power",
             collapsed_sections.contains("graph-overview-output-power"),
-            interactive_graph_with_axis(
-                &settings.language,
-                "OUTPUT POWER HISTORY",
-            history.iter().map(|(time, watts)| (*time, *watts as f64)),
-            &settings.graph_style,
-            "W",
-            format_graph_axis_start(
-                settings.graph_timespan_minutes,
-                history.front().map(|(timestamp, _)| {
-                    Instant::now()
-                        .saturating_duration_since(*timestamp)
-                        .as_secs()
-                        .div_ceil(60)
-                }),
-            ),
-            ),
+            if collapsed_sections.contains("graph-overview-output-power")
+                || collapsed_sections.contains("total-power-overview")
+            {
+                widget::text("").into()
+            } else {
+                interactive_graph_with_axis(
+                    &settings.language,
+                    "OUTPUT POWER HISTORY",
+                    history.iter().map(|(time, watts)| (*time, *watts as f64)),
+                    &settings.graph_style,
+                    "W",
+                    format_graph_axis_start(
+                        settings.graph_timespan_minutes,
+                        history.front().map(|(timestamp, _)| {
+                            Instant::now()
+                                .saturating_duration_since(*timestamp)
+                                .as_secs()
+                                .div_ceil(60)
+                        }),
+                    ),
+                )
+            },
             copy_feedback,
         ))
         .push(collapsible_graph(
             "INPUT POWER HISTORY",
             "graph-overview-input-power",
             collapsed_sections.contains("graph-overview-input-power"),
-            if input_history.is_empty() {
-            widget::text::caption("INPUT POWER HISTORY · No measured input samples").into()
-        } else {
-            interactive_graph_with_axis(
-                &settings.language,
-                "INPUT POWER HISTORY",
-                input_history
-                    .iter()
-                    .map(|(time, watts)| (*time, input_display_power_w(*watts) as f64)),
-                &settings.graph_style,
-                "W",
-                format_graph_axis_start(
-                    settings.graph_timespan_minutes,
-                    input_history.front().map(|(timestamp, _)| {
-                        Instant::now()
-                            .saturating_duration_since(*timestamp)
-                            .as_secs()
-                            .div_ceil(60)
-                    }),
-                ),
-            )
-        },
+            if collapsed_sections.contains("graph-overview-input-power")
+                || collapsed_sections.contains("total-power-overview")
+            {
+                widget::text("").into()
+            } else if input_history.is_empty() {
+                widget::text::caption("No measured input samples").into()
+            } else {
+                interactive_graph_with_axis(
+                    &settings.language,
+                    "INPUT POWER HISTORY",
+                    input_history
+                        .iter()
+                        .map(|(time, watts)| (*time, input_display_power_w(*watts) as f64)),
+                    &settings.graph_style,
+                    "W",
+                    format_graph_axis_start(
+                        settings.graph_timespan_minutes,
+                        input_history.front().map(|(timestamp, _)| {
+                            Instant::now()
+                                .saturating_duration_since(*timestamp)
+                                .as_secs()
+                                .div_ceil(60)
+                        }),
+                    ),
+                )
+            },
             copy_feedback,
         ))
         .push(widget::divider::horizontal::default())
@@ -11306,6 +11318,36 @@ mod history_tests {
             hue_device_list_key("sensor", "00112233-4455-6677-8899-aabbccddeeff"),
             "2-hue-sensor-00112233-4455-6677-8899-aabbccddeeff"
         );
+    }
+
+    #[test]
+    fn overview_graph_disclosures_toggle_independently_of_parent() {
+        let mut collapsed = HashSet::new();
+        toggle_collapsible_state(
+            &mut collapsed,
+            "graph-overview-output-power".into(),
+        );
+        toggle_collapsible_state(
+            &mut collapsed,
+            "graph-overview-daily-ratio".into(),
+        );
+        assert!(collapsed.contains("graph-overview-output-power"));
+        assert!(collapsed.contains("graph-overview-daily-ratio"));
+        assert!(!collapsed.contains("graph-overview-input-power"));
+        assert!(!collapsed.contains("graph-overview-daily-input"));
+        assert!(!collapsed.contains("graph-overview-daily-output"));
+        toggle_collapsible_state(&mut collapsed, "total-power-overview".into());
+        assert!(collapsed.contains("total-power-overview"));
+        assert!(collapsed.contains("graph-overview-output-power"));
+        assert!(collapsed.contains("graph-overview-daily-ratio"));
+        toggle_collapsible_state(&mut collapsed, "total-power-overview".into());
+        assert!(!collapsed.contains("total-power-overview"));
+        toggle_collapsible_state(
+            &mut collapsed,
+            "graph-overview-output-power".into(),
+        );
+        assert!(!collapsed.contains("graph-overview-output-power"));
+        assert!(collapsed.contains("graph-overview-daily-ratio"));
     }
 
     #[test]
