@@ -1,5 +1,7 @@
 # Changelog
 
+- Give each of the five graphs in Total Power Input & Output its own COSMIC-style disclosure control. Persist their individual expanded/collapsed states without affecting the parent section, and avoid drawing graphs while collapsed.
+
 - Integrate Hue lights and environment sensors into Settings → Devices with visibility controls, searchable unified inventory, per-light switches, and persistent +/− ordering shared with FRITZ!Box and Tasmota devices; refresh the paired Hue Bridge during device discovery.
 - Include measured temperatures from visible, reachable Hue sensors in the panel average, excluding invalid and offline readings.
 - Add full-width input/output watt history and recorded seven-day input, output and input/output percentage trends inside Total Power Input & Output without fabricating missing data. Show the installed version in the popup title bar.
