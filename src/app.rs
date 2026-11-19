@@ -1163,6 +1163,67 @@ fn menu_power_flow_summary(
         .into()
 }
 
+/// Two rows by three columns for the overview's daily energy figures.
+fn daily_power_metric(
+    label: &'static str,
+    value: String,
+) -> cosmic::Element<'static, Message> {
+    widget::container(
+        widget::Column::new()
+            .spacing(5)
+            .width(cosmic::iced::Length::Fill)
+            .push(widget::text::caption(label))
+            .push(widget::text::title2(keep_value_unit_together(value))),
+    )
+    .width(cosmic::iced::Length::FillPortion(1))
+    .padding([6, 4])
+    .into()
+}
+
+fn daily_power_metrics_grid(
+    today_input_wh: Option<f64>,
+    today_output_wh: Option<f64>,
+    yesterday_input_wh: Option<f64>,
+    yesterday_output_wh: Option<f64>,
+) -> cosmic::Element<'static, Message> {
+    let energy_display = |value: Option<f64>| {
+        value
+            .filter(|value| value.is_finite())
+            .map(|value| format!("{value:.0} Wh"))
+            .unwrap_or_else(|| "— Wh".to_string())
+    };
+    let percent_display = |input: Option<f64>, output: Option<f64>| {
+        energy_input_output_ratio_percent(input, output)
+            .map(|value| format!("{value:.1}%"))
+            .unwrap_or_else(|| "—".to_string())
+    };
+    let today = widget::Row::new()
+        .spacing(10)
+        .width(cosmic::iced::Length::Fill)
+        .push(daily_power_metric("TODAY INPUT", energy_display(today_input_wh)))
+        .push(daily_power_metric("TODAY OUTPUT", energy_display(today_output_wh)))
+        .push(daily_power_metric(
+            "TODAY IN / OUT",
+            percent_display(today_input_wh, today_output_wh),
+        ));
+    let yesterday = widget::Row::new()
+        .spacing(10)
+        .width(cosmic::iced::Length::Fill)
+        .push(daily_power_metric("Y'DAY INPUT", energy_display(yesterday_input_wh)))
+        .push(daily_power_metric("Y'DAY OUTPUT", energy_display(yesterday_output_wh)))
+        .push(daily_power_metric(
+            "Y'DAY IN / OUT",
+            percent_display(yesterday_input_wh, yesterday_output_wh),
+        ));
+    widget::Column::new()
+        .spacing(10)
+        .width(cosmic::iced::Length::Fill)
+        .push(today)
+        .push(widget::divider::horizontal::default())
+        .push(yesterday)
+        .into()
+}
+
 fn weather_detail_metric(
     language: &str,
     label: &'static str,
@@ -2465,9 +2526,25 @@ fn total_power_overview(
             input_low_label,
             input_high_label,
         ))
-        .push(menu_power_flow_summary(
-            total_input_w as f64,
-            total_output_w as f64,
+        .push(
+            widget::Row::new()
+                .spacing(14)
+                .width(cosmic::iced::Length::Fill)
+                .push(widget::text::caption("NOW").width(cosmic::iced::Length::Fill))
+                .push(widget::text::body(format!(
+                    "IN {}",
+                    keep_value_unit_together(if has_input_readings {
+                        format!("{total_input_w} W")
+                    } else {
+                        "— W".to_string()
+                    })
+                )))
+                .push(widget::text::body(format!(
+                    "OUT {}",
+                    keep_value_unit_together(format!("{total_output_w} W"))
+                ))),
+        )
+        .push(daily_power_metrics_grid(
             input_today_wh,
             output_today_wh,
             input_yesterday_wh,
