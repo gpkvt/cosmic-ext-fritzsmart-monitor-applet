@@ -18,12 +18,22 @@ use cosmic::widget;
 use futures::{SinkExt, StreamExt};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::LazyLock;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime};
 
 static AUTOSIZE_MAIN_ID: LazyLock<widget::Id> =
     LazyLock::new(|| widget::Id::new("fritz-power-monitor-autosize-main"));
 static FIRST_POPULATED_PANEL_RENDERED: AtomicBool = AtomicBool::new(false);
+static APPLET_UPDATE_COUNT: AtomicU64 = AtomicU64::new(0);
+static PANEL_VIEW_COUNT: AtomicU64 = AtomicU64::new(0);
+
+/// Read by the independent watchdog thread without locking the UI.
+pub(crate) fn diagnostic_event_counts() -> (u64, u64) {
+    (
+        APPLET_UPDATE_COUNT.load(Ordering::Relaxed),
+        PANEL_VIEW_COUNT.load(Ordering::Relaxed),
+    )
+}
 pub type GraphSamples = Vec<(Instant, f64)>;
 type CopyFeedback = (String, Instant);
 const COPY_FEEDBACK_DURATION: Duration = Duration::from_millis(900);
@@ -4408,6 +4418,7 @@ impl cosmic::Application for AppModel {
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
+        PANEL_VIEW_COUNT.fetch_add(1, Ordering::Relaxed);
         let primary_reading = self
             .selected_ains
             .first()
@@ -9325,6 +9336,7 @@ impl cosmic::Application for AppModel {
     }
 
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
+        APPLET_UPDATE_COUNT.fetch_add(1, Ordering::Relaxed);
         match message {
             Message::ShowGraph(title, values, unit, _axis_start) => {
                 self.history_graph_devices.clear();
