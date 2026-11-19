@@ -10650,7 +10650,6 @@ mod daily_energy_history_tests {
     }
 }
 
-
 #[cfg(test)]
 mod energy_input_output_ratio_tests {
     use super::energy_input_output_ratio_percent;
@@ -10671,8 +10670,14 @@ mod energy_input_output_ratio_tests {
     fn energy_ratio_requires_valid_input_and_positive_output() {
         assert_eq!(energy_input_output_ratio_percent(None, Some(500.0)), None);
         assert_eq!(energy_input_output_ratio_percent(Some(250.0), None), None);
-        assert_eq!(energy_input_output_ratio_percent(Some(250.0), Some(0.0)), None);
-        assert_eq!(energy_input_output_ratio_percent(Some(250.0), Some(-1.0)), None);
+        assert_eq!(
+            energy_input_output_ratio_percent(Some(250.0), Some(0.0)),
+            None
+        );
+        assert_eq!(
+            energy_input_output_ratio_percent(Some(250.0), Some(-1.0)),
+            None
+        );
         assert_eq!(
             energy_input_output_ratio_percent(Some(f64::NAN), Some(500.0)),
             None
