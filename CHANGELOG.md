@@ -1,5 +1,7 @@
 # Changelog
 
+- Use smaller body-sized values for the total input/output NOW, TODAY, and Y'DAY summary.
+
 ### Added
 
 - Add one-click copy controls beside menu section and device titles, copying the displayed title text without triggering disclosure actions.
