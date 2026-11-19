@@ -9666,10 +9666,9 @@ impl cosmic::Application for AppModel {
             }
             Message::ClockTick => {
                 let now = Instant::now();
-                if self
-                    .last_liveness_logged_at
-                    .is_none_or(|previous| now.saturating_duration_since(previous) >= Duration::from_secs(60))
-                {
+                if self.last_liveness_logged_at.is_none_or(|previous| {
+                    now.saturating_duration_since(previous) >= Duration::from_secs(60)
+                }) {
                     self.last_liveness_logged_at = Some(now);
                     crate::diagnostics::debug(format!(
                         "applet event loop alive (readings: {}, Hue lights: {}, Hue sensors: {}, menu open: {}, connection error: {})",
