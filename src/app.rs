@@ -1370,6 +1370,19 @@ fn daily_power_metrics_grid(
 }
 
 /// Append only live Netatmo values not already present in the OpenWeatherMap weather summary.
+/// CO₂ is an indoor ventilation indicator, not a complete air quality index.
+fn co2_ventilation_label(ppm: f64) -> &'static str {
+    if ppm < 800.0 {
+        "Good"
+    } else if ppm < 1200.0 {
+        "Moderate"
+    } else if ppm < 2000.0 {
+        "Elevated"
+    } else {
+        "Very high"
+    }
+}
+
 fn netatmo_weather_extra_metrics(
     sensors: &[NetatmoSensor],
     hidden_ids: &[String],
@@ -1377,7 +1390,10 @@ fn netatmo_weather_extra_metrics(
     let mut metrics = Vec::new();
     for sensor in sensors.iter().filter(|sensor| sensor.reachable && !hidden_ids.contains(&sensor.id)) {
         if let Some(ppm) = sensor.co2_ppm.filter(|ppm| ppm.is_finite() && *ppm >= 0.0) {
-            metrics.push((format!("Air quality (CO₂) · {}", sensor.name), format!("{ppm:.0} ppm")));
+            metrics.push((
+                format!("Air quality (CO₂) · {}", sensor.name),
+                format!("{} · {ppm:.0} ppm", co2_ventilation_label(ppm)),
+            ));
         }
         if let Some(noise) = sensor.noise_db.filter(|noise| noise.is_finite() && *noise >= 0.0) {
             metrics.push((format!("Noise · {}", sensor.name), format!("{noise:.0} dB")));
@@ -13408,6 +13424,17 @@ mod history_tests {
     }
 
     #[test]
+    fn co2_ventilation_categories_have_clear_boundaries() {
+        assert_eq!(co2_ventilation_label(500.0), "Good");
+        assert_eq!(co2_ventilation_label(799.0), "Good");
+        assert_eq!(co2_ventilation_label(800.0), "Moderate");
+        assert_eq!(co2_ventilation_label(1199.0), "Moderate");
+        assert_eq!(co2_ventilation_label(1200.0), "Elevated");
+        assert_eq!(co2_ventilation_label(1999.0), "Elevated");
+        assert_eq!(co2_ventilation_label(2000.0), "Very high");
+    }
+
+    #[test]
     fn netatmo_weather_details_include_only_new_live_metrics() {
         let sensor = NetatmoSensor {
             id: "indoor-1".into(),
@@ -13425,7 +13452,7 @@ mod history_tests {
         assert_eq!(
             netatmo_weather_extra_metrics(&[sensor.clone()], &[]),
             vec![
-                ("Air quality (CO₂) · Office".into(), "1350 ppm".into()),
+                ("Air quality (CO₂) · Office".into(), "Elevated · 1350 ppm".into()),
                 ("Noise · Office".into(), "44 dB".into()),
             ]
         );
