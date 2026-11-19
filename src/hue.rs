@@ -53,6 +53,10 @@ fn client() -> Result<Client, String> {
     Client::builder()
         .timeout(Duration::from_secs(8))
         .connect_timeout(Duration::from_secs(4))
+        // Do not let environment proxies or redirects forward the API key
+        // outside the explicitly configured local bridge.
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
         .danger_accept_invalid_certs(true)
         .build()
         .map_err(|error| format!("Cannot configure the Hue Bridge connection: {error}"))
