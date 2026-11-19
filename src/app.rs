@@ -2412,10 +2412,8 @@ fn total_power_overview(
         .map(|(timestamp, value)| (*timestamp, input_display_power_w(*value) as f64))
         .collect();
     let graph = if has_input_readings {
-        let (output_aligned, input_aligned) = aligned_power_series(
-            &history.iter().copied().collect(),
-            &input_history,
-        );
+        let (output_aligned, input_aligned) =
+            aligned_power_series(&history.iter().copied().collect(), &input_history);
         let graph_title = format!(
             "{} & {}",
             crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
