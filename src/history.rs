@@ -94,15 +94,19 @@ fn parse_device_history(
         };
         let mut history = VecDeque::new();
         for sample in samples {
-            let (Some(power), Some(temperature)) = (
-                sample.get("power_w").and_then(Value::as_i64),
-                sample.get("temperature_c").and_then(Value::as_f64),
-            ) else {
+            let Some(power) = sample.get("power_w").and_then(Value::as_i64) else {
                 continue;
             };
-            if !temperature.is_finite() {
-                continue;
-            }
+            // Power-only devices (for example Tasmota plugs) store NaN as
+            // JSON null. Restore their W readings even though no valid
+            // temperature exists, rather than silently losing energy history.
+            let temperature = match sample.get("temperature_c") {
+                None | Some(Value::Null) => f64::NAN,
+                Some(value) => match value.as_f64() {
+                    Some(value) if value.is_finite() => value,
+                    _ => continue,
+                },
+            };
             if let Some(instant) = sample_instant(sample, now_epoch, now, window) {
                 history.push_back((instant, power, temperature));
             }
@@ -331,6 +335,28 @@ mod tests {
     }
 
     #[test]
+    fn power_only_devices_survive_history_restart_without_temperature() {
+        let path = temporary_path();
+        let now = Instant::now();
+        let power = VecDeque::new();
+        let devices = HashMap::from([(
+            "TASMOTA:AABBCCDDEEFF".into(),
+            VecDeque::from([
+                (now - Duration::from_secs(30), 120, f64::NAN),
+                (now, 175, f64::NAN),
+            ]),
+        )]);
+        save_to_path(&path, &power, &devices).unwrap();
+        let (_, restored) = load_from_path(&path, Duration::from_secs(60));
+        let restored = restored.get("TASMOTA:AABBCCDDEEFF").unwrap();
+        assert_eq!(restored.len(), 2);
+        assert_eq!(restored[0].1, 120);
+        assert_eq!(restored[1].1, 175);
+        assert!(restored.iter().all(|(_, _, temperature)| temperature.is_nan()));
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn expired_and_future_samples_are_ignored() {
         let path = temporary_path();
         let now = epoch_now().unwrap();
@@ -375,6 +401,27 @@ mod tests {
         assert_eq!(device.len(), 1);
         assert_eq!(device[0].1, 100);
         assert!((device[0].2 - 21.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn invalid_typed_temperature_is_rejected_without_discarding_null_values() {
+        let now = epoch_now().unwrap();
+        let doc = json!({
+            "version": 1,
+            "power": [],
+            "devices": {
+                "test": [
+                    {"timestamp": now, "power_w": 5, "temperature_c": null},
+                    {"timestamp": now, "power_w": 7},
+                    {"timestamp": now, "power_w": 9, "temperature_c": "invalid"}
+                ]
+            }
+        });
+        let (_, histories) = load_from_document(&doc, Duration::from_secs(60));
+        let readings = histories.get("test").unwrap();
+        assert_eq!(readings.len(), 2);
+        assert_eq!(readings.iter().map(|(_, power, _)| *power).collect::<Vec<_>>(), vec![5, 7]);
+        assert!(readings.iter().all(|(_, _, temperature)| temperature.is_nan()));
     }
 
     #[test]
