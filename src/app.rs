@@ -6176,16 +6176,16 @@ impl cosmic::Application for AppModel {
                             &self.settings.prometheus_bind_address,
                         ) {
                             Some(address) if address.ip().is_loopback() => format!(
-                                "{} · loopback only. No API calls when scraped.",
+                                "When enabled: {} · loopback only. No API calls when scraped.",
                                 crate::prometheus::endpoint_url(
                                     &self.settings.prometheus_bind_address,
                                 ).unwrap_or_default(),
                             ),
                             Some(address) if address.ip().is_unspecified() => format!(
-                                "Listening on {address} (all interfaces). Use this computer's LAN IP to scrape.",
+                                "Configured bind {address} (all interfaces). Use this computer's LAN IP to scrape.",
                             ),
                             Some(address) => format!(
-                                "Listening on {address}. Remote clients may access this HTTP endpoint.",
+                                "Configured bind {address}. Remote clients may access this HTTP endpoint when enabled.",
                             ),
                             None => "Invalid bind address. Enter an IP:port, e.g. 127.0.0.1:9817 or 0.0.0.0:9817. No listener is opened until valid.".into(),
                         },
@@ -11242,8 +11242,14 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::PrometheusEnabledChanged(enabled) => {
-                self.settings.prometheus_enabled = enabled;
-                if !enabled {
+                // Never enable the persisted exporter with a malformed
+                // address, which might otherwise revert to loopback on restart.
+                self.settings.prometheus_enabled = enabled
+                    && crate::prometheus::parse_bind_address(
+                        &self.settings.prometheus_bind_address,
+                    )
+                    .is_some();
+                if !self.settings.prometheus_enabled {
                     crate::prometheus::publish(
                         false,
                         &self.settings.prometheus_bind_address,
