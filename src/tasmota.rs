@@ -379,12 +379,13 @@ pub async fn discover_devices(
     username: String,
     password: String,
     fritzbox_url: String,
+    scan_subnet: bool,
 ) -> Result<Vec<TasmotaDevice>, String> {
     discover_devices_with_options(
         username,
         password,
         fritzbox_url,
-        true,
+        scan_subnet,
         Duration::from_secs(6),
     )
     .await
