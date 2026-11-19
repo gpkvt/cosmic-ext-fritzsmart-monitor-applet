@@ -544,17 +544,42 @@ pub async fn fetch_readings(
     devices: &[TasmotaDevice],
     username: &str,
     password: &str,
-) -> (Vec<TasmotaReading>, Vec<String>) {
+) -> (Vec<TasmotaReading>, Vec<(String, String)>) {
     let client = match Client::builder().timeout(Duration::from_secs(5)).build() {
         Ok(client) => client,
-        Err(error) => return (Vec::new(), vec![error.to_string()]),
+        Err(error) => {
+            record_discovery_diagnostic(format!("Could not create Tasmota client: {error}"));
+            return (
+                Vec::new(),
+                devices
+                    .iter()
+                    .map(|device| (device.id.clone(), device.name.clone()))
+                    .collect(),
+            );
+        }
     };
-    // Probe selected Tasmota devices concurrently. Serial requests made the
-    // initial refresh take up to five seconds per device on an unresponsive LAN.
+    // Each device gets three attempts, in parallel with the other devices.
+    // Never make a slow or disconnected plug block healthy plugs.
     let results = futures::future::join_all(devices.iter().map(|device| async {
-        query_status(&client, &device.address, username, password)
-            .await
-            .and_then(|status| parse_reading(device, &status))
+        for attempt in 0..3 {
+            let result = query_status(&client, &device.address, username, password)
+                .await
+                .and_then(|status| parse_reading(device, &status));
+            match result {
+                Ok(reading) => return Ok(reading),
+                Err(error) => {
+                    if attempt == 2 {
+                        record_discovery_diagnostic(format!(
+                            "Tasmota {} unavailable after 3 attempts: {error}",
+                            device.name
+                        ));
+                        return Err((device.id.clone(), device.name.clone()));
+                    }
+                    tokio::time::sleep(Duration::from_millis(350)).await;
+                }
+            }
+        }
+        unreachable!("the third attempt always returns");
     }))
     .await;
     let mut readings = Vec::new();
@@ -562,7 +587,7 @@ pub async fn fetch_readings(
     for result in results {
         match result {
             Ok(reading) => readings.push(reading),
-            Err(error) => errors.push(error),
+            Err(device) => errors.push(device),
         }
     }
     (readings, errors)
