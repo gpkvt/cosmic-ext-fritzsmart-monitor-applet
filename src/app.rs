@@ -5046,6 +5046,30 @@ impl cosmic::Application for AppModel {
                         widget::text_input("192.168.1.2", &self.settings.hue_bridge_ip)
                             .on_input(Message::HueBridgeIpChanged),
                     )
+                    .push({
+                        let mut discovery = widget::Column::new()
+                            .spacing(4)
+                            .push(
+                                widget::button::text(if self.hue_discovering {
+                                    "Searching for Hue Bridges…"
+                                } else {
+                                    "Find Hue Bridge automatically"
+                                })
+                                .on_press(Message::DiscoverHueBridges),
+                            );
+                        if let Some(note) = &self.hue_discovery_note {
+                            discovery = discovery.push(widget::text::caption(note.clone()));
+                        }
+                        for ip in &self.hue_bridges {
+                            if ip != &self.settings.hue_bridge_ip {
+                                discovery = discovery.push(
+                                    widget::button::text(format!("Use Hue Bridge at {ip}"))
+                                        .on_press(Message::UseHueBridge(ip.clone())),
+                                );
+                            }
+                        }
+                        discovery
+                    })
                     .push(widget::text::body("Hue application key"))
                     .push(
                         widget::secure_input(
@@ -5074,7 +5098,18 @@ impl cosmic::Application for AppModel {
                             ),
                     )
                     .push(widget::text::caption(
-                        "Hue's bridge certificate uses a bridge ID instead of its IP, so only this Hue LAN connection skips TLS certificate verification. Use a trusted local network.",
+                        if self.hue_pairing {
+                            "Pairing is active for 30 seconds. Press the physical button on the Hue Bridge now.".to_string()
+                        } else if let Some(error) = &self.hue_error {
+                            format!("Hue Bridge: {error}")
+                        } else if !self.hue_lights.is_empty() {
+                            format!("Hue Bridge paired · {} light(s) found", self.hue_lights.len())
+                        } else {
+                            "Press the physical bridge button, then Pair Hue Bridge. Pairing also waits for button presses after you click.".to_string()
+                        },
+                    ))
+                    .push(widget::text::caption(
+                        "Hue's bridge certificate uses a bridge ID instead of its IP. The Hue-only LAN connection skips TLS certificate checks; use a trusted local network.",
                     ))
                     .push(widget::divider::horizontal::default())
                     .push(
@@ -5095,21 +5130,6 @@ impl cosmic::Application for AppModel {
                     )
                     .push(widget::divider::horizontal::default())
             }
-            if self.active_settings_section == Some("connection") {
-                if let Some(error) = &self.hue_error {
-                    content = content.push(widget::text::caption(format!("Hue Bridge: {error}")));
-                } else if self.hue_pairing {
-                    content = content.push(widget::text::caption(
-                        "Waiting for the Hue Bridge to authorize pairing…",
-                    ));
-                } else if !self.hue_lights.is_empty() {
-                    content = content.push(widget::text::caption(format!(
-                        "Hue Bridge connected · {} light(s) found",
-                        self.hue_lights.len()
-                    )));
-                }
-            }
-
             if self.active_settings_section == Some("menu-order") {
                 content = content
                     .push(widget::text::body(crate::i18n::tr(
