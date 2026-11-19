@@ -3271,16 +3271,16 @@ impl cosmic::Application for AppModel {
         // two-line layouts; multiline mode changes arrangement, not typography.
         let panel_text_size = f32::from(self.settings.panel_text_size);
 
-        // Render every panel value through the same fixed-width, right-aligned
+        // Render every panel value through the same fixed-width, left-aligned
         // text slot. For multiline values, size the slot from the longest line
-        // so the number and unit share the same right edge as single-line values.
+        // so the number and unit share the same left edge as single-line values.
         let panel_value = |value: String| -> cosmic::Element<'static, Message> {
             // The panel text-size setting is authoritative in every layout.
             // Multiline mode changes arrangement and line height, not font size.
             let font_size = panel_text_size;
             // Normalize each line independently. A trailing space on the
             // second line is especially visible in the compact panel because
-            // it makes the value appear not to reach the right edge.
+            // it makes the value appear not to reach the left edge.
             let lines: Vec<String> = value
                 .lines()
                 .map(|line| line.trim_end().to_owned())
@@ -3294,7 +3294,7 @@ impl cosmic::Application for AppModel {
                 * 0.62;
             // Keep a shared minimum width for every value slot. Without
             // this, the slot collapses to the text's natural width and
-            // right-alignment has no visible effect for short readings.
+            // left-alignment has no visible effect for short readings.
             let width = width.max(font_size * 4.0);
             if lines.len() > 1 {
                 // Build the two lines as separate fixed-height rows. Relying on
@@ -3305,7 +3305,7 @@ impl cosmic::Application for AppModel {
                 // Give the column and every line the same explicit width.
                 // Fill inside a shrink-sized Column can otherwise leave each
                 // line at its natural width, so short second-line readings
-                // start at the left instead of sharing the right edge.
+                // start at the left instead of sharing the left edge.
                 let column = lines.into_iter().fold(
                     widget::Column::new()
                         .width(cosmic::iced::Length::Fixed(width))
@@ -3318,19 +3318,19 @@ impl cosmic::Application for AppModel {
                             .size(font_size)
                             .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.65))
                             .width(cosmic::iced::Length::Fixed(width))
-                            .align_x(cosmic::iced::Alignment::End);
+                            .align_x(cosmic::iced::Alignment::Start);
                         column.push(
                             widget::container(text)
                                 .width(cosmic::iced::Length::Fixed(width))
                                 .height(cosmic::iced::Length::Fixed(row_height))
-                                .align_x(cosmic::iced::Alignment::End)
+                                .align_x(cosmic::iced::Alignment::Start)
                                 .center_y(row_height as u16),
                         )
                     },
                 );
                 widget::container(column)
                     .width(cosmic::iced::Length::Fixed(width))
-                    .align_x(cosmic::iced::Alignment::End)
+                    .align_x(cosmic::iced::Alignment::Start)
                     .into()
             } else {
                 let text = self
@@ -3340,10 +3340,10 @@ impl cosmic::Application for AppModel {
                     .size(font_size)
                     .line_height(cosmic::iced::widget::text::LineHeight::Relative(0.65))
                     .width(cosmic::iced::Length::Fill)
-                    .align_x(cosmic::iced::Alignment::End);
+                    .align_x(cosmic::iced::Alignment::Start);
                 widget::container(text)
                     .width(cosmic::iced::Length::Fixed(width))
-                    .align_x(cosmic::iced::Alignment::End)
+                    .align_x(cosmic::iced::Alignment::Start)
                     .into()
             }
         };
@@ -3364,7 +3364,7 @@ impl cosmic::Application for AppModel {
                 24.0
             };
             // Paired multiline rows share their group's available width so
-            // their value columns end at the same right edge. Standalone
+            // their value columns end at the same left edge. Standalone
             // readings retain their natural width to avoid pushing later items
             // out of the panel.
             let align_value_column = self.settings.panel_multiline && !icon_at_top;
@@ -3393,7 +3393,7 @@ impl cosmic::Application for AppModel {
                 item = item.push(icon_column);
             }
             // Give the value the remaining item width and align its contents
-            // to the right. In paired rows this creates a shared right edge;
+            // to the left. In paired rows this creates a shared left edge;
             // standalone rows retain their intrinsic width because the row
             // itself remains shrink-wrapped.
             let mut value = widget::container(value)
@@ -3402,7 +3402,7 @@ impl cosmic::Application for AppModel {
                 } else {
                     cosmic::iced::Length::Shrink
                 })
-                .align_x(cosmic::iced::Alignment::End);
+                .align_x(cosmic::iced::Alignment::Start);
             if !icon_at_top {
                 value = value.center_y(item_height as u16);
             }
