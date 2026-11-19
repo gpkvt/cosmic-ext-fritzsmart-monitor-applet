@@ -6431,24 +6431,24 @@ impl cosmic::Application for AppModel {
                 );
                 if !self.devices_loading && !inactive_saved_devices.is_empty() {
                     content = content.push(
-                        widget::Row::new()
-                            .spacing(10)
-                            .align_y(cosmic::iced::Alignment::Center)
+                        widget::Column::new()
+                            .spacing(4)
+                            .width(cosmic::iced::Length::Fill)
                             .push(action_button(
                                 "edit-delete-symbolic",
-                                format!(
-                                    "{} ({})",
-                                    crate::i18n::tr(
-                                        &self.settings.language,
-                                        "Remove inactive devices",
-                                    ),
-                                    inactive_saved_devices.len(),
+                                crate::i18n::tr(
+                                    &self.settings.language,
+                                    "Remove inactive devices",
                                 ),
                                 Message::RemoveInactiveDevices,
                             ))
-                            .push(widget::text::caption(crate::i18n::tr(
-                                &self.settings.language,
-                                "Remove confirmed-offline devices from the saved list. They can be discovered again.",
+                            .push(widget::text::caption(format!(
+                                "{} · {}",
+                                inactive_saved_devices.len(),
+                                crate::i18n::tr(
+                                    &self.settings.language,
+                                    "Remove confirmed-offline devices from the saved list. They can be discovered again.",
+                                ),
                             ))),
                     );
                 }
