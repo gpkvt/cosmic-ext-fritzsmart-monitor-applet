@@ -9,6 +9,12 @@ usage() {
 Repository workflow helper
 
 Usage:
+  ./scripts/repo.sh update
+      Fast-forward the current checkout from its configured upstream.
+
+  ./scripts/repo.sh check
+      Run Rust formatting, compilation, lint and test checks locally.
+
   ./scripts/repo.sh publish-pages
       Build, validate and publish docs/ to the gh-pages branch.
 
@@ -56,7 +62,23 @@ case "$command" in
   help|-h|--help)
     usage
     ;;
+  update|pull)
+    [[ $# -eq 0 ]] || die "update does not accept arguments."
+    git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "Run this command inside a Git checkout."
+    branch="$(git branch --show-current)"
+    [[ -n "$branch" ]] || die "Detached HEAD: check out a branch before updating."
+    printf 'Fast-forwarding %s from its configured upstream...\n' "$branch"
+    git pull --ff-only
+    ;;
+  check|checks)
+    [[ $# -eq 0 ]] || die "check does not accept arguments."
+    cargo fmt --all -- --check
+    cargo check --locked --all-targets
+    cargo clippy --locked --all-targets -- -D warnings
+    cargo test --locked --all-targets
+    ;;
   publish-pages|pages)
+    [[ $# -eq 0 ]] || die "publish-pages does not accept arguments."
     require_gh
     dispatch gh-pages.yml
     ;;

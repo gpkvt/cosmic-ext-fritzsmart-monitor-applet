@@ -9,13 +9,16 @@ ICON_FILE := $(DATADIR)/icons/hicolor/scalable/apps/$(APP_ID).svg
 
 UPDATE ?= 1
 
-.PHONY: build update install reload uninstall repo-help publish-pages publish-release build-release workflows workflow-runs workflow-watch
+.PHONY: build check update install reload uninstall repo-help publish-pages publish-release build-release workflows workflow-runs workflow-watch
 
 build:
 	cargo build --release
 
+check:
+	@bash scripts/repo.sh check
+
 update:
-	git pull --ff-only
+	@bash scripts/repo.sh update
 
 install:
 	clear || true
