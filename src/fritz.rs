@@ -196,6 +196,7 @@ pub struct FritzSettings {
     pub temperature_alerts: HashMap<String, TemperatureAlertThresholds>,
     pub input_ains: HashSet<String>,
     pub input_defaults_initialized: bool,
+    pub prometheus_enabled: bool,
     pub weather_enabled: bool,
     /// Show unique Netatmo measurements below the OpenWeatherMap weather card.
     pub weather_netatmo_extra_metrics: bool,
@@ -263,6 +264,7 @@ impl Default for FritzSettings {
             temperature_alerts: HashMap::new(),
             input_ains: HashSet::new(),
             input_defaults_initialized: false,
+            prometheus_enabled: false,
             weather_enabled: false,
             weather_netatmo_extra_metrics: false,
             openweathermap_api_key: String::new(),
@@ -713,6 +715,7 @@ impl FritzSettings {
             input_ains: parse_input_ains(&get("INPUT_AINS")),
             input_defaults_initialized: get("INPUT_DEFAULTS_INITIALIZED")
                 .eq_ignore_ascii_case("true"),
+            prometheus_enabled: get("PROMETHEUS_ENABLED").eq_ignore_ascii_case("true"),
             weather_enabled: get("WEATHER_ENABLED").eq_ignore_ascii_case("true"),
             weather_netatmo_extra_metrics: get("WEATHER_NETATMO_EXTRA_METRICS").eq_ignore_ascii_case("true"),
             openweathermap_api_key: get("OPENWEATHERMAP_API_KEY"),
@@ -999,6 +1002,7 @@ impl FritzSettings {
                 "false"
             },
         );
+        contents.push_str(&format!("PROMETHEUS_ENABLED={}\n", if self.prometheus_enabled { "true" } else { "false" }));
         // Keep rotating Netatmo OAuth refresh tokens in the same owner-only
         // atomic settings file as the existing Hue and router credentials.
         contents.push_str(&format!(
