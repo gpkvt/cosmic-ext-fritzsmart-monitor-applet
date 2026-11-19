@@ -288,7 +288,7 @@ fn build_debug_report(app: &AppModel, fritzbox_dump: &str) -> String {
             .join("\n")
     };
     let cpu_temperature = cpu_temperature_c()
-        .map(|temperature| format!("{temperature:.1} °C"))
+        .map(|temperature| format_temperature(temperature, &settings.temperature_unit))
         .unwrap_or_else(|| "Not available".into());
     let history_diagnostics = serde_json::to_string_pretty(&app.history_storage_diagnostics)
         .unwrap_or_else(|error| format!("Could not serialize history diagnostics: {error}"));
@@ -1378,7 +1378,7 @@ fn escape_svg_text(value: &str) -> String {
 }
 
 fn format_graph_y_tick(value: f64, unit: &str) -> String {
-    if unit == "°C" || unit.contains("/s") {
+    if unit.starts_with("°") || unit.contains("/s") {
         format!("{value:.1}")
     } else if value.abs() >= 100.0 {
         format!("{value:.0}")
@@ -5341,7 +5341,7 @@ impl cosmic::Application for AppModel {
 
                 let cpu_temperature = cpu_temperature_c();
                 let cpu_temperature_label = cpu_temperature
-                    .map(|temperature| format!("{temperature:.1} °C"))
+                    .map(|temperature| format_temperature(temperature, &self.settings.temperature_unit))
                     .unwrap_or_else(|| {
                         crate::i18n::tr(&self.settings.language, "Not available").to_string()
                     });
@@ -5959,9 +5959,9 @@ impl cosmic::Application for AppModel {
                                     .spacing(2)
                                     .push(widget::text::body(weather.description.clone()))
                                     .push(widget::text::caption(format!(
-                                        "{} {:.1} °C",
+                                        "{} {}",
                                         crate::i18n::tr(&self.settings.language, "Feels like"),
-                                        weather.feels_like_c
+                                        format_temperature(weather.feels_like_c, &self.settings.temperature_unit)
                                     ))),
                             ),
                     )
@@ -6300,8 +6300,11 @@ impl cosmic::Application for AppModel {
                                         .align_x(cosmic::iced::Alignment::End)
                                         .push(
                                             widget::text::body(format!(
-                                                "{:.0} °C\n{:.0} °C",
-                                                day.max_temperature_c, day.min_temperature_c
+                                                "{:.0} {}\n{:.0} {}",
+                                                temperature_in_unit(day.max_temperature_c, &self.settings.temperature_unit),
+                                                temperature_unit_label(&self.settings.temperature_unit),
+                                                temperature_in_unit(day.min_temperature_c, &self.settings.temperature_unit),
+                                                temperature_unit_label(&self.settings.temperature_unit)
                                             ))
                                             .width(cosmic::iced::Length::Fill)
                                             .align_x(cosmic::iced::Alignment::End),
@@ -7159,7 +7162,7 @@ impl cosmic::Application for AppModel {
                                     };
                                     (
                                         format!("{value} W"),
-                                        temperature.map(|value| format!("{value:.1} °C")),
+                                        temperature.map(|value| format_temperature(value, &self.settings.temperature_unit)),
                                     )
                                 }),
                             "internet-bandwidth" => Some((
