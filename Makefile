@@ -9,7 +9,7 @@ ICON_FILE := $(DATADIR)/icons/hicolor/scalable/apps/$(APP_ID).svg
 
 UPDATE ?= 1
 
-.PHONY: build check update install reload uninstall repo-help publish-pages publish-release build-release workflows workflow-runs workflow-watch
+.PHONY: build check update install reload uninstall chatgpt-change repo-help publish-pages publish-release build-release workflows workflow-runs workflow-watch
 
 build:
 	cargo build --release
@@ -64,3 +64,7 @@ workflow-runs:
 workflow-watch:
 	@test -n "$(RUN_ID)" || { echo "Usage: make workflow-watch RUN_ID=<id>" >&2; exit 2; }
 	@bash scripts/repo.sh watch "$(RUN_ID)"
+
+chatgpt-change:
+	@test -n "$(REQUEST)" || { echo "Usage: make chatgpt-change REQUEST='Describe the change'" >&2; exit 2; }
+	@bash scripts/chatgpt-change.sh "$(REQUEST)"
