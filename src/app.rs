@@ -7066,10 +7066,8 @@ impl cosmic::Application for AppModel {
                 menu_cards.push(("bandwidth".to_string(), bandwidth_card.into()));
                 // Live sort keys also cover Hue rows without treating missing
                 // metering data as 0 W or writing Hue values into power history.
-                let mut device_sort_metadata: HashMap<
-                    String,
-                    (String, Option<f64>, Option<f64>),
-                > = HashMap::new();
+                let mut device_sort_metadata: HashMap<String, (String, Option<f64>, Option<f64>)> =
+                    HashMap::new();
                 // Custom order remains the default; column sort overrides it only in this list.
                 let ordered_readings = sorted_device_readings(
                     &self.readings,
@@ -7454,7 +7452,10 @@ impl cosmic::Application for AppModel {
                         (
                             reading.name.to_lowercase(),
                             Some(reading.power_w as f64),
-                            reading.temperature_c.is_finite().then_some(reading.temperature_c),
+                            reading
+                                .temperature_c
+                                .is_finite()
+                                .then_some(reading.temperature_c),
                         ),
                     );
                     menu_cards.push((row_key, device_card.into()));
@@ -7580,7 +7581,8 @@ impl cosmic::Application for AppModel {
                             }
                         });
                     let row_key = format!("2-inactive-{device_key}");
-                    device_sort_metadata.insert(row_key.clone(), (device.name.to_lowercase(), None, None));
+                    device_sort_metadata
+                        .insert(row_key.clone(), (device.name.to_lowercase(), None, None));
                     menu_cards.push((row_key, device_card.into()));
                 }
 
@@ -7596,7 +7598,9 @@ impl cosmic::Application for AppModel {
                     {
                         let id = light.id.clone();
                         widget::toggler(light.on.unwrap_or(false))
-                            .on_toggle(move |enabled| Message::SetHueLightPower(id.clone(), enabled))
+                            .on_toggle(move |enabled| {
+                                Message::SetHueLightPower(id.clone(), enabled)
+                            })
                             .into()
                     } else {
                         widget::toggler(light.on.unwrap_or(false)).into()
@@ -7617,23 +7621,35 @@ impl cosmic::Application for AppModel {
                                             .push(widget::text::body(light.name.clone()))
                                             .push(widget::text::caption("Hue · Light")),
                                     )
-                                    .push(widget::icon::from_name(if expanded {
-                                        "go-up-symbolic"
-                                    } else {
-                                        "go-down-symbolic"
-                                    }).size(16)),
+                                    .push(
+                                        widget::icon::from_name(if expanded {
+                                            "go-up-symbolic"
+                                        } else {
+                                            "go-down-symbolic"
+                                        })
+                                        .size(16),
+                                    ),
                             )
                             .on_press(Message::ToggleDeviceDetails(device_key))
                             .padding([8, 12])
                             .width(cosmic::iced::Length::Fill)
                             .class(cosmic::theme::Button::Text),
                         )
-                        .push(widget::text::body("—").width(cosmic::iced::Length::Fixed(76.0))
-                            .align_x(cosmic::iced::Alignment::End))
-                        .push(widget::text::body("—").width(cosmic::iced::Length::Fixed(90.0))
-                            .align_x(cosmic::iced::Alignment::End))
+                        .push(
+                            widget::text::body("—")
+                                .width(cosmic::iced::Length::Fixed(76.0))
+                                .align_x(cosmic::iced::Alignment::End),
+                        )
+                        .push(
+                            widget::text::body("—")
+                                .width(cosmic::iced::Length::Fixed(90.0))
+                                .align_x(cosmic::iced::Alignment::End),
+                        )
                         .push(widget::Space::new().width(cosmic::iced::Length::Fixed(108.0)))
-                        .push(copy_menu_title_button(light.name.clone(), self.copy_feedback.as_ref()))
+                        .push(copy_menu_title_button(
+                            light.name.clone(),
+                            self.copy_feedback.as_ref(),
+                        ))
                         .push(widget::container(toggle).width(cosmic::iced::Length::Fixed(52.0)));
                     let mut card = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
@@ -7641,19 +7657,26 @@ impl cosmic::Application for AppModel {
                         .add(heading);
                     if expanded {
                         card = card.add(
-                            widget::container(widget::text::caption(if !light.reachable
-                                || light.on.is_none() {
-                                "Hue Bridge · Light unavailable"
-                            } else if light.on == Some(true) {
-                                "Hue Bridge · Light on · No power meter"
-                            } else {
-                                "Hue Bridge · Light off · No power meter"
-                            })).padding([8, 12]),
+                            widget::container(widget::text::caption(
+                                if !light.reachable || light.on.is_none() {
+                                    "Hue Bridge · Light unavailable"
+                                } else if light.on == Some(true) {
+                                    "Hue Bridge · Light on · No power meter"
+                                } else {
+                                    "Hue Bridge · Light off · No power meter"
+                                },
+                            ))
+                            .padding([8, 12]),
                         );
                     }
-                    device_sort_metadata.insert(row_key.clone(), (light.name.to_lowercase(), None, None));
-                    menu_cards.push((row_key, widget::container(card)
-                        .width(cosmic::iced::Length::Fill).into()));
+                    device_sort_metadata
+                        .insert(row_key.clone(), (light.name.to_lowercase(), None, None));
+                    menu_cards.push((
+                        row_key,
+                        widget::container(card)
+                            .width(cosmic::iced::Length::Fill)
+                            .into(),
+                    ));
                 }
 
                 // Hue motion sensors share the same device-list columns. Lux
@@ -7662,16 +7685,20 @@ impl cosmic::Application for AppModel {
                     let device_key = format!("hue-sensor-{}", sensor.id);
                     let row_key = hue_device_list_key("sensor", &sensor.id);
                     let expanded = is_device_expanded(&self.expanded_devices, &device_key);
-                    let temperature = sensor.temperature_c
+                    let temperature = sensor
+                        .temperature_c
                         .filter(|_| sensor.reachable)
                         .map(|value| format_temperature(value, &self.settings.temperature_unit))
                         .unwrap_or_else(|| "—".into());
-                    let lux = sensor.illuminance_lux
+                    let lux = sensor
+                        .illuminance_lux
                         .filter(|_| sensor.reachable)
-                        .map(|value| if value >= 100.0 {
-                            format!("{value:.0} lx")
-                        } else {
-                            format!("{value:.1} lx")
+                        .map(|value| {
+                            if value >= 100.0 {
+                                format!("{value:.0} lx")
+                            } else {
+                                format!("{value:.1} lx")
+                            }
                         })
                         .unwrap_or_else(|| "—".into());
                     let motion = if !sensor.reachable {
@@ -7699,26 +7726,39 @@ impl cosmic::Application for AppModel {
                                             .push(widget::text::body(sensor.name.clone()))
                                             .push(widget::text::caption("Hue · Sensor")),
                                     )
-                                    .push(widget::icon::from_name(if expanded {
-                                        "go-up-symbolic"
-                                    } else {
-                                        "go-down-symbolic"
-                                    }).size(16)),
+                                    .push(
+                                        widget::icon::from_name(if expanded {
+                                            "go-up-symbolic"
+                                        } else {
+                                            "go-down-symbolic"
+                                        })
+                                        .size(16),
+                                    ),
                             )
                             .on_press(Message::ToggleDeviceDetails(device_key))
                             .padding([8, 12])
                             .width(cosmic::iced::Length::Fill)
                             .class(cosmic::theme::Button::Text),
                         )
-                        .push(widget::text::body("—").width(cosmic::iced::Length::Fixed(76.0))
-                            .align_x(cosmic::iced::Alignment::End))
-                        .push(widget::text::body(keep_value_unit_together(temperature))
-                            .width(cosmic::iced::Length::Fixed(90.0))
-                            .align_x(cosmic::iced::Alignment::End))
-                        .push(widget::text::caption(keep_value_unit_together(lux.clone()))
-                            .width(cosmic::iced::Length::Fixed(108.0))
-                            .align_x(cosmic::iced::Alignment::End))
-                        .push(copy_menu_title_button(sensor.name.clone(), self.copy_feedback.as_ref()))
+                        .push(
+                            widget::text::body("—")
+                                .width(cosmic::iced::Length::Fixed(76.0))
+                                .align_x(cosmic::iced::Alignment::End),
+                        )
+                        .push(
+                            widget::text::body(keep_value_unit_together(temperature))
+                                .width(cosmic::iced::Length::Fixed(90.0))
+                                .align_x(cosmic::iced::Alignment::End),
+                        )
+                        .push(
+                            widget::text::caption(keep_value_unit_together(lux.clone()))
+                                .width(cosmic::iced::Length::Fixed(108.0))
+                                .align_x(cosmic::iced::Alignment::End),
+                        )
+                        .push(copy_menu_title_button(
+                            sensor.name.clone(),
+                            self.copy_feedback.as_ref(),
+                        ))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fixed(52.0)));
                     let mut card = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
@@ -7732,7 +7772,7 @@ impl cosmic::Application for AppModel {
                                     .push(widget::text::caption(format!("Motion · {motion}")))
                                     .push(widget::text::caption(format!("Illuminance · {lux}")))
                                     .push(widget::text::caption(
-                                        "Hue Bridge · Sensor · No measured W or power history"
+                                        "Hue Bridge · Sensor · No measured W or power history",
                                     )),
                             )
                             .padding([8, 12]),
@@ -7740,10 +7780,18 @@ impl cosmic::Application for AppModel {
                     }
                     device_sort_metadata.insert(
                         row_key.clone(),
-                        (sensor.name.to_lowercase(), None, sensor.temperature_c.filter(|_| sensor.reachable)),
+                        (
+                            sensor.name.to_lowercase(),
+                            None,
+                            sensor.temperature_c.filter(|_| sensor.reachable),
+                        ),
                     );
-                    menu_cards.push((row_key, widget::container(card)
-                        .width(cosmic::iced::Length::Fill).into()));
+                    menu_cards.push((
+                        row_key,
+                        widget::container(card)
+                            .width(cosmic::iced::Length::Fill)
+                            .into(),
+                    ));
                 }
 
                 if let Some(power_sections) = total_power_overview(
@@ -7783,7 +7831,9 @@ impl cosmic::Application for AppModel {
                     menu_cards.push((
                         "2-hue-bridge-placeholder".into(),
                         widget::container(widget::text::caption(note))
-                            .padding([8, 12]).width(cosmic::iced::Length::Fill).into(),
+                            .padding([8, 12])
+                            .width(cosmic::iced::Length::Fill)
+                            .into(),
                     ));
                 }
                 menu_cards.retain(|(key, _)| {
@@ -7829,11 +7879,14 @@ impl cosmic::Application for AppModel {
                         }
                     };
                     let section_position = |key: &str| {
-                        self.settings.menu_order.iter()
+                        self.settings
+                            .menu_order
+                            .iter()
                             .position(|candidate| candidate == section(key))
                             .unwrap_or(usize::MAX)
                     };
-                    section_position(left).cmp(&section_position(right))
+                    section_position(left)
+                        .cmp(&section_position(right))
                         .then_with(|| {
                             if !left.starts_with("2-") || !right.starts_with("2-") {
                                 return std::cmp::Ordering::Equal;
@@ -7843,9 +7896,13 @@ impl cosmic::Application for AppModel {
                             if inactive_cmp != std::cmp::Ordering::Equal {
                                 return inactive_cmp;
                             }
-                            let (Some((left_name, left_power, left_temperature)),
-                                 Some((right_name, right_power, right_temperature))) =
-                                (device_sort_metadata.get(left), device_sort_metadata.get(right))
+                            let (
+                                Some((left_name, left_power, left_temperature)),
+                                Some((right_name, right_power, right_temperature)),
+                            ) = (
+                                device_sort_metadata.get(left),
+                                device_sort_metadata.get(right),
+                            )
                             else {
                                 return std::cmp::Ordering::Equal;
                             };
@@ -7856,19 +7913,24 @@ impl cosmic::Application for AppModel {
                                     if descending { cmp.reverse() } else { cmp }
                                 }
                                 "power" => compare_optional_device_values(
-                                    *left_power, *right_power, descending
-                                ).then_with(|| left_name.cmp(right_name)),
+                                    *left_power,
+                                    *right_power,
+                                    descending,
+                                )
+                                .then_with(|| left_name.cmp(right_name)),
                                 "temperature" => compare_optional_device_values(
-                                    *left_temperature, *right_temperature, descending
-                                ).then_with(|| left_name.cmp(right_name)),
+                                    *left_temperature,
+                                    *right_temperature,
+                                    descending,
+                                )
+                                .then_with(|| left_name.cmp(right_name)),
                                 _ => std::cmp::Ordering::Equal,
                             }
                         })
                 });
                 let device_count = menu_cards
                     .iter()
-                    .filter(|(key, _)| key.starts_with("2-")
-                        && key != "2-hue-bridge-placeholder")
+                    .filter(|(key, _)| key.starts_with("2-") && key != "2-hue-bridge-placeholder")
                     .count();
                 let inactive_count = menu_cards
                     .iter()
@@ -7935,7 +7997,8 @@ impl cosmic::Application for AppModel {
                                     device_cards = device_cards.push(
                                         widget::container(widget::text::caption(format!(
                                             "Hue Bridge: {error}"
-                                        ))).padding([4, 12]),
+                                        )))
+                                        .padding([4, 12]),
                                     );
                                 } else if let Some(warning) = &self.hue_sensor_warning {
                                     device_cards = device_cards.push(
@@ -10777,12 +10840,27 @@ mod history_tests {
     fn device_sort_places_unmetered_hue_values_after_metered_values() {
         use std::cmp::Ordering;
         for descending in [false, true] {
-            assert_eq!(compare_optional_device_values(Some(16.0), None, descending), Ordering::Less);
-            assert_eq!(compare_optional_device_values(None, Some(16.0), descending), Ordering::Greater);
-            assert_eq!(compare_optional_device_values(None, None, descending), Ordering::Equal);
+            assert_eq!(
+                compare_optional_device_values(Some(16.0), None, descending),
+                Ordering::Less
+            );
+            assert_eq!(
+                compare_optional_device_values(None, Some(16.0), descending),
+                Ordering::Greater
+            );
+            assert_eq!(
+                compare_optional_device_values(None, None, descending),
+                Ordering::Equal
+            );
         }
-        assert_eq!(compare_optional_device_values(Some(1.0), Some(2.0), false), Ordering::Less);
-        assert_eq!(compare_optional_device_values(Some(1.0), Some(2.0), true), Ordering::Greater);
+        assert_eq!(
+            compare_optional_device_values(Some(1.0), Some(2.0), false),
+            Ordering::Less
+        );
+        assert_eq!(
+            compare_optional_device_values(Some(1.0), Some(2.0), true),
+            Ordering::Greater
+        );
     }
 
     #[test]
