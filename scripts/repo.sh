@@ -17,7 +17,7 @@ Usage:
       Run Rust formatting, compilation, lint and test checks locally.
 
   ./scripts/repo.sh publish-pages
-      Dispatch Pages publication (unavailable without gh-pages.yml).
+      Manually dispatch the GitHub Pages build, validation, and gh-pages publication workflow.
 
   ./scripts/repo.sh publish-release [patch|minor|major]
       Dispatch a release (unavailable without release.yml).
@@ -25,7 +25,7 @@ Usage:
   ./scripts/repo.sh build-release [ref]
       Dispatch package generation (unavailable without its workflow).
 
-      These commands explain that workflows are disabled before calling gh.
+      Release and packaging workflows remain disabled; their commands report that clearly.
       Local checks and packaging/build-linux-packages.sh remain available.
 
   ./scripts/repo.sh workflows
@@ -52,8 +52,7 @@ require_gh() {
 dispatch() {
   local workflow="$1"
   shift
-  # Workflow definitions were removed from this repository. Avoid misleading
-  # GitHub CLI/authentication errors when the requested workflow is absent.
+  # Fail early with a useful error when a particular workflow is absent.
   [[ -f "$REPO_ROOT/.github/workflows/$workflow" ]] ||
     die "GitHub Actions is disabled: .github/workflows/$workflow does not exist. Restore the workflow before using this command; use make check for local validation."
   require_gh
