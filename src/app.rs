@@ -5907,6 +5907,20 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption(
                         "Leave empty to use the system certificate store",
                     ))
+                    .push(
+                        widget::Row::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::text::body(
+                                "Allow invalid TLS certificates (FRITZ!Box only)",
+                            ))
+                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                            .push(widget::toggler(self.settings.allow_invalid_certs)
+                                .on_toggle(Message::AllowInvalidCertsChanged)),
+                    )
+                    .push(widget::text::caption(
+                        "Unsafe: disables certificate verification only for FRITZ!Box HTTPS. Prefer a trusted CA certificate. Other integrations have separate TLS policies.",
+                    ))
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::title3("Tasmota devices"))
                     .push(widget::text::caption(
@@ -6046,23 +6060,6 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption(
                         "Netatmo requires internet access. This applet supports read-only Weather Station modules, not Netatmo thermostats or cameras."
                     ))
-                    .push(widget::divider::horizontal::default())
-                    .push(
-                        widget::Row::new().width(cosmic::iced::Length::Fill)
-                            .width(cosmic::iced::Length::Fill)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(
-                                widget::text::body(crate::i18n::tr(
-                                    &self.settings.language,
-                                    "Allow invalid TLS certificates",
-                                ))
-                                .width(cosmic::iced::Length::Fill),
-                            )
-                            .push(
-                                widget::toggler(self.settings.allow_invalid_certs)
-                                    .on_toggle(Message::AllowInvalidCertsChanged),
-                            ),
-                    )
                     .push(widget::divider::horizontal::default())
             }
             if self.active_settings_section == Some("menu-order") {
@@ -13155,6 +13152,35 @@ mod history_tests {
             average_temperature_with_hue_c(&[], &[], &[solar], &[], &[], &[], true,),
             None
         );
+    }
+
+    #[test]
+    fn netatmo_outdoor_override_uses_only_live_outdoor_temperature() {
+        let sensor = NetatmoSensor {
+            id: "outdoor-1".into(),
+            name: "Garden".into(),
+            is_outdoor: true,
+            temperature_c: Some(8.5),
+            humidity_percent: None,
+            co2_ppm: None,
+            pressure_hpa: None,
+            noise_db: None,
+            rain_mm: None,
+            wind_kmh: None,
+            reachable: true,
+        };
+        let selected = "NETATMO:outdoor-1";
+        assert_eq!(selected_weather_temperature(&[], &[sensor.clone()], selected, 14.0), 8.5);
+        assert_eq!(selected_weather_temperature(&[], &[], selected, 14.0), 14.0);
+        assert_eq!(selected_weather_temperature(&[], &[NetatmoSensor {
+            reachable: false, ..sensor.clone()
+        }], selected, 14.0), 14.0);
+        assert_eq!(selected_weather_temperature(&[], &[NetatmoSensor {
+            temperature_c: None, ..sensor.clone()
+        }], selected, 14.0), 14.0);
+        assert_eq!(selected_weather_temperature(&[], &[NetatmoSensor {
+            is_outdoor: false, ..sensor
+        }], selected, 14.0), 14.0);
     }
 
     #[test]
