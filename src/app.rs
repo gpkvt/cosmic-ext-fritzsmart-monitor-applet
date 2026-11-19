@@ -5052,7 +5052,7 @@ impl cosmic::Application for AppModel {
                                 } else {
                                     "Pair Hue Bridge"
                                 })
-                                .on_press_maybe((!self.hue_pairing).then_some(Message::PairHueBridge)),
+                                .on_press(Message::PairHueBridge),
                             )
                             .push(
                                 widget::button::text("Refresh Hue lights")
@@ -5080,6 +5080,22 @@ impl cosmic::Application for AppModel {
                             ),
                     )
                     .push(widget::divider::horizontal::default())
+            }
+            if self.active_settings_section == Some("connection") {
+                if let Some(error) = &self.hue_error {
+                    content = content.push(widget::text::caption(format!(
+                        "Hue Bridge: {error}"
+                    )));
+                } else if self.hue_pairing {
+                    content = content.push(widget::text::caption(
+                        "Waiting for the Hue Bridge to authorize pairing…",
+                    ));
+                } else if !self.hue_lights.is_empty() {
+                    content = content.push(widget::text::caption(format!(
+                        "Hue Bridge connected · {} light(s) found",
+                        self.hue_lights.len()
+                    )));
+                }
             }
 
             if self.active_settings_section == Some("menu-order") {
