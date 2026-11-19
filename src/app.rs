@@ -1258,9 +1258,15 @@ fn daily_power_metrics_grid(
         return widget::Column::new()
             .spacing(10)
             .width(cosmic::iced::Length::Fill)
-            .push(daily_power_metric("TODAY OUTPUT", energy_display(today_output_wh)))
+            .push(daily_power_metric(
+                "TODAY OUTPUT",
+                energy_display(today_output_wh),
+            ))
             .push(widget::divider::horizontal::default())
-            .push(daily_power_metric("Y'DAY OUTPUT", energy_display(yesterday_output_wh)))
+            .push(daily_power_metric(
+                "Y'DAY OUTPUT",
+                energy_display(yesterday_output_wh),
+            ))
             .into();
     }
     let percent_display = |input: Option<f64>, output: Option<f64>| {
@@ -2020,7 +2026,11 @@ fn panel_power_source_label(
     match names.as_slice() {
         [name] => (*name).to_string(),
         [] => if input { "Power input" } else { "Power output" }.to_string(),
-        _ => format!("Total {}: {}", if input { "input" } else { "output" }, names.join(", ")),
+        _ => format!(
+            "Total {}: {}",
+            if input { "input" } else { "output" },
+            names.join(", ")
+        ),
     }
 }
 
@@ -3627,11 +3637,13 @@ fn menu_element_label(id: &str, has_input: bool) -> &'static str {
         "weather" => "Weather",
         "internet-bandwidth" => "Internet bandwidth",
         "devices" => "Devices",
-        "total-power-output" => if has_input {
-            "Total power input & output"
-        } else {
-            "Total power output"
-        },
+        "total-power-output" => {
+            if has_input {
+                "Total power input & output"
+            } else {
+                "Total power output"
+            }
+        }
         _ => "Unknown element",
     }
 }
@@ -5853,7 +5865,10 @@ impl cosmic::Application for AppModel {
                         "total-power-output" => "total-power-output",
                         _ => continue,
                     };
-                    let label = crate::i18n::tr(&self.settings.language, menu_element_label(id, has_input_device));
+                    let label = crate::i18n::tr(
+                        &self.settings.language,
+                        menu_element_label(id, has_input_device),
+                    );
                     let visible = !self
                         .settings
                         .hidden_menu_elements
@@ -12183,7 +12198,10 @@ mod history_tests {
         assert!(has_input_device(&settings));
         settings.input_ains.clear();
         assert!(!has_input_device(&settings));
-        assert_eq!(menu_element_label("total-power-output", false), "Total power output");
+        assert_eq!(
+            menu_element_label("total-power-output", false),
+            "Total power output"
+        );
         assert_eq!(
             menu_element_label("total-power-output", true),
             "Total power input & output"
@@ -12219,10 +12237,7 @@ mod history_tests {
             panel_power_source_label(&readings, &HashSet::new(), false),
             "Total output: Living room, Solar roof, Solar garage"
         );
-        assert_eq!(
-            panel_power_source_label(&[], &inputs, true),
-            "Power input"
-        );
+        assert_eq!(panel_power_source_label(&[], &inputs, true), "Power input");
     }
 
     #[test]
