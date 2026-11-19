@@ -118,6 +118,21 @@ for page in pages:
         }
         if set(safeguard_icons) != expected_icons or len(safeguard_icons) != 6:
             fail("index.html: safeguard icons must use all six dedicated SVG image assets")
+        compatibility_section = re.search(r'<section id="compatibility">(.*?)</section>', content, re.S)
+        if not compatibility_section:
+            fail("index.html: compatibility section is missing")
+        compatibility_icons = re.findall(
+            r'<div class="detail-icon"[^>]*>\s*<img src="icons/([a-z-]+\.svg)" alt="" width="28" height="28"></div>',
+            compatibility_section.group(1),
+        )
+        expected_compatibility_icons = {
+            "monitor.svg",
+            "router.svg",
+            "plug-zap.svg",
+            "cloud-sun.svg",
+        }
+        if set(compatibility_icons) != expected_compatibility_icons or len(compatibility_icons) != 4:
+            fail("index.html: all four compatibility cards must have dedicated SVG icons")
         hero_gallery = re.search(r'<div class="hero-gallery"[^>]*>(.*?)</div>', content, re.S)
         if not hero_gallery:
             fail("index.html: screenshot card gallery is missing")
