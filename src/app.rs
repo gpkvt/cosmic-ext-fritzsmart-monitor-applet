@@ -4,6 +4,7 @@ use crate::fritz::{
     fetch_fritz_data,
 };
 use crate::hue::{HueLight, HueSensor, HueSnapshot};
+use crate::netatmo::{NetatmoSensor, NetatmoSnapshot};
 use crate::weather::{
     WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather,
     fetch_weather_forecast, starry_night_overlay,
@@ -57,6 +58,11 @@ pub struct AppModel {
     hue_discovery_note: Option<String>,
     hue_pending: HashSet<String>,
     hue_next_refresh_at: Option<Instant>,
+    netatmo_sensors: Vec<NetatmoSensor>,
+    netatmo_error: Option<String>,
+    netatmo_loading: bool,
+    netatmo_next_refresh_at: Option<Instant>,
+    netatmo_generation: u64,
     internet_bandwidth: Option<FritzInternetBandwidth>,
     fritzbox_system_info: Option<FritzBoxSystemInfo>,
     bandwidth_history: VecDeque<(Instant, u64, u64)>,
@@ -163,6 +169,12 @@ pub enum Message {
     HueSnapshotLoaded(Result<HueSnapshot, String>),
     SetHueLightPower(String, bool),
     HueLightPowerFinished(String, Result<(), String>),
+    NetatmoClientIdChanged(String),
+    NetatmoClientSecretChanged(String),
+    NetatmoRefreshTokenChanged(String),
+    RefreshNetatmo,
+    NetatmoLoaded(u64, Result<NetatmoSnapshot, String>),
+    ToggleNetatmoVisible(String, bool),
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
@@ -4313,6 +4325,19 @@ impl cosmic::Application for AppModel {
                 cosmic::Action::App(Message::HueBridgesDiscovered(result))
             }));
         }
+        let netatmo_configured = !settings.netatmo_client_id.trim().is_empty()
+            && !settings.netatmo_client_secret.trim().is_empty()
+            && !settings.netatmo_refresh_token.trim().is_empty();
+        if netatmo_configured {
+            tasks.push(Task::perform(
+                crate::netatmo::fetch_stations(
+                    settings.netatmo_client_id.clone(),
+                    settings.netatmo_client_secret.clone(),
+                    settings.netatmo_refresh_token.clone(),
+                ),
+                |result| cosmic::Action::App(Message::NetatmoLoaded(0, result)),
+            ));
+        }
         if hue_configured {
             tasks.push(Task::perform(
                 crate::hue::fetch_snapshot(
@@ -4334,6 +4359,7 @@ impl cosmic::Application for AppModel {
                 selected_ains: initial_device_selection(&settings),
                 devices: known_devices,
                 hue_loading: hue_configured,
+                netatmo_loading: netatmo_configured,
                 hue_discovering: hue_auto_discover,
                 devices_loaded: saved_devices_loaded,
                 devices_loading: false,
@@ -4383,6 +4409,10 @@ impl cosmic::Application for AppModel {
             })
             || self.devices_loading
             || self.hue_loading
+            || self.netatmo_loading
+            || self.netatmo_next_refresh_at.is_some_and(|deadline| {
+                deadline.saturating_duration_since(now) <= Duration::from_secs(15)
+            })
             || self.hue_pairing
             || self.hue_discovering
             || self.hue_next_refresh_at.is_some_and(|deadline| {
@@ -9271,12 +9301,7 @@ impl cosmic::Application for AppModel {
                 .width(cosmic::iced::Length::Fill)
                 .height(cosmic::iced::Length::Fill)
                 .push(
-                    widget::container(sticky_header.push(icon_action_button(
-                        "window-close-symbolic",
-                        "Close menu",
-                        Message::TogglePopup,
-                    )))
-                    .padding([8, 12]),
+                    widget::container(sticky_header).padding([8, 12]),
                 )
                 .push(widget::divider::horizontal::default())
                 .push(scrollable_content)
@@ -9323,11 +9348,6 @@ impl cosmic::Application for AppModel {
                         "preferences-system-symbolic",
                         crate::i18n::tr(&self.settings.language, "Settings"),
                         Message::ToggleSettings,
-                    ))
-                    .push(icon_action_button(
-                        "window-close-symbolic",
-                        "Close menu",
-                        Message::TogglePopup,
                     )),
             )
             .padding([8, 12])
