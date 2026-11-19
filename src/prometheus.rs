@@ -278,9 +278,9 @@ pub fn serve() {
     let mut listener: Option<TcpListener> = None;
     let mut bind_failed = false;
     loop {
-        let (enabled, text) = SNAPSHOT.lock()
-            .map(|state| (state.enabled, state.text.clone()))
-            .unwrap_or((false, String::new()));
+        let enabled = SNAPSHOT.lock()
+            .map(|state| state.enabled)
+            .unwrap_or(false);
         if !enabled {
             listener = None;
             bind_failed = false;
