@@ -2696,8 +2696,7 @@ fn menu_element_label(id: &str) -> &'static str {
         "weather" => "Weather",
         "internet-bandwidth" => "Internet bandwidth",
         "devices" => "Devices",
-        "total-power-output" => "Total power out",
-        "total-power-input" => "Total power in",
+        "total-power-output" => "Total power input & output",
         _ => "Unknown element",
     }
 }
@@ -4712,7 +4711,6 @@ impl cosmic::Application for AppModel {
                         "internet-bandwidth" => "internet-bandwidth",
                         "devices" => "devices",
                         "total-power-output" => "total-power-output",
-                        "total-power-input" => "total-power-input",
                         _ => continue,
                     };
                     let label = crate::i18n::tr(&self.settings.language, menu_element_label(id));
@@ -4943,37 +4941,43 @@ impl cosmic::Application for AppModel {
                         if let Some(thresholds) = alert_thresholds {
                             device_row = device_row
                                 .push(widget::text::caption(format!(
-                                    "{}: {} °C",
+                                    "{}: {}",
                                     crate::i18n::tr(&self.settings.language, "Upper limit"),
-                                    thresholds.high_c
+                                    format_temperature(f64::from(thresholds.high_c), &self.settings.temperature_unit)
                                 )))
                                 .push(
-                                    widget::slider(0.0..=40.0, f32::from(thresholds.high_c), {
-                                        let ain = ain.clone();
-                                        move |value| {
-                                            Message::TemperatureAlertHighChanged(
-                                                ain.clone(),
-                                                value.round() as i16,
-                                            )
-                                        }
-                                    })
+                                    widget::slider(
+                                        if self.settings.temperature_unit == "F" { 32.0..=104.0 } else { 0.0..=40.0 },
+                                        temperature_in_unit(f64::from(thresholds.high_c), &self.settings.temperature_unit) as f32,
+                                        {
+                                            let ain = ain.clone();
+                                            let unit = self.settings.temperature_unit.clone();
+                                            move |value| {
+                                                let celsius = if unit == "F" { (f64::from(value) - 32.0) * 5.0 / 9.0 } else { f64::from(value) };
+                                                Message::TemperatureAlertHighChanged(ain.clone(), celsius.round() as i16)
+                                            }
+                                        },
+                                    )
                                     .step(1.0_f32),
                                 )
                                 .push(widget::text::caption(format!(
-                                    "{}: {} °C",
+                                    "{}: {}",
                                     crate::i18n::tr(&self.settings.language, "Lower limit"),
-                                    thresholds.low_c
+                                    format_temperature(f64::from(thresholds.low_c), &self.settings.temperature_unit)
                                 )))
                                 .push(
-                                    widget::slider(-10.0..=10.0, f32::from(thresholds.low_c), {
-                                        let ain = ain.clone();
-                                        move |value| {
-                                            Message::TemperatureAlertLowChanged(
-                                                ain.clone(),
-                                                value.round() as i16,
-                                            )
-                                        }
-                                    })
+                                    widget::slider(
+                                        if self.settings.temperature_unit == "F" { 14.0..=32.0 } else { -10.0..=0.0 },
+                                        temperature_in_unit(f64::from(thresholds.low_c), &self.settings.temperature_unit) as f32,
+                                        {
+                                            let ain = ain.clone();
+                                            let unit = self.settings.temperature_unit.clone();
+                                            move |value| {
+                                                let celsius = if unit == "F" { (f64::from(value) - 32.0) * 5.0 / 9.0 } else { f64::from(value) };
+                                                Message::TemperatureAlertLowChanged(ain.clone(), celsius.round() as i16)
+                                            }
+                                        },
+                                    )
                                     .step(1.0_f32),
                                 )
                                 .push(widget::text::caption(
