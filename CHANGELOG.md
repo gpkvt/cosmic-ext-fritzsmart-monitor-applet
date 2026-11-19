@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Documentation
+
+- Refresh the GitHub Pages homepage, compatibility and FAQ content for Netatmo Weather Stations, including the new outdoor temperature source, OAuth setup, cloud/credential boundaries, sensor histories and unsupported device types; expand the user guide and refresh the deployed Pages copy.
+
 ### Added
 
 - Support selecting a Netatmo outdoor (NAModule1) sensor as the outdoor weather temperature, sharing the single saved source setting with FRITZ!Box devices and falling back to OpenWeatherMap when Netatmo data is unavailable.
