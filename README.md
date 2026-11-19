@@ -34,7 +34,7 @@ The applet supports Philips Hue Bridges on the local network through the **CLIP 
 3. Select **Pair Hue Bridge**, then press the physical link button on the bridge (or press the button first). Pairing retries for about 30 seconds while waiting for button authorization. A clear error appears directly below the pairing controls if authorization fails. Alternatively, paste an existing Hue application key into the secure field.
 4. Open **Settings → Devices** to manage FRITZ!Box, Tasmota and Hue devices in one searchable list. Discovered Hue lights and sensors have persistent visibility checkboxes and share the saved +/− order controls with power meters; lights can also be switched here. Open **Devices** in the popup to view the same selected Hue devices alongside the metered devices, with temperature (°C/°F), lux and motion details where reported. **Discover devices** also refreshes the paired Hue Bridge; Bridge pairing and credentials remain under **Settings → Connection**.
 
-Hue sensor cards offer independent **Temperature** and **Illuminance** graphs. Only real temperature and lux samples are recorded in a separate `hue-sensors.json` history file; the selected graph time range and °C/°F unit are respected. Each graph can be collapsed independently and its state survives restarts. In **Settings → Devices**, each Hue sensor has optional **Temperature alerts**, with upper/lower threshold sliders and native notifications when valid readings cross a limit. Alerts are off by default and do not trigger on missing or offline measurements. The menu opens on a panel click, closes when clicking outside the popup, and can also be dismissed through its Close button or by clicking the panel entry again. Hovering a panel reading shows a COSMIC tooltip with its device name (or **Average temperature** for averaged readings) over the value only. Hovering does not open the main menu; clicking the panel opens or closes it. The installed desktop entry deliberately omits `X-CosmicHoverPopup`: COSMIC Panel treats the presence of that key as permission to **synthesize a click on hover**, including when the value is `Auto`. Omitting the key avoids unexpected popup grabs and keeps menu activation strictly click-only.
+Hue sensor cards offer independent **Temperature** and **Illuminance** graphs. Only real temperature and lux samples are recorded in a separate `hue-sensors.json` history file; the selected graph time range and °C/°F unit are respected. Each graph can be collapsed independently and its state survives restarts. In **Settings → Devices**, each Hue sensor has optional **Temperature alerts**, with upper/lower threshold sliders and native notifications when valid readings cross a limit. Alerts are off by default and do not trigger on missing or offline measurements. The menu opens on a panel click, closes when clicking outside the popup, and can also be dismissed through its Close button or by clicking the panel entry again. Hovering a panel reading shows a COSMIC tooltip with its device name (or **Average temperature** for averaged readings) over the value only. Hovering does not open the main menu; clicking the panel opens or closes it. The installed desktop entry deliberately omits `X-CosmicHoverPopup` because COSMIC Panel otherwise generates synthetic pointer clicks on hover; the panel row and its multiline children are shrink-wrapped after readings change. The installed desktop entry deliberately omits `X-CosmicHoverPopup`: COSMIC Panel treats the presence of that key as permission to **synthesize a click on hover**, including when the value is `Auto`. Omitting the key avoids unexpected popup grabs and keeps menu activation strictly click-only.
 
 When **Average temperature** is enabled for the panel, valid readings from visible, reachable Hue temperature sensors are included alongside selected FRITZ!Box readings. Sensors without live temperatures are excluded rather than counted as zero. Hue light and sensor readings refresh independently once per minute, as well as on manual refresh and after switching a light. When a bridge is unreachable, its known Hue devices remain listed as unavailable, their stale switch states and sensor readings are cleared, and an error appears without affecting power monitoring. Only private/local bridge IP addresses are accepted.
 
@@ -304,6 +304,27 @@ download links follow the latest published version.
 The applet does not need a third-party cloud service for its core FRITZ!Box monitoring. Keep credentials, API keys, router addresses and diagnostic details private when reporting issues.
 
 ## Troubleshooting
+
+### Panel readings briefly appear, then the applet disappears
+
+**Resolved in the reported COSMIC setup with v2.0.45.** The fix removes the `X-CosmicHoverPopup` desktop-entry key and conflicting `Fill` sizing from nested multiline panel rows. COSMIC Panel treats the **presence** of that desktop-entry key as a request for synthetic hover clicks, even when its value is `Auto`; the applet's menu is meant to open on **click**, not hover. Panel rows are now shrink-wrapped so live readings do not request incompatible surface widths.
+
+If updating from an older version, **reinstall the applet**, not just the executable: the corrected `.desktop` entry must replace the old copy. From a clean source checkout:
+
+```sh
+make install
+grep -H '^X-CosmicHoverPopup=' ~/.local/share/applications/com.gpkvt.FritzPowerMonitor.desktop \
+  || echo 'Click-only panel entry is installed'
+```
+
+The `grep` command should find **no matching key**. If you installed a system-wide Debian package, update that package and check `/usr/share/applications/com.gpkvt.FritzPowerMonitor.desktop` instead. A stale user-local desktop entry can override the system entry, so remove or update an outdated local override when applicable. Reload COSMIC Panel after updating the entry.
+
+If the applet still disappears, collect the applet's privacy-safe syslog stages and compare its PID with the panel process. The last successful device refresh is **not** by itself evidence that device loading caused the exit:
+
+```sh
+journalctl -b -t fritz-power-monitor -p debug -n 120 --no-pager
+pgrep -af 'fritz-power-monitor|cosmic-panel'
+```
 
 **The applet does not appear in COSMIC Settings**
 
