@@ -1924,6 +1924,25 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
             let base = settings.url.trim_end_matches('/');
             let devices_xml = fetch_device_list_xml(&client, base, &sid).await?;
             let mut fetched = parse_fetch_result_xml(&devices_xml, &selected_fritz)?;
+            // Re-read only absent devices (two retries after the first check).
+            // Healthy readings remain valid even if a subsequent request fails.
+            for _retry in 1..3 {
+                if fetched.missing_devices.is_empty() {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(350)).await;
+                if let Ok(xml) = fetch_device_list_xml(&client, base, &sid).await {
+                    let absent_ids: Vec<String> = fetched
+                        .missing_devices
+                        .iter()
+                        .map(|(ain, _)| ain.clone())
+                        .collect();
+                    if let Ok(retried) = parse_fetch_result_xml(&xml, &absent_ids) {
+                        fetched.readings.extend(retried.readings);
+                        fetched.missing_devices = retried.missing_devices;
+                    }
+                }
+            }
             let (device_info, wan_info) = tokio::join!(
                 tokio::time::timeout(Duration::from_secs(3), fetch_device_info(&client, base)),
                 tokio::time::timeout(Duration::from_secs(3), fetch_wan_link_info(&client, base)),
@@ -1990,6 +2009,27 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
                     .into_iter()
                     .filter(|device| wanted.contains(&normalize_ain_for_selection(&device.id)))
                     .collect();
+                // The persisted selection can contain devices that are missing
+                // from the current Tasmota address cache. Preserve their identity
+                // so the UI can display each device as inactive individually.
+                let available_ids: HashSet<String> = devices
+                    .iter()
+                    .map(|device| normalize_ain_for_selection(&device.id))
+                    .collect();
+                for ain in &selected_tasmota {
+                    if !available_ids.contains(&normalize_ain_for_selection(ain)) {
+                        let name = settings
+                            .known_devices
+                            .iter()
+                            .find(|device| {
+                                normalize_ain_for_selection(&device.ain)
+                                    == normalize_ain_for_selection(ain)
+                            })
+                            .map(|device| device.name.clone())
+                            .unwrap_or_else(|| ain.clone());
+                        result.missing_devices.push((ain.clone(), name));
+                    }
+                }
                 let (readings, errors) = crate::tasmota::fetch_readings(
                     &devices,
                     &settings.tasmota_username,
@@ -2009,17 +2049,17 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
                         power_controllable: true,
                         power_toggle_allowed: true,
                     }));
-                if !errors.is_empty() {
-                    result
-                        .missing_devices
-                        .push(("TASMOTA".into(), errors.join("; ")));
-                }
+                result.missing_devices.extend(errors);
             }
             Err(error) => {
-                if result.readings.is_empty() {
-                    fritz_error = Some(error.clone());
+                if selected_fritz.is_empty() {
+                    // No usable Tasmota inventory at all: surface a connection error,
+                    // rather than declaring all devices inactive without probing.
+                    fritz_error = Some(error);
                 } else {
-                    result.missing_devices.push(("TASMOTA".into(), error));
+                    // The FRITZ!Box readings are independent of Tasmota discovery.
+                    // A cache/discovery error does not establish which plug is offline.
+                    eprintln!("Could not resolve cached Tasmota devices: {error}");
                 }
             }
         }
@@ -2034,7 +2074,13 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
             .push(("FRITZ!Box".into(), error.clone()));
     }
 
-    if result.readings.is_empty() {
+    if result.readings.is_empty()
+        && !result.missing_devices.iter().any(|(ain, _)| {
+            selected_ains.iter().any(|selected| {
+                normalize_ain_for_selection(selected) == normalize_ain_for_selection(ain)
+            })
+        })
+    {
         return Err(
             fritz_error.unwrap_or_else(|| "No selected devices returned usable readings".into())
         );
