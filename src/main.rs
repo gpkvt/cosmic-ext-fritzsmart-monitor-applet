@@ -32,6 +32,11 @@ fn main() -> cosmic::iced::Result {
     let result = cosmic::applet::run::<app::AppModel>(());
     if result.is_err() {
         diagnostics::error("COSMIC applet runtime exited with an error");
+    } else {
+        // A clean exit means the applet was told to shut down, or its event
+        // loop finished. Distinguish it from an absent panic/segfault when
+        // diagnosing a panel item disappearing after readings arrive.
+        diagnostics::info("COSMIC applet event loop exited normally");
     }
     result
 }
