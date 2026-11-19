@@ -107,6 +107,8 @@ make install
 
 The panel menu opens on **click**, not hover, and closes when clicked outside or toggled from the panel entry. No separate close button is required.
 
+**Optional Netatmo weather details:** Under **Settings → Weather**, enable **Show additional Netatmo weather readings** to add live CO₂/air-quality (ppm), sound level (dB), and rainfall (mm) to the Weather details, each labeled with its Netatmo module. It is off by default; only visible, reachable modules contribute, and humidity, wind and pressure are not duplicated from OpenWeatherMap.
+
 **CO₂ notifications:** In **Settings → Devices**, a Netatmo module with CO₂ measurements exposes a toggle and an adjustable high threshold (600–5,000 ppm; default 1,200 ppm). Alerts are disabled by default, notify only when a valid reading rises from safe to above the limit, and re-arm after returning to the safe range. Missing or stale readings do not notify. Threshold changes reset the alarm baseline.
 
 **Outdoor temperature source:** In **Settings → Devices**, enable **Outdoor temperature source** on a Netatmo outdoor module (NAModule1) or a supported FRITZ!Box temperature device. Only one source can be active. The selected live value replaces the OpenWeatherMap temperature in the panel and Weather heading. If the source becomes unavailable, the OpenWeatherMap reading is used instead.
