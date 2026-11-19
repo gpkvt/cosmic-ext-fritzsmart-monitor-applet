@@ -4277,7 +4277,20 @@ mod tests {
             "de", "es", "nl", "fr", "it", "sv", "pt", "pl", "da", "no", "ja", "ko",
         ] {
             for key in keys {
-                assert_ne!(tr(locale, key), key, "missing {locale} translation: {key}");
+                // These native translations are legitimately spelled like English.
+                // All other untranslated UI strings must still fail this test.
+                let unchanged_by_design = matches!(
+                    (locale, key),
+                    ("nl" | "fr" | "pt", "Interface")
+                        | ("nl" | "fr", "maximum")
+                        | ("nl" | "fr" | "pl" | "da" | "no", "minimum")
+                        | ("fr", "Photo")
+                        | ("it", "Password")
+                        | ("sv" | "da", "Layout" | "Support")
+                );
+                if !unchanged_by_design {
+                    assert_ne!(tr(locale, key), key, "missing {locale} translation: {key}");
+                }
             }
         }
     }
