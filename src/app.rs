@@ -1000,10 +1000,10 @@ fn menu_energy_summary(
             .join(" ")
     };
     let sparkline = if points.is_empty() {
-        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 44"><path d="M4 22H356" fill="none" stroke="#888888" stroke-opacity=".45" stroke-width="2" stroke-linecap="round"/></svg>"#.to_string()
+        r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 44"><path d="M4 22H356" fill="none" stroke="#888888" stroke-opacity=".45" stroke-width="2" stroke-linecap="round"/></svg>"##.to_string()
     } else {
         format!(
-            r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 44"><polyline points="{points}" fill="none" stroke="#8ab4f8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>"#
+            r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 44"><polyline points="{points}" fill="none" stroke="#8ab4f8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>"##
         )
     };
     let graph: cosmic::Element<'static, Message> = widget::container(
