@@ -92,6 +92,18 @@ for page in pages:
             fail("index.html: standalone screenshot gallery must remain removed")
         if 'id="hero-lightbox"' not in content or "data-hero-lightbox" not in content or "showHeroScreenshot" not in content:
             fail("index.html: fanned hero cards must open the full-screen screenshot viewer")
+        for gallery_feature in (
+            'id="hero-lightbox-thumbnails"',
+            'id="hero-lightbox-counter"',
+            'class="hero-lightbox-thumb"',
+            "aria-current",
+            "event.key==='ArrowLeft'",
+            "event.key==='ArrowRight'",
+            "event.key==='Escape'",
+            "event.key==='Tab'",
+        ):
+            if gallery_feature not in content:
+                fail(f"index.html: fullscreen screenshot gallery is missing {gallery_feature}")
         safeguard_icons = re.findall(
             r'<div class="detail-icon"[^>]*>\s*<img src="icons/([a-z-]+\.svg)" alt="" width="28" height="28"></div>',
             content,
