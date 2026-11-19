@@ -11924,12 +11924,12 @@ mod history_tests {
         let selected = vec!["111111".into()];
         let sensors = vec![sensor.clone()];
         assert_eq!(
-            average_temperature_with_hue_c(&[reading.clone()], &selected, &sensors, &[], false,),
+            average_temperature_with_hue_c(std::slice::from_ref(&reading), &selected, &sensors, &[], false,),
             Some(22.0)
         );
         let hidden = vec![hue_device_id("sensor", &sensor.id)];
         assert_eq!(
-            average_temperature_with_hue_c(&[reading.clone()], &selected, &sensors, &hidden, false,),
+            average_temperature_with_hue_c(std::slice::from_ref(&reading), &selected, &sensors, &hidden, false,),
             Some(20.0)
         );
         let offline = HueSensor {
