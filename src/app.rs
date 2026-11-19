@@ -2471,14 +2471,10 @@ fn total_power_overview(
         crate::i18n::tr(&settings.language, "TOTAL POWER INPUT")
     );
     let graph = if has_input_readings {
-        let (output_aligned, input_aligned) = aligned_power_series(
-            &history.iter().copied().collect(),
-            &input_history,
-        );
         interactive_combined_graph_with_axis(
             &graph_title,
-            if output_aligned.is_empty() { output_values } else { output_aligned },
-            if input_aligned.is_empty() { input_values } else { input_aligned },
+            output_values,
+            input_values,
             &settings.graph_style,
             "W",
             axis_start,
@@ -7026,8 +7022,6 @@ impl cosmic::Application for AppModel {
                         "devices"
                     } else if key.starts_with("3-") {
                         "total-power-output"
-                    } else if key.starts_with("4-") {
-                        "total-power-input"
                     } else if key.starts_with("5-") {
                         "history"
                     } else {
@@ -7051,8 +7045,6 @@ impl cosmic::Application for AppModel {
                         "devices"
                     } else if key.starts_with("3-") {
                         "total-power-output"
-                    } else if key.starts_with("4-") {
-                        "total-power-input"
                     } else if key.starts_with("5-") {
                         "history"
                     } else {
@@ -10373,6 +10365,7 @@ mod history_tests {
         assert_eq!(format_graph_y_tick(123.4, "W"), "123");
         assert_eq!(format_graph_y_tick(12.34, "W"), "12.3");
         assert_eq!(format_graph_y_tick(21.26, "°C"), "21.3");
+        assert_eq!(format_graph_y_tick(70.26, "°F"), "70.3");
         assert_eq!(format_graph_y_tick(8.26, "Mb/s"), "8.3");
     }
 
