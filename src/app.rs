@@ -117,6 +117,7 @@ pub enum Message {
     TogglePopup,
     PopupClosed(Id),
     PopupMonitorSize(Id, Option<f32>),
+    TooltipSurfaceAction(cosmic::surface::Action<Message>),
     Refresh,
     ClockTick,
     CopyFeedbackTick,
@@ -1245,6 +1246,7 @@ fn daily_power_metrics_grid(
     today_output_wh: Option<f64>,
     yesterday_input_wh: Option<f64>,
     yesterday_output_wh: Option<f64>,
+    has_input_device: bool,
 ) -> cosmic::Element<'static, Message> {
     let energy_display = |value: Option<f64>| {
         value
@@ -1252,6 +1254,15 @@ fn daily_power_metrics_grid(
             .map(|value| format!("{value:.0} Wh"))
             .unwrap_or_else(|| "— Wh".to_string())
     };
+    if !has_input_device {
+        return widget::Column::new()
+            .spacing(10)
+            .width(cosmic::iced::Length::Fill)
+            .push(daily_power_metric("TODAY OUTPUT", energy_display(today_output_wh)))
+            .push(widget::divider::horizontal::default())
+            .push(daily_power_metric("Y'DAY OUTPUT", energy_display(yesterday_output_wh)))
+            .into();
+    }
     let percent_display = |input: Option<f64>, output: Option<f64>| {
         energy_input_output_ratio_percent(input, output)
             .map(|value| format!("{value:.1}%"))
@@ -1322,13 +1333,23 @@ fn daily_energy_history_section(
     input_ains: &HashSet<String>,
     refresh_interval_seconds: u32,
     collapsed: bool,
+    has_input_device: bool,
     copy_feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
     let history = daily_energy_history(device_history, input_ains, refresh_interval_seconds);
     // The last entry always represents today, including a missing-data day.
-    let today_percentage = history
+    let today_summary = history
         .last()
-        .map(|(_, input, output)| format_daily_energy_percentage(*input, *output))
+        .map(|(_, input, output)| {
+            if has_input_device {
+                format_daily_energy_percentage(*input, *output)
+            } else {
+                output
+                    .filter(|wh| wh.is_finite())
+                    .map(|wh| format!("{wh:.0} Wh"))
+                    .unwrap_or_else(|| "—".to_string())
+            }
+        })
         .unwrap_or_else(|| "—".to_string());
     let mut heading_content = widget::Row::new()
         .spacing(8)
@@ -1337,7 +1358,7 @@ fn daily_energy_history_section(
         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
     if collapsed {
         heading_content =
-            heading_content.push(widget::text::body(format!("Today · {today_percentage}")));
+            heading_content.push(widget::text::body(format!("Today · {today_summary}")));
     }
     let heading = widget::button::custom(
         heading_content.push(
@@ -1368,18 +1389,22 @@ fn daily_energy_history_section(
         .push(heading_row);
     if !collapsed {
         let value_width = cosmic::iced::Length::Fixed(104.0);
-        let header = widget::Row::new()
+        let mut header = widget::Row::new()
             .spacing(8)
             .align_y(cosmic::iced::Alignment::Center)
             .padding([4, 12])
-            .push(widget::text::caption("DAY").width(cosmic::iced::Length::Fill))
-            .push(widget::text::caption("SOLAR INPUT").width(value_width))
-            .push(widget::text::caption("GRID USE").width(value_width))
-            .push(
+            .push(widget::text::caption("DAY").width(cosmic::iced::Length::Fill));
+        if has_input_device {
+            header = header.push(widget::text::caption("SOLAR INPUT").width(value_width));
+        }
+        header = header.push(widget::text::caption("GRID USE").width(value_width));
+        if has_input_device {
+            header = header.push(
                 widget::text::caption("IN / OUT %")
                     .width(cosmic::iced::Length::Fixed(96.0))
                     .align_x(cosmic::iced::Alignment::End),
             );
+        }
         let mut rows = widget::Column::new()
             .spacing(2)
             .push(header)
@@ -1395,20 +1420,23 @@ fn daily_energy_history_section(
                     .map(|wh| format!("{wh:.0} Wh"))
                     .unwrap_or_else(|| "—".into())
             };
-            rows = rows.push(
-                widget::Row::new()
-                    .spacing(8)
-                    .align_y(cosmic::iced::Alignment::Center)
-                    .padding([3, 12])
-                    .push(widget::text::body(date_label).width(cosmic::iced::Length::Fill))
-                    .push(widget::text::body(format_wh(solar_wh)).width(value_width))
-                    .push(widget::text::body(format_wh(grid_wh)).width(value_width))
-                    .push(
-                        widget::text::body(format_daily_energy_percentage(solar_wh, grid_wh))
-                            .width(cosmic::iced::Length::Fixed(96.0))
-                            .align_x(cosmic::iced::Alignment::End),
-                    ),
-            );
+            let mut row = widget::Row::new()
+                .spacing(8)
+                .align_y(cosmic::iced::Alignment::Center)
+                .padding([3, 12])
+                .push(widget::text::body(date_label).width(cosmic::iced::Length::Fill));
+            if has_input_device {
+                row = row.push(widget::text::body(format_wh(solar_wh)).width(value_width));
+            }
+            row = row.push(widget::text::body(format_wh(grid_wh)).width(value_width));
+            if has_input_device {
+                row = row.push(
+                    widget::text::body(format_daily_energy_percentage(solar_wh, grid_wh))
+                        .width(cosmic::iced::Length::Fixed(96.0))
+                        .align_x(cosmic::iced::Alignment::End),
+                );
+            }
+            rows = rows.push(row);
         }
         section = section.push(rows);
         section = section.push(
@@ -1969,6 +1997,33 @@ fn interactive_graph_inner(
         Message::ShowGraph(title.to_string(), values, unit.to_string(), axis_start),
     )
 }
+/// Device roles are saved independently of reachability. A configured input
+/// keeps the solar UI visible when its readings are temporarily unavailable.
+fn has_input_device(settings: &FritzSettings) -> bool {
+    !settings.input_ains.is_empty()
+}
+
+/// Tooltip on a panel power value names its contributing devices. An
+/// aggregate sum is labelled as a total, never as an average.
+fn panel_power_source_label(
+    readings: &[FritzReading],
+    input_ains: &HashSet<String>,
+    input: bool,
+) -> String {
+    let names: Vec<&str> = readings
+        .iter()
+        .filter(|reading| {
+            input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain)) == input
+        })
+        .map(|reading| reading.name.as_str())
+        .collect();
+    match names.as_slice() {
+        [name] => (*name).to_string(),
+        [] => if input { "Power input" } else { "Power output" }.to_string(),
+        _ => format!("Total {}: {}", if input { "input" } else { "output" }, names.join(", ")),
+    }
+}
+
 fn input_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64 {
     readings
         .iter()
@@ -2529,6 +2584,7 @@ struct LivePowerSummaryData {
     language: String,
     axis_start: String,
     history_collapsed: bool,
+    has_input_device: bool,
 }
 
 fn live_power_summary(
@@ -2549,6 +2605,7 @@ fn live_power_summary(
         language,
         axis_start,
         history_collapsed,
+        has_input_device,
     } = data;
 
     // Keep the current-power card focused on energy flow and aggregate input/output history.
@@ -2592,26 +2649,43 @@ fn live_power_summary(
     );
     if !history_collapsed {
         let output_label = crate::i18n::tr(&language, "TOTAL POWER OUTPUT");
-        let input_label = crate::i18n::tr(&language, "TOTAL POWER INPUT");
-        let combined_title = format!("{output_label} & {input_label}");
-        content = content
-            .push(interactive_combined_graph_with_axis(
-                &combined_title,
-                output_history,
-                input_history,
-                &graph_style,
-                "W",
-                axis_start,
-                (output_label, input_label),
-            ))
-            .push(menu_power_flow_summary(
-                current_input_w,
-                current_output_w,
-                today_input_wh,
-                today_output_wh,
-                yesterday_input_wh,
-                yesterday_output_wh,
-            ));
+        if has_input_device {
+            let input_label = crate::i18n::tr(&language, "TOTAL POWER INPUT");
+            let combined_title = format!("{output_label} & {input_label}");
+            content = content
+                .push(interactive_combined_graph_with_axis(
+                    &combined_title,
+                    output_history,
+                    input_history,
+                    &graph_style,
+                    "W",
+                    axis_start,
+                    (output_label, input_label),
+                ))
+                .push(menu_power_flow_summary(
+                    current_input_w,
+                    current_output_w,
+                    today_input_wh,
+                    today_output_wh,
+                    yesterday_input_wh,
+                    yesterday_output_wh,
+                ));
+        } else {
+            content = content
+                .push(interactive_graph_with_axis(
+                    &language,
+                    output_label,
+                    output_history.into_iter(),
+                    &graph_style,
+                    "W",
+                    axis_start,
+                ))
+                .push(menu_energy_values(
+                    Some(current_output_w),
+                    yesterday_output_wh,
+                    today_output_wh,
+                ));
+        }
     }
     surface_card(content.into(), 14)
 }
@@ -2749,6 +2823,7 @@ fn daily_power_metric_trends(
     refresh_interval_seconds: u32,
     style: &str,
     collapsed_sections: &HashSet<String>,
+    has_input_device: bool,
     copy_feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
     let daily = daily_energy_history(device_history, input_ains, refresh_interval_seconds);
@@ -2758,13 +2833,14 @@ fn daily_power_metric_trends(
         .iter()
         .filter_map(|(_, input, output)| energy_input_output_ratio_percent(*input, *output))
         .collect();
-    widget::Column::new()
+    let mut trends = widget::Column::new()
         .spacing(12)
         .width(cosmic::iced::Length::Fill)
         .push(widget::text::caption(
             "DAILY ENERGY TRENDS · LAST 7 DAYS (RECORDED DAYS ONLY)",
-        ))
-        .push(daily_metric_trend(
+        ));
+    if has_input_device {
+        trends = trends.push(daily_metric_trend(
             "INPUT · Wh",
             "graph-overview-daily-input",
             collapsed_sections.contains("graph-overview-daily-input"),
@@ -2772,17 +2848,19 @@ fn daily_power_metric_trends(
             "Wh",
             style,
             copy_feedback,
-        ))
-        .push(daily_metric_trend(
-            "OUTPUT · Wh",
-            "graph-overview-daily-output",
-            collapsed_sections.contains("graph-overview-daily-output"),
-            &output,
-            "Wh",
-            style,
-            copy_feedback,
-        ))
-        .push(daily_metric_trend(
+        ));
+    }
+    trends = trends.push(daily_metric_trend(
+        "OUTPUT · Wh",
+        "graph-overview-daily-output",
+        collapsed_sections.contains("graph-overview-daily-output"),
+        &output,
+        "Wh",
+        style,
+        copy_feedback,
+    ));
+    if has_input_device {
+        trends = trends.push(daily_metric_trend(
             "INPUT / OUTPUT · %",
             "graph-overview-daily-ratio",
             collapsed_sections.contains("graph-overview-daily-ratio"),
@@ -2790,8 +2868,9 @@ fn daily_power_metric_trends(
             "%",
             style,
             copy_feedback,
-        ))
-        .into()
+        ));
+    }
+    trends.into()
 }
 
 fn total_power_overview(
@@ -2859,8 +2938,9 @@ fn total_power_overview(
     let collapsed = collapsed_sections.contains("total-power-overview");
     // Construct graphs only when this section is visible. This also avoids
     // rebuilding expensive SVGs while the entire overview is collapsed.
+    let has_input = has_input_device(settings);
     let content = (!collapsed).then(|| {
-        widget::Column::new()
+        let mut content = widget::Column::new()
             .spacing(10)
             .width(cosmic::iced::Length::Fill)
             .push(daily_power_metrics_grid(
@@ -2868,6 +2948,7 @@ fn total_power_overview(
                 output_today_wh,
                 input_yesterday_wh,
                 output_yesterday_wh,
+                has_input,
             ))
             .push(widget::divider::horizontal::default())
             .push(power_metrics_row(
@@ -2877,18 +2958,19 @@ fn total_power_overview(
                 output_low_label,
                 output_high_label,
                 current_output.clone(),
-            ))
-            .push(power_metrics_row(
+            ));
+        if has_input {
+            content = content.push(power_metrics_row(
                 "INPUT LOW",
                 "INPUT HIGH",
                 "NOW INPUT",
                 input_low_label,
                 input_high_label,
                 current_input.clone(),
-            ))
+            ));
+        }
+        content = content
             .push(widget::divider::horizontal::default())
-            // Current/low/high are derived from the exact same recorded W series.
-            // Give input and output their own full-width, zoomable graphs.
             .push(widget::text::caption(
                 "LIVE POWER · LOW, HIGH & NOW IN RECORDED W HISTORY",
             ))
@@ -2896,9 +2978,7 @@ fn total_power_overview(
                 "OUTPUT POWER HISTORY",
                 "graph-overview-output-power",
                 collapsed_sections.contains("graph-overview-output-power"),
-                if collapsed_sections.contains("graph-overview-output-power")
-                    || collapsed_sections.contains("total-power-overview")
-                {
+                if collapsed_sections.contains("graph-overview-output-power") {
                     widget::text("").into()
                 } else {
                     interactive_graph_with_axis(
@@ -2919,14 +2999,13 @@ fn total_power_overview(
                     )
                 },
                 copy_feedback,
-            ))
-            .push(collapsible_graph(
+            ));
+        if has_input {
+            content = content.push(collapsible_graph(
                 "INPUT POWER HISTORY",
                 "graph-overview-input-power",
                 collapsed_sections.contains("graph-overview-input-power"),
-                if collapsed_sections.contains("graph-overview-input-power")
-                    || collapsed_sections.contains("total-power-overview")
-                {
+                if collapsed_sections.contains("graph-overview-input-power") {
                     widget::text("").into()
                 } else if input_history.is_empty() {
                     widget::text::caption("No measured input samples").into()
@@ -2951,7 +3030,9 @@ fn total_power_overview(
                     )
                 },
                 copy_feedback,
-            ))
+            ));
+        }
+        content
             .push(widget::divider::horizontal::default())
             .push(daily_power_metric_trends(
                 device_history,
@@ -2959,6 +3040,7 @@ fn total_power_overview(
                 settings.refresh_interval_seconds,
                 &settings.graph_style,
                 collapsed_sections,
+                has_input,
                 copy_feedback,
             ))
     });
@@ -2967,18 +3049,23 @@ fn total_power_overview(
     let mut heading_content = widget::Row::new()
         .spacing(8)
         .align_y(cosmic::iced::Alignment::Center)
-        .push(widget::text::body("TOTAL POWER INPUT & OUTPUT"))
+        .push(widget::text::body(if has_input {
+            "TOTAL POWER INPUT & OUTPUT"
+        } else {
+            "TOTAL POWER OUTPUT"
+        }))
         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
     if collapsed {
-        heading_content = heading_content
-            .push(widget::text::body(format!(
+        if has_input {
+            heading_content = heading_content.push(widget::text::body(format!(
                 "IN {}",
                 keep_value_unit_together(current_input)
-            )))
-            .push(widget::text::body(format!(
-                "OUT {}",
-                keep_value_unit_together(current_output)
             )));
+        }
+        heading_content = heading_content.push(widget::text::body(format!(
+            "OUT {}",
+            keep_value_unit_together(current_output)
+        )));
     }
     let heading = widget::button::custom(
         heading_content.push(
@@ -2999,7 +3086,12 @@ fn total_power_overview(
         .align_y(cosmic::iced::Alignment::Center)
         .push(heading)
         .push(copy_menu_title_button(
-            "TOTAL POWER INPUT & OUTPUT".to_string(),
+            if has_input {
+                "TOTAL POWER INPUT & OUTPUT"
+            } else {
+                "TOTAL POWER OUTPUT"
+            }
+            .to_string(),
             copy_feedback,
         ));
     let mut section = widget::Column::new()
@@ -3529,13 +3621,17 @@ fn format_bandwidth(bits_per_second: u64) -> String {
     format!("{} Mb/s", format_compact_decimal(megabits_per_second))
 }
 
-fn menu_element_label(id: &str) -> &'static str {
+fn menu_element_label(id: &str, has_input: bool) -> &'static str {
     match id {
         "summary" => "Live power summary",
         "weather" => "Weather",
         "internet-bandwidth" => "Internet bandwidth",
         "devices" => "Devices",
-        "total-power-output" => "Total power input & output",
+        "total-power-output" => if has_input {
+            "Total power input & output"
+        } else {
+            "Total power output"
+        },
         _ => "Unknown element",
     }
 }
@@ -4424,7 +4520,7 @@ impl cosmic::Application for AppModel {
 
         // Keep every reading at its intrinsic width. Expanding each child to
         // Fill inside the horizontal panel row pushes later readings off-screen.
-        let panel_item = |_label: &'static str,
+        let panel_item = |tooltip_label: String,
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>,
                           icon_at_top: bool|
@@ -4471,7 +4567,16 @@ impl cosmic::Application for AppModel {
             // to the left. In paired rows this creates a shared left edge;
             // standalone rows retain their intrinsic width because the row
             // itself remains shrink-wrapped.
-            let mut value = widget::container(value)
+            // Use COSMIC's dedicated tooltip surface on the *value* only.
+            // Hover never sends TogglePopup: the main menu remains click-only.
+            let tooltip_value = self.core.applet.applet_tooltip(
+                value,
+                tooltip_label,
+                false,
+                Message::TooltipSurfaceAction,
+                self.core.main_window_id(),
+            );
+            let mut value = widget::container(tooltip_value)
                 .width(if align_value_column {
                     cosmic::iced::Length::Fill
                 } else {
@@ -4501,7 +4606,17 @@ impl cosmic::Application for AppModel {
             panel_items.push((
                 "weather",
                 panel_item(
-                    "Weather",
+                    self.readings
+                        .iter()
+                        .find(|reading| {
+                            crate::fritz::normalize_ain_for_selection(&reading.ain)
+                                == crate::fritz::normalize_ain_for_selection(
+                                    &self.settings.weather_temperature_ain,
+                                )
+                                && reading.temperature_c.is_finite()
+                        })
+                        .map(|reading| reading.name.clone())
+                        .unwrap_or_else(|| "Outdoor weather".to_string()),
                     Some(
                         widget::icon::from_name(weather.icon_name())
                             .size(
@@ -4550,7 +4665,11 @@ impl cosmic::Application for AppModel {
                 panel_items.push((
                     "power-consumption",
                     panel_item(
-                        "Power OUT",
+                        panel_power_source_label(
+                            &self.readings,
+                            &self.settings.input_ains,
+                            false,
+                        ),
                         Some(
                             widget::svg(widget::svg::Handle::from_memory(
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v5M16 3v5"/><path d="M6 8h12v3a6 6 0 0 1-6 6h0a6 6 0 0 1-6-6V8Z"/><path d="M12 17v2a3 3 0 0 0 3 3h1"/></svg>"#.to_vec(),
@@ -4568,13 +4687,18 @@ impl cosmic::Application for AppModel {
                     .into(),
                 ));
             }
-            if panel_item_is_enabled(&self.settings, "solar-power")
+            if has_input_device(&self.settings)
+                && panel_item_is_enabled(&self.settings, "solar-power")
                 && let Some(input_power) = input_power
             {
                 panel_items.push((
                     "solar-power",
                     panel_item(
-                        "Power IN",
+                        panel_power_source_label(
+                            &self.readings,
+                            &self.settings.input_ains,
+                            true,
+                        ),
                         Some(
                             widget::svg(widget::svg::Handle::from_memory(
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 2-5h14l2 5H3Z"/><path d="M4 9h16l-2 11H6L4 9Z"/><path d="M8 9l1 11M16 9l-1 11M5 13h14M6 17h12"/><path d="M12 1v2M2 5l2 1M22 5l-2 1"/></svg>"#.to_vec(),
@@ -4610,7 +4734,7 @@ impl cosmic::Application for AppModel {
                 // layout used by every other reading.
                 let bandwidth_row = |label: &'static str, icon: &'static str, value: String| {
                     panel_item(
-                        label,
+                        label.to_string(),
                         Some(widget::icon::from_name(icon).size(10).into()),
                         panel_value(keep_value_unit_together(value)),
                         false,
@@ -4640,7 +4764,13 @@ impl cosmic::Application for AppModel {
                 panel_items.push((
                     "temperature",
                     panel_item(
-                        "Temperature",
+                        if self.settings.panel_average_temperature {
+                            "Average temperature".to_string()
+                        } else {
+                            primary_reading
+                                .map(|reading| reading.name.clone())
+                                .unwrap_or_else(|| "Temperature".to_string())
+                        },
                         Some(
                             widget::svg(widget::svg::Handle::from_memory(
                                 br#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z"/><path d="M12 11v6"/></svg>"#.to_vec(),
@@ -4739,7 +4869,7 @@ impl cosmic::Application for AppModel {
         // Keep connection health visible even when the popup is closed.
         if self.error.is_some() {
             content = content.push(panel_item(
-                "Connection error",
+                "Connection error".to_string(),
                 Some(
                     widget::icon::from_name("dialog-warning-symbolic")
                         .size(self.settings.panel_text_size.into())
@@ -4751,7 +4881,7 @@ impl cosmic::Application for AppModel {
         }
         if self.weather_error.is_some() {
             content = content.push(panel_item(
-                "Weather unavailable",
+                "Weather unavailable".to_string(),
                 Some(
                     widget::icon::from_name("weather-severe-alert-symbolic")
                         .size(self.settings.panel_text_size.into())
@@ -4971,11 +5101,7 @@ impl cosmic::Application for AppModel {
 
         // The applet popup keeps its compact layout; expanded graphs use the
         // dedicated native window above.
-        let has_input_device = self.readings.iter().any(|reading| {
-            self.settings
-                .input_ains
-                .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
-        });
+        let has_input_device = has_input_device(&self.settings);
         let mut content = widget::Column::new()
             .spacing(10)
             .padding(12)
@@ -5279,10 +5405,7 @@ impl cosmic::Application for AppModel {
                     .settings
                     .panel_order
                     .iter()
-                    .filter(|item| {
-                        item.as_str() != "solar-power"
-                            || (has_input_device && !self.settings.panel_net_power)
-                    })
+                    .filter(|item| item.as_str() != "solar-power" || has_input_device)
                     .collect();
                 let visible_panel_order_ids: Vec<String> = visible_panel_order
                     .iter()
@@ -5730,7 +5853,7 @@ impl cosmic::Application for AppModel {
                         "total-power-output" => "total-power-output",
                         _ => continue,
                     };
-                    let label = crate::i18n::tr(&self.settings.language, menu_element_label(id));
+                    let label = crate::i18n::tr(&self.settings.language, menu_element_label(id, has_input_device));
                     let visible = !self
                         .settings
                         .hidden_menu_elements
@@ -7515,11 +7638,21 @@ impl cosmic::Application for AppModel {
                             aligned_power_series(&self.history, &input).1
                         },
                         output_history: {
-                            let input = rebuild_input_power_history(
-                                &self.device_history,
-                                &self.settings.input_ains,
-                            );
-                            aligned_power_series(&self.history, &input).0
+                            if has_input_device {
+                                let input = rebuild_input_power_history(
+                                    &self.device_history,
+                                    &self.settings.input_ains,
+                                );
+                                aligned_power_series(&self.history, &input).0
+                            } else {
+                                // Without an input device there is nothing to
+                                // align against. Use the measured output series
+                                // directly rather than producing an empty graph.
+                                self.history
+                                    .iter()
+                                    .map(|(time, watts)| (*time, *watts as f64))
+                                    .collect()
+                            }
                         },
                         current_input_w: input_display_power_w(input_power_w(
                             &self.readings,
@@ -7542,6 +7675,7 @@ impl cosmic::Application for AppModel {
                         history_collapsed: self
                             .collapsed_menu_sections
                             .contains("current-power-history"),
+                        has_input_device,
                     },
                     self.copy_feedback.as_ref(),
                 );
@@ -8413,6 +8547,7 @@ impl cosmic::Application for AppModel {
                         self.settings.refresh_interval_seconds,
                         self.collapsed_menu_sections
                             .contains("daily-energy-history"),
+                        has_input_device,
                         self.copy_feedback.as_ref(),
                     ),
                 ));
@@ -9136,6 +9271,9 @@ impl cosmic::Application for AppModel {
 
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
+            Message::TooltipSurfaceAction(action) => {
+                return Task::done(cosmic::Action::Surface(action));
+            }
             Message::ShowGraph(title, values, unit, _axis_start) => {
                 self.history_graph_devices.clear();
                 self.history_graph_index = None;
@@ -12030,6 +12168,61 @@ mod history_tests {
 
         set_panel_item_visibility(&mut hidden, "temperature", false);
         assert!(!panel_item_is_visible(&hidden, "temperature"));
+    }
+
+    #[test]
+    fn solar_ui_depends_on_configured_input_not_live_reachability() {
+        let mut settings = FritzSettings::default();
+        assert!(!has_input_device(&settings));
+        // The only way to enable the solar UI is to designate an input role.
+        settings.input_ains.insert("123456".to_string());
+        assert!(has_input_device(&settings));
+        // No currently reachable readings: retain controls and historical data.
+        let offline_readings: Vec<FritzReading> = Vec::new();
+        assert!(offline_readings.is_empty());
+        assert!(has_input_device(&settings));
+        settings.input_ains.clear();
+        assert!(!has_input_device(&settings));
+        assert_eq!(menu_element_label("total-power-output", false), "Total power output");
+        assert_eq!(
+            menu_element_label("total-power-output", true),
+            "Total power input & output"
+        );
+    }
+
+    #[test]
+    fn panel_power_tooltips_name_one_device_and_label_multiple_as_totals() {
+        let reading = |ain: &str, name: &str| FritzReading {
+            ain: ain.to_string(),
+            name: name.to_string(),
+            power_w: 100,
+            temperature_c: 20.0,
+            power_state: None,
+            power_controllable: false,
+            power_toggle_allowed: false,
+        };
+        let readings = [
+            reading("11:11-11", "Living room"),
+            reading("22:22-22", "Solar roof"),
+            reading("33:33-33", "Solar garage"),
+        ];
+        let inputs = HashSet::from(["222222".to_string(), "333333".to_string()]);
+        assert_eq!(
+            panel_power_source_label(&readings, &inputs, false),
+            "Living room"
+        );
+        assert_eq!(
+            panel_power_source_label(&readings, &inputs, true),
+            "Total input: Solar roof, Solar garage"
+        );
+        assert_eq!(
+            panel_power_source_label(&readings, &HashSet::new(), false),
+            "Total output: Living room, Solar roof, Solar garage"
+        );
+        assert_eq!(
+            panel_power_source_label(&[], &inputs, true),
+            "Power input"
+        );
     }
 
     #[test]
