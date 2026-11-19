@@ -7646,11 +7646,9 @@ impl cosmic::Application for AppModel {
                 } else {
                     Vec::new()
                 };
-                let extra_rows = netatmo_metrics.len().div_ceil(2);
-                // The fixed photo previously clipped content at 260 px.
-                // Expand all layers together, including the night overlay.
-                let weather_card_height = 260.0 + extra_rows as f32 * 68.0
-                    + if extra_rows > 0 { 34.0 } else { 0.0 };
+                // Keep the original photo size regardless of Netatmo module count.
+                // The extra readings scroll inside the existing weather image.
+                let weather_card_height = 260.0;
                 if !netatmo_metrics.is_empty() {
                     let mut extra = widget::Column::new()
                         .spacing(8)
@@ -7731,7 +7729,10 @@ impl cosmic::Application for AppModel {
                                 self.copy_feedback.as_ref(),
                             )),
                     )
-                    .push(weather_details);
+                    .push(
+                        widget::scrollable(weather_details)
+                            .height(cosmic::iced::Length::Fill),
+                    );
                 let current_image_handle = weather
                     .slideshow_sequence
                     .get(self.weather_slideshow_index)
