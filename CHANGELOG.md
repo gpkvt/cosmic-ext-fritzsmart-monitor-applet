@@ -1,5 +1,7 @@
 # Changelog
 
+- Unify the Total Power Input & Output large-value layout: daily IN/OUT/percentage values first, input/output LOW/HIGH in the same visual style, and larger NOW readings last at the bottom without nested metric cards.
+
 - Add a standalone Cargo release-build workflow for Rust changes, pull requests and manual runs, verifying the binary and retaining a short-lived build artifact.
 
 - Show TODAY and Y'DAY input, output and input/output percentage as large values in a two-row, three-column grid in Total Power Input & Output, retaining the low/high readings.
