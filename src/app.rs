@@ -8885,7 +8885,6 @@ impl cosmic::Application for AppModel {
                             .push(widget::text::caption(format!("Rain · {}", fmt(sensor.rain_mm, "mm"))))
                             .push(widget::text::caption(format!("Wind · {}", fmt(sensor.wind_kmh, "km/h"))))
                             .push(widget::text::caption("No wattage or power history: Netatmo Weather Stations do not measure mains power."));
-                        let mut details = details;
                         for (metric, label, unit) in crate::netatmo::METRICS {
                             if crate::netatmo::metric_value(sensor, metric).is_some()
                                 || self.netatmo_history.get(&sensor.id)
