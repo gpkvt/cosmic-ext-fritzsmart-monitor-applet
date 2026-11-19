@@ -9967,10 +9967,11 @@ mod history_tests {
         settings.panel_internet_bandwidth = false;
         assert!(!panel_item_is_enabled(&settings, "internet-bandwidth"));
 
-        // Solar is available independently, but never while net power is active.
+        // Input and output stay independently available, even when the
+        // legacy net-power setting is enabled.
         assert!(panel_item_is_enabled(&settings, "solar-power"));
         settings.panel_net_power = true;
-        assert!(!panel_item_is_enabled(&settings, "solar-power"));
+        assert!(panel_item_is_enabled(&settings, "solar-power"));
     }
 
     #[test]
