@@ -2,6 +2,13 @@
 
 All notable changes to FRITZ!Power Monitor are recorded below. See [GitHub Releases](https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases) for published versions.
 
+## v3.0.1 — 2026-11-19
+
+### Fixed
+
+- Use the available monitor height for the applet menu instead of limiting it to 85%, keeping it anchored outside its source panel and allowing the Wayland compositor to resize it vertically around display constraints such as the COSMIC dock. Preserve the fixed header/footer and scrollable menu and settings content.
+- Restore Wikimedia Commons links for weather backgrounds: keep the current image's source-file link visible beneath the photo and move expanded credits, file links and license terms outside the fixed-height clipped image overlay.
+
 ## v3.0.0 — 2026-11-19
 
 ### Highlights
