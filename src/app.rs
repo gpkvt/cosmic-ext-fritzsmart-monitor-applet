@@ -1012,7 +1012,9 @@ fn menu_energy_summary(
             .width(cosmic::iced::Length::Fill)
             .height(cosmic::iced::Length::Fixed(44.0)),
     )
-    .width(cosmic::iced::Length::Fill)
+    // Reserve explicit space for the figures alongside the graph. A plain
+    // Fill here consumed the entire row and pushed the values out of view.
+    .width(cosmic::iced::Length::FillPortion(3))
     .into();
     let value_row = |label: &'static str, value: Option<f64>, unit: &'static str| {
         let display = value
@@ -1031,7 +1033,7 @@ fn menu_energy_summary(
     };
     let values = widget::Column::new()
         .spacing(2)
-        .width(cosmic::iced::Length::Fixed(150.0))
+        .width(cosmic::iced::Length::FillPortion(2))
         .push(value_row("CURRENT", current_power_w, "W"))
         .push(value_row("Y'DAY", yesterday_wh, "Wh"))
         .push(value_row("TODAY", today_wh, "Wh"));
