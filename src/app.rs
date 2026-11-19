@@ -2835,6 +2835,54 @@ fn hue_device_is_visible(hidden: &[String], id: &str) -> bool {
         .any(|item| crate::fritz::canonical_device_key(item) == key)
 }
 
+fn hue_settings_card(
+    id: String,
+    name: String,
+    visible: bool,
+    details: String,
+    language: &str,
+    light_control: Option<cosmic::Element<'static, Message>>,
+) -> cosmic::Element<'static, Message> {
+    let selection_id = id.clone();
+    let header = widget::Row::new()
+        .spacing(6)
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(
+            widget::checkbox(visible)
+                .label(name)
+                .on_toggle(move |checked| {
+                    Message::ToggleHueDeviceVisible(selection_id.clone(), checked)
+                }),
+        )
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+        .push(icon_action_button(
+            "+",
+            crate::i18n::tr(language, "Move device up"),
+            Message::MoveDevice(id.clone(), true),
+        ))
+        .push(icon_action_button(
+            "−",
+            crate::i18n::tr(language, "Move device down"),
+            Message::MoveDevice(id, false),
+        ));
+    let mut content = widget::Column::new()
+        .spacing(6)
+        .push(header)
+        .push(widget::text::caption(details));
+    if let Some(control) = light_control {
+        content = content.push(
+            widget::Row::new()
+                .width(cosmic::iced::Length::Fill)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(widget::text::caption("Light power"))
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(control),
+        );
+    }
+    surface_card(content.into(), 8)
+}
+
 enum SettingsDeviceEntry<'a> {
     Metered(&'a FritzDevice),
     HueLight(&'a HueLight),
@@ -5299,24 +5347,33 @@ impl cosmic::Application for AppModel {
                     widget::text_input("Search devices by name or ID", &self.device_search)
                         .on_input(Message::DeviceSearchChanged),
                 );
-                if !self.devices.is_empty() {
-                    content = content.push(widget::text::caption(crate::i18n::tr(
-                        &self.settings.language,
-                        "Use a selected FRITZ!Box device's sensor reading instead of the outdoor temperature reported by OpenWeatherMap.",
-                    )));
-                    let mut ordered_devices: Vec<&FritzDevice> = self.devices.iter().collect();
-                    ordered_devices.sort_by_key(|device| {
-                        device_order_position(&self.settings.device_order, &device.ain)
+                if !self.devices.is_empty()
+                    || !self.hue_lights.is_empty()
+                    || !self.hue_sensors.is_empty()
+                {
+                    content = content.push(widget::text::caption(
+                        "Select visible devices and use +/− to arrange their saved order. Power-meter input and temperature alerts are only available where supported.",
+                    ));
+                    let mut ordered_devices: Vec<SettingsDeviceEntry<'_>> = self
+                        .devices
+                        .iter()
+                        .map(SettingsDeviceEntry::Metered)
+                        .chain(self.hue_lights.iter().map(SettingsDeviceEntry::HueLight))
+                        .chain(self.hue_sensors.iter().map(SettingsDeviceEntry::HueSensor))
+                        .collect();
+                    ordered_devices.sort_by_key(|entry| {
+                        device_order_position(&self.settings.device_order, &entry.device_id())
                     });
-                    ordered_devices
-                        .retain(|device| device_matches_search(device, &self.device_search));
+                    ordered_devices.retain(|entry| entry.matches_search(&self.device_search));
                     if ordered_devices.is_empty() {
                         content = content.push(widget::text::caption(crate::i18n::tr(
                             &self.settings.language,
                             "No devices match your search",
                         )));
                     }
-                    for device in ordered_devices.iter() {
+                    for entry in ordered_devices {
+                        match entry {
+                        SettingsDeviceEntry::Metered(device) => {
                         let selected = self.selected_ains.iter().any(|selected_ain| {
                             crate::fritz::normalize_ain_for_selection(selected_ain)
                                 == crate::fritz::normalize_ain_for_selection(&device.ain)
@@ -5525,10 +5582,106 @@ impl cosmic::Application for AppModel {
                                 ));
                         }
                         content = content.push(surface_card(device_row.into(), 8));
+                        }
+                        SettingsDeviceEntry::HueLight(light) => {
+                            let id = hue_device_id("light", &light.id);
+                            let visible = hue_device_is_visible(
+                                &self.settings.hidden_hue_devices, &id
+                            );
+                            let status = if !light.reachable || light.on.is_none() {
+                                "Unavailable"
+                            } else if light.on == Some(true) {
+                                "On"
+                            } else {
+                                "Off"
+                            };
+                            let light_control: cosmic::Element<'static, Message> =
+                                if light.reachable
+                                    && light.on.is_some()
+                                    && !self.hue_pending.contains(&light.id)
+                                {
+                                    let light_id = light.id.clone();
+                                    widget::toggler(light.on.unwrap_or(false))
+                                        .on_toggle(move |enabled| {
+                                            Message::SetHueLightPower(light_id.clone(), enabled)
+                                        })
+                                        .into()
+                                } else {
+                                    widget::toggler(light.on.unwrap_or(false)).into()
+                                };
+                            content = content.push(hue_settings_card(
+                                id,
+                                light.name.clone(),
+                                visible,
+                                format!("Hue Bridge · Light · {status} · No measured W"),
+                                &self.settings.language,
+                                Some(light_control),
+                            ));
+                        }
+                        SettingsDeviceEntry::HueSensor(sensor) => {
+                            let id = hue_device_id("sensor", &sensor.id);
+                            let visible = hue_device_is_visible(
+                                &self.settings.hidden_hue_devices, &id
+                            );
+                            let temperature = sensor.temperature_c
+                                .filter(|_| sensor.reachable)
+                                .map(|value| format_temperature(value, &self.settings.temperature_unit))
+                                .unwrap_or_else(|| "—".to_string());
+                            let lux = sensor.illuminance_lux
+                                .filter(|_| sensor.reachable)
+                                .map(|value| if value >= 100.0 {
+                                    format!("{value:.0} lx")
+                                } else {
+                                    format!("{value:.1} lx")
+                                })
+                                .unwrap_or_else(|| "—".to_string());
+                            let motion = if !sensor.reachable {
+                                "Unavailable"
+                            } else {
+                                match sensor.motion {
+                                    Some(true) => "Motion detected",
+                                    Some(false) => "No motion",
+                                    None => "Motion unavailable",
+                                }
+                            };
+                            content = content.push(hue_settings_card(
+                                id,
+                                sensor.name.clone(),
+                                visible,
+                                format!("Hue Bridge · Sensor · {temperature} · {lux} · {motion} · No measured W"),
+                                &self.settings.language,
+                                None,
+                            ));
+                        }
+                        }
                     }
                 } else if self.devices_loaded {
                     content = content.push(widget::text::caption(
-                        "No compatible devices found. Check the FRITZ!Box connection and Tasmota credentials in Connection, then search again.",
+                        "No devices found. Check the connections and scan again.",
+                    ));
+                }
+                if !self.settings.hue_bridge_ip.trim().is_empty() {
+                    content = content.push(widget::divider::horizontal::default());
+                    if let Some(error) = &self.hue_error {
+                        content = content.push(widget::text::caption(format!(
+                            "Hue Bridge: {error}"
+                        )));
+                    } else if self.hue_lights.is_empty() && self.hue_sensors.is_empty() {
+                        content = content.push(widget::text::caption(
+                            if self.hue_loading {
+                                "Loading Hue devices from the bridge…"
+                            } else {
+                                "No Hue devices discovered. Pair the bridge in Connection and scan again."
+                            },
+                        ));
+                    }
+                    if let Some(warning) = &self.hue_sensor_warning {
+                        content = content.push(widget::text::caption(warning.clone()));
+                    }
+                    content = content.push(action_button(
+                        "view-refresh-symbolic",
+                        "Refresh Hue lights",
+                        Message::RefreshHueLights,
                     ));
                 }
             }
