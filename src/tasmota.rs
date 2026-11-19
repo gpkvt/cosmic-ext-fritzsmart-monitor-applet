@@ -48,7 +48,7 @@ pub struct TasmotaReading {
     pub power_state: Option<bool>,
 }
 
-fn is_tasmota_service(info: &mdns_sd::ServiceInfo) -> bool {
+fn is_tasmota_service(info: &mdns_sd::ResolvedService) -> bool {
     let identity_matches = [info.get_fullname(), info.get_hostname()]
         .iter()
         .any(|value| value.to_ascii_lowercase().contains("tasmota"));
@@ -181,11 +181,11 @@ fn discover_services(scan_duration: Duration) -> Result<Vec<(String, u16, IpAddr
                 }
             ));
             for address in info.get_addresses() {
-                if matches!(address, IpAddr::V4(_)) {
+                if matches!(address.to_ip_addr(), IpAddr::V4(_)) {
                     found.insert((
                         info.get_hostname().trim_end_matches('.').to_string(),
                         info.get_port(),
-                        *address,
+                        address.to_ip_addr(),
                     ));
                 }
             }
