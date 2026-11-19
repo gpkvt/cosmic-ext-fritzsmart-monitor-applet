@@ -68,6 +68,41 @@ pub fn language(setting: &str) -> &'static str {
 /// Translate an English source string; unknown strings fall back to English.
 pub fn tr(setting: &str, key: &'static str) -> &'static str {
     let lang = language(setting);
+    // Device-inventory cleanup is offered in every supported UI language.
+    if key == "Remove inactive devices" {
+        return match lang {
+            "de" => "Inaktive Geräte entfernen",
+            "es" => "Eliminar dispositivos inactivos",
+            "nl" => "Inactieve apparaten verwijderen",
+            "fr" => "Supprimer les appareils inactifs",
+            "it" => "Rimuovi dispositivi inattivi",
+            "sv" => "Ta bort inaktiva enheter",
+            "pt" => "Remover dispositivos inativos",
+            "pl" => "Usuń nieaktywne urządzenia",
+            "da" => "Fjern inaktive enheder",
+            "no" => "Fjern inaktive enheter",
+            "ja" => "非アクティブなデバイスを削除",
+            "ko" => "비활성 장치 제거",
+            _ => "Remove inactive devices",
+        };
+    }
+    if key == "Remove confirmed-offline devices from the saved list. They can be discovered again." {
+        return match lang {
+            "de" => "Bestätigt offline befindliche Geräte aus der gespeicherten Liste entfernen. Eine erneute Suche fügt sie wieder hinzu.",
+            "es" => "Quita de la lista los dispositivos sin conexión confirmados. Puedes redescubrirlos.",
+            "nl" => "Verwijder bevestigde offline apparaten uit de opgeslagen lijst. Je kunt ze opnieuw zoeken.",
+            "fr" => "Retirez les appareils confirmés hors ligne de la liste enregistrée. Vous pourrez les redécouvrir.",
+            "it" => "Rimuove i dispositivi confermati offline dall'elenco salvato. Puoi rilevarli di nuovo.",
+            "sv" => "Ta bort bekräftat frånkopplade enheter från den sparade listan. De kan hittas igen.",
+            "pt" => "Remove os dispositivos confirmados como offline da lista guardada. Pode descobri-los novamente.",
+            "pl" => "Usuń potwierdzone urządzenia offline z zapisanej listy. Można je ponownie wykryć.",
+            "da" => "Fjern bekræftede offlineenheder fra den gemte liste. De kan findes igen.",
+            "no" => "Fjern bekreftede frakoblede enheter fra den lagrede listen. De kan oppdages igjen.",
+            "ja" => "オフラインと確認されたデバイスを保存済みリストから削除します。再検出できます。",
+            "ko" => "오프라인으로 확인된 장치를 저장된 목록에서 제거합니다. 다시 검색할 수 있습니다.",
+            _ => "Remove confirmed-offline devices from the saved list. They can be discovered again.",
+        };
+    }
     if lang != "de" {
         return match (lang, key) {
             // Spanish

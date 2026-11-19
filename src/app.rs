@@ -213,6 +213,7 @@ pub enum Message {
     DiscoverDevices,
     DevicesLoaded(Result<Vec<FritzDevice>, String>),
     RemoveDevice(String),
+    RemoveInactiveDevices,
     DeviceSearchChanged(String),
     ToggleDevice(String, bool),
     ToggleHueDeviceVisible(String, bool),
@@ -535,6 +536,33 @@ fn newly_missing_devices(
     // a transient transition does not trigger a delayed duplicate notification.
     *previously_missing = current;
     newly_missing
+}
+
+/// Return only persisted, selected and confirmed-missing metered devices.
+/// A pending/failed refresh is not proof that every saved device is inactive,
+/// and a live reading always wins over an obsolete missing-device marker.
+fn inactive_saved_device_ids(
+    devices: &[FritzDevice],
+    selected_ains: &[String],
+    missing_ains: &HashSet<String>,
+    readings: &[FritzReading],
+) -> Vec<String> {
+    let selected: HashSet<String> = selected_ains
+        .iter()
+        .map(|id| crate::fritz::canonical_device_key(id))
+        .collect();
+    let live: HashSet<String> = readings
+        .iter()
+        .map(|reading| crate::fritz::canonical_device_key(&reading.ain))
+        .collect();
+    devices
+        .iter()
+        .filter(|device| {
+            let id = crate::fritz::canonical_device_key(&device.ain);
+            selected.contains(&id) && missing_ains.contains(&id) && !live.contains(&id)
+        })
+        .map(|device| device.ain.clone())
+        .collect()
 }
 
 fn clear_confirmed_power_changes(
@@ -4244,6 +4272,36 @@ impl AppModel {
         self.persist_settings();
     }
 
+    /// Single source of truth for removing saved FRITZ!/Tasmota device
+    /// references. Called once per device for both individual and bulk removal;
+    /// callers persist after their entire operation is complete.
+    fn forget_saved_device(&mut self, ain: &str) {
+        let canonical = crate::fritz::canonical_device_key(ain);
+        let same_device = |id: &str| crate::fritz::canonical_device_key(id) == canonical;
+        self.missing_device_ains.remove(&canonical);
+        self.devices.retain(|device| !same_device(&device.ain));
+        self.selected_ains.retain(|selected| !same_device(selected));
+        self.settings.known_devices = self.devices.clone();
+        self.settings.ains = self.selected_ains.clone();
+        self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
+        self.settings.device_selection_initialized = true;
+        self.settings.device_order.retain(|id| !same_device(id));
+        self.settings.input_ains.retain(|id| !same_device(id));
+        self.settings.temperature_alerts.retain(|id, _| !same_device(id));
+        self.temperature_alert_state.retain(|id, _| !same_device(id));
+        self.pending_power_changes.retain(|id| !same_device(id));
+        self.pending_power_targets.retain(|id, _| !same_device(id));
+        self.expanded_devices.remove(&canonical);
+        self.collapsed_menu_sections.retain(|id| {
+            id.strip_prefix("device-graph-pair-")
+                .is_none_or(|device_id| !same_device(device_id))
+        });
+        if same_device(&self.settings.weather_temperature_ain) {
+            self.settings.weather_temperature_ain.clear();
+            self.settings.weather_temperature_source_initialized = true;
+        }
+    }
+
     fn schedule_settings_save(&mut self) {
         // Reordering can emit several updates during a drag. Persist once the
         // user has stopped moving items instead of writing on every step.
@@ -6356,6 +6414,38 @@ impl cosmic::Application for AppModel {
                     crate::i18n::tr(&self.settings.language, "Discover devices"),
                     Message::DiscoverDevices,
                 ));
+                // Only offer bulk removal for devices independently confirmed
+                // inactive by the last successful poll, not merely unselected
+                // or temporarily absent from an in-progress discovery.
+                let inactive_saved_devices = inactive_saved_device_ids(
+                    &self.devices,
+                    &self.selected_ains,
+                    &self.missing_device_ains,
+                    &self.readings,
+                );
+                if !self.devices_loading && !inactive_saved_devices.is_empty() {
+                    content = content.push(
+                        widget::Column::new()
+                            .spacing(4)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(action_button(
+                                "edit-delete-symbolic",
+                                crate::i18n::tr(
+                                    &self.settings.language,
+                                    "Remove inactive devices",
+                                ),
+                                Message::RemoveInactiveDevices,
+                            ))
+                            .push(widget::text::caption(format!(
+                                "{} · {}",
+                                inactive_saved_devices.len(),
+                                crate::i18n::tr(
+                                    &self.settings.language,
+                                    "Remove confirmed-offline devices from the saved list. They can be discovered again.",
+                                ),
+                            ))),
+                    );
+                }
                 if self.devices_loading {
                     content = content.push(widget::text::caption(
                         "Searching FRITZ!Box, Tasmota and configured Hue Bridge…",
@@ -12350,38 +12440,42 @@ impl cosmic::Application for AppModel {
                 }
             }
             Message::RemoveDevice(ain) => {
-                let normalized = crate::fritz::normalize_ain_for_selection(&ain);
-                self.missing_device_ains
-                    .remove(&crate::fritz::canonical_device_key(&ain));
-                self.devices.retain(|device| {
-                    crate::fritz::normalize_ain_for_selection(&device.ain) != normalized
-                });
-                self.selected_ains.retain(|selected| {
-                    crate::fritz::normalize_ain_for_selection(selected) != normalized
-                });
-                self.settings.known_devices = self.devices.clone();
-                self.settings.ains = self.selected_ains.clone();
-                self.settings.ain = self.selected_ains.first().cloned().unwrap_or_default();
-                self.settings
-                    .device_order
-                    .retain(|id| crate::fritz::normalize_ain_for_selection(id) != normalized);
-                self.settings.input_ains.remove(&normalized);
-                self.settings.temperature_alerts.remove(&normalized);
-                self.expanded_devices
-                    .remove(&crate::fritz::canonical_device_key(&ain));
-                self.collapsed_menu_sections
-                    .remove(&format!("device-graph-pair-{normalized}"));
-                if crate::fritz::normalize_ain_for_selection(&self.settings.weather_temperature_ain)
-                    == normalized
-                {
-                    self.settings.weather_temperature_ain.clear();
-                    self.settings.weather_temperature_source_initialized = true;
-                }
+                self.forget_saved_device(&ain);
                 self.persist_layout_state();
                 record_diagnostic_event(
                     &mut self.diagnostic_events,
                     format!("Device removed from saved inventory by user: {ain}."),
                 );
+            }
+            Message::RemoveInactiveDevices => {
+                if self.devices_loading {
+                    return Task::none();
+                }
+                let ids = inactive_saved_device_ids(
+                    &self.devices,
+                    &self.selected_ains,
+                    &self.missing_device_ains,
+                    &self.readings,
+                );
+                if !ids.is_empty() {
+                    for ain in &ids {
+                        self.forget_saved_device(ain);
+                    }
+                    // Save once so selected devices, inventory and ordering are
+                    // persisted together; never discard historical graph data.
+                    self.persist_layout_state();
+                    record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        format!("Removed {} confirmed inactive saved device(s).", ids.len()),
+                    );
+                    if self.settings_saved_until.is_some() {
+                        self.settings_status = Some(format!(
+                            "{}: {}",
+                            crate::i18n::tr(&self.settings.language, "Remove inactive devices"),
+                            ids.len(),
+                        ));
+                    }
+                }
             }
             Message::ToggleHueDeviceVisible(id, visible) => {
                 let known = self
@@ -12969,6 +13063,78 @@ mod history_tests {
             assert!((quick_slider_position(value, graph) - position as f32).abs() < 0.001);
             assert!((quick_slider_value(position as f32, graph) - value).abs() < 0.001);
         }
+    }
+
+    #[test]
+    fn bulk_inactive_removal_targets_only_confirmed_missing_saved_devices() {
+        let devices = vec![
+            FritzDevice { ain: "12:34-56".into(), name: "Offline FRITZ".into() },
+            FritzDevice { ain: "TASMOTA:AA:BB".into(), name: "Offline Tasmota".into() },
+            FritzDevice { ain: "789".into(), name: "Online".into() },
+            FritzDevice { ain: "456".into(), name: "Not selected".into() },
+        ];
+        let selected = vec![
+            "123456".into(),
+            "tasmota:aabb".into(),
+            "789".into(),
+        ];
+        let missing = HashSet::from([
+            "123456".to_string(),
+            "TASMOTAAABB".to_string(),
+            "789".to_string(),
+            "456".to_string(),
+        ]);
+        let live = vec![FritzReading {
+            ain: "789".into(),
+            name: "Online".into(),
+            power_w: 10,
+            has_power_meter: true,
+            temperature_c: 20.0,
+            power_state: None,
+            power_controllable: false,
+            power_toggle_allowed: false,
+        }];
+        assert_eq!(
+            inactive_saved_device_ids(&devices, &selected, &missing, &live),
+            vec!["12:34-56".to_string(), "TASMOTA:AA:BB".to_string()],
+        );
+        assert!(inactive_saved_device_ids(&devices, &selected, &HashSet::new(), &[]).is_empty());
+        assert!(inactive_saved_device_ids(&devices, &selected, &missing, &[
+            live[0].clone(),
+            FritzReading { ain: "TASMOTA:AABB".into(), ..live[0].clone() },
+            FritzReading { ain: "123456".into(), ..live[0].clone() },
+        ]).is_empty());
+    }
+
+    #[test]
+    fn forgetting_saved_device_clears_related_configuration_by_canonical_id() {
+        let stale = FritzDevice { ain: "TASMOTA:AA:BB".into(), name: "Old plug".into() };
+        let active = FritzDevice { ain: "12:34-56".into(), name: "Active plug".into() };
+        let mut app = AppModel::default();
+        app.devices = vec![stale.clone(), active.clone()];
+        app.selected_ains = vec!["tasmota:aabb".into(), active.ain.clone()];
+        app.settings.device_order = vec![stale.ain.clone(), active.ain.clone()];
+        app.settings.input_ains.insert("TASMOTAAABB".into());
+        app.settings.temperature_alerts.insert(
+            "TASMOTAAABB".into(),
+            TemperatureAlertThresholds::default(),
+        );
+        app.settings.weather_temperature_ain = stale.ain.clone();
+        app.missing_device_ains.insert("TASMOTAAABB".into());
+        app.expanded_devices.insert("TASMOTAAABB".into());
+        app.collapsed_menu_sections.insert("device-graph-pair-TASMOTAAABB".into());
+        app.forget_saved_device(&stale.ain);
+        assert_eq!(app.devices, vec![active.clone()]);
+        assert_eq!(app.settings.known_devices, vec![active.clone()]);
+        assert_eq!(app.selected_ains, vec![active.ain.clone()]);
+        assert_eq!(app.settings.ains, vec![active.ain.clone()]);
+        assert_eq!(app.settings.device_order, vec![active.ain]);
+        assert!(app.missing_device_ains.is_empty());
+        assert!(app.settings.input_ains.is_empty());
+        assert!(app.settings.temperature_alerts.is_empty());
+        assert!(app.settings.weather_temperature_ain.is_empty());
+        assert!(app.expanded_devices.is_empty());
+        assert!(app.collapsed_menu_sections.is_empty());
     }
 
     #[test]
