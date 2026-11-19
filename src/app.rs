@@ -2563,18 +2563,18 @@ fn collapsible_graph(
 
 /// Full-width compact plot for each actual daily metric. Missing daily
 /// readings are omitted rather than plotted as fabricated zero measurements.
+/// Each recorded daily trend owns its own persisted disclosure state.
 fn daily_metric_trend(
     label: &'static str,
+    section_id: &'static str,
+    collapsed: bool,
     values: &[f64],
     unit: &'static str,
     style: &str,
+    copy_feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
-    let mut column = widget::Column::new()
-        .spacing(4)
-        .width(cosmic::iced::Length::Fill)
-        .push(widget::text::caption(label));
-    if values.len() >= 2 {
-        column = column.push(graph_visual_with_dimensions(
+    let graph = if values.len() >= 2 {
+        graph_visual_with_dimensions(
             values.iter().copied(),
             style,
             unit,
@@ -2582,13 +2582,11 @@ fn daily_metric_trend(
             cosmic::iced::Length::Fixed(120.0),
             Some("6d ago".into()),
             None,
-        ));
+        )
     } else {
-        column = column.push(widget::text::caption(
-            "Not enough recorded days to draw a trend",
-        ));
-    }
-    column.into()
+        widget::text::caption("Not enough recorded days to draw a trend").into()
+    };
+    collapsible_graph(label, section_id, collapsed, graph, copy_feedback)
 }
 
 /// These three histories represent all TODAY/Y'DAY energy metrics in the
@@ -2598,6 +2596,8 @@ fn daily_power_metric_trends(
     input_ains: &HashSet<String>,
     refresh_interval_seconds: u32,
     style: &str,
+    collapsed_sections: &HashSet<String>,
+    copy_feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
     let daily = daily_energy_history(device_history, input_ains, refresh_interval_seconds);
     let input: Vec<f64> = daily.iter().filter_map(|(_, input, _)| *input).collect();
@@ -2612,9 +2612,33 @@ fn daily_power_metric_trends(
         .push(widget::text::caption(
             "DAILY ENERGY TRENDS · LAST 7 DAYS (RECORDED DAYS ONLY)",
         ))
-        .push(daily_metric_trend("INPUT · Wh", &input, "Wh", style))
-        .push(daily_metric_trend("OUTPUT · Wh", &output, "Wh", style))
-        .push(daily_metric_trend("INPUT / OUTPUT · %", &ratio, "%", style))
+        .push(daily_metric_trend(
+            "INPUT · Wh",
+            "graph-overview-daily-input",
+            collapsed_sections.contains("graph-overview-daily-input"),
+            &input,
+            "Wh",
+            style,
+            copy_feedback,
+        ))
+        .push(daily_metric_trend(
+            "OUTPUT · Wh",
+            "graph-overview-daily-output",
+            collapsed_sections.contains("graph-overview-daily-output"),
+            &output,
+            "Wh",
+            style,
+            copy_feedback,
+        ))
+        .push(daily_metric_trend(
+            "INPUT / OUTPUT · %",
+            "graph-overview-daily-ratio",
+            collapsed_sections.contains("graph-overview-daily-ratio"),
+            &ratio,
+            "%",
+            style,
+            copy_feedback,
+        ))
         .into()
 }
 
@@ -2703,9 +2727,13 @@ fn total_power_overview(
         .push(widget::text::caption(
             "LIVE POWER · LOW, HIGH & NOW IN RECORDED W HISTORY",
         ))
-        .push(interactive_graph_with_axis(
-            &settings.language,
+        .push(collapsible_graph(
             "OUTPUT POWER HISTORY",
+            "graph-overview-output-power",
+            collapsed_sections.contains("graph-overview-output-power"),
+            interactive_graph_with_axis(
+                &settings.language,
+                "OUTPUT POWER HISTORY",
             history.iter().map(|(time, watts)| (*time, *watts as f64)),
             &settings.graph_style,
             "W",
@@ -2718,8 +2746,14 @@ fn total_power_overview(
                         .div_ceil(60)
                 }),
             ),
+            ),
+            copy_feedback,
         ))
-        .push(if input_history.is_empty() {
+        .push(collapsible_graph(
+            "INPUT POWER HISTORY",
+            "graph-overview-input-power",
+            collapsed_sections.contains("graph-overview-input-power"),
+            if input_history.is_empty() {
             widget::text::caption("INPUT POWER HISTORY · No measured input samples").into()
         } else {
             interactive_graph_with_axis(
@@ -2740,13 +2774,17 @@ fn total_power_overview(
                     }),
                 ),
             )
-        })
+        },
+            copy_feedback,
+        ))
         .push(widget::divider::horizontal::default())
         .push(daily_power_metric_trends(
             device_history,
             &settings.input_ains,
             settings.refresh_interval_seconds,
             &settings.graph_style,
+            collapsed_sections,
+            copy_feedback,
         ));
     let collapsed = collapsed_sections.contains("total-power-overview");
     // Match the other collapsed popup sections: one full-width disclosure
