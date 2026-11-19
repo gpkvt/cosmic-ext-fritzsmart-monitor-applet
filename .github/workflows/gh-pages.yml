@@ -1,0 +1,49 @@
+name: Publish GitHub Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build, validate and publish website
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install documentation dependencies
+        run: python -m pip install --disable-pip-version-check 'Markdown>=3.6,<4'
+
+      - name: Build static documentation
+        run: python scripts/build-pages.py
+
+      - name: Validate Pages assets and links
+        run: python scripts/validate-pages.py
+
+      - name: Publish docs to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./docs
+          keep_files: false
+          enable_jekyll: false
+          commit_message: 'docs(pages): manual publish from ${{ github.sha }}'
