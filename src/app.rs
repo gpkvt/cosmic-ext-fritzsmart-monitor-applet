@@ -11306,7 +11306,12 @@ mod disclosure_state_tests {
         assert!(menu_card_needs_divider(1, "2-device-a", false, true));
         assert!(!menu_card_needs_divider(2, "2-device-b", true, true));
         assert!(!menu_card_needs_divider(3, "2-inactive-device", true, true));
-        assert!(menu_card_needs_divider(4, "3-total-power-overview", true, true));
+        assert!(menu_card_needs_divider(
+            4,
+            "3-total-power-overview",
+            true,
+            true
+        ));
         assert!(menu_card_needs_divider(2, "2-device-b", true, false));
     }
 
