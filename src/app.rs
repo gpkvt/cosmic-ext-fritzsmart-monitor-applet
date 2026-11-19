@@ -3503,10 +3503,9 @@ impl cosmic::Application for AppModel {
             .then(|| {
                 format!(
                     "{} W",
-                    input_display_power_w(input_power_w(
-                        &self.readings,
-                        &self.settings.input_ains,
-                    ))
+                    input_display_power_w(
+                        input_power_w(&self.readings, &self.settings.input_ains,)
+                    )
                 )
             });
 
@@ -6460,28 +6459,26 @@ impl cosmic::Application for AppModel {
                     self.flow_animation_frame,
                     &self.settings.language,
                 );
-                let (yesterday_input_wh, today_input_wh) =
-                    yesterday_and_today_energy_wh_for_ains(
-                        &self.device_history,
-                        &self.settings.input_ains,
-                        &self.settings.input_ains,
-                        self.settings.refresh_interval_seconds,
-                        true,
-                    );
+                let (yesterday_input_wh, today_input_wh) = yesterday_and_today_energy_wh_for_ains(
+                    &self.device_history,
+                    &self.settings.input_ains,
+                    &self.settings.input_ains,
+                    self.settings.refresh_interval_seconds,
+                    true,
+                );
                 let output_ains: HashSet<String> = self
                     .device_history
                     .keys()
                     .filter(|ain| !self.settings.input_ains.contains(*ain))
                     .cloned()
                     .collect();
-                let (yesterday_output_wh, today_output_wh) =
-                    yesterday_and_today_energy_wh_for_ains(
-                        &self.device_history,
-                        &output_ains,
-                        &self.settings.input_ains,
-                        self.settings.refresh_interval_seconds,
-                        false,
-                    );
+                let (yesterday_output_wh, today_output_wh) = yesterday_and_today_energy_wh_for_ains(
+                    &self.device_history,
+                    &output_ains,
+                    &self.settings.input_ains,
+                    self.settings.refresh_interval_seconds,
+                    false,
+                );
                 let summary_card = live_power_summary(LivePowerSummaryData {
                     energy_flow,
                     input_history: {
@@ -6502,10 +6499,8 @@ impl cosmic::Application for AppModel {
                         &self.readings,
                         &self.settings.input_ains,
                     )) as f64,
-                    current_output_w: output_power_w(
-                        &self.readings,
-                        &self.settings.input_ains,
-                    ) as f64,
+                    current_output_w: output_power_w(&self.readings, &self.settings.input_ains)
+                        as f64,
                     today_input_wh,
                     today_output_wh,
                     yesterday_input_wh,
