@@ -166,6 +166,7 @@ pub enum Message {
     ToggleWeatherAttribution,
     TestNotification,
     CopyDiagnosticUrl(String),
+    CopyMenuTitle(String),
     ClearDiagnosticEvents,
     WriteDebugFile,
     DebugDumpGenerated(String),
@@ -1193,10 +1194,15 @@ fn daily_energy_history_section(
     .padding([8, 12])
     .class(cosmic::theme::Button::Text);
 
+    let heading_row = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(heading)
+        .push(copy_menu_title_button("DAILY ENERGY · LAST 7 DAYS".to_string()));
     let mut section = widget::Column::new()
         .spacing(0)
         .width(cosmic::iced::Length::Fill)
-        .push(heading);
+        .push(heading_row);
     if !collapsed {
         let value_width = cosmic::iced::Length::Fixed(104.0);
         let header = widget::Row::new()
@@ -2311,7 +2317,15 @@ fn live_power_summary(data: LivePowerSummaryData) -> cosmic::Element<'static, Me
     .width(cosmic::iced::Length::Fill)
     .padding([4, 0])
     .class(cosmic::theme::Button::Text);
-    content = content.push(history_heading);
+    content = content.push(
+        widget::Row::new()
+            .width(cosmic::iced::Length::Fill)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(history_heading)
+            .push(copy_menu_title_button(
+                crate::i18n::tr(&language, "CURRENT POWER HISTORY").to_string(),
+            )),
+    );
     if !history_collapsed {
         let output_label = crate::i18n::tr(&language, "TOTAL POWER OUTPUT");
         let input_label = crate::i18n::tr(&language, "TOTAL POWER INPUT");
@@ -2364,10 +2378,15 @@ fn collapsible_graph(
     .width(cosmic::iced::Length::Fill)
     .padding([4, 0])
     .class(cosmic::theme::Button::Text);
+    let heading_row = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(heading)
+        .push(copy_menu_title_button(title.to_string()));
     let mut section = widget::Column::new()
         .spacing(4)
         .width(cosmic::iced::Length::Fill)
-        .push(heading);
+        .push(heading_row);
     if !collapsed {
         section = section.push(graph);
     }
@@ -2573,10 +2592,15 @@ fn total_power_overview(
     .width(cosmic::iced::Length::Fill)
     .padding([4, 0])
     .class(cosmic::theme::Button::Text);
+    let heading_row = widget::Row::new()
+        .width(cosmic::iced::Length::Fill)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(heading)
+        .push(copy_menu_title_button("TOTAL POWER INPUT & OUTPUT".to_string()));
     let mut section = widget::Column::new()
         .spacing(4)
         .width(cosmic::iced::Length::Fill)
-        .push(heading);
+        .push(heading_row);
     if !collapsed {
         section = section.push(content);
     }
@@ -2923,6 +2947,14 @@ fn diagnostic_url_button(url: String) -> cosmic::Element<'static, Message> {
     .width(cosmic::iced::Length::Fill)
     .class(cosmic::theme::Button::Text)
     .into()
+}
+
+fn copy_menu_title_button(title: String) -> cosmic::Element<'static, Message> {
+    widget::button::custom(widget::icon::from_name("edit-copy-symbolic").size(14))
+        .on_press(Message::CopyMenuTitle(title))
+        .padding([4, 6])
+        .class(cosmic::theme::Button::Text)
+        .into()
 }
 
 fn diagnostic_section_heading(
@@ -6170,7 +6202,15 @@ impl cosmic::Application for AppModel {
                     .spacing(8)
                     .width(cosmic::iced::Length::Fill)
                     .height(cosmic::iced::Length::Fixed(240.0))
-                    .push(weather_heading)
+                    .push(
+                        widget::Row::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(weather_heading)
+                            .push(copy_menu_title_button(
+                                crate::i18n::tr(&self.settings.language, "Weather").to_string(),
+                            )),
+                    )
                     .push(weather_details);
                 let current_image_handle = weather
                     .slideshow_sequence
@@ -6755,6 +6795,7 @@ impl cosmic::Application for AppModel {
                         .width(cosmic::iced::Length::Fill)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(device_heading_button)
+                        .push(copy_menu_title_button(reading.name.clone()))
                         .push(history_button)
                         .push(power_toggle);
                     let device_axis_start = format_graph_axis_start(
@@ -7217,7 +7258,16 @@ impl cosmic::Application for AppModel {
                             .width(cosmic::iced::Length::Fill)
                             .padding([8, 12])
                             .class(cosmic::theme::Button::Text);
-                            device_cards = device_cards.push(heading);
+                            device_cards = device_cards.push(
+                                widget::Row::new()
+                                    .width(cosmic::iced::Length::Fill)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(heading)
+                                    .push(copy_menu_title_button(
+                                        crate::i18n::tr(&self.settings.language, "DEVICES")
+                                            .to_string(),
+                                    )),
+                            );
                             device_section_started = true;
                         }
                         if !self.collapsed_menu_sections.contains("devices") {
@@ -7339,7 +7389,13 @@ impl cosmic::Application for AppModel {
                     .width(cosmic::iced::Length::Fill)
                     .padding([8, 12])
                     .class(cosmic::theme::Button::Text);
-                    let mut section_column = widget::Column::new().spacing(0).push(heading);
+                    let heading_row = widget::Row::new()
+                        .width(cosmic::iced::Length::Fill)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(heading)
+                        .push(copy_menu_title_button(section.1.to_string()));
+                    let mut section_column =
+                        widget::Column::new().spacing(0).push(heading_row);
                     if !collapsed {
                         section_column = section_column.push(card);
                     }
@@ -8340,6 +8396,9 @@ impl cosmic::Application for AppModel {
             }
             Message::CopyDiagnosticUrl(url) => {
                 return cosmic::iced::clipboard::write(url);
+            }
+            Message::CopyMenuTitle(title) => {
+                return cosmic::iced::clipboard::write(title);
             }
             Message::ClearDiagnosticEvents => {
                 self.diagnostic_events.clear();
