@@ -1,3 +1,4 @@
+use crate::hue::HueLight;
 use crate::fritz::{
     FritzBoxSystemInfo, FritzDevice, FritzFetchResult, FritzInternetBandwidth, FritzReading,
     FritzSettings, TemperatureAlertThresholds, collect_fritzbox_debug_dump, discover_devices,
@@ -32,6 +33,12 @@ pub struct AppModel {
     popup_max_height: Option<f32>,
     graph_window: Option<Id>,
     readings: Vec<FritzReading>,
+    hue_lights: Vec<HueLight>,
+    hue_error: Option<String>,
+    hue_loading: bool,
+    hue_pairing: bool,
+    hue_pending: HashSet<String>,
+    hue_next_refresh_at: Option<Instant>,
     internet_bandwidth: Option<FritzInternetBandwidth>,
     fritzbox_system_info: Option<FritzBoxSystemInfo>,
     bandwidth_history: VecDeque<(Instant, u64, u64)>,
@@ -126,6 +133,14 @@ pub enum Message {
     TasmotaUsernameChanged(String),
     TasmotaPasswordChanged(String),
     TasmotaSubnetScanChanged(bool),
+    HueBridgeIpChanged(String),
+    HueApplicationKeyChanged(String),
+    PairHueBridge,
+    HueBridgePaired(Result<String, String>),
+    RefreshHueLights,
+    HueLightsLoaded(Result<Vec<HueLight>, String>),
+    SetHueLightPower(String, bool),
+    HueLightPowerFinished(String, Result<(), String>),
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
@@ -3559,6 +3574,17 @@ impl cosmic::Application for AppModel {
         let mut tasks = vec![Task::perform(fetch_fritz_data(), |result| {
             cosmic::Action::App(Message::Updated(Box::new(result)))
         })];
+        let hue_configured = !settings.hue_bridge_ip.trim().is_empty()
+            && !settings.hue_application_key.trim().is_empty();
+        if hue_configured {
+            tasks.push(Task::perform(
+                crate::hue::fetch_lights(
+                    settings.hue_bridge_ip.clone(),
+                    settings.hue_application_key.clone(),
+                ),
+                |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+            ));
+        }
         if restore_forecast {
             tasks.push(Task::perform(
                 fetch_weather_forecast(forecast_location, 7),
@@ -3570,6 +3596,7 @@ impl cosmic::Application for AppModel {
                 core,
                 selected_ains: initial_device_selection(&settings),
                 devices: known_devices,
+                hue_loading: hue_configured,
                 devices_loaded: saved_devices_loaded,
                 devices_loading: false,
                 settings,
@@ -3615,7 +3642,12 @@ impl cosmic::Application for AppModel {
             || self.next_weather_refresh_at.is_some_and(|deadline| {
                 deadline.saturating_duration_since(now) <= Duration::from_secs(15)
             })
-            || self.devices_loading;
+            || self.devices_loading
+            || self.hue_loading
+            || self.hue_pairing
+            || self.hue_next_refresh_at.is_some_and(|deadline| {
+                deadline.saturating_duration_since(now) <= Duration::from_secs(15)
+            });
         let clock = if self.refresh_started_at.is_some() {
             Subscription::run(animation_ticks)
         } else if needs_second_precision {
