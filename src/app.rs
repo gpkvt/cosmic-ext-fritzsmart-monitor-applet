@@ -117,7 +117,6 @@ pub enum Message {
     TogglePopup,
     PopupClosed(Id),
     PopupMonitorSize(Id, Option<f32>),
-    TooltipSurfaceAction(cosmic::surface::Action<Message>),
     Refresh,
     ClockTick,
     CopyFeedbackTick,
@@ -4579,14 +4578,14 @@ impl cosmic::Application for AppModel {
             // to the left. In paired rows this creates a shared left edge;
             // standalone rows retain their intrinsic width because the row
             // itself remains shrink-wrapped.
-            // Use COSMIC's dedicated tooltip surface on the *value* only.
-            // Hover never sends TogglePopup: the main menu remains click-only.
-            let tooltip_value = self.core.applet.applet_tooltip(
+            // Keep hover help inside the panel's own widget tree. A separate
+            // Wayland tooltip popup can race the grabbed XDG menu and cause a
+            // fatal popup protocol error in some COSMIC compositor versions.
+            // Only the explicit panel button handles opening the main menu.
+            let tooltip_value = widget::tooltip(
                 value,
-                tooltip_label,
-                false,
-                Message::TooltipSurfaceAction,
-                self.core.main_window_id(),
+                widget::text::body(tooltip_label),
+                widget::tooltip::Position::Bottom,
             );
             let mut value = widget::container(tooltip_value)
                 .width(if align_value_column {
@@ -9286,9 +9285,6 @@ impl cosmic::Application for AppModel {
 
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
-            Message::TooltipSurfaceAction(action) => {
-                return Task::done(cosmic::Action::Surface(action));
-            }
             Message::ShowGraph(title, values, unit, _axis_start) => {
                 self.history_graph_devices.clear();
                 self.history_graph_index = None;
