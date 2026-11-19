@@ -67,7 +67,7 @@ case "$command" in
     git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "Run this command inside a Git checkout."
     branch="$(git branch --show-current)"
     [[ -n "$branch" ]] || die "Detached HEAD: check out a branch before updating."
-    printf 'Fast-forwarding %s from its configured upstream...\\n' "$branch"
+    printf 'Fast-forwarding %s from its configured upstream...\n' "$branch"
     git pull --ff-only
     ;;
   check|checks)
