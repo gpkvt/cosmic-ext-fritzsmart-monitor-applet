@@ -6146,7 +6146,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::toggler(self.settings.prometheus_enabled)
                             .on_toggle(Message::PrometheusEnabledChanged)))
                     .push(widget::text::caption(
-                        "HTTP 127.0.0.1:9817/metrics · disabled by default. Read-only, no API requests on scrape. Device IDs and names are exposed to local clients. Never expose or proxy this endpoint to an untrusted network."
+                        format!("{} · disabled by default. Read-only, no API requests on scrape. Device IDs and names are exposed to local clients. Never expose or proxy this endpoint to an untrusted network.", crate::prometheus::ENDPOINT)
                     ))
                     .push(widget::divider::horizontal::default())
             }
@@ -7633,8 +7633,8 @@ impl cosmic::Application for AppModel {
                 let extra_rows = netatmo_metrics.len().div_ceil(2);
                 // The fixed photo previously clipped content at 260 px.
                 // Expand all layers together, including the night overlay.
-                let weather_card_height = 260.0 + extra_rows as f32 * 54.0
-                    + if extra_rows > 0 { 25.0 } else { 0.0 };
+                let weather_card_height = 260.0 + extra_rows as f32 * 68.0
+                    + if extra_rows > 0 { 34.0 } else { 0.0 };
                 if !netatmo_metrics.is_empty() {
                     let mut extra = widget::Column::new()
                         .spacing(8)
@@ -7728,7 +7728,7 @@ impl cosmic::Application for AppModel {
                         let photo = widget::image::Image::new(image_handle)
                             .width(cosmic::iced::Length::Fill)
                             .height(cosmic::iced::Length::Fixed(weather_card_height))
-                            .content_fit(cosmic::iced::ContentFit::Fill);
+                            .content_fit(cosmic::iced::ContentFit::Cover);
                         let details = widget::container(weather_content)
                             .width(cosmic::iced::Length::Fill)
                             .height(cosmic::iced::Length::Fixed(weather_card_height))
