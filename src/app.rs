@@ -10479,10 +10479,7 @@ mod history_tests {
             input_range_labels(&zero),
             ("0 W".to_string(), "0 W".to_string())
         );
-        let recorded = VecDeque::from([
-            (start, -250),
-            (start + Duration::from_secs(60), -100),
-        ]);
+        let recorded = VecDeque::from([(start, -250), (start + Duration::from_secs(60), -100)]);
         assert_eq!(
             input_range_labels(&recorded),
             ("100 W".to_string(), "250 W".to_string())
