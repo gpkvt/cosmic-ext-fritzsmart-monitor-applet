@@ -259,13 +259,20 @@ fn light_level_to_lux(raw: f64) -> Option<f64> {
     lux.is_finite().then_some(lux)
 }
 
-fn valid_sensor_feature(resource: &Value, feature: &str, valid: &str) -> bool {
+fn valid_sensor_feature(
+    resource: &Value,
+    feature: &str,
+    valid: &str,
+    report_path: &str,
+) -> bool {
     resource.get("enabled").and_then(Value::as_bool) != Some(false)
-        && resource
-            .get(feature)
-            .and_then(|feature| feature.get(valid))
-            .and_then(Value::as_bool)
-            != Some(false)
+        // New CLIP v2 report data supersedes the deprecated validity flag.
+        && (resource.pointer(report_path).is_some()
+            || resource
+                .get(feature)
+                .and_then(|feature| feature.get(valid))
+                .and_then(Value::as_bool)
+                != Some(false))
 }
 
 /// Join separate temperature, light-level, and motion service resources by
@@ -340,21 +347,21 @@ fn parse_sensors(
                 continue;
             }
             match kind {
-                "temperature" if valid_sensor_feature(resource, "temperature", "temperature_valid") => {
+                "temperature" if valid_sensor_feature(resource, "temperature", "temperature_valid", "/temperature/temperature_report/temperature") => {
                     item.temperature_c = resource
                         .pointer("/temperature/temperature_report/temperature")
                         .or_else(|| resource.pointer("/temperature/temperature"))
                         .and_then(Value::as_f64)
                         .filter(|value| value.is_finite());
                 }
-                "light_level" if valid_sensor_feature(resource, "light", "light_level_valid") => {
+                "light_level" if valid_sensor_feature(resource, "light", "light_level_valid", "/light/light_level_report/light_level") => {
                     item.illuminance_lux = resource
                         .pointer("/light/light_level_report/light_level")
                         .or_else(|| resource.pointer("/light/light_level"))
                         .and_then(Value::as_f64)
                         .and_then(light_level_to_lux);
                 }
-                "motion" if valid_sensor_feature(resource, "motion", "motion_valid") => {
+                "motion" if valid_sensor_feature(resource, "motion", "motion_valid", "/motion/motion_report/motion") => {
                     item.motion = resource
                         .pointer("/motion/motion_report/motion")
                         .or_else(|| resource.pointer("/motion/motion"))
@@ -679,6 +686,21 @@ mod tests {
         let sensors = parse_sensors(Some(&disabled), Some(&invalid), None, &device, None);
         assert_eq!(sensors[0].temperature_c, None);
         assert_eq!(sensors[0].illuminance_lux, None);
+    }
+
+    #[test]
+    fn modern_sensor_report_takes_priority_over_obsolete_validity_flag() {
+        let id = "00112233-4455-6677-8899-aabbccddeeff";
+        let device = json!({"data": [{"id": id, "metadata": {"name": "Entry sensor"}}]});
+        let temp = json!({"data": [{
+            "owner": {"rid": id}, "enabled": true,
+            "temperature": {
+                "temperature_valid": false,
+                "temperature_report": {"temperature": 19.25}
+            }
+        }]});
+        let sensors = parse_sensors(Some(&temp), None, None, &device, None);
+        assert_eq!(sensors[0].temperature_c, Some(19.25));
     }
 
     #[test]
