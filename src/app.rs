@@ -1430,8 +1430,10 @@ fn outdoor_air_pollution_metrics(pollution: &AirPollutionData) -> Vec<(String, S
 /// The photo and its night overlay expand together; all other menu cards remain
 /// separate, and the popup's outer scroll handles unusually large sensor sets.
 fn weather_photo_height(metric_count: usize) -> f32 {
-    const BASE_HEIGHT: f32 = 260.0;
-    const EXTRA_ROW_HEIGHT: f32 = 88.0;
+    // A compact photo keeps the complete grid visible while taking around
+    // 25% less space than the previous 260px + 88px/extra-row layout.
+    const BASE_HEIGHT: f32 = 195.0;
+    const EXTRA_ROW_HEIGHT: f32 = 66.0;
     let extra_rows = metric_count.div_ceil(4).saturating_sub(2);
     BASE_HEIGHT + extra_rows as f32 * EXTRA_ROW_HEIGHT
 }
@@ -13598,12 +13600,18 @@ mod history_tests {
 
     #[test]
     fn weather_photo_grows_for_every_extra_metric_row_without_inner_scrolling() {
-        assert_eq!(weather_photo_height(0), 260.0);
-        assert_eq!(weather_photo_height(8), 260.0);
-        assert_eq!(weather_photo_height(9), 348.0);
-        assert_eq!(weather_photo_height(12), 348.0);
-        assert_eq!(weather_photo_height(13), 436.0);
-        assert_eq!(weather_photo_height(21), 612.0);
+        assert_eq!(weather_photo_height(0), 195.0);
+        assert_eq!(weather_photo_height(8), 195.0);
+        assert_eq!(weather_photo_height(9), 261.0);
+        assert_eq!(weather_photo_height(12), 261.0);
+        assert_eq!(weather_photo_height(13), 327.0);
+        assert_eq!(weather_photo_height(21), 459.0);
+        // Preserve exactly three quarters of the old computed height.
+        for metrics in 0..=40 {
+            let extra_rows = metrics.div_ceil(4).saturating_sub(2) as f32;
+            let old_height = 260.0 + 88.0 * extra_rows;
+            assert_eq!(weather_photo_height(metrics), old_height * 0.75);
+        }
     }
 
     #[test]
