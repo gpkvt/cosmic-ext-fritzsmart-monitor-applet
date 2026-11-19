@@ -159,6 +159,7 @@ pub enum Message {
     DeviceSearchChanged(String),
     ToggleDevice(String, bool),
     MoveDevice(String, bool),
+    SortDeviceList(&'static str),
     ToggleDeviceInput(String, bool),
     ToggleTemperatureAlert(String, bool),
     TemperatureAlertHighChanged(String, i16),
@@ -2685,6 +2686,121 @@ fn toggle_collapsible_state(ids: &mut HashSet<String>, id: String) {
     if !ids.remove(&id) {
         ids.insert(id);
     }
+}
+
+/// Apply live name/power/temperature sorting without overwriting custom device order.
+fn sorted_device_readings<'a>(
+    readings: &'a [FritzReading],
+    saved_order: &[String],
+    column: &str,
+    descending: bool,
+) -> Vec<&'a FritzReading> {
+    let mut sorted: Vec<_> = readings.iter().collect();
+    sorted.sort_by(|left, right| {
+        let comparison = match column {
+            "name" => {
+                let value = left.name.to_lowercase().cmp(&right.name.to_lowercase());
+                if descending { value.reverse() } else { value }
+            }
+            "power" => {
+                let value = left.power_w.cmp(&right.power_w);
+                if descending { value.reverse() } else { value }
+            }
+            "temperature" => match (
+                left.temperature_c.is_finite(),
+                right.temperature_c.is_finite(),
+            ) {
+                (true, true) => {
+                    let value = left.temperature_c.total_cmp(&right.temperature_c);
+                    if descending { value.reverse() } else { value }
+                }
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                (false, false) => std::cmp::Ordering::Equal,
+            },
+            _ => device_order_position(saved_order, &left.ain)
+                .cmp(&device_order_position(saved_order, &right.ain)),
+        };
+        comparison
+            .then_with(|| {
+                device_order_position(saved_order, &left.ain)
+                    .cmp(&device_order_position(saved_order, &right.ain))
+            })
+            .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
+            .then_with(|| {
+                crate::fritz::canonical_device_key(&left.ain)
+                    .cmp(&crate::fritz::canonical_device_key(&right.ain))
+            })
+    });
+    sorted
+}
+
+/// COSMIC text buttons expose sort direction without adding a separate toolbar.
+fn device_sort_button(
+    label: &str,
+    column: &'static str,
+    current_column: &str,
+    descending: bool,
+    width: cosmic::iced::Length,
+) -> cosmic::Element<'static, Message> {
+    let indicator = if column == current_column {
+        if column == "saved" {
+            " ✓"
+        } else if descending {
+            " ↓"
+        } else {
+            " ↑"
+        }
+    } else {
+        ""
+    };
+    widget::button::custom(widget::text::caption(format!("{label}{indicator}")))
+        .on_press(Message::SortDeviceList(column))
+        .width(width)
+        .padding([4, 2])
+        .class(cosmic::theme::Button::Text)
+        .into()
+}
+
+fn device_sort_header(
+    current_column: &str,
+    descending: bool,
+    temperature_unit: &str,
+) -> cosmic::Element<'static, Message> {
+    widget::Row::new()
+        .spacing(8)
+        .width(cosmic::iced::Length::Fill)
+        .padding([2, 12])
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(device_sort_button(
+            "NAME",
+            "name",
+            current_column,
+            descending,
+            cosmic::iced::Length::Fill,
+        ))
+        .push(device_sort_button(
+            "W",
+            "power",
+            current_column,
+            descending,
+            cosmic::iced::Length::Fixed(76.0),
+        ))
+        .push(device_sort_button(
+            if temperature_unit == "F" { "°F" } else { "°C" },
+            "temperature",
+            current_column,
+            descending,
+            cosmic::iced::Length::Fixed(90.0),
+        ))
+        .push(device_sort_button(
+            "CUSTOM",
+            "saved",
+            current_column,
+            descending,
+            cosmic::iced::Length::Fixed(82.0),
+        ))
+        .into()
 }
 
 /// Shared persisted visibility state for Panel settings and item-order controls.
@@ -6695,12 +6811,13 @@ impl cosmic::Application for AppModel {
                         ))
                 };
                 menu_cards.push(("bandwidth".to_string(), bandwidth_card.into()));
-                // The settings list is authoritative for popup device order.
-                // Keep newly discovered devices after configured entries.
-                let mut ordered_readings: Vec<_> = self.readings.iter().collect();
-                ordered_readings.sort_by_key(|reading| {
-                    device_order_position(&self.settings.device_order, &reading.ain)
-                });
+                // Custom order remains the default; column sort overrides it only in this list.
+                let ordered_readings = sorted_device_readings(
+                    &self.readings,
+                    &self.settings.device_order,
+                    &self.settings.device_sort,
+                    self.settings.device_sort_descending,
+                );
                 for (index, reading) in ordered_readings.iter().enumerate() {
                     let device_key = crate::fritz::normalize_ain_for_selection(&reading.ain);
                     let is_expanded = is_device_expanded(&self.expanded_devices, &device_key);
@@ -6743,9 +6860,23 @@ impl cosmic::Application for AppModel {
                             device_corner_radius.bottom_left
                         },
                     ];
+                    let mut device_title = widget::Column::new()
+                        .spacing(3)
+                        .width(cosmic::iced::Length::Fill)
+                        .push(
+                            widget::text::body(reading.name.clone())
+                                .class(cosmic::theme::Text::Accent),
+                        );
+                    if is_expanded {
+                        device_title = device_title.push(widget::text::caption(format!(
+                            "{} {}",
+                            crate::i18n::tr(&self.settings.language, "LAST"),
+                            format_graph_timespan(self.settings.graph_timespan_minutes).to_uppercase()
+                        )));
+                    }
                     let device_heading_button = widget::button::custom(
                         widget::Row::new()
-                            .spacing(12)
+                            .spacing(8)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(
                                 widget::container(
@@ -6754,33 +6885,22 @@ impl cosmic::Application for AppModel {
                                 .center_x(32)
                                 .center_y(36),
                             )
+                            .push(device_title)
                             .push(
-                                widget::Column::new()
-                                    .spacing(3)
-                                    .width(cosmic::iced::Length::Fill)
-                                    .push(
-                                        widget::text::body(reading.name.clone())
-                                            .class(cosmic::theme::Text::Accent),
-                                    )
-                                    .push(widget::text::caption(if is_expanded {
-                                        format!(
-                                            "{} {}",
-                                            crate::i18n::tr(&self.settings.language, "LAST"),
-                                            format_graph_timespan(
-                                                self.settings.graph_timespan_minutes
-                                            )
-                                            .to_uppercase()
-                                        )
-                                    } else {
-                                        format!(
-                                            "{} W · {}",
-                                            reading.power_w,
-                                            format_temperature(
-                                                reading.temperature_c,
-                                                &self.settings.temperature_unit
-                                            )
-                                        )
-                                    })),
+                                widget::text::body(keep_value_unit_together(format!(
+                                    "{} W",
+                                    reading.power_w
+                                )))
+                                .width(cosmic::iced::Length::Fixed(76.0))
+                                .align_x(cosmic::iced::Alignment::End),
+                            )
+                            .push(
+                                widget::text::body(keep_value_unit_together(format_temperature(
+                                    reading.temperature_c,
+                                    &self.settings.temperature_unit,
+                                )))
+                                .width(cosmic::iced::Length::Fixed(90.0))
+                                .align_x(cosmic::iced::Alignment::End),
                             )
                             .push(
                                 widget::icon::from_name(if is_expanded {
@@ -7095,8 +7215,21 @@ impl cosmic::Application for AppModel {
                         })
                     })
                     .collect();
-                missing_devices.sort_by_key(|device| {
-                    device_order_position(&self.settings.device_order, &device.ain)
+                missing_devices.sort_by(|left, right| {
+                    let comparison = if self.settings.device_sort == "name" {
+                        let comparison = left.name.to_lowercase().cmp(&right.name.to_lowercase());
+                        if self.settings.device_sort_descending {
+                            comparison.reverse()
+                        } else {
+                            comparison
+                        }
+                    } else {
+                        std::cmp::Ordering::Equal
+                    };
+                    comparison.then_with(|| {
+                        device_order_position(&self.settings.device_order, &left.ain)
+                            .cmp(&device_order_position(&self.settings.device_order, &right.ain))
+                    })
                 });
                 for device in missing_devices {
                     let device_key = crate::fritz::normalize_ain_for_selection(&device.ain);
@@ -7119,6 +7252,19 @@ impl cosmic::Application for AppModel {
                                                 &self.settings.language,
                                                 "No live reading available",
                                             ))),
+                                    )
+                                    .push(
+                                        widget::text::body("— W")
+                                            .width(cosmic::iced::Length::Fixed(76.0))
+                                            .align_x(cosmic::iced::Alignment::End),
+                                    )
+                                    .push(
+                                        widget::text::body(format!(
+                                            "— {}",
+                                            temperature_unit_label(&self.settings.temperature_unit)
+                                        ))
+                                        .width(cosmic::iced::Length::Fixed(90.0))
+                                        .align_x(cosmic::iced::Alignment::End),
                                     )
                                     .push(
                                         widget::icon::from_name(if is_expanded {
@@ -7275,6 +7421,13 @@ impl cosmic::Application for AppModel {
                                         self.copy_feedback.as_ref(),
                                     )),
                             );
+                            if !collapsed {
+                                device_cards = device_cards.push(device_sort_header(
+                                    &self.settings.device_sort,
+                                    self.settings.device_sort_descending,
+                                    &self.settings.temperature_unit,
+                                ));
+                            }
                             device_section_started = true;
                         }
                         if !self.collapsed_menu_sections.contains("devices") {
@@ -8680,6 +8833,15 @@ impl cosmic::Application for AppModel {
                     self.schedule_settings_save();
                 }
             }
+            Message::SortDeviceList(column) => {
+                if self.settings.device_sort == column && column != "saved" {
+                    self.settings.device_sort_descending = !self.settings.device_sort_descending;
+                } else {
+                    self.settings.device_sort = column.to_string();
+                    self.settings.device_sort_descending = false;
+                }
+                self.schedule_settings_save();
+            }
             Message::MoveDevice(ain, move_up) => {
                 let mut order: Vec<String> = self
                     .devices
@@ -8705,6 +8867,8 @@ impl cosmic::Application for AppModel {
                 if let Some(target) = target {
                     order.swap(index, target);
                     self.settings.device_order = order;
+                    self.settings.device_sort = "saved".into();
+                    self.settings.device_sort_descending = false;
                     self.schedule_settings_save();
                 }
             }
