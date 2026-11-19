@@ -1,5 +1,7 @@
 # Changelog
 
+- Show TODAY and Y'DAY input/output percentages side by side on one row in the shared power history summary.
+
 ### Changed
 
 - Unify device identity handling for menu ordering and expanded/collapsed state, including Tasmota and differently formatted AINs; keep device and graph state clean on removal.

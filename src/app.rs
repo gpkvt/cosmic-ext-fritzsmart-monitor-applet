@@ -1090,11 +1090,7 @@ fn menu_power_flow_summary(
             .spacing(8)
             .align_y(cosmic::iced::Alignment::Center)
             .push(widget::text::caption(label).width(cosmic::iced::Length::Fill))
-            .push(
-                widget::text::caption(ratio)
-                    .width(cosmic::iced::Length::Fixed(184.0))
-                    .align_x(cosmic::iced::Alignment::End),
-            )
+            .push(widget::text::caption(ratio))
     };
     let heading = widget::Row::new()
         .spacing(8)
@@ -1145,12 +1141,20 @@ fn menu_power_flow_summary(
             energy_display(yesterday_input_wh),
             energy_display(yesterday_output_wh),
         ))
-        .push(ratio_row("TODAY IN / OUT", today_input_wh, today_output_wh))
-        .push(ratio_row(
-            "Y'DAY IN / OUT",
-            yesterday_input_wh,
-            yesterday_output_wh,
-        ))
+        .push(
+            widget::Row::new()
+                .spacing(16)
+                .width(cosmic::iced::Length::Fill)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(
+                    ratio_row("TODAY IN / OUT", today_input_wh, today_output_wh)
+                        .width(cosmic::iced::Length::FillPortion(1)),
+                )
+                .push(
+                    ratio_row("Y'DAY IN / OUT", yesterday_input_wh, yesterday_output_wh)
+                        .width(cosmic::iced::Length::FillPortion(1)),
+                ),
+        )
         .into()
 }
 
