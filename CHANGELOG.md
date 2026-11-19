@@ -4,6 +4,15 @@
 
 ### Added
 
+- Support selecting a Netatmo outdoor (NAModule1) sensor as the outdoor weather temperature, sharing the single saved source setting with FRITZ!Box devices and falling back to OpenWeatherMap when Netatmo data is unavailable.
+
+### Changed
+
+- Place the invalid-certificate toggle beside the FRITZ!Box trusted CA configuration, explicitly label it FRITZ!Box-only, and keep other integrations' TLS policies independent.
+
+
+### Added
+
 - Optional **Netatmo Weather Station API** integration with OAuth2 refresh-token authentication (read_station), independently refreshed station and module readings for temperature, humidity, CO₂, pressure, noise, rain and wind, read-only device cards, searchable/ordered visibility controls, per-device temperature alerts, panel-average temperatures and persisted collapsible metric history graphs. Missing and stale measurements are never presented as current data, and Netatmo does not contribute W or Wh to power totals.
 - Netatmo developer credentials and automatically rotated refresh tokens are saved with owner-only permissions. Document cloud/API requirements, the independent connection, limitations and Netatmo data security in the README, user guide, compatibility page and SECURITY.md.
 
