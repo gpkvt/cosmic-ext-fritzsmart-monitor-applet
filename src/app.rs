@@ -37,6 +37,9 @@ pub struct AppModel {
     hue_error: Option<String>,
     hue_loading: bool,
     hue_pairing: bool,
+    hue_discovering: bool,
+    hue_bridges: Vec<String>,
+    hue_discovery_note: Option<String>,
     hue_pending: HashSet<String>,
     hue_next_refresh_at: Option<Instant>,
     internet_bandwidth: Option<FritzInternetBandwidth>,
@@ -135,6 +138,9 @@ pub enum Message {
     TasmotaSubnetScanChanged(bool),
     HueBridgeIpChanged(String),
     HueApplicationKeyChanged(String),
+    DiscoverHueBridges,
+    HueBridgesDiscovered(Result<Vec<String>, String>),
+    UseHueBridge(String),
     PairHueBridge,
     HueBridgePaired(Result<String, String>),
     RefreshHueLights,
@@ -3576,6 +3582,12 @@ impl cosmic::Application for AppModel {
         })];
         let hue_configured = !settings.hue_bridge_ip.trim().is_empty()
             && !settings.hue_application_key.trim().is_empty();
+        let hue_auto_discover = settings.hue_bridge_ip.trim().is_empty();
+        if hue_auto_discover {
+            tasks.push(Task::perform(crate::hue::discover_bridges(), |result| {
+                cosmic::Action::App(Message::HueBridgesDiscovered(result))
+            }));
+        }
         if hue_configured {
             tasks.push(Task::perform(
                 crate::hue::fetch_lights(
@@ -3597,6 +3609,7 @@ impl cosmic::Application for AppModel {
                 selected_ains: initial_device_selection(&settings),
                 devices: known_devices,
                 hue_loading: hue_configured,
+                hue_discovering: hue_auto_discover,
                 devices_loaded: saved_devices_loaded,
                 devices_loading: false,
                 settings,
@@ -3645,6 +3658,7 @@ impl cosmic::Application for AppModel {
             || self.devices_loading
             || self.hue_loading
             || self.hue_pairing
+            || self.hue_discovering
             || self.hue_next_refresh_at.is_some_and(|deadline| {
                 deadline.saturating_duration_since(now) <= Duration::from_secs(15)
             });
