@@ -1246,6 +1246,7 @@ fn daily_power_metrics_grid(
     today_output_wh: Option<f64>,
     yesterday_input_wh: Option<f64>,
     yesterday_output_wh: Option<f64>,
+    has_input_device: bool,
 ) -> cosmic::Element<'static, Message> {
     let energy_display = |value: Option<f64>| {
         value
@@ -1253,6 +1254,15 @@ fn daily_power_metrics_grid(
             .map(|value| format!("{value:.0} Wh"))
             .unwrap_or_else(|| "— Wh".to_string())
     };
+    if !has_input_device {
+        return widget::Column::new()
+            .spacing(10)
+            .width(cosmic::iced::Length::Fill)
+            .push(daily_power_metric("TODAY OUTPUT", energy_display(today_output_wh)))
+            .push(widget::divider::horizontal::default())
+            .push(daily_power_metric("Y'DAY OUTPUT", energy_display(yesterday_output_wh)))
+            .into();
+    }
     let percent_display = |input: Option<f64>, output: Option<f64>| {
         energy_input_output_ratio_percent(input, output)
             .map(|value| format!("{value:.1}%"))
@@ -1323,13 +1333,23 @@ fn daily_energy_history_section(
     input_ains: &HashSet<String>,
     refresh_interval_seconds: u32,
     collapsed: bool,
+    has_input_device: bool,
     copy_feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
     let history = daily_energy_history(device_history, input_ains, refresh_interval_seconds);
     // The last entry always represents today, including a missing-data day.
-    let today_percentage = history
+    let today_summary = history
         .last()
-        .map(|(_, input, output)| format_daily_energy_percentage(*input, *output))
+        .map(|(_, input, output)| {
+            if has_input_device {
+                format_daily_energy_percentage(*input, *output)
+            } else {
+                output
+                    .filter(|wh| wh.is_finite())
+                    .map(|wh| format!("{wh:.0} Wh"))
+                    .unwrap_or_else(|| "—".to_string())
+            }
+        })
         .unwrap_or_else(|| "—".to_string());
     let mut heading_content = widget::Row::new()
         .spacing(8)
@@ -1338,7 +1358,7 @@ fn daily_energy_history_section(
         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
     if collapsed {
         heading_content =
-            heading_content.push(widget::text::body(format!("Today · {today_percentage}")));
+            heading_content.push(widget::text::body(format!("Today · {today_summary}")));
     }
     let heading = widget::button::custom(
         heading_content.push(
@@ -1369,18 +1389,22 @@ fn daily_energy_history_section(
         .push(heading_row);
     if !collapsed {
         let value_width = cosmic::iced::Length::Fixed(104.0);
-        let header = widget::Row::new()
+        let mut header = widget::Row::new()
             .spacing(8)
             .align_y(cosmic::iced::Alignment::Center)
             .padding([4, 12])
-            .push(widget::text::caption("DAY").width(cosmic::iced::Length::Fill))
-            .push(widget::text::caption("SOLAR INPUT").width(value_width))
-            .push(widget::text::caption("GRID USE").width(value_width))
-            .push(
+            .push(widget::text::caption("DAY").width(cosmic::iced::Length::Fill));
+        if has_input_device {
+            header = header.push(widget::text::caption("SOLAR INPUT").width(value_width));
+        }
+        header = header.push(widget::text::caption("GRID USE").width(value_width));
+        if has_input_device {
+            header = header.push(
                 widget::text::caption("IN / OUT %")
                     .width(cosmic::iced::Length::Fixed(96.0))
                     .align_x(cosmic::iced::Alignment::End),
             );
+        }
         let mut rows = widget::Column::new()
             .spacing(2)
             .push(header)
@@ -1396,20 +1420,23 @@ fn daily_energy_history_section(
                     .map(|wh| format!("{wh:.0} Wh"))
                     .unwrap_or_else(|| "—".into())
             };
-            rows = rows.push(
-                widget::Row::new()
-                    .spacing(8)
-                    .align_y(cosmic::iced::Alignment::Center)
-                    .padding([3, 12])
-                    .push(widget::text::body(date_label).width(cosmic::iced::Length::Fill))
-                    .push(widget::text::body(format_wh(solar_wh)).width(value_width))
-                    .push(widget::text::body(format_wh(grid_wh)).width(value_width))
-                    .push(
-                        widget::text::body(format_daily_energy_percentage(solar_wh, grid_wh))
-                            .width(cosmic::iced::Length::Fixed(96.0))
-                            .align_x(cosmic::iced::Alignment::End),
-                    ),
-            );
+            let mut row = widget::Row::new()
+                .spacing(8)
+                .align_y(cosmic::iced::Alignment::Center)
+                .padding([3, 12])
+                .push(widget::text::body(date_label).width(cosmic::iced::Length::Fill));
+            if has_input_device {
+                row = row.push(widget::text::body(format_wh(solar_wh)).width(value_width));
+            }
+            row = row.push(widget::text::body(format_wh(grid_wh)).width(value_width));
+            if has_input_device {
+                row = row.push(
+                    widget::text::body(format_daily_energy_percentage(solar_wh, grid_wh))
+                        .width(cosmic::iced::Length::Fixed(96.0))
+                        .align_x(cosmic::iced::Alignment::End),
+                );
+            }
+            rows = rows.push(row);
         }
         section = section.push(rows);
         section = section.push(
@@ -2557,6 +2584,7 @@ struct LivePowerSummaryData {
     language: String,
     axis_start: String,
     history_collapsed: bool,
+    has_input_device: bool,
 }
 
 fn live_power_summary(
@@ -2577,6 +2605,7 @@ fn live_power_summary(
         language,
         axis_start,
         history_collapsed,
+        has_input_device,
     } = data;
 
     // Keep the current-power card focused on energy flow and aggregate input/output history.
@@ -2620,26 +2649,43 @@ fn live_power_summary(
     );
     if !history_collapsed {
         let output_label = crate::i18n::tr(&language, "TOTAL POWER OUTPUT");
-        let input_label = crate::i18n::tr(&language, "TOTAL POWER INPUT");
-        let combined_title = format!("{output_label} & {input_label}");
-        content = content
-            .push(interactive_combined_graph_with_axis(
-                &combined_title,
-                output_history,
-                input_history,
-                &graph_style,
-                "W",
-                axis_start,
-                (output_label, input_label),
-            ))
-            .push(menu_power_flow_summary(
-                current_input_w,
-                current_output_w,
-                today_input_wh,
-                today_output_wh,
-                yesterday_input_wh,
-                yesterday_output_wh,
-            ));
+        if has_input_device {
+            let input_label = crate::i18n::tr(&language, "TOTAL POWER INPUT");
+            let combined_title = format!("{output_label} & {input_label}");
+            content = content
+                .push(interactive_combined_graph_with_axis(
+                    &combined_title,
+                    output_history,
+                    input_history,
+                    &graph_style,
+                    "W",
+                    axis_start,
+                    (output_label, input_label),
+                ))
+                .push(menu_power_flow_summary(
+                    current_input_w,
+                    current_output_w,
+                    today_input_wh,
+                    today_output_wh,
+                    yesterday_input_wh,
+                    yesterday_output_wh,
+                ));
+        } else {
+            content = content
+                .push(interactive_graph_with_axis(
+                    &language,
+                    output_label,
+                    output_history.into_iter(),
+                    &graph_style,
+                    "W",
+                    axis_start,
+                ))
+                .push(menu_energy_values(
+                    Some(current_output_w),
+                    yesterday_output_wh,
+                    today_output_wh,
+                ));
+        }
     }
     surface_card(content.into(), 14)
 }
@@ -2777,6 +2823,7 @@ fn daily_power_metric_trends(
     refresh_interval_seconds: u32,
     style: &str,
     collapsed_sections: &HashSet<String>,
+    has_input_device: bool,
     copy_feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
     let daily = daily_energy_history(device_history, input_ains, refresh_interval_seconds);
@@ -2786,13 +2833,14 @@ fn daily_power_metric_trends(
         .iter()
         .filter_map(|(_, input, output)| energy_input_output_ratio_percent(*input, *output))
         .collect();
-    widget::Column::new()
+    let mut trends = widget::Column::new()
         .spacing(12)
         .width(cosmic::iced::Length::Fill)
         .push(widget::text::caption(
             "DAILY ENERGY TRENDS · LAST 7 DAYS (RECORDED DAYS ONLY)",
-        ))
-        .push(daily_metric_trend(
+        ));
+    if has_input_device {
+        trends = trends.push(daily_metric_trend(
             "INPUT · Wh",
             "graph-overview-daily-input",
             collapsed_sections.contains("graph-overview-daily-input"),
@@ -2800,17 +2848,19 @@ fn daily_power_metric_trends(
             "Wh",
             style,
             copy_feedback,
-        ))
-        .push(daily_metric_trend(
-            "OUTPUT · Wh",
-            "graph-overview-daily-output",
-            collapsed_sections.contains("graph-overview-daily-output"),
-            &output,
-            "Wh",
-            style,
-            copy_feedback,
-        ))
-        .push(daily_metric_trend(
+        ));
+    }
+    trends = trends.push(daily_metric_trend(
+        "OUTPUT · Wh",
+        "graph-overview-daily-output",
+        collapsed_sections.contains("graph-overview-daily-output"),
+        &output,
+        "Wh",
+        style,
+        copy_feedback,
+    ));
+    if has_input_device {
+        trends = trends.push(daily_metric_trend(
             "INPUT / OUTPUT · %",
             "graph-overview-daily-ratio",
             collapsed_sections.contains("graph-overview-daily-ratio"),
@@ -2818,8 +2868,9 @@ fn daily_power_metric_trends(
             "%",
             style,
             copy_feedback,
-        ))
-        .into()
+        ));
+    }
+    trends.into()
 }
 
 fn total_power_overview(
