@@ -994,7 +994,8 @@ fn output_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i6
     readings
         .iter()
         .filter(|reading| {
-            !input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+            reading.has_power_meter
+                && !input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
         })
         .map(|reading| reading.power_w)
         .sum()
@@ -2090,7 +2091,8 @@ fn input_power_w(readings: &[FritzReading], input_ains: &HashSet<String>) -> i64
     readings
         .iter()
         .filter(|reading| {
-            input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+            reading.has_power_meter
+                && input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
         })
         .map(|reading| signed_device_power(reading.power_w, true))
         .sum()
@@ -2271,6 +2273,10 @@ fn record_device_sample(
     now: Instant,
     window: Duration,
 ) {
+    // Never write a fabricated 0 W history sample for a sensor or thermostat.
+    if !reading.has_power_meter {
+        return;
+    }
     let samples = history
         .entry(crate::fritz::normalize_ain_for_selection(&reading.ain))
         .or_default();
@@ -2457,6 +2463,7 @@ fn displayed_power_w(readings: &[FritzReading], selected_ains: &[String]) -> Opt
             })
         })
         .or_else(|| readings.first())
+        .filter(|reading| reading.has_power_meter)
         .map(|reading| reading.power_w)
 }
 
@@ -2474,7 +2481,8 @@ fn energy_flow_values(
     input_ains: &HashSet<String>,
 ) -> Option<EnergyFlow> {
     let has_solar_reading = readings.iter().any(|reading| {
-        input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+        reading.has_power_meter
+            && input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
     });
     if !has_solar_reading {
         return None;
@@ -7119,7 +7127,7 @@ impl cosmic::Application for AppModel {
                                     widget::text::body(reading.name.clone())
                                         .width(cosmic::iced::Length::Fill),
                                 )
-                                .push(widget::text::body(format!("{:.0} W", reading.power_w)))
+                                .push(widget::text::body(if reading.has_power_meter { format!("{} W", reading.power_w) } else { "— W".into() }))
                                 .push(if reading.temperature_c.is_finite() {
                                     widget::text::caption(format!(
                                         "{} · {state}",
@@ -7189,7 +7197,7 @@ impl cosmic::Application for AppModel {
                                 "ain": reading.ain,
                                 "normalized_ain": ain,
                                 "current_reading_available": true,
-                                "current_power_w": reading.power_w,
+                                "current_power_w": reading.has_power_meter.then_some(reading.power_w),
                                 "current_temperature_c": reading.temperature_c.is_finite().then_some(reading.temperature_c),
                                 "history_entry_found": samples.is_some(),
                                 "sample_count": sample_count,
@@ -8254,10 +8262,11 @@ impl cosmic::Application for AppModel {
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(device_heading_button)
                         .push(
-                            widget::text::body(keep_value_unit_together(format!(
-                                "{} W",
-                                reading.power_w
-                            )))
+                            widget::text::body(keep_value_unit_together(if reading.has_power_meter {
+                                format!("{} W", reading.power_w)
+                            } else {
+                                "— W".to_string()
+                            }))
                             .width(cosmic::iced::Length::Fixed(76.0))
                             .align_x(cosmic::iced::Alignment::End),
                         )
@@ -8529,7 +8538,7 @@ impl cosmic::Application for AppModel {
                         row_key.clone(),
                         (
                             reading.name.to_lowercase(),
-                            Some(reading.power_w as f64),
+                            reading.has_power_meter.then_some(reading.power_w as f64),
                             reading
                                 .temperature_c
                                 .is_finite()
@@ -12655,6 +12664,7 @@ mod history_tests {
                 ain: "111111".into(),
                 name: "First".into(),
                 power_w: 800,
+                has_power_meter: true,
                 temperature_c: 20.0,
                 power_state: None,
                 power_controllable: false,
@@ -12664,6 +12674,7 @@ mod history_tests {
                 ain: "222222".into(),
                 name: "Solar input".into(),
                 power_w: 250,
+                has_power_meter: true,
                 temperature_c: 21.0,
                 power_state: None,
                 power_controllable: false,
@@ -12777,6 +12788,7 @@ mod history_tests {
                 ain: "111111".into(),
                 name: "Load".into(),
                 power_w: 400,
+                has_power_meter: true,
                 temperature_c: 20.0,
                 power_state: None,
                 power_controllable: false,
@@ -12786,6 +12798,7 @@ mod history_tests {
                 ain: "222222".into(),
                 name: "Solar".into(),
                 power_w: 250,
+                has_power_meter: true,
                 temperature_c: 21.0,
                 power_state: None,
                 power_controllable: false,
@@ -12795,6 +12808,7 @@ mod history_tests {
                 ain: "333333".into(),
                 name: "Solar battery".into(),
                 power_w: 100,
+                has_power_meter: true,
                 temperature_c: 22.0,
                 power_state: None,
                 power_controllable: false,
@@ -12815,6 +12829,7 @@ mod history_tests {
                 ain: "111111".into(),
                 name: "FRITZ! load".into(),
                 power_w: 400,
+                has_power_meter: true,
                 temperature_c: 20.0,
                 power_state: None,
                 power_controllable: false,
@@ -12824,6 +12839,7 @@ mod history_tests {
                 ain: "TASMOTA:AABBCCDDEEFF".into(),
                 name: "Tasmota load".into(),
                 power_w: 75,
+                has_power_meter: true,
                 temperature_c: f64::NAN,
                 power_state: Some(true),
                 power_controllable: true,
@@ -12833,6 +12849,7 @@ mod history_tests {
                 ain: "TASMOTA:FFEEDDCCBBAA".into(),
                 name: "Tasmota solar inverter".into(),
                 power_w: 125,
+                has_power_meter: true,
                 temperature_c: f64::NAN,
                 power_state: Some(true),
                 power_controllable: true,
@@ -12855,6 +12872,7 @@ mod history_tests {
                 ain: "111111".into(),
                 name: "House load".into(),
                 power_w: 900,
+                has_power_meter: true,
                 temperature_c: 20.0,
                 power_state: None,
                 power_controllable: false,
@@ -12864,6 +12882,7 @@ mod history_tests {
                 ain: "222222".into(),
                 name: "Solar inverter".into(),
                 power_w: 350,
+                has_power_meter: true,
                 temperature_c: 21.0,
                 power_state: None,
                 power_controllable: false,
@@ -12890,6 +12909,7 @@ mod history_tests {
                 ain: "111111".into(),
                 name: "House load".into(),
                 power_w: 250,
+                has_power_meter: true,
                 temperature_c: 20.0,
                 power_state: None,
                 power_controllable: false,
@@ -12899,6 +12919,7 @@ mod history_tests {
                 ain: "222222".into(),
                 name: "Solar inverter".into(),
                 power_w: 800,
+                has_power_meter: true,
                 temperature_c: 21.0,
                 power_state: None,
                 power_controllable: false,
@@ -12924,6 +12945,7 @@ mod history_tests {
             ain: "111111".into(),
             name: "House load".into(),
             power_w: 250,
+            has_power_meter: true,
             temperature_c: 20.0,
             power_state: None,
             power_controllable: false,
@@ -12992,6 +13014,7 @@ mod history_tests {
             ain: ain.to_string(),
             name: name.to_string(),
             power_w: 100,
+            has_power_meter: true,
             temperature_c: 20.0,
             power_state: None,
             power_controllable: false,
@@ -13083,6 +13106,7 @@ mod history_tests {
                 ain: "111111".into(),
                 name: "First".into(),
                 power_w: 100,
+                has_power_meter: true,
                 temperature_c: 20.0,
                 power_state: None,
                 power_controllable: false,
@@ -13092,6 +13116,7 @@ mod history_tests {
                 ain: "222222".into(),
                 name: "Second".into(),
                 power_w: 200,
+                has_power_meter: true,
                 temperature_c: 24.0,
                 power_state: None,
                 power_controllable: false,
@@ -13110,6 +13135,7 @@ mod history_tests {
                 ain: "111111".into(),
                 name: "Living room".into(),
                 power_w: 0,
+                has_power_meter: true,
                 temperature_c: 20.0,
                 power_state: None,
                 power_controllable: false,
@@ -13119,6 +13145,7 @@ mod history_tests {
                 ain: "222222".into(),
                 name: "Bedroom".into(),
                 power_w: 0,
+                has_power_meter: true,
                 temperature_c: 24.0,
                 power_state: None,
                 power_controllable: false,
@@ -13128,6 +13155,7 @@ mod history_tests {
                 ain: "333333".into(),
                 name: "Unselected office".into(),
                 power_w: 0,
+                has_power_meter: true,
                 temperature_c: 40.0,
                 power_state: None,
                 power_controllable: false,
@@ -13154,6 +13182,7 @@ mod history_tests {
                 ain: "111111".into(),
                 name: "Living room".into(),
                 power_w: 100,
+                has_power_meter: true,
                 temperature_c: 20.0,
                 power_state: None,
                 power_controllable: false,
@@ -13163,6 +13192,7 @@ mod history_tests {
                 ain: "222222".into(),
                 name: "Solar inverter".into(),
                 power_w: 200,
+                has_power_meter: true,
                 temperature_c: 40.0,
                 power_state: None,
                 power_controllable: false,
@@ -13172,6 +13202,7 @@ mod history_tests {
                 ain: "333333".into(),
                 name: "ROOF SOLAR METER".into(),
                 power_w: 300,
+                has_power_meter: true,
                 temperature_c: 50.0,
                 power_state: None,
                 power_controllable: false,
@@ -13197,6 +13228,7 @@ mod history_tests {
             ain: "111111".into(),
             name: "Living room".into(),
             power_w: 150,
+            has_power_meter: true,
             temperature_c: 20.0,
             power_state: None,
             power_controllable: false,
@@ -13382,6 +13414,7 @@ mod history_tests {
                 ain: "11:11 11".into(),
                 name: "Generation".into(),
                 power_w: 900,
+                has_power_meter: true,
                 temperature_c: 20.0,
                 power_state: None,
                 power_controllable: false,
@@ -13391,6 +13424,7 @@ mod history_tests {
                 ain: "22:22 22".into(),
                 name: "Consumption".into(),
                 power_w: 250,
+                has_power_meter: true,
                 temperature_c: 21.0,
                 power_state: None,
                 power_controllable: false,
@@ -13412,6 +13446,7 @@ mod history_tests {
             ain: "11:11 11".into(),
             name: "Test device".into(),
             power_w: 120,
+            has_power_meter: true,
             temperature_c: 21.5,
             power_state: None,
             power_controllable: false,
@@ -13763,6 +13798,7 @@ mod history_tests {
                 ain: "12:34-56".into(),
                 name: "Test switch".into(),
                 power_w: 100,
+                has_power_meter: true,
                 temperature_c: 20.0,
                 power_state: reported,
                 power_controllable: false,
@@ -13919,6 +13955,7 @@ mod device_list_sort_tests {
             ain: ain.into(),
             name: name.into(),
             power_w,
+            has_power_meter: true,
             temperature_c,
             power_state: None,
             power_controllable: false,
@@ -14038,6 +14075,7 @@ mod disclosure_state_tests {
             ain: "TASMOTA:AABB".into(),
             name: "Desk plug".into(),
             power_w: 42,
+            has_power_meter: true,
             temperature_c: f64::NAN,
             power_state: Some(true),
             power_controllable: true,

@@ -4,6 +4,10 @@
 
 ### Added
 
+- Discover more FRITZ!Box Smart Home devices, including switch-only, temperature-only, thermostat and simple on/off modules. Show available readings without inventing wattage, restrict switching to explicitly unlocked switch interfaces, and exclude non-meter devices from power totals and history.
+
+### Added
+
 - Add per-Netatmo CO₂ threshold notifications, off by default, with adjustable 600–5,000 ppm limit (1,200 ppm default), saved preferences and safe-range re-arming. Missing and stale measurements do not fire notifications.
 
 ### Automation
