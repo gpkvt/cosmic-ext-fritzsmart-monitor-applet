@@ -7665,7 +7665,7 @@ impl cosmic::Application for AppModel {
                         history_collapsed: self
                             .collapsed_menu_sections
                             .contains("current-power-history"),
-                        has_input_device: has_input_device(&self.settings),
+                        has_input_device,
                     },
                     self.copy_feedback.as_ref(),
                 );
@@ -8537,7 +8537,7 @@ impl cosmic::Application for AppModel {
                         self.settings.refresh_interval_seconds,
                         self.collapsed_menu_sections
                             .contains("daily-energy-history"),
-                        has_input_device(&self.settings),
+                        has_input_device,
                         self.copy_feedback.as_ref(),
                     ),
                 ));
