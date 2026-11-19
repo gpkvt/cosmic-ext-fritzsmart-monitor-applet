@@ -54,7 +54,10 @@ jobs:
       - name: Bump version and create immutable tag
         id: version
         env:
-          BUMP_TYPE: ${{ inputs.bump_type || 'patch' }}
+          # Preserve workflow_dispatch semantics, but let a merged
+          # release(major): PR request a major stable release on push.
+          # Ordinary source/documentation pushes still default to patch.
+          BUMP_TYPE: ${{ inputs.bump_type || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'release(major):') && 'major') || 'patch' }}
         shell: bash
         run: |
           set -euo pipefail
