@@ -603,7 +603,7 @@ fn serialize_netatmo_co2_alerts(alerts: &HashMap<String, u16>) -> String {
     let mut entries: Vec<_> = alerts
         .iter()
         .filter(|(id, threshold)| {
-            crate::netatmo::valid_id(id) && (600..=5000).contains(threshold)
+            crate::netatmo::valid_id(id) && (600..=5000).contains(*threshold)
         })
         .map(|(id, threshold)| format!("{id}:{threshold}"))
         .collect();
