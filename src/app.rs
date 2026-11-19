@@ -3467,6 +3467,7 @@ enum SettingsDeviceEntry<'a> {
     Metered(&'a FritzDevice),
     HueLight(&'a HueLight),
     HueSensor(&'a HueSensor),
+    Netatmo(&'a NetatmoSensor),
 }
 
 impl SettingsDeviceEntry<'_> {
@@ -3475,6 +3476,7 @@ impl SettingsDeviceEntry<'_> {
             Self::Metered(device) => device.ain.clone(),
             Self::HueLight(light) => hue_device_id("light", &light.id),
             Self::HueSensor(sensor) => hue_device_id("sensor", &sensor.id),
+            Self::Netatmo(sensor) => format!("NETATMO:{}", sensor.id),
         }
     }
 
@@ -3494,6 +3496,11 @@ impl SettingsDeviceEntry<'_> {
                 sensor.name.to_lowercase().contains(query.as_str())
                     || sensor.id.to_lowercase().contains(query.as_str())
                     || "hue sensor motion temperature lux".contains(query.as_str())
+            }
+            Self::Netatmo(sensor) => {
+                sensor.name.to_lowercase().contains(query.as_str())
+                    || sensor.id.to_lowercase().contains(query.as_str())
+                    || "netatmo weather station temperature humidity co2 pressure".contains(query.as_str())
             }
         }
     }
@@ -6032,7 +6039,7 @@ impl cosmic::Application for AppModel {
                         "Manage connected devices",
                     )))
                     .push(widget::text::caption(
-                        "Discover FRITZ!Box and Tasmota power meters plus paired Hue lights and sensors. Devices are managed together.",
+                        "Manage FRITZ!Box and Tasmota power meters, Hue lights/sensors, and Netatmo Weather Station modules together.",
                     ))
                     .push(
                         widget::Row::new().width(cosmic::iced::Length::Fill)
@@ -6069,6 +6076,7 @@ impl cosmic::Application for AppModel {
                 if !self.devices.is_empty()
                     || !self.hue_lights.is_empty()
                     || !self.hue_sensors.is_empty()
+                    || !self.netatmo_sensors.is_empty()
                 {
                     content = content.push(widget::text::caption(
                         "Select visible devices and use +/− to arrange their saved order. Power-meter input and temperature alerts are only available where supported.",
@@ -6079,6 +6087,7 @@ impl cosmic::Application for AppModel {
                         .map(SettingsDeviceEntry::Metered)
                         .chain(self.hue_lights.iter().map(SettingsDeviceEntry::HueLight))
                         .chain(self.hue_sensors.iter().map(SettingsDeviceEntry::HueSensor))
+                        .chain(self.netatmo_sensors.iter().map(SettingsDeviceEntry::Netatmo))
                         .collect();
                     ordered_devices.sort_by_key(|entry| {
                         device_order_position(&self.settings.device_order, &entry.device_id())
@@ -6250,6 +6259,39 @@ impl cosmic::Application for AppModel {
                                     Some(light_control),
                                     None,
                                 ));
+                            }
+                            SettingsDeviceEntry::Netatmo(sensor) => {
+                                let id = format!("NETATMO:{}", sensor.id);
+                                let visible = !self.settings.hidden_netatmo_devices.contains(&sensor.id);
+                                let check_id = sensor.id.clone();
+                                let row = widget::Row::new()
+                                    .width(cosmic::iced::Length::Fill)
+                                    .spacing(8)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(widget::checkbox(visible)
+                                        .label(sensor.name.clone())
+                                        .on_toggle(move |value| Message::ToggleNetatmoVisible(check_id.clone(), value)))
+                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                    .push(icon_action_button("+", "Move device up", Message::MoveDevice(id.clone(), true)))
+                                    .push(icon_action_button("−", "Move device down", Message::MoveDevice(id.clone(), false)));
+                                let mut details = widget::Column::new()
+                                    .spacing(8)
+                                    .push(row)
+                                    .push(widget::text::caption(if sensor.reachable {
+                                        "Netatmo · Weather Station · Read-only cloud sensor"
+                                    } else {
+                                        "Netatmo · Weather Station · Unavailable / stale"
+                                    }));
+                                if sensor.temperature_c.is_some() {
+                                    let key = crate::fritz::normalize_ain_for_selection(&id);
+                                    details = details.push(temperature_alert_controls(
+                                        id,
+                                        self.settings.temperature_alerts.get(&key).copied(),
+                                        &self.settings.language,
+                                        &self.settings.temperature_unit,
+                                    ));
+                                }
+                                content = content.push(surface_card(details.into(), 8));
                             }
                             SettingsDeviceEntry::HueSensor(sensor) => {
                                 let id = hue_device_id("sensor", &sensor.id);
@@ -10482,6 +10524,7 @@ impl cosmic::Application for AppModel {
                             .iter()
                             .map(|sensor| hue_device_id("sensor", &sensor.id)),
                     )
+                    .chain(self.netatmo_sensors.iter().map(|sensor| format!("NETATMO:{}", sensor.id)))
                     .collect();
                 order.sort_by_key(|device_ain| {
                     device_order_position(&self.settings.device_order, device_ain)
