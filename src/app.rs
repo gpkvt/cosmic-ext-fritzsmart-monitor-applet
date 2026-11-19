@@ -11243,6 +11243,46 @@ mod disclosure_state_tests {
     }
 
     #[test]
+    fn inactive_device_transition_notifies_only_on_change() {
+        let mut previous = HashSet::new();
+        let missing = vec![("TASMOTA:AA:BB".to_string(), "Desk plug".to_string())];
+        assert_eq!(
+            super::newly_missing_devices(&mut previous, &missing, &HashSet::new()),
+            vec!["Desk plug".to_string()]
+        );
+        assert!(
+            super::newly_missing_devices(&mut previous, &missing, &HashSet::new()).is_empty()
+        );
+        let recovered = vec![super::FritzReading {
+            ain: "TASMOTA:AABB".into(),
+            name: "Desk plug".into(),
+            power_w: 42,
+            temperature_c: f64::NAN,
+            power_state: Some(true),
+            power_controllable: true,
+            power_toggle_allowed: true,
+        }];
+        assert_eq!(
+            super::recovered_device_names(&previous, &recovered),
+            vec!["Desk plug".to_string()]
+        );
+        assert!(super::newly_missing_devices(
+            &mut previous,
+            &[],
+            &HashSet::new()
+        )
+        .is_empty());
+        assert!(super::recovered_device_names(&previous, &recovered).is_empty());
+    }
+
+    #[test]
+    fn inactive_devices_are_polled_at_least_once_per_minute() {
+        assert_eq!(super::refresh_interval_with_inactive_devices(3600, true), 60);
+        assert_eq!(super::refresh_interval_with_inactive_devices(30, true), 30);
+        assert_eq!(super::refresh_interval_with_inactive_devices(300, false), 300);
+    }
+
+    #[test]
     fn section_disclosure_toggles_without_mutating_other_sections() {
         let mut collapsed = HashSet::from(["devices".to_string()]);
         toggle_collapsible_state(&mut collapsed, "total-power-overview".into());
