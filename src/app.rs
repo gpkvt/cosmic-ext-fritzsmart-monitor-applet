@@ -3033,16 +3033,17 @@ fn copy_feedback_icon(
         "emblem-ok-symbolic"
     };
     // Fixed icon bounds prevent shifting adjacent heading controls.
-    widget::container(widget::icon::from_name(icon).size(if phase == CopyIconPhase::Pulse {
+    let size = if phase == CopyIconPhase::Pulse {
         18
     } else {
         14
-    }))
-    .width(cosmic::iced::Length::Fixed(20.0))
-    .height(cosmic::iced::Length::Fixed(20.0))
-    .align_x(cosmic::iced::Alignment::Center)
-    .align_y(cosmic::iced::Alignment::Center)
-    .into()
+    };
+    widget::container(widget::icon::from_name(icon).size(size))
+        .width(cosmic::iced::Length::Fixed(20.0))
+        .height(cosmic::iced::Length::Fixed(20.0))
+        .align_x(cosmic::iced::Alignment::Center)
+        .align_y(cosmic::iced::Alignment::Center)
+        .into()
 }
 
 fn copy_menu_title_button(
@@ -5403,7 +5404,7 @@ impl cosmic::Application for AppModel {
                     ))
                     .push(diagnostic_url_button(
                         "https://api.openweathermap.org/data/2.5/weather".into(),
-                    self.copy_feedback.as_ref(),
+                        self.copy_feedback.as_ref(),
                     ));
 
                 let commons_status = if !self.settings.weather_enabled {
@@ -5445,7 +5446,7 @@ impl cosmic::Application for AppModel {
                     ))
                     .push(diagnostic_url_button(
                         "https://commons.wikimedia.org/w/api.php".into(),
-                    self.copy_feedback.as_ref(),
+                        self.copy_feedback.as_ref(),
                     ));
 
                 let forecast_status = if self.settings.weather_location.trim().is_empty() {
@@ -5485,7 +5486,7 @@ impl cosmic::Application for AppModel {
                     ))
                     .push(diagnostic_url_button(
                         "https://geocoding-api.open-meteo.com/v1/search".into(),
-                    self.copy_feedback.as_ref(),
+                        self.copy_feedback.as_ref(),
                     ))
                     .push(diagnostic_status_row(
                         crate::i18n::tr(&self.settings.language, "Open-Meteo · forecast"),
@@ -5494,7 +5495,7 @@ impl cosmic::Application for AppModel {
                     ))
                     .push(diagnostic_url_button(
                         "https://api.open-meteo.com/v1/forecast".into(),
-                    self.copy_feedback.as_ref(),
+                        self.copy_feedback.as_ref(),
                     ))
                     .push(action_button(
                         "view-refresh-symbolic",
@@ -10891,8 +10892,14 @@ mod copy_feedback_tests {
     fn copy_icon_pulses_and_returns_to_idle_without_affecting_other_buttons() {
         let start = Instant::now();
         let feedback = ("Title".to_string(), start);
-        assert_eq!(copy_icon_phase("Title", Some(&feedback), start), CopyIconPhase::Pulse);
-        assert_eq!(copy_icon_phase("Other", Some(&feedback), start), CopyIconPhase::Idle);
+        assert_eq!(
+            copy_icon_phase("Title", Some(&feedback), start),
+            CopyIconPhase::Pulse
+        );
+        assert_eq!(
+            copy_icon_phase("Other", Some(&feedback), start),
+            CopyIconPhase::Idle
+        );
         assert_eq!(
             copy_icon_phase("Title", Some(&feedback), start + Duration::from_millis(300)),
             CopyIconPhase::Confirmed
