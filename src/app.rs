@@ -121,6 +121,7 @@ pub enum Message {
     PasswordChanged(String),
     TasmotaUsernameChanged(String),
     TasmotaPasswordChanged(String),
+    TasmotaSubnetScanChanged(bool),
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
@@ -4604,7 +4605,22 @@ impl cosmic::Application for AppModel {
                     )))
                     .push(widget::text::caption(
                         "Searches the FRITZ!Box and the local network for compatible Tasmota devices. Both appear in the same list below.",
-                    ));
+                    ))
+                    .push(
+                        widget::Row::new()
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::Column::new()
+                                    .spacing(3)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .push(widget::text::body("Scan the local subnet"))
+                                    .push(widget::text::caption(
+                                        "Also probe the FRITZ!Box /24 network after mDNS discovery. Disable this for mDNS-only discovery or networks where subnet scans are undesirable.",
+                                    )),
+                            )
+                            .push(widget::toggler(self.settings.tasmota_subnet_scan)
+                                .on_toggle(Message::TasmotaSubnetScanChanged)),
+                    );
                 content = content.push(action_button(
                     "view-refresh-symbolic",
                     crate::i18n::tr(&self.settings.language, "Discover devices"),
@@ -8627,6 +8643,10 @@ impl cosmic::Application for AppModel {
             }
             Message::TasmotaPasswordChanged(value) => {
                 self.settings.tasmota_password = value;
+                self.persist_settings();
+            }
+            Message::TasmotaSubnetScanChanged(value) => {
+                self.settings.tasmota_subnet_scan = value;
                 self.persist_settings();
             }
             Message::AllowInvalidCertsChanged(value) => {
