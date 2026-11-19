@@ -89,6 +89,8 @@ pub struct AppModel {
     device_history: HashMap<String, VecDeque<(Instant, i64, f64)>>,
     hue_sensor_history: crate::history::HueSensorHistory,
     temperature_alert_state: HashMap<String, bool>,
+    /// Tracks safe/over-limit CO₂ states independently from temperature alarms.
+    netatmo_co2_alert_state: HashMap<String, bool>,
     missing_device_ains: HashSet<String>,
     next_refresh_at: Option<Instant>,
     refresh_started_at: Option<Instant>,
@@ -177,6 +179,8 @@ pub enum Message {
     NetatmoLoaded(u64, Result<NetatmoSnapshot, String>),
     ToggleNetatmoOutdoorTemperature(String, bool),
     ToggleNetatmoVisible(String, bool),
+    ToggleNetatmoCo2Alert(String, bool),
+    NetatmoCo2ThresholdChanged(String, u16),
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
@@ -480,6 +484,20 @@ fn device_matches_search(device: &FritzDevice, query: &str) -> bool {
     query.is_empty()
         || device.name.to_lowercase().contains(&query.to_lowercase())
         || device.ain.to_lowercase().contains(&query.to_lowercase())
+}
+
+/// Alert only after a measured safe -> high transition, never for first samples
+/// or measurements missing because a station is offline.
+fn netatmo_co2_above_limit(ppm: Option<f64>, threshold: u16) -> Option<bool> {
+    ppm.filter(|value| value.is_finite() && *value >= 0.0)
+        .map(|value| value > f64::from(threshold))
+}
+
+fn notify_netatmo_co2_alert(name: &str, ppm: f64, threshold: u16) {
+    let _ = notify_rust::Notification::new()
+        .summary(&format!("High CO₂: {name}"))
+        .body(&format!("{ppm:.0} ppm (limit: {threshold} ppm). Ventilate the room."))
+        .show();
 }
 
 fn temperature_outside_limits(temperature: f64, thresholds: TemperatureAlertThresholds) -> bool {
@@ -6382,6 +6400,39 @@ impl cosmic::Application for AppModel {
                                             })),
                                     );
                                 }
+                                // Show CO₂ alarm configuration whenever a module has a
+                                // valid CO₂ sensor, including if the reading later goes stale.
+                                if sensor.co2_ppm.is_some()
+                                    || self.settings.netatmo_co2_alerts.contains_key(&sensor.id)
+                                {
+                                    let enabled_threshold = self.settings.netatmo_co2_alerts.get(&sensor.id).copied();
+                                    let module_id = sensor.id.clone();
+                                    details = details.push(
+                                        widget::Row::new()
+                                            .width(cosmic::iced::Length::Fill)
+                                            .align_y(cosmic::iced::Alignment::Center)
+                                            .push(widget::text::caption("CO₂ notifications"))
+                                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                            .push(widget::toggler(enabled_threshold.is_some()).on_toggle(
+                                                move |enabled| Message::ToggleNetatmoCo2Alert(module_id.clone(), enabled)
+                                            )),
+                                    );
+                                    if let Some(threshold) = enabled_threshold {
+                                        let module_id = sensor.id.clone();
+                                        details = details
+                                            .push(widget::text::caption(format!("CO₂ alert above: {threshold} ppm")))
+                                            .push(widget::slider(
+                                                600.0..=5000.0,
+                                                f32::from(threshold),
+                                                move |value| Message::NetatmoCo2ThresholdChanged(
+                                                    module_id.clone(), value.round() as u16
+                                                ),
+                                            ).step(100.0_f32))
+                                            .push(widget::text::caption(
+                                                "Notify once when CO₂ rises above the limit; re-arm after it returns to the safe range. Disabled by default.",
+                                            ));
+                                    }
+                                }
                                 if sensor.temperature_c.is_some() {
                                     let key = crate::fritz::normalize_ain_for_selection(&id);
                                     details = details.push(temperature_alert_controls(
@@ -11245,6 +11296,24 @@ impl cosmic::Application for AppModel {
                                 let now = Instant::now();
                                 for sensor in &sensors {
                                     crate::netatmo::record_history(&mut self.netatmo_history, sensor, now, window);
+                                    if let Some(threshold) = self.settings.netatmo_co2_alerts.get(&sensor.id).copied() {
+                                        if let Some(above) = netatmo_co2_above_limit(
+                                            sensor.reachable.then_some(sensor.co2_ppm).flatten(),
+                                            threshold,
+                                        ) {
+                                            if should_notify_temperature_alert(
+                                                self.netatmo_co2_alert_state.get(&sensor.id).copied(),
+                                                above,
+                                            ) {
+                                                if let Some(ppm) = sensor.co2_ppm {
+                                                    notify_netatmo_co2_alert(&sensor.name, ppm, threshold);
+                                                }
+                                            }
+                                            self.netatmo_co2_alert_state.insert(sensor.id.clone(), above);
+                                        }
+                                    } else {
+                                        self.netatmo_co2_alert_state.remove(&sensor.id);
+                                    }
                                     let key = crate::fritz::normalize_ain_for_selection(
                                         &format!("NETATMO:{}", sensor.id));
                                     if let Some(thresholds) =
@@ -11328,6 +11397,26 @@ impl cosmic::Application for AppModel {
                 }
                 self.settings.weather_temperature_source_initialized = true;
                 self.persist_settings();
+            }
+            Message::ToggleNetatmoCo2Alert(id, enabled) => {
+                if !self.netatmo_sensors.iter().any(|sensor| sensor.id == id
+                    && (sensor.co2_ppm.is_some() || self.settings.netatmo_co2_alerts.contains_key(&id))) {
+                    return Task::none();
+                }
+                self.netatmo_co2_alert_state.remove(&id);
+                if enabled {
+                    self.settings.netatmo_co2_alerts.entry(id).or_insert(1200);
+                } else {
+                    self.settings.netatmo_co2_alerts.remove(&id);
+                }
+                self.persist_settings();
+            }
+            Message::NetatmoCo2ThresholdChanged(id, threshold) => {
+                if let Some(saved) = self.settings.netatmo_co2_alerts.get_mut(&id) {
+                    *saved = threshold.clamp(600, 5000);
+                    self.netatmo_co2_alert_state.remove(&id);
+                    self.persist_settings();
+                }
             }
             Message::ToggleNetatmoVisible(id, visible) => {
                 if !self.netatmo_sensors.iter().any(|sensor| sensor.id == id) {
@@ -12649,6 +12738,18 @@ mod history_tests {
         assert!(device_matches_search(&device, "  INVERTER  "));
         assert!(device_matches_search(&device, "  "));
         assert!(!device_matches_search(&device, "smart plug"));
+    }
+
+    #[test]
+    fn co2_alerts_only_fire_after_a_safe_to_high_transition() {
+        assert_eq!(netatmo_co2_above_limit(Some(1200.0), 1200), Some(false));
+        assert_eq!(netatmo_co2_above_limit(Some(1200.1), 1200), Some(true));
+        assert_eq!(netatmo_co2_above_limit(None, 1200), None);
+        assert_eq!(netatmo_co2_above_limit(Some(f64::NAN), 1200), None);
+        assert!(!should_notify_temperature_alert(None, true));
+        assert!(should_notify_temperature_alert(Some(false), true));
+        assert!(!should_notify_temperature_alert(Some(true), true));
+        assert!(!should_notify_temperature_alert(Some(true), false));
     }
 
     #[test]

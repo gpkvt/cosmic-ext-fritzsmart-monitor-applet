@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Add per-Netatmo CO₂ threshold notifications, off by default, with adjustable 600–5,000 ppm limit (1,200 ppm default), saved preferences and safe-range re-arming. Missing and stale measurements do not fire notifications.
+
 ### Automation
 
 - Restore **manual-only GitHub Pages publication** via Actions `workflow_dispatch` or `make publish-pages`: build static documentation, validate assets and links, then deploy to the existing `gh-pages` branch. Regular pushes and release workflows remain disabled.
