@@ -1055,6 +1055,35 @@ fn menu_energy_values(
         .into()
 }
 
+fn menu_temperature_values(
+    current_c: Option<f64>,
+    minimum_c: Option<f64>,
+    maximum_c: Option<f64>,
+) -> cosmic::Element<'static, Message> {
+    let value_row = |label: &'static str, value: Option<f64>| {
+        let display = value
+            .filter(|value| value.is_finite())
+            .map(|value| format!("{value:.1} °C"))
+            .unwrap_or_else(|| "— °C".to_string());
+        widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::text::caption(label).width(cosmic::iced::Length::Fill))
+            .push(
+                widget::text::title3(keep_value_unit_together(display))
+                    .width(cosmic::iced::Length::Fixed(92.0))
+                    .align_x(cosmic::iced::Alignment::End),
+            )
+    };
+    widget::Column::new()
+        .spacing(4)
+        .width(cosmic::iced::Length::Fill)
+        .push(value_row("CURRENT", current_c))
+        .push(value_row("MIN", minimum_c))
+        .push(value_row("MAX", maximum_c))
+        .into()
+}
+
 fn menu_power_flow_summary(
     current_input_w: f64,
     current_output_w: f64,
@@ -6840,10 +6869,36 @@ impl cosmic::Application for AppModel {
                         }
                     });
                     let mut device_graph_content = widget::Column::new()
-                        .spacing(8)
+                        .spacing(12)
                         .width(cosmic::iced::Length::Fill)
-                        .push(power_graph);
+                        .push(
+                            widget::Row::new()
+                                .spacing(12)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .width(cosmic::iced::Length::Fill)
+                                .push(
+                                    widget::container(power_graph)
+                                        .width(cosmic::iced::Length::FillPortion(3)),
+                                )
+                                .push(
+                                    widget::container(menu_energy_values(
+                                        device_history
+                                            .and_then(|samples| samples.back())
+                                            .map(|(_, power, _)| *power as f64),
+                                        device_yesterday_wh,
+                                        device_today_wh,
+                                    ))
+                                    .width(cosmic::iced::Length::FillPortion(2)),
+                                ),
+                        );
                     if reading.temperature_c.is_finite() {
+                        let temperature_samples: Vec<f64> = device_history
+                            .into_iter()
+                            .flat_map(|samples| samples.iter().map(|(_, _, temperature)| *temperature))
+                            .filter(|temperature| temperature.is_finite())
+                            .collect();
+                        let minimum_temperature = temperature_samples.iter().copied().reduce(f64::min);
+                        let maximum_temperature = temperature_samples.iter().copied().reduce(f64::max);
                         let temperature_graph = widget::container(
                             widget::container(
                                 widget::Column::new()
@@ -6912,36 +6967,27 @@ impl cosmic::Application for AppModel {
                                 ..Default::default()
                             }
                         });
-                        device_graph_content = device_graph_content.push(temperature_graph);
+                        device_graph_content = device_graph_content.push(
+                            widget::Row::new()
+                                .spacing(12)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .width(cosmic::iced::Length::Fill)
+                                .push(
+                                    widget::container(temperature_graph)
+                                        .width(cosmic::iced::Length::FillPortion(3)),
+                                )
+                                .push(
+                                    widget::container(menu_temperature_values(
+                                        current_temperature,
+                                        minimum_temperature,
+                                        maximum_temperature,
+                                    ))
+                                    .width(cosmic::iced::Length::FillPortion(2)),
+                                ),
+                        );
                     }
                     let current_temperature = reading.temperature_c.is_finite().then_some(reading.temperature_c);
-                    let mut graph_side_info = widget::Column::new()
-                        .spacing(10)
-                        .width(cosmic::iced::Length::FillPortion(2));
-                    if let Some(temperature) = current_temperature {
-                        graph_side_info = graph_side_info.push(device_metric_tile(
-                            "TEMPERATURE",
-                            format!("{temperature:.1} °C"),
-                            "utilities-temperature-symbolic",
-                            device_corner_radius,
-                        ));
-                    }
-                    graph_side_info = graph_side_info.push(menu_energy_values(
-                        device_history
-                            .and_then(|samples| samples.back())
-                            .map(|(_, power, _)| *power as f64),
-                        device_yesterday_wh,
-                        device_today_wh,
-                    ));
-                    let graph_columns = widget::Row::new()
-                        .spacing(12)
-                        .align_y(cosmic::iced::Alignment::Start)
-                        .width(cosmic::iced::Length::Fill)
-                        .push(
-                            widget::container(device_graph_content)
-                                .width(cosmic::iced::Length::FillPortion(3)),
-                        )
-                        .push(graph_side_info);
+                    let graph_columns = device_graph_content;
                     let device_graphs = collapsible_graph(
                         if reading.temperature_c.is_finite() {
                             "POWER & TEMPERATURE HISTORY"
