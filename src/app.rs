@@ -2127,17 +2127,21 @@ fn device_corner_radius(index: usize, device_count: usize) -> cosmic::iced::bord
 }
 
 /// Match the large daily readings without nesting additional metric cards.
-fn power_range_row(
+/// Keep current power beside its low/high history in the same 3-column row.
+fn power_metrics_row(
     low_label: &'static str,
     high_label: &'static str,
+    now_label: &'static str,
     low: String,
     high: String,
+    now: String,
 ) -> cosmic::Element<'static, Message> {
     widget::Row::new()
         .spacing(10)
         .width(cosmic::iced::Length::Fill)
         .push(daily_power_metric(low_label, low))
         .push(daily_power_metric(high_label, high))
+        .push(daily_power_metric(now_label, now))
         .into()
 }
 
@@ -2540,8 +2544,8 @@ fn total_power_overview(
     } else {
         "— W".to_string()
     };
-    // One consistent large-value layout: daily energy, historical range,
-    // and the current input/output power values at the very bottom.
+    // One consistent large-value layout: daily energy first, then two
+    // three-column rows combining historical range with current power.
     let content = widget::Column::new()
         .spacing(10)
         .width(cosmic::iced::Length::Fill)
@@ -2552,24 +2556,21 @@ fn total_power_overview(
             output_yesterday_wh,
         ))
         .push(widget::divider::horizontal::default())
-        .push(power_range_row(
+        .push(power_metrics_row(
             "OUTPUT LOW",
             "OUTPUT HIGH",
+            "NOW OUTPUT",
             format!("{output_low} W"),
             format!("{output_high} W"),
+            current_value(total_output_w),
         ))
-        .push(power_range_row(
+        .push(power_metrics_row(
             "INPUT LOW",
             "INPUT HIGH",
+            "NOW INPUT",
             input_low_label,
             input_high_label,
-        ))
-        .push(widget::divider::horizontal::default())
-        .push(power_range_row(
-            "NOW INPUT",
-            "NOW OUTPUT",
             current_input.clone(),
-            current_value(total_output_w),
         ));
     let collapsed = collapsed_sections.contains("total-power-overview");
     let collapsed_summary = widget::Row::new()
