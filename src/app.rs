@@ -220,6 +220,7 @@ pub enum Message {
     ToggleTemperatureAlert(String, bool),
     TemperatureAlertHighChanged(String, i16),
     TemperatureAlertLowChanged(String, i16),
+    WeatherNetatmoExtraMetricsChanged(bool),
     WeatherUpdated(Box<Result<WeatherData, String>>),
     WeatherImagesUpdated(Result<(Vec<Vec<u8>>, Vec<crate::weather::CommonsAttribution>), String>),
     WeatherSlideshowTick,
@@ -1365,6 +1366,26 @@ fn daily_power_metrics_grid(
         .push(widget::divider::horizontal::default())
         .push(yesterday)
         .into()
+}
+
+/// Append only live Netatmo values not already present in the OpenWeatherMap weather summary.
+fn netatmo_weather_extra_metrics(
+    sensors: &[NetatmoSensor],
+    hidden_ids: &[String],
+) -> Vec<(String, String)> {
+    let mut metrics = Vec::new();
+    for sensor in sensors.iter().filter(|sensor| sensor.reachable && !hidden_ids.contains(&sensor.id)) {
+        if let Some(ppm) = sensor.co2_ppm.filter(|ppm| ppm.is_finite() && *ppm >= 0.0) {
+            metrics.push((format!("Air quality (CO₂) · {}", sensor.name), format!("{ppm:.0} ppm")));
+        }
+        if let Some(noise) = sensor.noise_db.filter(|noise| noise.is_finite() && *noise >= 0.0) {
+            metrics.push((format!("Noise · {}", sensor.name), format!("{noise:.0} dB")));
+        }
+        if let Some(rain) = sensor.rain_mm.filter(|rain| rain.is_finite() && *rain >= 0.0) {
+            metrics.push((format!("Rain · {}", sensor.name), format!("{rain:.1} mm")));
+        }
+    }
+    metrics
 }
 
 fn weather_detail_metric(
@@ -5880,6 +5901,17 @@ impl cosmic::Application for AppModel {
                     .push(widget::text::caption(format!("{} · {}", crate::i18n::tr(&self.settings.language, "Slideshow image duration"), format_countdown(u64::from(self.settings.weather_slideshow_interval_seconds)))))
                     .push(widget::slider(5.0..=300.0, f32::from(self.settings.weather_slideshow_interval_seconds), |value| Message::WeatherSlideshowDurationChanged(value.round() as u16)).step(5.0_f32))
                     .push(widget::text::caption(crate::i18n::tr(&self.settings.language, "Each photo is shown for 5 seconds to 5 minutes before the crossfade transition.")))
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::Row::new()
+                        .width(cosmic::iced::Length::Fill)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::body("Show additional Netatmo weather readings"))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(widget::toggler(self.settings.weather_netatmo_extra_metrics)
+                            .on_toggle(Message::WeatherNetatmoExtraMetricsChanged)))
+                    .push(widget::text::caption(
+                        "Show available CO₂ (air quality, ppm), noise (dB) and rainfall (mm) below the weather card, with Netatmo module names. Existing OpenWeatherMap metrics are not duplicated.",
+                    ))
             }
 
             if self.active_settings_section == Some("connection") {
@@ -7725,6 +7757,34 @@ impl cosmic::Application for AppModel {
                     );
                 }
                 weather_section = weather_section.push(weather_visual);
+                if self.settings.weather_netatmo_extra_metrics {
+                    let metrics = netatmo_weather_extra_metrics(
+                        &self.netatmo_sensors,
+                        &self.settings.hidden_netatmo_devices,
+                    );
+                    if !metrics.is_empty() {
+                        let mut extra = widget::Column::new()
+                            .spacing(10)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::caption("NETATMO · ADDITIONAL READINGS"));
+                        for pair in metrics.chunks(2) {
+                            let mut row = widget::Row::new()
+                                .spacing(12)
+                                .width(cosmic::iced::Length::Fill);
+                            for (label, value) in pair {
+                                row = row.push(
+                                    widget::Column::new()
+                                        .spacing(2)
+                                        .width(cosmic::iced::Length::Fill)
+                                        .push(widget::text::caption(label.clone()))
+                                        .push(widget::text::body(value.clone())),
+                                );
+                            }
+                            extra = extra.push(row);
+                        }
+                        weather_section = weather_section.push(surface_card(extra.into(), 10));
+                    }
+                }
                 // Keep the source link OUTSIDE the fixed-height, clipped
                 // photograph. The old attribution expander placed its buttons
                 // inside the 260px overlay, where they disappeared below the
@@ -7732,51 +7792,60 @@ impl cosmic::Application for AppModel {
                 // Link to the current image's file page even while the full
                 // credits remain collapsed.
                 if let Some(first_credit) = current_attributions.first() {
-                    weather_section = weather_section.push(
-                        widget::Row::new()
-                            .spacing(6)
-                            .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::icon::from_name("image-x-generic-symbolic").size(14))
-                            .push(
-                                widget::button::custom(widget::text::caption(
-                                    "Wikimedia Commons ↗",
-                                ))
-                                .on_press(Message::OpenCommonsPage(first_credit.page_url.clone()))
-                                .padding([2, 6])
-                                .class(cosmic::theme::Button::Text),
-                            ),
-                    );
+                    // Attribution belongs below the clipped photo but shares
+                    // the same horizontal inset as the weather image content.
+                    let mut commons_info = widget::Column::new()
+                        .spacing(6)
+                        .width(cosmic::iced::Length::Fill)
+                        .push(
+                            widget::Row::new()
+                                .spacing(6)
+                                .align_y(cosmic::iced::Alignment::Center)
+                                .push(widget::icon::from_name("image-x-generic-symbolic").size(14))
+                                .push(
+                                    widget::button::custom(widget::text::caption(
+                                        "Wikimedia Commons ↗",
+                                    ))
+                                    .on_press(Message::OpenCommonsPage(first_credit.page_url.clone()))
+                                    .padding([2, 0])
+                                    .class(cosmic::theme::Button::Text),
+                                ),
+                        );
                     if self.weather_attribution_expanded {
                         for credit in &current_attributions {
-                            weather_section = weather_section.push(widget::text::caption(format!(
-                                "{} {} · {} · {}",
-                                crate::i18n::tr(&self.settings.language, "Photo"),
-                                credit.title,
-                                credit.artist,
-                                credit.license
-                            )));
-                            // Every source in a cross-faded image must remain
-                            // individually attributable, not just the first.
-                            weather_section = weather_section.push(
-                                widget::button::custom(widget::text::caption(
-                                    "Wikimedia Commons file page ↗",
-                                ))
-                                .on_press(Message::OpenCommonsPage(credit.page_url.clone()))
-                                .padding([2, 6])
-                                .class(cosmic::theme::Button::Text),
-                            );
+                            commons_info = commons_info
+                                .push(widget::text::caption(format!(
+                                    "{} {} · {} · {}",
+                                    crate::i18n::tr(&self.settings.language, "Photo"),
+                                    credit.title,
+                                    credit.artist,
+                                    credit.license
+                                )))
+                                .push(
+                                    widget::button::custom(widget::text::caption(
+                                        "Wikimedia Commons file page ↗",
+                                    ))
+                                    .on_press(Message::OpenCommonsPage(credit.page_url.clone()))
+                                    .padding([2, 0])
+                                    .class(cosmic::theme::Button::Text),
+                                );
                             if let Some(license_url) = &credit.license_url {
-                                weather_section = weather_section.push(
+                                commons_info = commons_info.push(
                                     widget::button::custom(widget::text::caption(
                                         "License terms ↗",
                                     ))
                                     .on_press(Message::OpenCommonsPage(license_url.clone()))
-                                    .padding([2, 6])
+                                    .padding([2, 0])
                                     .class(cosmic::theme::Button::Text),
                                 );
                             }
                         }
                     }
+                    weather_section = weather_section.push(
+                        widget::container(commons_info)
+                            .width(cosmic::iced::Length::Fill)
+                            .padding([6, 10]),
+                    );
                 }
                 if self.weather_forecast_expanded {
                     let forecast_days = self.weather_forecast_days.unwrap_or(7);
@@ -11098,6 +11167,10 @@ impl cosmic::Application for AppModel {
                     );
                 }
             }
+            Message::WeatherNetatmoExtraMetricsChanged(enabled) => {
+                self.settings.weather_netatmo_extra_metrics = enabled;
+                self.persist_settings();
+            }
             Message::WeatherEnabledChanged(enabled) => {
                 self.settings.weather_enabled = enabled;
                 self.next_weather_refresh_at = None;
@@ -13284,6 +13357,45 @@ mod history_tests {
         assert_eq!(
             average_temperature_with_hue_c(&[], &[], &[solar], &[], &[], &[], true,),
             None
+        );
+    }
+
+    #[test]
+    fn netatmo_weather_details_include_only_new_live_metrics() {
+        let sensor = NetatmoSensor {
+            id: "indoor-1".into(),
+            name: "Office".into(),
+            is_outdoor: false,
+            temperature_c: Some(22.0),
+            humidity_percent: Some(50.0),
+            co2_ppm: Some(1350.0),
+            pressure_hpa: Some(1015.0),
+            noise_db: Some(44.0),
+            rain_mm: None,
+            wind_kmh: Some(10.0),
+            reachable: true,
+        };
+        assert_eq!(
+            netatmo_weather_extra_metrics(&[sensor.clone()], &[]),
+            vec![
+                ("Air quality (CO₂) · Office".into(), "1350 ppm".into()),
+                ("Noise · Office".into(), "44 dB".into()),
+            ]
+        );
+        assert!(netatmo_weather_extra_metrics(&[sensor.clone()], &["indoor-1".into()]).is_empty());
+        assert!(netatmo_weather_extra_metrics(&[NetatmoSensor { reachable: false, ..sensor.clone() }], &[]).is_empty());
+        assert!(netatmo_weather_extra_metrics(&[NetatmoSensor {
+            co2_ppm: Some(f64::NAN), noise_db: None, ..sensor.clone()
+        }], &[]).is_empty());
+        let rain = NetatmoSensor {
+            id: "rain".into(), name: "Garden".into(), is_outdoor: false,
+            temperature_c: None, humidity_percent: None, co2_ppm: None,
+            pressure_hpa: None, noise_db: None, rain_mm: Some(1.25),
+            wind_kmh: None, reachable: true,
+        };
+        assert_eq!(
+            netatmo_weather_extra_metrics(&[rain], &[]),
+            vec![("Rain · Garden".into(), "1.2 mm".into())],
         );
     }
 
