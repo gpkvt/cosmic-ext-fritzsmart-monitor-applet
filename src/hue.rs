@@ -55,9 +55,11 @@ fn local_service_address(addresses: impl IntoIterator<Item = IpAddr>) -> Option<
 }
 
 fn discover_bridges_mdns(duration: Duration) -> Result<Vec<String>, String> {
-    let daemon = ServiceDaemon::new().map_err(|error| format!("Cannot start Hue mDNS discovery: {error}"))?;
+    let daemon = ServiceDaemon::new()
+        .map_err(|error| format!("Cannot start Hue mDNS discovery: {error}"))?;
     let service_type = "_hue._tcp.local.";
-    let receiver = daemon.browse(service_type)
+    let receiver = daemon
+        .browse(service_type)
         .map_err(|error| format!("Cannot browse for Hue Bridges: {error}"))?;
     let deadline = Instant::now() + duration;
     let mut addresses = BTreeSet::new();
@@ -262,7 +264,9 @@ fn pairing_waits_for_link_button(value: &Value) -> bool {
             .get("description")
             .and_then(Value::as_str)
             .is_some_and(|description| {
-                description.to_ascii_lowercase().contains("link button not pressed")
+                description
+                    .to_ascii_lowercase()
+                    .contains("link button not pressed")
             })
 }
 
@@ -296,9 +300,9 @@ pub async fn pair(address: String) -> Result<String, String> {
                         )) =>
             {
                 origin = origin.replacen("https://", "http://", 1);
-                send_pair_request(&client, &origin)
-                    .await
-                    .map_err(|error| format!("Hue Bridge pairing failed (HTTPS and HTTP): {error}"))?
+                send_pair_request(&client, &origin).await.map_err(|error| {
+                    format!("Hue Bridge pairing failed (HTTPS and HTTP): {error}")
+                })?
             }
             Err(error) => return Err(format!("Hue Bridge pairing request failed: {error}")),
         };
@@ -386,10 +390,7 @@ mod tests {
             ]),
             Some("192.168.42.21".to_string())
         );
-        assert_eq!(
-            local_service_address(["1.1.1.1".parse().unwrap()]),
-            None
-        );
+        assert_eq!(local_service_address(["1.1.1.1".parse().unwrap()]), None);
     }
 
     #[test]

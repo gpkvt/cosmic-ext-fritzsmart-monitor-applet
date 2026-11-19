@@ -9744,7 +9744,10 @@ impl cosmic::Application for AppModel {
                         } else if bridges.len() == 1 {
                             format!("Hue Bridge found at {}.", bridges[0])
                         } else {
-                            format!("{} Hue Bridges found. Select the correct one.", bridges.len())
+                            format!(
+                                "{} Hue Bridges found. Select the correct one.",
+                                bridges.len()
+                            )
                         });
                         if self.settings.hue_bridge_ip.trim().is_empty() && bridges.len() == 1 {
                             self.settings.hue_bridge_ip = bridges[0].clone();
@@ -9823,10 +9826,9 @@ impl cosmic::Application for AppModel {
                         );
                         if !self.hue_discovering {
                             self.hue_discovering = true;
-                            return Task::perform(
-                                crate::hue::discover_bridges(),
-                                |result| cosmic::Action::App(Message::HueBridgesDiscovered(result)),
-                            );
+                            return Task::perform(crate::hue::discover_bridges(), |result| {
+                                cosmic::Action::App(Message::HueBridgesDiscovered(result))
+                            });
                         }
                         return Task::none();
                     }
@@ -9852,9 +9854,8 @@ impl cosmic::Application for AppModel {
                         self.hue_loading = true;
                         self.hue_next_refresh_at = None;
                         self.hue_error = None;
-                        self.hue_discovery_note = Some(
-                            "Hue Bridge paired successfully. Loading lights…".into()
-                        );
+                        self.hue_discovery_note =
+                            Some("Hue Bridge paired successfully. Loading lights…".into());
                         return Task::perform(
                             crate::hue::fetch_lights(
                                 self.settings.hue_bridge_ip.clone(),
