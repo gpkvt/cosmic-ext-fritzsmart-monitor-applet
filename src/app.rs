@@ -2506,12 +2506,58 @@ fn total_power_overview(
                 ),
         );
     }
-    let section = collapsible_graph(
-        "TOTAL POWER INPUT & OUTPUT",
-        "total-power-overview",
-        collapsed_sections.contains("total-power-overview"),
-        content.into(),
-    );
+    let collapsed = collapsed_sections.contains("total-power-overview");
+    let current_value = |value: i64| format!("{value} W");
+    let current_input = if has_input_readings {
+        current_value(total_input_w)
+    } else {
+        "— W".to_string()
+    };
+    let collapsed_summary = widget::Row::new()
+        .spacing(8)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(
+            widget::text::caption(format!("IN {}", keep_value_unit_together(current_input)))
+                .align_x(cosmic::iced::Alignment::End),
+        )
+        .push(
+            widget::text::caption(format!(
+                "OUT {}",
+                keep_value_unit_together(current_value(total_output_w))
+            ))
+            .align_x(cosmic::iced::Alignment::End),
+        );
+    let heading = widget::button::custom(
+        widget::Row::new()
+            .spacing(8)
+            .align_y(cosmic::iced::Alignment::Center)
+            .push(widget::text::caption("TOTAL POWER INPUT & OUTPUT"))
+            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+            .push(if collapsed {
+                collapsed_summary.into()
+            } else {
+                widget::Space::new().width(cosmic::iced::Length::Shrink).into()
+            })
+            .push(
+                widget::icon::from_name(if collapsed {
+                    "go-next-symbolic"
+                } else {
+                    "go-down-symbolic"
+                })
+                .size(16),
+            ),
+    )
+    .on_press(Message::ToggleMenuSection("total-power-overview".into()))
+    .width(cosmic::iced::Length::Fill)
+    .padding([4, 0])
+    .class(cosmic::theme::Button::Text);
+    let mut section = widget::Column::new()
+        .spacing(4)
+        .width(cosmic::iced::Length::Fill)
+        .push(heading);
+    if !collapsed {
+        section = section.push(content);
+    }
     Some(vec![(
         "3-total-power-overview".to_string(),
         surface_card(section, 14),
