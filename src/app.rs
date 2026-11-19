@@ -2620,10 +2620,7 @@ fn total_power_overview(
     if !collapsed {
         section = section.push(widget::container(content).padding([8, 12]));
     }
-    Some(vec![(
-        "3-total-power-overview".to_string(),
-        section.into(),
-    )])
+    Some(vec![("3-total-power-overview".to_string(), section.into())])
 }
 
 fn panel_order_group_key(id: &str, multiline: bool) -> &str {
@@ -7363,8 +7360,7 @@ impl cosmic::Application for AppModel {
                                     .align_x(cosmic::iced::Alignment::End),
                                 )
                                 .push(
-                                    widget::Space::new()
-                                        .width(cosmic::iced::Length::Fixed(108.0)),
+                                    widget::Space::new().width(cosmic::iced::Length::Fixed(108.0)),
                                 )
                                 .push(copy_menu_title_button(
                                     device.name.clone(),
