@@ -6,7 +6,7 @@ use crate::fritz::{
 use crate::hue::{HueLight, HueSensor, HueSnapshot};
 use crate::netatmo::{NetatmoSensor, NetatmoSnapshot};
 use crate::weather::{
-    WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather,
+    AirPollutionData, WeatherData, WeatherForecast, build_weather_slideshow_frames, fetch_weather,
     fetch_weather_forecast, starry_night_overlay,
 };
 use cosmic::iced::{
@@ -1401,6 +1401,26 @@ fn netatmo_weather_extra_metrics(
         }
         if let Some(rain) = sensor.rain_mm.filter(|rain| rain.is_finite() && *rain >= 0.0) {
             metrics.push((format!("Rain · {}", sensor.name), format!("{rain:.1} mm")));
+        }
+    }
+    metrics
+}
+
+/// These are actual outdoor air pollutants, not Netatmo CO₂ readings.
+/// The OpenWeatherMap AQI uses a 1–5 index and concentrations in µg/m³.
+fn outdoor_air_pollution_metrics(pollution: &AirPollutionData) -> Vec<(String, String)> {
+    let mut metrics = vec![(
+        "Outdoor air pollution · OWM".to_string(),
+        format!("{} / 5 · {}", pollution.aqi, pollution.quality_label()),
+    )];
+    for (label, value) in [
+        ("PM2.5", pollution.pm2_5),
+        ("PM10", pollution.pm10),
+        ("NO₂", pollution.no2),
+        ("O₃", pollution.o3),
+    ] {
+        if let Some(value) = value.filter(|v| v.is_finite() && *v >= 0.0) {
+            metrics.push((label.to_string(), format!("{value:.1} µg/m³")));
         }
     }
     metrics
@@ -7686,6 +7706,14 @@ impl cosmic::Application for AppModel {
                     weather_detail_metric(&self.settings.language, "Sunrise", sunrise),
                     weather_detail_metric(&self.settings.language, "Sunset", sunset),
                 ];
+                // True ambient pollution values are sourced from the
+                // OpenWeatherMap Air Pollution API, not from the Netatmo
+                // CO₂ sensor; keep their labels and units distinct.
+                if let Some(pollution) = &weather.air_pollution {
+                    for (label, value) in outdoor_air_pollution_metrics(pollution) {
+                        weather_metric_tiles.push(weather_detail_metric_label(label, value));
+                    }
+                }
                 if self.settings.weather_netatmo_extra_metrics {
                     for (label, value) in netatmo_weather_extra_metrics(
                         &self.netatmo_sensors,
@@ -13559,6 +13587,38 @@ mod history_tests {
             }, "co2", &settings),
             "—"
         );
+    }
+
+    #[test]
+    fn outdoor_air_pollution_metrics_use_provider_index_and_mass_units() {
+        let metrics = outdoor_air_pollution_metrics(&AirPollutionData {
+            aqi: 3,
+            pm2_5: Some(12.5),
+            pm10: Some(24.2),
+            no2: Some(16.0),
+            o3: Some(35.3),
+        });
+        assert_eq!(
+            metrics,
+            vec![
+                ("Outdoor air pollution · OWM".into(), "3 / 5 · Moderate".into()),
+                ("PM2.5".into(), "12.5 µg/m³".into()),
+                ("PM10".into(), "24.2 µg/m³".into()),
+                ("NO₂".into(), "16.0 µg/m³".into()),
+                ("O₃".into(), "35.3 µg/m³".into()),
+            ]
+        );
+        assert!(!metrics.iter().any(|(label, value)| {
+            label.contains("CO₂") || value.contains("ppm")
+        }));
+        let partial = outdoor_air_pollution_metrics(&AirPollutionData {
+            aqi: 1,
+            pm2_5: Some(f64::NAN),
+            pm10: None,
+            no2: None,
+            o3: None,
+        });
+        assert_eq!(partial, vec![("Outdoor air pollution · OWM".into(), "1 / 5 · Good".into())]);
     }
 
     #[test]
