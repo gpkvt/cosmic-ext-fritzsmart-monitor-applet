@@ -1991,6 +1991,11 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
         .cloned()
         .collect();
 
+    eprintln!(
+        "fritz-power-monitor: reading refresh started (FRITZ: {}, Tasmota: {})",
+        selected_fritz.len(),
+        selected_tasmota.len()
+    );
     if !selected_fritz.is_empty() {
         validate_settings(&settings, true)?;
     } else if selected_tasmota.is_empty() {
@@ -2024,6 +2029,11 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
                 devices_xml = fetch_device_list_xml(&client, base, &sid).await;
             }
             let mut fetched = parse_fetch_result_xml(&devices_xml?, &selected_fritz)?;
+            eprintln!(
+                "fritz-power-monitor: FRITZ device list parsed (readings: {}, missing: {})",
+                fetched.readings.len(),
+                fetched.missing_devices.len()
+            );
             // Re-read only absent devices (two retries after the first check).
             // Healthy readings remain valid even if a subsequent request fails.
             for _retry in 1..3 {
@@ -2043,11 +2053,13 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
                     }
                 }
             }
+            eprintln!("fritz-power-monitor: loading FRITZ system and WAN device information");
             let (device_info, wan_info) = tokio::join!(
                 tokio::time::timeout(Duration::from_secs(3), fetch_device_info(&client, base)),
                 tokio::time::timeout(Duration::from_secs(3), fetch_wan_link_info(&client, base)),
             );
             let wan_info = wan_info.ok().flatten();
+            eprintln!("fritz-power-monitor: FRITZ system and WAN information request finished");
             fetched.internet_bandwidth = wan_info.as_ref().and_then(|wan| {
                 Some(FritzInternetBandwidth {
                     download_bits_per_second: wan.download_bits_per_second?,
@@ -2207,6 +2219,11 @@ pub async fn fetch_fritz_data() -> Result<FritzFetchResult, String> {
             })
             .unwrap_or(usize::MAX)
     });
+    eprintln!(
+        "fritz-power-monitor: device refresh completed (readings: {}, missing: {})",
+        result.readings.len(),
+        result.missing_devices.len()
+    );
     Ok(result)
 }
 
