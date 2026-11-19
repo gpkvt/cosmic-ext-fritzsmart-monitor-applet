@@ -182,6 +182,7 @@ pub enum Message {
     ToggleNetatmoCo2Alert(String, bool),
     NetatmoCo2ThresholdChanged(String, u16),
     PrometheusEnabledChanged(bool),
+    PrometheusBindChanged(String),
     AllowInvalidCertsChanged(bool),
     CaCertPathChanged(String),
     PanelTextSizeChanged(u8),
@@ -4616,7 +4617,7 @@ impl cosmic::Application for AppModel {
     fn view(&self) -> Element<'_, Self::Message> {
         PANEL_VIEW_COUNT.fetch_add(1, Ordering::Relaxed);
         if self.settings.prometheus_enabled {
-            crate::prometheus::publish(true, Some(crate::prometheus::LiveData {
+            crate::prometheus::publish(true, &self.settings.prometheus_bind_address, Some(crate::prometheus::LiveData {
                 settings: &self.settings,
                 devices: &self.readings,
                 hue_lights: &self.hue_lights,
@@ -4631,7 +4632,7 @@ impl cosmic::Application for AppModel {
                 weather_error: self.weather_error.is_some(),
             }));
         } else {
-            crate::prometheus::publish(false, None);
+            crate::prometheus::publish(false, &self.settings.prometheus_bind_address, None);
         }
         let primary_reading = self
             .selected_ains
@@ -6161,12 +6162,36 @@ impl cosmic::Application for AppModel {
                     .push(widget::Row::new()
                         .width(cosmic::iced::Length::Fill)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::text::body("Enable local /metrics endpoint"))
+                        .push(widget::text::body("Enable /metrics endpoint"))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                         .push(widget::toggler(self.settings.prometheus_enabled)
                             .on_toggle(Message::PrometheusEnabledChanged)))
+                    .push(widget::text::body("Bind address (IP:port)"))
+                    .push(widget::text_input(
+                        "127.0.0.1:9817",
+                        &self.settings.prometheus_bind_address,
+                    ).on_input(Message::PrometheusBindChanged))
                     .push(widget::text::caption(
-                        format!("{} · disabled by default. Read-only, no API requests on scrape. Device IDs and names are exposed to local clients. Never expose or proxy this endpoint to an untrusted network.", crate::prometheus::ENDPOINT)
+                        match crate::prometheus::parse_bind_address(
+                            &self.settings.prometheus_bind_address,
+                        ) {
+                            Some(address) if address.ip().is_loopback() => format!(
+                                "{} · loopback only. No API calls when scraped.",
+                                crate::prometheus::endpoint_url(
+                                    &self.settings.prometheus_bind_address,
+                                ).unwrap_or_default(),
+                            ),
+                            Some(address) if address.ip().is_unspecified() => format!(
+                                "Listening on {address} (all interfaces). Use this computer's LAN IP to scrape.",
+                            ),
+                            Some(address) => format!(
+                                "Listening on {address}. Remote clients may access this HTTP endpoint.",
+                            ),
+                            None => "Invalid bind address. Enter an IP:port, e.g. 127.0.0.1:9817 or 0.0.0.0:9817. No listener is opened until valid.".into(),
+                        },
+                    ))
+                    .push(widget::text::caption(
+                        "Disabled by default. No authentication or TLS; non-loopback bindings expose device names and IDs to reachable clients. Restrict access with a firewall and trusted networks.",
                     ))
                     .push(widget::divider::horizontal::default())
             }
@@ -11219,9 +11244,24 @@ impl cosmic::Application for AppModel {
             Message::PrometheusEnabledChanged(enabled) => {
                 self.settings.prometheus_enabled = enabled;
                 if !enabled {
-                    crate::prometheus::publish(false, None);
+                    crate::prometheus::publish(
+                        false,
+                        &self.settings.prometheus_bind_address,
+                        None,
+                    );
                 }
                 self.persist_settings();
+            }
+            Message::PrometheusBindChanged(bind_address) => {
+                self.settings.prometheus_bind_address = bind_address;
+                // Permit partial text while editing, but never persist an
+                // invalid socket address. The worker closes its old listener
+                // until the configured address becomes valid again.
+                if crate::prometheus::parse_bind_address(
+                    &self.settings.prometheus_bind_address,
+                ).is_some() {
+                    self.persist_settings();
+                }
             }
             Message::WeatherNetatmoExtraMetricsChanged(enabled) => {
                 self.settings.weather_netatmo_extra_metrics = enabled;
