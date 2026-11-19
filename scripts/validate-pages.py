@@ -104,9 +104,12 @@ for page in pages:
         ):
             if gallery_feature not in content:
                 fail(f"index.html: fullscreen screenshot gallery is missing {gallery_feature}")
+        details_section = re.search(r'<section id="details">(.*?)</section>', content, re.S)
+        if not details_section:
+            fail("index.html: details section is missing")
         safeguard_icons = re.findall(
             r'<div class="detail-icon"[^>]*>\s*<img src="icons/([a-z-]+\.svg)" alt="" width="28" height="28"></div>',
-            content,
+            details_section.group(1),
         )
         expected_icons = {
             "shield-check.svg",
