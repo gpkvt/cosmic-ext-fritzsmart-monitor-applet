@@ -5023,6 +5023,46 @@ impl cosmic::Application for AppModel {
                         .on_input(Message::TasmotaPasswordChanged),
                     )
                     .push(widget::divider::horizontal::default())
+                    .push(widget::text::title3("Philips Hue Bridge"))
+                    .push(widget::text::caption(
+                        "Local Hue Bridge (CLIP v2). Pair by pressing its physical link button, then choose Pair. Hue lights provide on/off state, not measured W or temperature.",
+                    ))
+                    .push(widget::text::body("Bridge IP address"))
+                    .push(
+                        widget::text_input("192.168.1.2", &self.settings.hue_bridge_ip)
+                            .on_input(Message::HueBridgeIpChanged),
+                    )
+                    .push(widget::text::body("Hue application key"))
+                    .push(
+                        widget::secure_input(
+                            "Hue application key",
+                            &self.settings.hue_application_key,
+                            None,
+                            true,
+                        )
+                        .on_input(Message::HueApplicationKeyChanged),
+                    )
+                    .push(
+                        widget::Row::new()
+                            .spacing(8)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(
+                                widget::button::text(if self.hue_pairing {
+                                    "Pairing…"
+                                } else {
+                                    "Pair Hue Bridge"
+                                })
+                                .on_press_maybe((!self.hue_pairing).then_some(Message::PairHueBridge)),
+                            )
+                            .push(
+                                widget::button::text("Refresh Hue lights")
+                                    .on_press(Message::RefreshHueLights),
+                            ),
+                    )
+                    .push(widget::text::caption(
+                        "Hue's bridge certificate uses a bridge ID instead of its IP, so only this Hue LAN connection skips TLS certificate verification. Use a trusted local network.",
+                    ))
+                    .push(widget::divider::horizontal::default())
                     .push(
                         widget::Row::new().width(cosmic::iced::Length::Fill)
                             .width(cosmic::iced::Length::Fill)
