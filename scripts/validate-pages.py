@@ -95,7 +95,7 @@ for page in pages:
         for gallery_feature in (
             'id="hero-lightbox-thumbnails"',
             'id="hero-lightbox-counter"',
-            'class="hero-lightbox-thumb"',
+            "button.className='hero-lightbox-thumb'",
             "aria-current",
             "event.key==='ArrowLeft'",
             "event.key==='ArrowRight'",
