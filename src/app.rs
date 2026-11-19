@@ -9666,6 +9666,23 @@ impl cosmic::Application for AppModel {
                     cosmic::Action::App(Message::Updated(Box::new(result)))
                 })];
 
+                if !self.netatmo_loading
+                    && !self.settings.netatmo_client_id.trim().is_empty()
+                    && !self.settings.netatmo_client_secret.trim().is_empty()
+                    && !self.settings.netatmo_refresh_token.trim().is_empty()
+                {
+                    self.netatmo_loading = true;
+                    self.netatmo_next_refresh_at = None;
+                    let generation = self.netatmo_generation;
+                    tasks.push(Task::perform(
+                        crate::netatmo::fetch_stations(
+                            self.settings.netatmo_client_id.clone(),
+                            self.settings.netatmo_client_secret.clone(),
+                            self.settings.netatmo_refresh_token.clone(),
+                        ),
+                        move |result| cosmic::Action::App(Message::NetatmoLoaded(generation, result)),
+                    ));
+                }
                 if !self.settings.hue_bridge_ip.trim().is_empty()
                     && !self.settings.hue_application_key.trim().is_empty()
                     && !self.hue_loading
@@ -9769,6 +9786,24 @@ impl cosmic::Application for AppModel {
                     .is_some_and(|deadline| Instant::now() >= deadline)
                 {
                     self.settings_saved_until = None;
+                }
+                if !self.netatmo_loading
+                    && self.netatmo_next_refresh_at.is_some_and(|at| now >= at)
+                    && !self.settings.netatmo_client_id.trim().is_empty()
+                    && !self.settings.netatmo_client_secret.trim().is_empty()
+                    && !self.settings.netatmo_refresh_token.trim().is_empty()
+                {
+                    self.netatmo_loading = true;
+                    self.netatmo_next_refresh_at = None;
+                    let generation = self.netatmo_generation;
+                    return Task::perform(
+                        crate::netatmo::fetch_stations(
+                            self.settings.netatmo_client_id.clone(),
+                            self.settings.netatmo_client_secret.clone(),
+                            self.settings.netatmo_refresh_token.clone(),
+                        ),
+                        move |result| cosmic::Action::App(Message::NetatmoLoaded(generation, result)),
+                    );
                 }
                 if !self.hue_loading
                     && !self.settings.hue_application_key.trim().is_empty()
@@ -10844,6 +10879,122 @@ impl cosmic::Application for AppModel {
             }
             Message::PasswordChanged(value) => {
                 self.settings.password = value;
+                self.persist_settings();
+            }
+            Message::NetatmoClientIdChanged(value) => {
+                self.settings.netatmo_client_id = value;
+                self.netatmo_generation = self.netatmo_generation.wrapping_add(1);
+                self.netatmo_loading = false;
+                self.netatmo_sensors.clear();
+                self.netatmo_error = None;
+                self.netatmo_next_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::NetatmoClientSecretChanged(value) => {
+                self.settings.netatmo_client_secret = value;
+                self.netatmo_generation = self.netatmo_generation.wrapping_add(1);
+                self.netatmo_loading = false;
+                self.netatmo_sensors.clear();
+                self.netatmo_error = None;
+                self.netatmo_next_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::NetatmoRefreshTokenChanged(value) => {
+                self.settings.netatmo_refresh_token = value;
+                self.netatmo_generation = self.netatmo_generation.wrapping_add(1);
+                self.netatmo_loading = false;
+                self.netatmo_sensors.clear();
+                self.netatmo_error = None;
+                self.netatmo_next_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::RefreshNetatmo => {
+                if self.netatmo_loading {
+                    return Task::none();
+                }
+                if self.settings.netatmo_client_id.trim().is_empty()
+                    || self.settings.netatmo_client_secret.trim().is_empty()
+                    || self.settings.netatmo_refresh_token.trim().is_empty()
+                {
+                    self.netatmo_error = Some("Enter the Netatmo client ID, client secret and refresh token first".into());
+                    return Task::none();
+                }
+                self.netatmo_loading = true;
+                self.netatmo_next_refresh_at = None;
+                let generation = self.netatmo_generation;
+                return Task::perform(
+                    crate::netatmo::fetch_stations(
+                        self.settings.netatmo_client_id.clone(),
+                        self.settings.netatmo_client_secret.clone(),
+                        self.settings.netatmo_refresh_token.clone(),
+                    ),
+                    move |result| cosmic::Action::App(Message::NetatmoLoaded(generation, result)),
+                );
+            }
+            Message::NetatmoLoaded(generation, result) => {
+                if generation != self.netatmo_generation {
+                    return Task::none();
+                }
+                self.netatmo_loading = false;
+                // Slow down cloud polling to a five-minute interval.
+                self.netatmo_next_refresh_at = Some(Instant::now() + Duration::from_secs(300));
+                match result {
+                    Ok(snapshot) => {
+                        // Netatmo rotates refresh tokens. Save a newly returned
+                        // token even when the separate station request fails.
+                        if snapshot.refresh_token != self.settings.netatmo_refresh_token {
+                            self.settings.netatmo_refresh_token = snapshot.refresh_token;
+                            self.persist_settings();
+                        }
+                        match snapshot.stations {
+                            Ok(sensors) => {
+                                self.netatmo_sensors = sensors;
+                                self.netatmo_error = None;
+                            }
+                            Err(error) => {
+                                for sensor in &mut self.netatmo_sensors {
+                                    sensor.reachable = false;
+                                    sensor.temperature_c = None;
+                                    sensor.humidity_percent = None;
+                                    sensor.co2_ppm = None;
+                                    sensor.pressure_hpa = None;
+                                    sensor.noise_db = None;
+                                    sensor.rain_mm = None;
+                                    sensor.wind_kmh = None;
+                                }
+                                self.netatmo_error = Some(error);
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        for sensor in &mut self.netatmo_sensors {
+                            sensor.reachable = false;
+                            sensor.temperature_c = None;
+                            sensor.humidity_percent = None;
+                            sensor.co2_ppm = None;
+                            sensor.pressure_hpa = None;
+                            sensor.noise_db = None;
+                            sensor.rain_mm = None;
+                            sensor.wind_kmh = None;
+                        }
+                        self.netatmo_error = Some(error);
+                    }
+                }
+                crate::diagnostics::debug(format!(
+                    "Netatmo station refresh finished (modules: {}, available: {}, failed: {})",
+                    self.netatmo_sensors.len(),
+                    self.netatmo_sensors.iter().filter(|sensor| sensor.reachable).count(),
+                    self.netatmo_error.is_some()
+                ));
+            }
+            Message::ToggleNetatmoVisible(id, visible) => {
+                if !self.netatmo_sensors.iter().any(|sensor| sensor.id == id) {
+                    return Task::none();
+                }
+                self.settings.hidden_netatmo_devices.retain(|entry| entry != &id);
+                if !visible {
+                    self.settings.hidden_netatmo_devices.push(id);
+                }
                 self.persist_settings();
             }
             Message::HueBridgeIpChanged(value) => {
