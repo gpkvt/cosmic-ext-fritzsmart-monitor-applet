@@ -219,8 +219,7 @@ async fn install_source_update(source: &Path) -> Result<String, String> {
 async fn install_flatpak_update() -> Result<String, String> {
     use std::collections::HashMap;
     use zbus::{
-        Connection, Proxy,
-        zvariant::{OwnedObjectPath, OwnedValue},
+        Connection, OwnedObjectPath, OwnedVariant, Proxy,
     };
 
     let connection = Connection::session()
@@ -234,7 +233,7 @@ async fn install_flatpak_update() -> Result<String, String> {
     )
     .await
     .map_err(|error| format!("The Flatpak update portal is unavailable: {error}"))?;
-    let options: HashMap<String, OwnedValue> = HashMap::new();
+    let options: HashMap<String, OwnedVariant> = HashMap::new();
     let handle: OwnedObjectPath = portal
         .call("CreateUpdateMonitor", &(options,))
         .await
@@ -247,7 +246,7 @@ async fn install_flatpak_update() -> Result<String, String> {
     )
     .await
     .map_err(|error| format!("Could not connect to the Flatpak update session: {error}"))?;
-    let options: HashMap<String, OwnedValue> = HashMap::new();
+    let options: HashMap<String, OwnedVariant> = HashMap::new();
     monitor
         .call::<_, _, ()>("Update", &("", options))
         .await
