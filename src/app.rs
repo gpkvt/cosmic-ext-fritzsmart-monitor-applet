@@ -2448,216 +2448,92 @@ fn total_power_overview(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     collapsed_sections: &HashSet<String>,
 ) -> Option<Vec<(String, cosmic::Element<'static, Message>)>> {
-    let output_low = history.iter().map(|(_, value)| *value).min()?;
-    let output_high = history.iter().map(|(_, value)| *value).max()?;
+    let (output_low, output_high) = {
+        let mut values = history.iter().map(|(_, value)| *value);
+        let first = values.next()?;
+        values.fold((first, first), |(low, high), value| (low.min(value), high.max(value)))
+    };
     let input_history = rebuild_input_power_history(device_history, &settings.input_ains);
     let has_input_readings = readings.iter().any(|reading| {
-        settings
-            .input_ains
-            .contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
+        settings.input_ains.contains(&crate::fritz::normalize_ain_for_selection(&reading.ain))
     });
-    let output_temperature_history =
-        rebuild_temperature_history(device_history, &settings.input_ains, false);
-    let input_temperature_history =
-        rebuild_temperature_history(device_history, &settings.input_ains, true);
     let (input_low, input_high) = input_display_range(&input_history);
-    let total_power = output_power_w(readings, &settings.input_ains);
-    let input_power = input_display_power_w(input_power_w(readings, &settings.input_ains));
+    let total_output_w = output_power_w(readings, &settings.input_ains);
+    let total_input_w = input_display_power_w(input_power_w(readings, &settings.input_ains));
     let axis_start = format_graph_axis_start(
         settings.graph_timespan_minutes,
-        history
-            .front()
-            .map(|(timestamp, _)| Instant::now().duration_since(*timestamp).as_secs() / 60),
+        history.front().map(|(timestamp, _)| Instant::now().duration_since(*timestamp).as_secs() / 60),
     );
-
-    let mut output_graph = widget::Column::new().spacing(8).push(collapsible_graph(
-        "POWER OUTPUT & TEMPERATURE",
-        "graph-total-output-pair",
-        collapsed_sections.contains("graph-total-output-pair"),
-        widget::Column::new()
-            .spacing(8)
-            .push(interactive_graph_with_axis(
-                &settings.language,
+    let output_values: GraphSamples = history.iter().map(|(timestamp, value)| (*timestamp, *value as f64)).collect();
+    let input_values: GraphSamples = input_history.iter().map(|(timestamp, value)| (*timestamp, input_display_power_w(*value) as f64)).collect();
+    let graph_title = format!(
+        "{} & {}",
+        crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
+        crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT")
+    );
+    let graph = if has_input_readings {
+        let (output_aligned, input_aligned) = aligned_power_series(
+            &history.iter().copied().collect(),
+            &input_history,
+        );
+        interactive_combined_graph_with_axis(
+            &graph_title,
+            if output_aligned.is_empty() { output_values } else { output_aligned },
+            if input_aligned.is_empty() { input_values } else { input_aligned },
+            &settings.graph_style,
+            "W",
+            axis_start,
+            (
                 crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-                history
-                    .iter()
-                    .map(|(timestamp, value)| (*timestamp, *value as f64)),
-                &settings.graph_style,
-                "W",
-                axis_start.clone(),
-            ))
-            .push(interactive_graph_with_axis(
-                &settings.language,
-                crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
-                output_temperature_history
-                    .iter()
-                    .map(|(timestamp, value)| (*timestamp, *value)),
-                &settings.graph_style,
-                "°C",
-                axis_start.clone(),
-            ))
-            .into(),
-    ));
-    if let Some((energy_wh, timespan)) = power_energy_and_timespan(history) {
-        output_graph = output_graph.push(widget::text::caption(format!(
-            "{}: {energy_wh:.1} Wh · {}",
-            crate::i18n::tr(&settings.language, "TOTAL ENERGY"),
-            format_elapsed_timespan(timespan)
-        )));
-    }
-    let output_content = widget::Column::new()
-        .spacing(8)
-        .width(cosmic::iced::Length::Fill)
-        .push(
-            widget::Row::new()
-                .spacing(8)
-                .width(cosmic::iced::Length::Fill)
-                .push(
-                    widget::container(range_metric_tile(
-                        "LOW",
-                        format!("{output_low} W"),
-                        "go-down-symbolic",
-                    ))
-                    .width(cosmic::iced::Length::Fill),
-                )
-                .push(
-                    widget::container(range_metric_tile(
-                        "HIGH",
-                        format!("{output_high} W"),
-                        "go-up-symbolic",
-                    ))
-                    .width(cosmic::iced::Length::Fill),
-                ),
+                crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
+            ),
         )
-        .push(graph_panel(output_graph.into()));
-    let output_ains: HashSet<String> = device_history
-        .keys()
+    } else {
+        interactive_graph_with_axis(
+            &settings.language,
+            &crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
+            output_values,
+            &settings.graph_style,
+            "W",
+            axis_start,
+        )
+    };
+    let output_ains: HashSet<String> = device_history.keys()
         .filter(|ain| !settings.input_ains.contains(*ain))
         .cloned()
         .collect();
     let (output_yesterday_wh, output_today_wh) = yesterday_and_today_energy_wh_for_ains(
-        device_history,
-        &output_ains,
-        &settings.input_ains,
-        settings.refresh_interval_seconds,
-        false,
+        device_history, &output_ains, &settings.input_ains,
+        settings.refresh_interval_seconds, false,
     );
-    let output_summary = menu_energy_summary(
-        history.iter().map(|(_, value)| *value as f64),
-        Some(total_power as f64),
-        output_yesterday_wh,
-        output_today_wh,
+    let (input_yesterday_wh, input_today_wh) = yesterday_and_today_energy_wh_for_ains(
+        device_history, &settings.input_ains, &settings.input_ains,
+        settings.refresh_interval_seconds, true,
     );
-    let output_section = total_power_section(
-        "TOTAL POWER OUTPUT",
-        total_power,
-        output_temperature_history
-            .back()
-            .map(|(_, value)| *value)
-            .filter(|value| value.is_finite())
-            .map(|value| format!("{value:.1} °C")),
-        "total-power-output",
-        collapsed_sections.contains("total-power-output"),
-        output_summary,
-        output_content.into(),
-    );
-    let mut sections = vec![("3-total-power-output".to_string(), output_section)];
-
-    if has_input_readings {
-        let input_energy_summary =
-            power_energy_and_timespan(&input_history).map(|(energy_wh, timespan)| {
-                widget::text::caption(format!(
-                    "{}: {energy_wh:.1} Wh · {}",
-                    crate::i18n::tr(&settings.language, "TOTAL ENERGY"),
-                    format_elapsed_timespan(timespan)
-                ))
-            });
-        let mut input_graph = widget::Column::new().spacing(8).push(collapsible_graph(
-            "POWER INPUT & TEMPERATURE",
-            "graph-total-input-pair",
-            collapsed_sections.contains("graph-total-input-pair"),
-            widget::Column::new()
-                .spacing(8)
-                .push(interactive_graph_with_axis(
-                    &settings.language,
-                    crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
-                    input_history.iter().map(|(timestamp, value)| {
-                        (*timestamp, input_display_power_w(*value) as f64)
-                    }),
-                    &settings.graph_style,
-                    "W",
-                    axis_start.clone(),
-                ))
-                .push(interactive_graph_with_axis(
-                    &settings.language,
-                    crate::i18n::tr(&settings.language, "AVERAGE TEMPERATURE"),
-                    input_temperature_history
-                        .iter()
-                        .map(|(timestamp, value)| (*timestamp, *value)),
-                    &settings.graph_style,
-                    "°C",
-                    axis_start.clone(),
-                ))
-                .into(),
+    let mut content = widget::Column::new()
+        .spacing(10)
+        .width(cosmic::iced::Length::Fill)
+        .push(graph_panel(graph))
+        .push(widget::Row::new().spacing(8).width(cosmic::iced::Length::Fill)
+            .push(widget::container(range_metric_tile("OUTPUT LOW", format!("{output_low} W"), "go-down-symbolic")).width(cosmic::iced::Length::Fill))
+            .push(widget::container(range_metric_tile("OUTPUT HIGH", format!("{output_high} W"), "go-up-symbolic")).width(cosmic::iced::Length::Fill)))
+        .push(menu_power_flow_summary(
+            total_input_w as f64, total_output_w as f64,
+            input_today_wh, output_today_wh,
+            input_yesterday_wh, output_yesterday_wh,
         ));
-        if let Some(summary) = input_energy_summary {
-            input_graph = input_graph.push(summary);
-        }
-
-        let input_content = widget::Column::new()
-            .spacing(8)
-            .width(cosmic::iced::Length::Fill)
-            .push(
-                widget::Row::new()
-                    .spacing(8)
-                    .width(cosmic::iced::Length::Fill)
-                    .push(
-                        widget::container(range_metric_tile(
-                            "LOW",
-                            format!("{input_low} W"),
-                            "go-down-symbolic",
-                        ))
-                        .width(cosmic::iced::Length::Fill),
-                    )
-                    .push(
-                        widget::container(range_metric_tile(
-                            "HIGH",
-                            format!("{input_high} W"),
-                            "go-up-symbolic",
-                        ))
-                        .width(cosmic::iced::Length::Fill),
-                    ),
-            )
-            .push(graph_panel(input_graph.into()));
-        let (input_yesterday_wh, input_today_wh) = yesterday_and_today_energy_wh_for_ains(
-            device_history,
-            &settings.input_ains,
-            &settings.input_ains,
-            settings.refresh_interval_seconds,
-            true,
-        );
-        let input_summary = menu_energy_summary(
-            input_history
-                .iter()
-                .map(|(_, value)| input_display_power_w(*value) as f64),
-            Some(input_power as f64),
-            input_yesterday_wh,
-            input_today_wh,
-        );
-        let input_section = total_power_section(
-            "TOTAL POWER INPUT",
-            input_power,
-            input_temperature_history
-                .back()
-                .map(|(_, value)| format!("{value:.1} °C")),
-            "total-power-input",
-            collapsed_sections.contains("total-power-input"),
-            input_summary,
-            input_content.into(),
-        );
-        sections.push(("4-total-power-input".to_string(), input_section));
+    if has_input_readings {
+        content = content.push(widget::Row::new().spacing(8).width(cosmic::iced::Length::Fill)
+            .push(widget::container(range_metric_tile("INPUT LOW", format!("{input_low} W"), "go-down-symbolic")).width(cosmic::iced::Length::Fill))
+            .push(widget::container(range_metric_tile("INPUT HIGH", format!("{input_high} W"), "go-up-symbolic")).width(cosmic::iced::Length::Fill)));
     }
-    Some(sections)
+    let section = collapsible_graph(
+        "TOTAL POWER INPUT & OUTPUT",
+        "total-power-overview",
+        collapsed_sections.contains("total-power-overview"),
+        content.into(),
+    );
+    Some(vec![("3-total-power-overview".to_string(), surface_card(section, 14))])
 }
 
 fn panel_order_group_key(id: &str, multiline: bool) -> &str {
@@ -6892,7 +6768,7 @@ impl cosmic::Application for AppModel {
                                     .width(cosmic::iced::Length::Fill)
                                     .push(widget::text::caption(crate::i18n::tr(
                                         &self.settings.language,
-                                        "TEMPERATURE (°C)",
+                                        if self.settings.temperature_unit == "F" { "TEMPERATURE (°F)" } else { "TEMPERATURE (°C)" },
                                     )))
                                     .push(interactive_graph_with_axis(
                                         &self.settings.language,
@@ -6901,7 +6777,7 @@ impl cosmic::Application for AppModel {
                                             reading.name,
                                             crate::i18n::tr(
                                                 &self.settings.language,
-                                                "TEMPERATURE (°C)"
+                                                if self.settings.temperature_unit == "F" { "TEMPERATURE (°F)" } else { "TEMPERATURE (°C)" }
                                             )
                                         ),
                                         device_history.into_iter().flat_map(|samples| {
@@ -6909,12 +6785,12 @@ impl cosmic::Application for AppModel {
                                                 |(timestamp, _, temperature)| {
                                                     temperature
                                                         .is_finite()
-                                                        .then_some((*timestamp, *temperature))
+                                                        .then_some((*timestamp, temperature_in_unit(*temperature, &self.settings.temperature_unit)))
                                                 },
                                             )
                                         }),
                                         &self.settings.graph_style,
-                                        "°C",
+                                        temperature_unit_label(&self.settings.temperature_unit),
                                         device_axis_start,
                                     )),
                             )
