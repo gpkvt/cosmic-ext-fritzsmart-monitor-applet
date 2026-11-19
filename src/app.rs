@@ -1986,6 +1986,35 @@ fn average_selected_temperature_c(
     average_temperature_c(&selected_readings, exclude_solar)
 }
 
+/// Average only selected live temperature sources, including visible Hue
+/// environmental sensors. Missing/offline/invalid Hue values never count as 0.
+fn average_temperature_with_hue_c(
+    readings: &[FritzReading],
+    selected_ains: &[String],
+    sensors: &[HueSensor],
+    hidden_hue_devices: &[String],
+    exclude_solar: bool,
+) -> Option<f64> {
+    let selected_metered = readings.iter().filter(|reading| {
+        reading.temperature_c.is_finite()
+            && selected_ains.iter().any(|ain| {
+                crate::fritz::canonical_device_key(ain)
+                    == crate::fritz::canonical_device_key(&reading.ain)
+            })
+            && (!exclude_solar || !reading.name.to_lowercase().contains("solar"))
+    }).map(|reading| reading.temperature_c);
+    let selected_hue = sensors.iter().filter(|sensor| {
+        sensor.reachable
+            && hue_device_is_visible(hidden_hue_devices, &hue_device_id("sensor", &sensor.id))
+            && (!exclude_solar || !sensor.name.to_lowercase().contains("solar"))
+    }).filter_map(|sensor| sensor.temperature_c.filter(|temperature| temperature.is_finite()));
+    let (sum, count) = selected_metered.chain(selected_hue)
+        .fold((0.0_f64, 0_usize), |(sum, count), temperature| {
+            (sum + temperature, count + 1)
+        });
+    (count > 0).then(|| sum / count as f64)
+}
+
 fn aligned_power_series(
     output_history: &VecDeque<(Instant, i64)>,
     input_history: &VecDeque<(Instant, i64)>,
@@ -3853,9 +3882,11 @@ impl cosmic::Application for AppModel {
             "-- W".to_string()
         };
         let temperature = if self.settings.panel_average_temperature {
-            average_selected_temperature_c(
+            average_temperature_with_hue_c(
                 &self.readings,
                 &self.selected_ains,
+                &self.hue_sensors,
+                &self.settings.hidden_hue_devices,
                 self.settings.panel_exclude_solar_temperature,
             )
             .map(|temperature| format_temperature(temperature, &self.settings.temperature_unit))
@@ -11633,6 +11664,48 @@ mod history_tests {
         assert_eq!(average_temperature_c(&readings, false), Some(110.0 / 3.0));
         assert_eq!(average_temperature_c(&readings, true), Some(20.0));
         assert_eq!(average_temperature_c(&readings[1..], true), None);
+    }
+
+    #[test]
+    fn hue_sensor_temperatures_contribute_only_when_visible_and_reachable() {
+        let sensor = HueSensor {
+            id: "00112233-4455-6677-8899-aabbccddeeff".into(),
+            name: "Hallway motion".into(),
+            temperature_c: Some(24.0),
+            illuminance_lux: Some(100.0),
+            motion: Some(false),
+            reachable: true,
+        };
+        let reading = FritzReading {
+            ain: "111111".into(),
+            name: "Living room".into(),
+            power_w: 150,
+            temperature_c: 20.0,
+            power_state: None,
+            power_controllable: false,
+            power_toggle_allowed: false,
+        };
+        let selected = vec!["111111".into()];
+        let sensors = vec![sensor.clone()];
+        assert_eq!(average_temperature_with_hue_c(
+            &[reading.clone()], &selected, &sensors, &[], false,
+        ), Some(22.0));
+        let hidden = vec![hue_device_id("sensor", &sensor.id)];
+        assert_eq!(average_temperature_with_hue_c(
+            &[reading.clone()], &selected, &sensors, &hidden, false,
+        ), Some(20.0));
+        let offline = HueSensor { reachable: false, ..sensor.clone() };
+        assert_eq!(average_temperature_with_hue_c(
+            &[reading], &selected, &[offline], &[], false,
+        ), Some(20.0));
+        let invalid = HueSensor { temperature_c: Some(f64::NAN), ..sensor.clone() };
+        assert_eq!(average_temperature_with_hue_c(
+            &[], &[], &[invalid], &[], false,
+        ), None);
+        let solar = HueSensor { name: "Solar roof".into(), ..sensor };
+        assert_eq!(average_temperature_with_hue_c(
+            &[], &[], &[solar], &[], true,
+        ), None);
     }
 
     #[test]
