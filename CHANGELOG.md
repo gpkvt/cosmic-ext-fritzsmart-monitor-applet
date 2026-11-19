@@ -1,5 +1,7 @@
 # Changelog
 
+- Move the Total Power Input & Output copy icon beside its heading and animate copy buttons with a brief pulsing checkmark, without moving the button hit targets.
+
 - Show TODAY and Y'DAY input/output percentages side by side on one row in the shared power history summary.
 
 ### Changed
