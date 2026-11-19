@@ -963,13 +963,10 @@ fn today_energy_wh_for_ains(
         .filter(|(ain, _)| selected_ains.contains(*ain))
         .map(|(ain, samples)| (ain.clone(), samples.clone()))
         .collect();
-    let (_, solar_wh, grid_wh) = daily_energy_history(
-        &selected_history,
-        input_ains,
-        refresh_interval_seconds,
-    )
-    .into_iter()
-    .last()?;
+    let (_, solar_wh, grid_wh) =
+        daily_energy_history(&selected_history, input_ains, refresh_interval_seconds)
+            .into_iter()
+            .last()?;
     if input_energy { solar_wh } else { grid_wh }
 }
 
@@ -6785,9 +6782,9 @@ impl cosmic::Application for AppModel {
                         self.settings.input_ains.contains(&device_key),
                     );
                     let device_summary = menu_energy_summary(
-                        device_history.into_iter().flat_map(|samples| {
-                            samples.iter().map(|(_, power, _)| *power as f64)
-                        }),
+                        device_history
+                            .into_iter()
+                            .flat_map(|samples| samples.iter().map(|(_, power, _)| *power as f64)),
                         device_today_wh,
                     );
                     let mut card_column = widget::list::list_column()
