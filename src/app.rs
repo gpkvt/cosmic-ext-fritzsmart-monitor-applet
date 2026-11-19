@@ -870,7 +870,7 @@ fn daily_energy_history(
     let now = Instant::now();
     let wall_now = SystemTime::now();
     let today = chrono::Local::now().date_naive();
-    let first_day = today - chrono::Duration::days(13);
+    let first_day = today - chrono::Duration::days(6);
     let max_gap = Duration::from_secs(u64::from(refresh_interval_seconds.max(30)) * 3);
     let mut totals = BTreeMap::<chrono::NaiveDate, (Option<f64>, Option<f64>)>::new();
 
@@ -941,7 +941,7 @@ fn daily_energy_history(
         }
     }
 
-    (0..14)
+    (0..7)
         .rev()
         .map(|offset| {
             let date = today - chrono::Duration::days(offset);
@@ -962,7 +962,7 @@ fn daily_energy_history_section(
         widget::Row::new()
             .spacing(8)
             .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::text::body("DAILY ENERGY · LAST 14 DAYS"))
+            .push(widget::text::body("DAILY ENERGY · LAST 7 DAYS"))
             .push(widget::Space::new().width(cosmic::iced::Length::Fill))
             .push(
                 widget::icon::from_name(if collapsed {
