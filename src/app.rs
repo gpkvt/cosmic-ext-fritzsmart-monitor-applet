@@ -68,6 +68,7 @@ pub struct AppModel {
     copy_feedback: Option<CopyFeedback>,
     history: VecDeque<(Instant, i64)>,
     device_history: HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    hue_sensor_history: crate::history::HueSensorHistory,
     temperature_alert_state: HashMap<String, bool>,
     missing_device_ains: HashSet<String>,
     next_refresh_at: Option<Instant>,
@@ -2141,6 +2142,69 @@ fn record_device_sample(
     }
 }
 
+/// Collect only measurements the Hue Bridge actually reported. A temporary
+/// connection failure never creates a fake 0 °C / 0 lux data point.
+fn record_hue_sensor_sample(
+    history: &mut crate::history::HueSensorHistory,
+    sensor: &HueSensor,
+    now: Instant,
+    window: Duration,
+) {
+    if !sensor.reachable || !crate::hue::valid_sensor_id(&sensor.id) {
+        return;
+    }
+    let temperature = sensor.temperature_c.filter(|value| value.is_finite());
+    let lux = sensor
+        .illuminance_lux
+        .filter(|value| value.is_finite() && *value >= 0.0);
+    if temperature.is_none() && lux.is_none() {
+        return;
+    }
+    let samples = history.entry(sensor.id.clone()).or_default();
+    let interval = graph_sample_interval(window);
+    if let Some((timestamp, recorded_temperature, recorded_lux)) = samples.back_mut()
+        && now.saturating_duration_since(*timestamp) < interval
+    {
+        *recorded_temperature = temperature;
+        *recorded_lux = lux;
+    } else {
+        samples.push_back((now, temperature, lux));
+    }
+    while samples
+        .front()
+        .is_some_and(|(time, _, _)| now.saturating_duration_since(*time) > window)
+    {
+        samples.pop_front();
+    }
+    while samples.len() > max_history_samples(window) {
+        samples.pop_front();
+    }
+}
+
+/// Build a sensor-only metric trace without implying readings when the service
+/// is offline or missing. A Celsius recording is converted for °F display.
+fn hue_sensor_graph_samples(
+    history: &crate::history::HueSensorHistory,
+    sensor_id: &str,
+    temperature: bool,
+    fahrenheit: bool,
+) -> GraphSamples {
+    history
+        .get(sensor_id)
+        .into_iter()
+        .flat_map(|samples| samples.iter())
+        .filter_map(|(timestamp, celsius, lux)| {
+            let value = if temperature {
+                celsius.map(|value| if fahrenheit { value * 9.0 / 5.0 + 32.0 } else { value })
+            } else {
+                *lux
+            };
+            value.filter(|number| number.is_finite() && (temperature || *number >= 0.0))
+                .map(|number| (*timestamp, number))
+        })
+        .collect()
+}
+
 fn surface_card<'a>(
     content: cosmic::Element<'a, Message>,
     padding: u16,
@@ -2559,6 +2623,59 @@ fn collapsible_graph(
         section = section.push(graph);
     }
     section.into()
+}
+
+/// Temperature and illuminance have independent histories and disclosures.
+/// Only actual samples are drawn; a collapsed graph is never constructed.
+fn hue_sensor_metric_graph(
+    history: &crate::history::HueSensorHistory,
+    sensor: &HueSensor,
+    temperature: bool,
+    settings: &FritzSettings,
+    collapsed_sections: &HashSet<String>,
+    copy_feedback: Option<&CopyFeedback>,
+) -> cosmic::Element<'static, Message> {
+    let language = &settings.language;
+    let unit = settings.temperature_unit.as_str();
+    let style = settings.graph_style.as_str();
+    let timespan_minutes = settings.graph_timespan_minutes;
+    let kind = if temperature { "temperature" } else { "lux" };
+    let section_id = format!("hue-sensor-graph-{kind}-{}", sensor.id);
+    let collapsed = collapsed_sections.contains(&section_id);
+    let label = if temperature {
+        if unit == "F" {
+            "TEMPERATURE (°F)"
+        } else {
+            "TEMPERATURE (°C)"
+        }
+    } else {
+        "ILLUMINANCE (lx)"
+    };
+    let measurement_unit = if temperature {
+        if unit == "F" { "°F" } else { "°C" }
+    } else {
+        "lx"
+    };
+    let graph: cosmic::Element<'static, Message> = if collapsed {
+        widget::text("").into()
+    } else {
+        let full = hue_sensor_graph_samples(history, &sensor.id, temperature, unit == "F");
+        let samples = graph_values_for_timespan(&full, timespan_minutes);
+        if samples.len() < 2 {
+            widget::text::caption("Not enough recorded sensor readings to draw a graph").into()
+        } else {
+            let start = graph_axis_start_for_samples(&samples, timespan_minutes);
+            interactive_graph_with_axis(
+                language,
+                &format!("{} · {label}", sensor.name),
+                samples.into_iter(),
+                style,
+                measurement_unit,
+                start,
+            )
+        }
+    };
+    collapsible_graph(label, section_id, collapsed, graph, copy_feedback)
 }
 
 /// Full-width compact plot for each actual daily metric. Missing daily
@@ -3049,6 +3166,89 @@ fn hue_device_is_visible(hidden: &[String], id: &str) -> bool {
         .any(|item| crate::fritz::canonical_device_key(item) == key)
 }
 
+/// Same controls for FRITZ!Box devices and Hue environmental sensors:
+/// alerts are per physical device and thresholds are stored in Celsius.
+fn temperature_alert_controls(
+    id: String,
+    thresholds: Option<TemperatureAlertThresholds>,
+    language: &str,
+    unit: &str,
+) -> cosmic::Element<'static, Message> {
+    let toggle_id = id.clone();
+    let mut controls = widget::Column::new()
+        .spacing(6)
+        .width(cosmic::iced::Length::Fill)
+        .push(
+            widget::Row::new()
+                .width(cosmic::iced::Length::Fill)
+                .align_y(cosmic::iced::Alignment::Center)
+                .push(widget::text::caption(crate::i18n::tr(
+                    language,
+                    "Temperature alerts",
+                )))
+                .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                .push(widget::toggler(thresholds.is_some()).on_toggle(move |enabled| {
+                    Message::ToggleTemperatureAlert(toggle_id.clone(), enabled)
+                })),
+        );
+    if let Some(thresholds) = thresholds {
+        let fahrenheit = unit == "F";
+        let high_id = id.clone();
+        let low_id = id;
+        controls = controls
+            .push(widget::text::caption(format!(
+                "{}: {}",
+                crate::i18n::tr(language, "Upper limit"),
+                format_temperature(f64::from(thresholds.high_c), unit)
+            )))
+            .push(
+                widget::slider(
+                    if fahrenheit { 32.0..=104.0 } else { 0.0..=40.0 },
+                    temperature_in_unit(f64::from(thresholds.high_c), unit) as f32,
+                    move |value| {
+                        let celsius = if fahrenheit {
+                            (f64::from(value) - 32.0) * 5.0 / 9.0
+                        } else {
+                            f64::from(value)
+                        };
+                        Message::TemperatureAlertHighChanged(
+                            high_id.clone(),
+                            celsius.round() as i16,
+                        )
+                    },
+                )
+                .step(1.0_f32),
+            )
+            .push(widget::text::caption(format!(
+                "{}: {}",
+                crate::i18n::tr(language, "Lower limit"),
+                format_temperature(f64::from(thresholds.low_c), unit)
+            )))
+            .push(
+                widget::slider(
+                    if fahrenheit { 14.0..=86.0 } else { -10.0..=30.0 },
+                    temperature_in_unit(f64::from(thresholds.low_c), unit) as f32,
+                    move |value| {
+                        let celsius = if fahrenheit {
+                            (f64::from(value) - 32.0) * 5.0 / 9.0
+                        } else {
+                            f64::from(value)
+                        };
+                        Message::TemperatureAlertLowChanged(
+                            low_id.clone(),
+                            celsius.round() as i16,
+                        )
+                    },
+                )
+                .step(1.0_f32),
+            )
+            .push(widget::text::caption(
+                "Notify above the upper limit or below the lower limit",
+            ));
+    }
+    controls.into()
+}
+
 fn hue_settings_card(
     id: String,
     name: String,
@@ -3056,6 +3256,7 @@ fn hue_settings_card(
     details: String,
     language: &str,
     light_control: Option<cosmic::Element<'static, Message>>,
+    additional_controls: Option<cosmic::Element<'static, Message>>,
 ) -> cosmic::Element<'static, Message> {
     let selection_id = id.clone();
     let header = widget::Row::new()
@@ -3093,6 +3294,9 @@ fn hue_settings_card(
                 .push(widget::Space::new().width(cosmic::iced::Length::Fill))
                 .push(control),
         );
+    }
+    if let Some(controls) = additional_controls {
+        content = content.push(controls);
     }
     surface_card(content.into(), 8)
 }
@@ -3879,6 +4083,7 @@ impl cosmic::Application for AppModel {
         let history_window = graph_history_window(settings.graph_timespan_minutes);
         let history_storage_window = graph_history_storage_window(settings.graph_timespan_minutes);
         let (mut history, device_history) = crate::history::load(history_storage_window);
+        let hue_sensor_history = crate::history::load_hue_sensors(history_storage_window);
         history
             .retain(|(timestamp, _)| Instant::now().duration_since(*timestamp) <= history_window);
         let history_storage_diagnostics = crate::history::diagnostics(history_storage_window);
@@ -3961,6 +4166,7 @@ impl cosmic::Application for AppModel {
                 },
                 history,
                 device_history,
+                hue_sensor_history,
                 history_storage_diagnostics,
                 collapsed_menu_sections,
                 expanded_devices,
@@ -5701,116 +5907,15 @@ impl cosmic::Application for AppModel {
                                                             }
                                                         }),
                                                 ),
-                                        )
-                                        .push(
-                                            widget::Row::new()
-                                                .width(cosmic::iced::Length::Fill)
-                                                .align_y(cosmic::iced::Alignment::Center)
-                                                .push(widget::text::caption(crate::i18n::tr(
-                                                    &self.settings.language,
-                                                    "Temperature alerts",
-                                                )))
-                                                .push(
-                                                    widget::Space::new()
-                                                        .width(cosmic::iced::Length::Fill),
-                                                )
-                                                .push(
-                                                    widget::toggler(alert_thresholds.is_some())
-                                                        .on_toggle({
-                                                            let ain = ain.clone();
-                                                            move |enabled| {
-                                                                Message::ToggleTemperatureAlert(
-                                                                    ain.clone(),
-                                                                    enabled,
-                                                                )
-                                                            }
-                                                        }),
-                                                ),
                                         );
                                 }
-                                if let Some(thresholds) = alert_thresholds {
-                                    device_row = device_row
-                                        .push(widget::text::caption(format!(
-                                            "{}: {}",
-                                            crate::i18n::tr(&self.settings.language, "Upper limit"),
-                                            format_temperature(
-                                                f64::from(thresholds.high_c),
-                                                &self.settings.temperature_unit
-                                            )
-                                        )))
-                                        .push(
-                                            widget::slider(
-                                                if self.settings.temperature_unit == "F" {
-                                                    32.0..=104.0
-                                                } else {
-                                                    0.0..=40.0
-                                                },
-                                                temperature_in_unit(
-                                                    f64::from(thresholds.high_c),
-                                                    &self.settings.temperature_unit,
-                                                )
-                                                    as f32,
-                                                {
-                                                    let ain = ain.clone();
-                                                    let unit =
-                                                        self.settings.temperature_unit.clone();
-                                                    move |value| {
-                                                        let celsius = if unit == "F" {
-                                                            (f64::from(value) - 32.0) * 5.0 / 9.0
-                                                        } else {
-                                                            f64::from(value)
-                                                        };
-                                                        Message::TemperatureAlertHighChanged(
-                                                            ain.clone(),
-                                                            celsius.round() as i16,
-                                                        )
-                                                    }
-                                                },
-                                            )
-                                            .step(1.0_f32),
-                                        )
-                                        .push(widget::text::caption(format!(
-                                            "{}: {}",
-                                            crate::i18n::tr(&self.settings.language, "Lower limit"),
-                                            format_temperature(
-                                                f64::from(thresholds.low_c),
-                                                &self.settings.temperature_unit
-                                            )
-                                        )))
-                                        .push(
-                                            widget::slider(
-                                                if self.settings.temperature_unit == "F" {
-                                                    14.0..=32.0
-                                                } else {
-                                                    -10.0..=0.0
-                                                },
-                                                temperature_in_unit(
-                                                    f64::from(thresholds.low_c),
-                                                    &self.settings.temperature_unit,
-                                                )
-                                                    as f32,
-                                                {
-                                                    let ain = ain.clone();
-                                                    let unit =
-                                                        self.settings.temperature_unit.clone();
-                                                    move |value| {
-                                                        let celsius = if unit == "F" {
-                                                            (f64::from(value) - 32.0) * 5.0 / 9.0
-                                                        } else {
-                                                            f64::from(value)
-                                                        };
-                                                        Message::TemperatureAlertLowChanged(
-                                                            ain.clone(),
-                                                            celsius.round() as i16,
-                                                        )
-                                                    }
-                                                },
-                                            )
-                                            .step(1.0_f32),
-                                        )
-                                        .push(widget::text::caption(
-                                            "Notify above the upper limit or below the lower limit",
-                                        ));
+                                if !is_tasmota {
+                                    device_row = device_row.push(temperature_alert_controls(
+                                        ain.clone(),
+                                        alert_thresholds,
+                                        &self.settings.language,
+                                        &self.settings.temperature_unit,
+                                    ));
                                 }
                                 content = content.push(surface_card(device_row.into(), 8));
                             }
@@ -5846,6 +5951,7 @@ impl cosmic::Application for AppModel {
                                     format!("Hue Bridge · Light · {status} · No measured W"),
                                     &self.settings.language,
                                     Some(light_control),
+                                    None,
                                 ));
                             }
                             SettingsDeviceEntry::HueSensor(sensor) => {
@@ -5879,14 +5985,24 @@ impl cosmic::Application for AppModel {
                                         None => "Motion unavailable",
                                     }
                                 };
+                                let alert_key =
+                                    crate::fritz::normalize_ain_for_selection(&id);
+                                let thresholds =
+                                    self.settings.temperature_alerts.get(&alert_key).copied();
                                 content = content.push(hue_settings_card(
-                                id,
-                                sensor.name.clone(),
-                                visible,
-                                format!("Hue Bridge · Sensor · {temperature} · {lux} · {motion} · No measured W"),
-                                &self.settings.language,
-                                None,
-                            ));
+                                    id.clone(),
+                                    sensor.name.clone(),
+                                    visible,
+                                    format!("Hue Bridge · Sensor · {temperature} · {lux} · {motion} · No measured W"),
+                                    &self.settings.language,
+                                    None,
+                                    Some(temperature_alert_controls(
+                                        id,
+                                        thresholds,
+                                        &self.settings.language,
+                                        &self.settings.temperature_unit,
+                                    )),
+                                ));
                             }
                         }
                     }
@@ -8206,18 +8322,31 @@ impl cosmic::Application for AppModel {
                         .list_item_padding([0, 0])
                         .add(heading);
                     if expanded {
-                        card = card.add(
-                            widget::container(
-                                widget::Column::new()
-                                    .spacing(4)
-                                    .push(widget::text::caption(format!("Motion · {motion}")))
-                                    .push(widget::text::caption(format!("Illuminance · {lux}")))
-                                    .push(widget::text::caption(
-                                        "Hue Bridge · Sensor · No measured W or power history",
-                                    )),
-                            )
-                            .padding([8, 12]),
-                        );
+                        let details = widget::Column::new()
+                            .spacing(10)
+                            .width(cosmic::iced::Length::Fill)
+                            .push(widget::text::caption(format!("Motion · {motion}")))
+                            .push(widget::text::caption(format!("Illuminance · {lux}")))
+                            .push(widget::text::caption(
+                                "Hue Bridge · Sensor · No measured W or power history",
+                            ))
+                            .push(hue_sensor_metric_graph(
+                                &self.hue_sensor_history,
+                                sensor,
+                                true,
+                                &self.settings,
+                                &self.collapsed_menu_sections,
+                                self.copy_feedback.as_ref(),
+                            ))
+                            .push(hue_sensor_metric_graph(
+                                &self.hue_sensor_history,
+                                sensor,
+                                false,
+                                &self.settings,
+                                &self.collapsed_menu_sections,
+                                self.copy_feedback.as_ref(),
+                            ));
+                        card = card.add(widget::container(details).padding([8, 12]));
                     }
                     device_sort_metadata.insert(
                         row_key.clone(),
@@ -8876,7 +9005,14 @@ impl cosmic::Application for AppModel {
             widget::Column::new()
                 .width(cosmic::iced::Length::Fill)
                 .height(cosmic::iced::Length::Fill)
-                .push(widget::container(sticky_header).padding([8, 12]))
+                .push(
+                    widget::container(sticky_header.push(icon_action_button(
+                        "window-close-symbolic",
+                        "Close menu",
+                        Message::TogglePopup,
+                    )))
+                    .padding([8, 12]),
+                )
                 .push(widget::divider::horizontal::default())
                 .push(scrollable_content)
         } else {
@@ -8922,6 +9058,11 @@ impl cosmic::Application for AppModel {
                         "⚙",
                         crate::i18n::tr(&self.settings.language, "Settings"),
                         Message::ToggleSettings,
+                    ))
+                    .push(icon_action_button(
+                        "window-close-symbolic",
+                        "Close menu",
+                        Message::TogglePopup,
                     )),
             )
             .padding([8, 12])
@@ -10042,6 +10183,7 @@ impl cosmic::Application for AppModel {
                     let storage_window =
                         graph_history_storage_window(self.settings.graph_timespan_minutes);
                     (self.history, self.device_history) = crate::history::load(storage_window);
+                    self.hue_sensor_history = crate::history::load_hue_sensors(storage_window);
                     let window = graph_history_window(self.settings.graph_timespan_minutes);
                     let now = Instant::now();
                     self.history
@@ -10587,6 +10729,51 @@ impl cosmic::Application for AppModel {
                 self.hue_next_refresh_at = Some(Instant::now() + Duration::from_secs(60));
                 match result {
                     Ok(snapshot) => {
+                        let now = Instant::now();
+                        let window =
+                            graph_history_storage_window(self.settings.graph_timespan_minutes);
+                        for sensor in &snapshot.sensors {
+                            record_hue_sensor_sample(
+                                &mut self.hue_sensor_history,
+                                sensor,
+                                now,
+                                window,
+                            );
+                            let key = crate::fritz::normalize_ain_for_selection(
+                                &hue_device_id("sensor", &sensor.id),
+                            );
+                            if let Some(thresholds) =
+                                self.settings.temperature_alerts.get(&key).copied()
+                            {
+                                // Offline or invalid readings must not fire alerts
+                                // or establish a fake temperature baseline.
+                                if let Some(temperature) = sensor.temperature_c
+                                    .filter(|value| sensor.reachable && value.is_finite())
+                                {
+                                    let outside = temperature_outside_limits(temperature, thresholds);
+                                    if should_notify_temperature_alert(
+                                        self.temperature_alert_state.get(&key).copied(),
+                                        outside,
+                                    ) {
+                                        notify_temperature_alert(
+                                            &sensor.name,
+                                            temperature,
+                                            thresholds,
+                                            &self.settings.language,
+                                            &self.settings.temperature_unit,
+                                        );
+                                    }
+                                    self.temperature_alert_state.insert(key, outside);
+                                }
+                            } else {
+                                self.temperature_alert_state.remove(&key);
+                            }
+                        }
+                        if let Err(error) =
+                            crate::history::save_hue_sensors(&self.hue_sensor_history)
+                        {
+                            eprintln!("Could not persist Hue sensor history: {error}");
+                        }
                         self.hue_lights = snapshot.lights;
                         self.hue_sensors = snapshot.sensors;
                         self.hue_sensor_warning = snapshot.sensor_warning;
@@ -10702,6 +10889,7 @@ impl cosmic::Application for AppModel {
                 let storage_window =
                     graph_history_storage_window(self.settings.graph_timespan_minutes);
                 (self.history, self.device_history) = crate::history::load(storage_window);
+                self.hue_sensor_history = crate::history::load_hue_sensors(storage_window);
                 let window = graph_history_window(self.settings.graph_timespan_minutes);
                 let now = Instant::now();
                 self.history
@@ -11098,20 +11286,14 @@ impl cosmic::Application for AppModel {
             }
             Message::TemperatureAlertHighChanged(ain, high_c) => {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
-                self.settings
-                    .temperature_alerts
-                    .entry(key)
-                    .or_default()
-                    .high_c = high_c.clamp(0, 40);
+                let thresholds = self.settings.temperature_alerts.entry(key).or_default();
+                thresholds.high_c = high_c.clamp(0, 40).max(thresholds.low_c + 1);
                 self.persist_settings();
             }
             Message::TemperatureAlertLowChanged(ain, low_c) => {
                 let key = crate::fritz::normalize_ain_for_selection(&ain);
-                self.settings
-                    .temperature_alerts
-                    .entry(key)
-                    .or_default()
-                    .low_c = low_c.clamp(-10, 10);
+                let thresholds = self.settings.temperature_alerts.entry(key).or_default();
+                thresholds.low_c = low_c.clamp(-10, 30).min(thresholds.high_c - 1);
                 self.persist_settings();
             }
             Message::TogglePopup => {
@@ -11155,6 +11337,10 @@ impl cosmic::Application for AppModel {
                     .max_width(720.0)
                     .min_width(720.0)
                     .max_height(max_height);
+                // A grabbed XDG popup is dismissed by the compositor when
+                // focus moves to another window. Leave it ungrabbed so only
+                // explicit panel/header clicks close the menu.
+                settings.grab = false;
                 return get_popup(settings);
             }
             Message::PopupClosed(id) => {
@@ -11343,6 +11529,66 @@ mod history_tests {
         );
         assert_eq!(sections.len(), 1);
         assert_eq!(sections[0].0, "3-total-power-overview");
+    }
+
+    #[test]
+    fn hue_sensor_history_ignores_offline_and_missing_values() {
+        let mut history = crate::history::HueSensorHistory::new();
+        let now = Instant::now();
+        let sensor = HueSensor {
+            id: "11112222-3333-4444-5555-aabbccddeeff".into(),
+            name: "Hallway motion".into(),
+            temperature_c: Some(22.0),
+            illuminance_lux: Some(120.0),
+            motion: Some(false),
+            reachable: true,
+        };
+        let window = Duration::from_secs(120);
+        record_hue_sensor_sample(&mut history, &sensor, now, window);
+        assert_eq!(history[&sensor.id].len(), 1);
+        let mut offline = sensor.clone();
+        offline.reachable = false;
+        offline.temperature_c = Some(99.0);
+        offline.illuminance_lux = Some(0.0);
+        record_hue_sensor_sample(
+            &mut history,
+            &offline,
+            now + Duration::from_secs(60),
+            window,
+        );
+        assert_eq!(history[&sensor.id].len(), 1);
+        let mut unavailable = sensor.clone();
+        unavailable.temperature_c = None;
+        unavailable.illuminance_lux = None;
+        record_hue_sensor_sample(
+            &mut history,
+            &unavailable,
+            now + Duration::from_secs(60),
+            window,
+        );
+        assert_eq!(history[&sensor.id].len(), 1);
+        let trace = hue_sensor_graph_samples(&history, &sensor.id, true, false);
+        assert_eq!(trace.len(), 1);
+        assert!((trace[0].1 - 22.0).abs() < f64::EPSILON);
+        let fahrenheit = hue_sensor_graph_samples(&history, &sensor.id, true, true);
+        assert!((fahrenheit[0].1 - 71.6).abs() < 0.001);
+        let lux = hue_sensor_graph_samples(&history, &sensor.id, false, false);
+        assert_eq!(lux[0].1, 120.0);
+    }
+
+    #[test]
+    fn hue_alerts_use_standard_threshold_transitions() {
+        let thresholds = TemperatureAlertThresholds {
+            high_c: 28,
+            low_c: 18,
+        };
+        assert!(!temperature_outside_limits(23.0, thresholds));
+        assert!(temperature_outside_limits(29.0, thresholds));
+        assert!(temperature_outside_limits(17.0, thresholds));
+        assert!(!should_notify_temperature_alert(None, true));
+        assert!(should_notify_temperature_alert(Some(false), true));
+        assert!(!should_notify_temperature_alert(Some(true), true));
+        assert!(!should_notify_temperature_alert(Some(true), false));
     }
 
     #[test]

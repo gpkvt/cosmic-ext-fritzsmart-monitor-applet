@@ -106,6 +106,11 @@ pub async fn discover_bridges() -> Result<Vec<String>, String> {
         .map_err(|error| format!("Hue Bridge discovery task failed: {error}"))?
 }
 
+/// Stable resource identity used when recording and restoring sensor histories.
+pub(crate) fn valid_sensor_id(id: &str) -> bool {
+    light_id_valid(id)
+}
+
 fn light_id_valid(id: &str) -> bool {
     id.len() == 36
         && id.bytes().enumerate().all(|(index, byte)| {

@@ -53,6 +53,30 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+          # Some GitHub runner images have only vendor apt sources enabled.
+          # Restore the official Ubuntu archives only when the core dev packages
+          # are missing, retaining signature verification.
+          if ! apt-cache show libdbus-1-dev >/dev/null 2>&1; then
+            . /etc/os-release
+            if [[ "${ID:-}" != ubuntu || "${VERSION_CODENAME:-}" != noble ]]; then
+              echo "Ubuntu Noble apt sources unavailable on unexpected runner" >&2
+              exit 1
+            fi
+            sudo tee /etc/apt/sources.list.d/fritz-monitor-ubuntu.sources >/dev/null <<'SOURCES'
+          Types: deb
+          URIs: http://archive.ubuntu.com/ubuntu
+          Suites: noble noble-updates noble-backports
+          Components: main restricted universe multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+          Types: deb
+          URIs: http://security.ubuntu.com/ubuntu
+          Suites: noble-security
+          Components: main restricted universe multiverse
+          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+          SOURCES
+            sudo apt-get update -o Acquire::Retries=3
+          fi
           sudo apt-get install --yes -o Acquire::Retries=3 \
             libdbus-1-dev libdisplay-info-dev libgbm-dev libinput-dev libseat-dev \
             libsystemd-dev libudev-dev libvulkan-dev libwayland-dev libxkbcommon-dev \

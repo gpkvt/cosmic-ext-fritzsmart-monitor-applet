@@ -11,6 +11,8 @@ use std::{
 
 pub type PowerHistory = VecDeque<(Instant, i64)>;
 pub type DeviceHistory = HashMap<String, VecDeque<(Instant, i64, f64)>>;
+/// Persist only actual readings for Hue sensors; missing values remain unavailable.
+pub type HueSensorHistory = HashMap<String, VecDeque<(Instant, Option<f64>, Option<f64>)>>;
 
 fn history_directory() -> Result<PathBuf, String> {
     let base = std::env::var_os("XDG_DATA_HOME")
@@ -298,6 +300,125 @@ pub fn save(power: &PowerHistory, devices: &DeviceHistory) -> Result<(), String>
     save_to_path(&history_path()?, power, devices)
 }
 
+/// Hue measurements are kept separate from power history: they are not watts.
+fn hue_history_path() -> Result<PathBuf, String> {
+    Ok(history_directory()?.join("hue-sensors.json"))
+}
+
+fn load_hue_sensors_from_path(path: &Path, window: Duration) -> HueSensorHistory {
+    let Ok(contents) = fs::read_to_string(path) else {
+        return HueSensorHistory::new();
+    };
+    let Ok(document) = serde_json::from_str::<Value>(&contents) else {
+        return HueSensorHistory::new();
+    };
+    if document.get("version").and_then(Value::as_u64) != Some(1) {
+        return HueSensorHistory::new();
+    }
+    let (Ok(now_epoch), now) = (epoch_now(), Instant::now()) else {
+        return HueSensorHistory::new();
+    };
+    let mut histories = HueSensorHistory::new();
+    let Some(sensors) = document.get("sensors").and_then(Value::as_object) else {
+        return histories;
+    };
+    for (id, samples) in sensors {
+        // Only keys for Hue physical devices are retained. Do not trust a
+        // malformed or externally edited on-disk history file.
+        if !crate::hue::valid_sensor_id(id) {
+            continue;
+        }
+        let Some(samples) = samples.as_array() else {
+            continue;
+        };
+        let mut readings = VecDeque::new();
+        for sample in samples {
+            let Some(instant) = sample_instant(sample, now_epoch, now, window) else {
+                continue;
+            };
+            let temperature = sample
+                .get("temperature_c")
+                .and_then(Value::as_f64)
+                .filter(|value| value.is_finite());
+            let lux = sample
+                .get("illuminance_lux")
+                .and_then(Value::as_f64)
+                .filter(|value| value.is_finite() && *value >= 0.0);
+            if temperature.is_some() || lux.is_some() {
+                readings.push_back((instant, temperature, lux));
+            }
+        }
+        // Bound disk-to-memory import even if the JSON contains a huge
+        // number of measurements for one sensor.
+        while readings.len() > 50_000 {
+            readings.pop_front();
+        }
+        if !readings.is_empty() {
+            histories.insert(id.clone(), readings);
+        }
+    }
+    histories
+}
+
+pub fn load_hue_sensors(window: Duration) -> HueSensorHistory {
+    hue_history_path()
+        .map(|path| load_hue_sensors_from_path(&path, window))
+        .unwrap_or_default()
+}
+
+fn save_hue_sensors_to_path(path: &Path, history: &HueSensorHistory) -> Result<(), String> {
+    let now = Instant::now();
+    let now_epoch = epoch_now()?;
+    let mut sensors = serde_json::Map::new();
+    for (id, readings) in history {
+        if !crate::hue::valid_sensor_id(id) {
+            continue;
+        }
+        let samples: Vec<Value> = readings
+            .iter()
+            .filter(|(_, temperature, lux)| temperature.is_some() || lux.is_some())
+            .map(|(instant, temperature, lux)| {
+                json!({
+                    "timestamp": timestamp_for(*instant, now, now_epoch),
+                    "temperature_c": temperature,
+                    "illuminance_lux": lux,
+                })
+            })
+            .collect();
+        sensors.insert(id.clone(), Value::Array(samples));
+    }
+    let contents = serde_json::to_vec(&json!({"version": 1, "sensors": sensors}))
+        .map_err(|error| error.to_string())?;
+    let parent = path.parent().ok_or("Invalid Hue history path")?;
+    fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_nanos();
+    let temporary = parent.join(format!(".hue-sensors.{}.{timestamp}.tmp", std::process::id()));
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(&temporary).map_err(|error| error.to_string())?;
+    let result = file
+        .write_all(&contents)
+        .and_then(|_| file.sync_all())
+        .and_then(|_| fs::rename(&temporary, path));
+    if let Err(error) = result {
+        let _ = fs::remove_file(&temporary);
+        return Err(error.to_string());
+    }
+    Ok(())
+}
+
+pub fn save_hue_sensors(history: &HueSensorHistory) -> Result<(), String> {
+    save_hue_sensors_to_path(&hue_history_path()?, history)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -311,6 +432,59 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ))
+    }
+
+    #[test]
+    fn hue_temperature_and_light_history_survives_restart_without_fake_samples() {
+        let path = temporary_path();
+        let id = "11112222-3333-4444-5555-aabbccddeeff".to_string();
+        let now = Instant::now();
+        let mut histories = HueSensorHistory::new();
+        histories.insert(
+            id.clone(),
+            VecDeque::from([
+                (now - Duration::from_secs(90), Some(21.5), Some(180.0)),
+                (now - Duration::from_secs(30), None, Some(220.0)),
+                (now, Some(22.0), None),
+            ]),
+        );
+        save_hue_sensors_to_path(&path, &histories).unwrap();
+        let loaded = load_hue_sensors_from_path(&path, Duration::from_secs(180));
+        let values = loaded.get(&id).unwrap();
+        assert_eq!(values.len(), 3);
+        assert_eq!(values[0].1, Some(21.5));
+        assert_eq!(values[1].1, None);
+        assert_eq!(values[1].2, Some(220.0));
+        assert_eq!(values[2].2, None);
+        let expired = load_hue_sensors_from_path(&path, Duration::from_secs(60));
+        assert_eq!(expired.get(&id).unwrap().len(), 2);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn hue_history_rejects_unknown_ids_and_invalid_values() {
+        let path = temporary_path();
+        let now = epoch_now().unwrap();
+        fs::write(
+            &path,
+            json!({
+                "version": 1,
+                "sensors": {
+                    "not-a-sensor": [{"timestamp": now, "temperature_c": 21.0}],
+                    "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": [
+                        {"timestamp": now, "temperature_c": "bad", "illuminance_lux": -1.0},
+                        {"timestamp": now, "temperature_c": 23.0, "illuminance_lux": null}
+                    ]
+                }
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let loaded = load_hue_sensors_from_path(&path, Duration::from_secs(60));
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"].len(), 1);
+        assert_eq!(loaded["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"][0].1, Some(23.0));
+        fs::remove_file(path).unwrap();
     }
 
     #[test]

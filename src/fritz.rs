@@ -491,6 +491,12 @@ fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
                             .chars()
                             .all(|character| character.is_ascii_alphanumeric())
                 })
+                || ["hue-sensor-graph-temperature-", "hue-sensor-graph-lux-"]
+                    .iter()
+                    .any(|prefix| {
+                        id.strip_prefix(prefix)
+                            .is_some_and(crate::hue::valid_sensor_id)
+                    })
         })
         .map(str::to_string)
         .collect::<Vec<_>>();
@@ -530,7 +536,7 @@ fn parse_temperature_alerts(value: &str) -> HashMap<String, TemperatureAlertThre
             };
             let ain = normalize_ain_for_selection(ain);
             let high_c = high.parse::<i16>().ok()?.clamp(0, 40);
-            let low_c = low.parse::<i16>().ok()?.clamp(-10, 0);
+            let low_c = low.parse::<i16>().ok()?.clamp(-10, 30).min(high_c - 1);
             (!ain.is_empty()).then_some((ain, TemperatureAlertThresholds { high_c, low_c }))
         })
         .collect()
@@ -731,12 +737,9 @@ impl FritzSettings {
             .temperature_alerts
             .iter()
             .map(|(ain, thresholds)| {
-                format!(
-                    "{}:{}:{}",
-                    normalize_ain_for_selection(ain),
-                    thresholds.high_c.clamp(0, 40),
-                    thresholds.low_c.clamp(-10, 0),
-                )
+                let high = thresholds.high_c.clamp(0, 40);
+                let low = thresholds.low_c.clamp(-10, 30).min(high - 1);
+                format!("{}:{}:{}", normalize_ain_for_selection(ain), high, low)
             })
             .collect();
         temperature_alerts.sort_unstable();
@@ -2341,6 +2344,21 @@ mod tests {
     }
 
     #[test]
+    fn hue_sensor_graph_disclosures_are_persisted_only_for_valid_ids() {
+        let valid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+        let value = format!(
+            "hue-sensor-graph-temperature-{valid},hue-sensor-graph-lux-{valid},hue-sensor-graph-temperature-invalid,other-graph-{valid}"
+        );
+        assert_eq!(
+            parse_collapsed_menu_sections(&value),
+            vec![
+                format!("hue-sensor-graph-temperature-{valid}"),
+                format!("hue-sensor-graph-lux-{valid}"),
+            ]
+        );
+    }
+
+    #[test]
     fn canonical_device_keys_are_case_insensitive() {
         assert_eq!(
             canonical_device_key("tasmota:aa:bb:cc:dd:ee:ff"),
@@ -2526,7 +2544,7 @@ mod tests {
             parse_temperature_alerts("123:-5:5").get("123"),
             Some(&TemperatureAlertThresholds {
                 high_c: 0,
-                low_c: 0
+                low_c: -1
             })
         );
         assert_eq!(
@@ -2537,6 +2555,17 @@ mod tests {
             }
         );
         assert!(FritzSettings::default().temperature_alerts.is_empty());
+        let hue_key = normalize_ain_for_selection(
+            "hue-sensor-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        );
+        let parsed = parse_temperature_alerts(
+            "huesensoraaaaaaaabbbbccccddddeeeeeeeeeeee:28:18"
+        );
+        assert_eq!(parsed.get(&hue_key), Some(&TemperatureAlertThresholds {
+            high_c: 28,
+            low_c: 18,
+        }));
+        assert_eq!(parse_temperature_alerts("123:25:30")["123"].low_c, 24);
     }
 
     #[test]
