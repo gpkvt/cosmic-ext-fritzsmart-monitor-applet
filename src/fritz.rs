@@ -274,13 +274,12 @@ fn parse_u16_setting(value: &str, default: u16, min: u16, max: u16) -> u16 {
     parse_clamped(value, default, min, max)
 }
 
-const MENU_ELEMENT_IDS: [&str; 6] = [
+const MENU_ELEMENT_IDS: [&str; 5] = [
     "summary",
     "weather",
     "internet-bandwidth",
     "devices",
     "total-power-output",
-    "total-power-input",
 ];
 
 fn default_menu_order() -> Vec<String> {
@@ -310,9 +309,8 @@ fn parse_menu_order(value: &str) -> Vec<String> {
         .map(str::trim)
         .filter(|id| !id.is_empty())
         .map(|id| match id {
-            // Migrate the former shared entry to output; input gets its own
-            // adjacent position so existing custom ordering remains stable.
-            "total-power" => "total-power-output",
+            // Merge legacy input/output entries into the unified power section.
+            "total-power" | "total-power-input" => "total-power-output",
             other => other,
         })
         .filter(|id| MENU_ELEMENT_IDS.contains(id))
@@ -325,15 +323,6 @@ fn parse_menu_order(value: &str) -> Vec<String> {
             .position(|id| id == "devices")
             .unwrap_or(order.len());
         order.insert(insert_at, "internet-bandwidth".to_string());
-    }
-    if order.iter().any(|id| id == "total-power-output")
-        && !order.iter().any(|id| id == "total-power-input")
-    {
-        let output_index = order
-            .iter()
-            .position(|id| id == "total-power-output")
-            .unwrap_or(order.len() - 1);
-        order.insert(output_index + 1, "total-power-input".to_string());
     }
     for id in MENU_ELEMENT_IDS {
         if !order.iter().any(|existing| existing == id) {
@@ -366,7 +355,10 @@ fn parse_unique_known_ids(value: &str, allowed: &[&str]) -> Vec<String> {
 }
 
 fn parse_hidden_menu_elements(value: &str) -> Vec<String> {
-    parse_unique_known_ids(value, &MENU_ELEMENT_IDS)
+    let migrated = value.split(',').map(str::trim).map(|id| {
+        if id == "total-power-input" || id == "total-power" { "total-power-output" } else { id }
+    }).collect::<Vec<_>>().join(",");
+    parse_unique_known_ids(&migrated, &MENU_ELEMENT_IDS)
 }
 
 fn parse_hidden_panel_items(value: &str) -> Vec<String> {
@@ -417,6 +409,7 @@ fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
         "internet-bandwidth",
         "total-power-output",
         "total-power-input",
+        "total-power-overview",
         "current-power-history",
         "graph-total-output-pair",
         "graph-total-input-pair",
