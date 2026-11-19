@@ -4028,6 +4028,18 @@ fn refresh_spinner_frame(started_at: Instant) -> String {
     format!("refresh-rotating-{angle}")
 }
 
+/// Use the full available vertical extent instead of an arbitrary 85%
+/// monitor-height cap. The source panel occupies its own edge; an opposite
+/// dock or panel is constrained by the Wayland popup compositor via RESIZE_Y.
+fn popup_available_height(monitor_height: Option<f32>, source_panel_height: f32) -> f32 {
+    let monitor_height = monitor_height
+        .filter(|height| height.is_finite() && *height > 0.0)
+        // Wayland will constrain this fallback when monitor geometry is not
+        // reported. Do not silently revert to a fixed 800-pixel popup.
+        .unwrap_or(2160.0);
+    (monitor_height - source_panel_height.max(0.0)).max(1.0)
+}
+
 fn clock_ticks(interval_duration: Duration) -> impl futures::Stream<Item = Message> {
     cosmic::iced::stream::channel(
         4,
@@ -9302,9 +9314,9 @@ impl cosmic::Application for AppModel {
                 .push(menu_footer)
         };
 
-        // Keep the popup within a practical height. The main-menu title bar
-        // remains fixed while the menu body scrolls; settings retain their
-        // existing fully scrollable layout.
+        // Fill the Wayland-constrained display height (excluding panels and
+        // dock), while keeping the main-menu header/footer fixed and the
+        // settings and overview bodies independently scrollable.
         self.core
             .applet
             .popup_container(
@@ -9320,7 +9332,7 @@ impl cosmic::Application for AppModel {
                 Limits::NONE
                     .min_width(720.0)
                     .max_width(720.0)
-                    .max_height(self.popup_max_height.unwrap_or(800.0)),
+                    .max_height(self.popup_max_height.unwrap_or(2160.0)),
             )
             .into()
     }
@@ -11583,21 +11595,38 @@ impl cosmic::Application for AppModel {
                     self.popup = None;
                     return Task::none();
                 };
-                let max_height = monitor_height
-                    .map(|height| (height * 0.85).max(1.0))
-                    .unwrap_or(800.0);
-                self.popup_max_height = Some(max_height);
+                // The monitor query reports the entire display, not its
+                // usable work area. Build the popup positioner first to get
+                // the real anchor rectangle of the source panel.
                 let mut settings = self.core.applet.get_popup_settings(
                     main_window_id,
                     id,
-                    Some((720, max_height.ceil().clamp(1.0, u32::MAX as f32) as u32)),
+                    None,
                     None,
                     None,
                 );
+                let source_panel_height = if self.core.applet.is_horizontal() {
+                    (settings.positioner.anchor_rect.height.max(0)
+                        + settings.positioner.offset.1.abs()) as f32
+                } else {
+                    0.0
+                };
+                let max_height = popup_available_height(monitor_height, source_panel_height);
+                self.popup_max_height = Some(max_height);
+                settings.positioner.size = Some((
+                    720,
+                    max_height.ceil().clamp(1.0, u32::MAX as f32) as u32,
+                ));
                 settings.positioner.size_limits = Limits::NONE
                     .max_width(720.0)
                     .min_width(720.0)
                     .max_height(max_height);
+                // libcosmic defaults to slide/flip only (bits 0..3). ResizeY
+                // (bit 5) is necessary when a dock or another panel reduces
+                // the compositor's usable popup rectangle. This lets Wayland
+                // fit the menu to the actual available space rather than
+                // guessing the dock's height from its configuration.
+                settings.positioner.constraint_adjustment |= 1 << 5;
                 // XDG popup grabs let the compositor dismiss the menu on
                 // an actual pointer click outside its surface. Panel hover
                 // is deliberately not an opening/closing event.
@@ -11634,6 +11663,23 @@ impl cosmic::Application for AppModel {
 #[cfg(test)]
 mod history_tests {
     use super::*;
+
+    #[test]
+    fn popup_uses_full_height_outside_source_panel() {
+        // The old implementation restricted the popup to 85% of the
+        // monitor height, even when plenty of workspace was available.
+        assert_eq!(popup_available_height(Some(1080.0), 40.0), 1040.0);
+        assert_eq!(popup_available_height(Some(2160.0), 64.0), 2096.0);
+        // Side panels do not occupy vertical space.
+        assert_eq!(popup_available_height(Some(1080.0), 0.0), 1080.0);
+    }
+
+    #[test]
+    fn popup_height_handles_missing_or_invalid_geometry() {
+        assert_eq!(popup_available_height(None, 40.0), 2120.0);
+        assert_eq!(popup_available_height(Some(f32::NAN), 40.0), 2120.0);
+        assert_eq!(popup_available_height(Some(24.0), 60.0), 1.0);
+    }
 
     #[test]
     fn persisted_device_selection_counts_as_completed_setup() {
