@@ -2037,44 +2037,6 @@ fn device_corner_radius(index: usize, device_count: usize) -> cosmic::iced::bord
     }
 }
 
-fn device_metric_tile<'a>(
-    label: impl Into<String>,
-    value: impl Into<String>,
-    icon: &'static str,
-    radius: cosmic::iced::border::Radius,
-) -> cosmic::Element<'a, Message> {
-    let label = label.into();
-    let mut heading = widget::Row::new()
-        .spacing(6)
-        .align_y(cosmic::iced::Alignment::Start)
-        .push(widget::icon::from_name(icon).size(14));
-    if !label.is_empty() {
-        heading = heading.push(widget::text::caption(label));
-    }
-    let content = widget::Row::new()
-        .width(cosmic::iced::Length::Fill)
-        .align_y(cosmic::iced::Alignment::Start)
-        .push(heading)
-        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-        .push(widget::text::title3(keep_value_unit_together(value.into())));
-    widget::container(content)
-        .width(cosmic::iced::Length::Fill)
-        .padding(10)
-        .style(move |theme| {
-            let cosmic = theme.cosmic();
-            cosmic::iced::widget::container::Style {
-                background: Some(
-                    cosmic::iced::Color::from(cosmic.background(false).small_widget).into(),
-                ),
-                border: cosmic::iced::Border {
-                    radius,
-                    ..Default::default()
-                },
-                ..Default::default()
-            }
-        })
-        .into()
-}
 
 fn range_metric_tile<'a>(
     label: &'static str,
