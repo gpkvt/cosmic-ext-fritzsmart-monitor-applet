@@ -951,6 +951,86 @@ fn daily_energy_history(
         .collect()
 }
 
+fn today_energy_wh_for_ains(
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    selected_ains: &HashSet<String>,
+    input_ains: &HashSet<String>,
+    refresh_interval_seconds: u32,
+    input_energy: bool,
+) -> Option<f64> {
+    let selected_history: HashMap<_, _> = device_history
+        .iter()
+        .filter(|(ain, _)| selected_ains.contains(*ain))
+        .map(|(ain, samples)| (ain.clone(), samples.clone()))
+        .collect();
+    let (_, solar_wh, grid_wh) = daily_energy_history(
+        &selected_history,
+        input_ains,
+        refresh_interval_seconds,
+    )
+    .into_iter()
+    .last()?;
+    if input_energy { solar_wh } else { grid_wh }
+}
+
+fn menu_energy_summary(
+    power_samples: impl Iterator<Item = f64>,
+    today_wh: Option<f64>,
+) -> cosmic::Element<'static, Message> {
+    let values: Vec<f64> = power_samples.collect();
+    let (minimum, maximum) = values
+        .iter()
+        .copied()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), value| {
+            (min.min(value), max.max(value))
+        });
+    let range = (maximum - minimum).max(1.0);
+    let points = if values.len() < 2 {
+        String::new()
+    } else {
+        values
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                let x = 4.0 + index as f64 * 352.0 / (values.len() - 1) as f64;
+                let y = 38.0 - ((*value - minimum) / range) * 32.0;
+                format!("{x:.1},{y:.1}")
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    let sparkline = if points.is_empty() {
+        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 44"><path d="M4 22H356" fill="none" stroke="#888888" stroke-opacity=".45" stroke-width="2" stroke-linecap="round"/></svg>"#.to_string()
+    } else {
+        format!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 44"><polyline points="{points}" fill="none" stroke="#8ab4f8" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>"#
+        )
+    };
+    let graph: cosmic::Element<'static, Message> = widget::container(
+        widget::svg(widget::svg::Handle::from_memory(sparkline.into_bytes()))
+            .width(cosmic::iced::Length::Fill)
+            .height(cosmic::iced::Length::Fixed(44.0)),
+    )
+    .width(cosmic::iced::Length::Fill)
+    .into();
+    let energy = today_wh
+        .map(|value| format!("{value:.0} Wh"))
+        .unwrap_or_else(|| "— Wh".to_string());
+    let today = widget::Column::new()
+        .spacing(2)
+        .align_x(cosmic::iced::Alignment::End)
+        .width(cosmic::iced::Length::Fixed(112.0))
+        .push(widget::text::caption("TODAY"))
+        .push(widget::text::title3(keep_value_unit_together(energy)));
+    widget::Row::new()
+        .spacing(12)
+        .align_y(cosmic::iced::Alignment::Center)
+        .width(cosmic::iced::Length::Fill)
+        .push(graph)
+        .push(today)
+        .into()
+}
+
 fn daily_energy_history_section(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     input_ains: &HashSet<String>,
@@ -2181,6 +2261,7 @@ fn total_power_section(
     temperature: Option<String>,
     section_id: &'static str,
     collapsed: bool,
+    summary: cosmic::Element<'static, Message>,
     content: cosmic::Element<'static, Message>,
 ) -> cosmic::Element<'static, Message> {
     // Use the established disclosure style from the other popup sections.
@@ -2215,7 +2296,8 @@ fn total_power_section(
     let mut section = widget::Column::new()
         .spacing(0)
         .width(cosmic::iced::Length::Fill)
-        .push(heading);
+        .push(heading)
+        .push(widget::container(summary).padding([0, 12]));
     if !collapsed {
         section = section.push(content);
     }
@@ -2311,6 +2393,22 @@ fn total_power_overview(
                 ),
         )
         .push(graph_panel(output_graph.into()));
+    let output_ains: HashSet<String> = readings
+        .iter()
+        .map(|reading| crate::fritz::normalize_ain_for_selection(&reading.ain))
+        .filter(|ain| !settings.input_ains.contains(ain))
+        .collect();
+    let output_today_wh = today_energy_wh_for_ains(
+        device_history,
+        &output_ains,
+        &settings.input_ains,
+        settings.refresh_interval_seconds,
+        false,
+    );
+    let output_summary = menu_energy_summary(
+        history.iter().map(|(_, value)| *value as f64),
+        output_today_wh,
+    );
     let output_section = total_power_section(
         "TOTAL POWER OUTPUT",
         total_power,
@@ -2321,6 +2419,7 @@ fn total_power_overview(
             .map(|value| format!("{value:.1} °C")),
         "total-power-output",
         collapsed_sections.contains("total-power-output"),
+        output_summary,
         output_content.into(),
     );
     let mut sections = vec![("3-total-power-output".to_string(), output_section)];
@@ -2391,6 +2490,19 @@ fn total_power_overview(
                     ),
             )
             .push(graph_panel(input_graph.into()));
+        let input_today_wh = today_energy_wh_for_ains(
+            device_history,
+            &settings.input_ains,
+            &settings.input_ains,
+            settings.refresh_interval_seconds,
+            true,
+        );
+        let input_summary = menu_energy_summary(
+            input_history
+                .iter()
+                .map(|(_, value)| input_display_power_w(*value) as f64),
+            input_today_wh,
+        );
         let input_section = total_power_section(
             "TOTAL POWER INPUT",
             input_power,
@@ -2399,6 +2511,7 @@ fn total_power_overview(
                 .map(|(_, value)| format!("{value:.1} °C")),
             "total-power-input",
             collapsed_sections.contains("total-power-input"),
+            input_summary,
             input_content.into(),
         );
         sections.push(("4-total-power-input".to_string(), input_section));
