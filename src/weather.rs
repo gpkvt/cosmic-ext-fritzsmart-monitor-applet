@@ -29,6 +29,8 @@ pub struct WeatherData {
     pub sunrise_unix: i64,
     pub sunset_unix: i64,
     pub location_name: String,
+    /// Outdoor pollution from OpenWeatherMap, not a Netatmo/CO₂ sensor.
+    pub air_pollution: Option<AirPollutionData>,
     pub background_image: Option<Vec<u8>>,
     pub background_images: Vec<Vec<u8>>,
     pub slideshow_frames: Vec<Vec<u8>>,
@@ -36,6 +38,94 @@ pub struct WeatherData {
     pub slideshow_frame_sources: Vec<Vec<usize>>,
     pub image_attribution: Option<CommonsAttribution>,
     pub image_attributions: Vec<CommonsAttribution>,
+}
+
+/// Ambient air pollutants supplied by OpenWeatherMap's Air Pollution API.
+/// AQI is the provider's 1–5 scale; concentrations are in µg/m³, never ppm.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AirPollutionData {
+    pub aqi: u8,
+    pub pm2_5: Option<f64>,
+    pub pm10: Option<f64>,
+    pub no2: Option<f64>,
+    pub o3: Option<f64>,
+}
+
+impl AirPollutionData {
+    pub fn quality_label(&self) -> &'static str {
+        match self.aqi {
+            1 => "Good",
+            2 => "Fair",
+            3 => "Moderate",
+            4 => "Poor",
+            5 => "Very poor",
+            _ => "Unavailable",
+        }
+    }
+}
+
+fn air_pollution_component(value: &serde_json::Value, key: &str) -> Option<f64> {
+    value[key].as_f64().filter(|n| n.is_finite() && *n >= 0.0)
+}
+
+/// Ignore old or malformed pollution samples instead of displaying stale
+/// pollution beside a fresh weather reading.
+fn parse_air_pollution(
+    payload: &serde_json::Value,
+    now_unix: i64,
+) -> Option<AirPollutionData> {
+    let reading = payload["list"].as_array()?.first()?;
+    let timestamp = reading["dt"].as_i64()?;
+    if timestamp > now_unix.saturating_add(600)
+        || now_unix.saturating_sub(timestamp) > 3 * 60 * 60
+    {
+        return None;
+    }
+    let aqi = reading["main"]["aqi"].as_u64()?;
+    if !(1..=5).contains(&aqi) {
+        return None;
+    }
+    let components = &reading["components"];
+    let result = AirPollutionData {
+        aqi: aqi as u8,
+        pm2_5: air_pollution_component(components, "pm2_5"),
+        pm10: air_pollution_component(components, "pm10"),
+        no2: air_pollution_component(components, "no2"),
+        o3: air_pollution_component(components, "o3"),
+    };
+    // The index alone is still a valid measurement when pollutants are absent.
+    Some(result)
+}
+
+/// Pollution and the weather conditions are independent: missing entitlement,
+/// network failures or invalid responses must not make weather unavailable.
+async fn fetch_air_pollution(
+    client: &Client,
+    api_key: &str,
+    latitude: f64,
+    longitude: f64,
+) -> Option<AirPollutionData> {
+    if !latitude.is_finite() || !longitude.is_finite()
+        || !(-90.0..=90.0).contains(&latitude)
+        || !(-180.0..=180.0).contains(&longitude)
+    {
+        return None;
+    }
+    let response = client
+        .get("https://api.openweathermap.org/data/2.5/air_pollution")
+        .query(&[
+            ("lat", latitude.to_string()),
+            ("lon", longitude.to_string()),
+            ("appid", api_key.to_string()),
+        ])
+        .send()
+        .await
+        .ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    let payload: serde_json::Value = response.json().await.ok()?;
+    parse_air_pollution(&payload, chrono::Utc::now().timestamp())
 }
 
 impl WeatherData {
@@ -335,10 +425,20 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
     let sunrise_unix = payload["sys"]["sunrise"].as_i64().unwrap_or(0);
     let sunset_unix = payload["sys"]["sunset"].as_i64().unwrap_or(0);
     let location_name = payload["name"].as_str().unwrap_or(location).to_string();
-    // Select photos using both the observed condition and OpenWeatherMap's
-    // local day/night indicator. Image failures remain non-fatal.
-    let (mut background_images, image_attributions) =
-        fetch_commons_background(&client, icon_code).await;
+    // Fetch actual outdoor pollutants independently from the conditions;
+    // Netatmo's outdoor AQI in its app comes from a third-party provider and
+    // is not a measurement exposed by the Weather Station read_station API.
+    // Run this alongside the Commons fetch to avoid delaying the weather UI.
+    let coordinates = payload["coord"]["lat"]
+        .as_f64()
+        .zip(payload["coord"]["lon"].as_f64());
+    let (air_pollution, (mut background_images, image_attributions)) = futures::join!(
+        async {
+            let (latitude, longitude) = coordinates?;
+            fetch_air_pollution(&client, &api_key, latitude, longitude).await
+        },
+        fetch_commons_background(&client, icon_code)
+    );
     let image_attribution = image_attributions.first().cloned();
     // At night, never substitute an unrelated image when Commons cannot
     // provide a credible match. Use a locally generated star field instead.
@@ -366,6 +466,7 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
         sunrise_unix,
         sunset_unix,
         location_name,
+        air_pollution,
         background_image,
         background_images,
         slideshow_frames,
@@ -1049,6 +1150,44 @@ mod tests {
     }
 
     #[test]
+    fn real_air_pollution_is_parsed_with_provider_units_not_co2() {
+        let payload = serde_json::json!({
+            "list": [{
+                "dt": 1000,
+                "main": {"aqi": 2},
+                "components": {
+                    "pm2_5": 12.25,
+                    "pm10": 28.6,
+                    "no2": 14.5,
+                    "o3": 32.9,
+                    "co": 150.0
+                }
+            }]
+        });
+        let pollution = parse_air_pollution(&payload, 1100).unwrap();
+        assert_eq!(pollution.aqi, 2);
+        assert_eq!(pollution.quality_label(), "Fair");
+        assert_eq!(pollution.pm2_5, Some(12.25));
+        assert_eq!(pollution.pm10, Some(28.6));
+        assert_eq!(pollution.no2, Some(14.5));
+        assert_eq!(pollution.o3, Some(32.9));
+        assert_eq!(parse_air_pollution(&payload, 12000), None);
+        assert_eq!(parse_air_pollution(&payload, 200), None);
+        assert_eq!(parse_air_pollution(&serde_json::json!({"list": []}), 1100), None);
+        let invalid = serde_json::json!({
+            "list": [{"dt": 1000, "main": {"aqi": 8}, "components": {}}]
+        });
+        assert_eq!(parse_air_pollution(&invalid, 1100), None);
+        let partial = serde_json::json!({
+            "list": [{"dt": 1000, "main": {"aqi": 1},
+                      "components": {"pm2_5": -1.0, "pm10": 3.0}}]
+        });
+        let pollution = parse_air_pollution(&partial, 1100).unwrap();
+        assert_eq!(pollution.pm2_5, None);
+        assert_eq!(pollution.pm10, Some(3.0));
+    }
+
+    #[test]
     fn maps_openweathermap_conditions_to_symbolic_icons() {
         for (code, expected) in [
             ("01d", "weather-clear-symbolic"),
@@ -1075,6 +1214,7 @@ mod tests {
                 sunrise_unix: 0,
                 sunset_unix: 0,
                 location_name: String::new(),
+                air_pollution: None,
                 background_image: None,
                 background_images: Vec::new(),
                 slideshow_frames: Vec::new(),
