@@ -566,6 +566,23 @@ fn format_graph_axis_start(configured_minutes: u32, actual_minutes: Option<u64>)
     format!("{} ago", parts.join(" "))
 }
 
+fn format_graph_axis_hour_tick(minutes: u32) -> String {
+    let total_hours = minutes / 60;
+    if total_hours == 0 {
+        return "Now".to_string();
+    }
+    let days = total_hours / 24;
+    let hours = total_hours % 24;
+    let label = if days > 0 && hours > 0 {
+        format!("{days}d {hours}h")
+    } else if days > 0 {
+        format!("{days}d")
+    } else {
+        format!("{hours}h")
+    };
+    format!("{label} ago")
+}
+
 fn graph_history_window(minutes: u32) -> Duration {
     Duration::from_secs(u64::from(minutes.clamp(5, 2_102_400)) * 60)
 }
@@ -1491,7 +1508,7 @@ fn graph_visual_with_dimensions(
                 if remaining == 0 {
                     "Now".to_string()
                 } else {
-                    format_graph_axis_start(total, Some(u64::from(remaining)))
+                    format_graph_axis_hour_tick(remaining)
                 }
             } else if column == 0 {
                 axis_start.clone().unwrap_or_else(|| "Start".to_string())
@@ -10419,6 +10436,16 @@ mod history_tests {
         assert_eq!(format_graph_y_tick(21.26, "°C"), "21.3");
         assert_eq!(format_graph_y_tick(70.26, "°F"), "70.3");
         assert_eq!(format_graph_y_tick(8.26, "Mb/s"), "8.3");
+    }
+
+    #[test]
+    fn graph_axis_ticks_show_whole_hours_only() {
+        assert_eq!(format_graph_axis_hour_tick(393), "6h ago");
+        assert_eq!(format_graph_axis_hour_tick(359), "5h ago");
+        assert_eq!(format_graph_axis_hour_tick(60), "1h ago");
+        assert_eq!(format_graph_axis_hour_tick(59), "Now");
+        assert_eq!(format_graph_axis_hour_tick(1_590), "1d 2h ago");
+        assert_eq!(format_graph_axis_hour_tick(2_880), "2d ago");
     }
 
     #[test]
