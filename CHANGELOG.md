@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Display actual outdoor ambient air pollution from OpenWeatherMap's Air Pollution API in the weather photo metric grid: 1–5 AQI plus PM2.5, PM10, NO₂ and O₃ in µg/m³. Keep this source clearly separate from indoor Netatmo CO₂ (ppm), ignore stale or invalid values, and leave normal weather functioning independently if pollution lookup fails. Export available pollution values to Prometheus.
+
 ### Improved
 
 - Show current values and native units in each collapsed Netatmo device **graph heading**, including temperature, humidity, CO₂, pressure, noise, rain and wind. Restore the device rows from PR #859; offline and invalid graph values appear as unavailable.

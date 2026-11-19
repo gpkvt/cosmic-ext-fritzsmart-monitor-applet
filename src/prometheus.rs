@@ -237,6 +237,15 @@ pub fn render(data: LiveData<'_>) -> String {
         e.gauge("fritz_monitor_weather_visibility_meters", &[], f64::from(weather.visibility_m));
         e.gauge("fritz_monitor_weather_sunrise_timestamp_seconds", &[], weather.sunrise_unix as f64);
         e.gauge("fritz_monitor_weather_sunset_timestamp_seconds", &[], weather.sunset_unix as f64);
+        // OWM ambient pollutants: not Netatmo CO₂ (ppm) and not the
+        // 0–500 US AQI scale. Missing/stale measurements are omitted.
+        if let Some(pollution) = &weather.air_pollution {
+            e.gauge("fritz_monitor_weather_air_pollution_owm_index", &[], f64::from(pollution.aqi));
+            e.optional("fritz_monitor_weather_pm2_5_micrograms_per_cubic_meter", &[], pollution.pm2_5);
+            e.optional("fritz_monitor_weather_pm10_micrograms_per_cubic_meter", &[], pollution.pm10);
+            e.optional("fritz_monitor_weather_no2_micrograms_per_cubic_meter", &[], pollution.no2);
+            e.optional("fritz_monitor_weather_o3_micrograms_per_cubic_meter", &[], pollution.o3);
+        }
     }
     if let Some(bandwidth) = data.bandwidth {
         e.gauge("fritz_monitor_internet_download_bits_per_second", &[], bandwidth.download_bits_per_second as f64);
