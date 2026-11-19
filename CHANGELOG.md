@@ -1,5 +1,7 @@
 # Changelog
 
+- Improve disappearing-applet diagnostics: log the first panel widget tree populated with meter readings, emit periodic liveness markers with separate metered/Hue counts, and record clean COSMIC event-loop shutdowns distinctly from Rust panics or runtime errors.
+
 - Keep the COSMIC panel applet shrink-wrapped to its displayed values after device refreshes, avoiding full-width autosize claims that can push neighboring panel items off-screen. Preserve a small clickable placeholder when no live value or connection-warning entry is available, instead of rendering an invisible empty button.
 
 - Route privacy-safe device-loading debug checkpoints to Linux syslog/systemd journal under the `fritz-power-monitor` tag, including startup, FRITZ!Box and Tasmota device refreshes, Hue CLIP v2 resource status, discovery, and Rust panic locations. Fall back to captured stderr if syslog is unavailable; document `journalctl` commands.
