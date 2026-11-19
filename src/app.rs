@@ -2709,107 +2709,109 @@ fn total_power_overview(
     let collapsed = collapsed_sections.contains("total-power-overview");
     // Construct graphs only when this section is visible. This also avoids
     // rebuilding expensive SVGs while the entire overview is collapsed.
-    let content = (!collapsed).then(|| widget::Column::new()
-        .spacing(10)
-        .width(cosmic::iced::Length::Fill)
-        .push(daily_power_metrics_grid(
-            input_today_wh,
-            output_today_wh,
-            input_yesterday_wh,
-            output_yesterday_wh,
-        ))
-        .push(widget::divider::horizontal::default())
-        .push(power_metrics_row(
-            "OUTPUT LOW",
-            "OUTPUT HIGH",
-            "NOW OUTPUT",
-            output_low_label,
-            output_high_label,
-            current_output.clone(),
-        ))
-        .push(power_metrics_row(
-            "INPUT LOW",
-            "INPUT HIGH",
-            "NOW INPUT",
-            input_low_label,
-            input_high_label,
-            current_input.clone(),
-        ))
-        .push(widget::divider::horizontal::default())
-        // Current/low/high are derived from the exact same recorded W series.
-        // Give input and output their own full-width, zoomable graphs.
-        .push(widget::text::caption(
-            "LIVE POWER · LOW, HIGH & NOW IN RECORDED W HISTORY",
-        ))
-        .push(collapsible_graph(
-            "OUTPUT POWER HISTORY",
-            "graph-overview-output-power",
-            collapsed_sections.contains("graph-overview-output-power"),
-            if collapsed_sections.contains("graph-overview-output-power")
-                || collapsed_sections.contains("total-power-overview")
-            {
-                widget::text("").into()
-            } else {
-                interactive_graph_with_axis(
-                    &settings.language,
-                    "OUTPUT POWER HISTORY",
-                    history.iter().map(|(time, watts)| (*time, *watts as f64)),
-                    &settings.graph_style,
-                    "W",
-                    format_graph_axis_start(
-                        settings.graph_timespan_minutes,
-                        history.front().map(|(timestamp, _)| {
-                            Instant::now()
-                                .saturating_duration_since(*timestamp)
-                                .as_secs()
-                                .div_ceil(60)
-                        }),
-                    ),
-                )
-            },
-            copy_feedback,
-        ))
-        .push(collapsible_graph(
-            "INPUT POWER HISTORY",
-            "graph-overview-input-power",
-            collapsed_sections.contains("graph-overview-input-power"),
-            if collapsed_sections.contains("graph-overview-input-power")
-                || collapsed_sections.contains("total-power-overview")
-            {
-                widget::text("").into()
-            } else if input_history.is_empty() {
-                widget::text::caption("No measured input samples").into()
-            } else {
-                interactive_graph_with_axis(
-                    &settings.language,
-                    "INPUT POWER HISTORY",
-                    input_history
-                        .iter()
-                        .map(|(time, watts)| (*time, input_display_power_w(*watts) as f64)),
-                    &settings.graph_style,
-                    "W",
-                    format_graph_axis_start(
-                        settings.graph_timespan_minutes,
-                        input_history.front().map(|(timestamp, _)| {
-                            Instant::now()
-                                .saturating_duration_since(*timestamp)
-                                .as_secs()
-                                .div_ceil(60)
-                        }),
-                    ),
-                )
-            },
-            copy_feedback,
-        ))
-        .push(widget::divider::horizontal::default())
-        .push(daily_power_metric_trends(
-            device_history,
-            &settings.input_ains,
-            settings.refresh_interval_seconds,
-            &settings.graph_style,
-            collapsed_sections,
-            copy_feedback,
-        )));
+    let content = (!collapsed).then(|| {
+        widget::Column::new()
+            .spacing(10)
+            .width(cosmic::iced::Length::Fill)
+            .push(daily_power_metrics_grid(
+                input_today_wh,
+                output_today_wh,
+                input_yesterday_wh,
+                output_yesterday_wh,
+            ))
+            .push(widget::divider::horizontal::default())
+            .push(power_metrics_row(
+                "OUTPUT LOW",
+                "OUTPUT HIGH",
+                "NOW OUTPUT",
+                output_low_label,
+                output_high_label,
+                current_output.clone(),
+            ))
+            .push(power_metrics_row(
+                "INPUT LOW",
+                "INPUT HIGH",
+                "NOW INPUT",
+                input_low_label,
+                input_high_label,
+                current_input.clone(),
+            ))
+            .push(widget::divider::horizontal::default())
+            // Current/low/high are derived from the exact same recorded W series.
+            // Give input and output their own full-width, zoomable graphs.
+            .push(widget::text::caption(
+                "LIVE POWER · LOW, HIGH & NOW IN RECORDED W HISTORY",
+            ))
+            .push(collapsible_graph(
+                "OUTPUT POWER HISTORY",
+                "graph-overview-output-power",
+                collapsed_sections.contains("graph-overview-output-power"),
+                if collapsed_sections.contains("graph-overview-output-power")
+                    || collapsed_sections.contains("total-power-overview")
+                {
+                    widget::text("").into()
+                } else {
+                    interactive_graph_with_axis(
+                        &settings.language,
+                        "OUTPUT POWER HISTORY",
+                        history.iter().map(|(time, watts)| (*time, *watts as f64)),
+                        &settings.graph_style,
+                        "W",
+                        format_graph_axis_start(
+                            settings.graph_timespan_minutes,
+                            history.front().map(|(timestamp, _)| {
+                                Instant::now()
+                                    .saturating_duration_since(*timestamp)
+                                    .as_secs()
+                                    .div_ceil(60)
+                            }),
+                        ),
+                    )
+                },
+                copy_feedback,
+            ))
+            .push(collapsible_graph(
+                "INPUT POWER HISTORY",
+                "graph-overview-input-power",
+                collapsed_sections.contains("graph-overview-input-power"),
+                if collapsed_sections.contains("graph-overview-input-power")
+                    || collapsed_sections.contains("total-power-overview")
+                {
+                    widget::text("").into()
+                } else if input_history.is_empty() {
+                    widget::text::caption("No measured input samples").into()
+                } else {
+                    interactive_graph_with_axis(
+                        &settings.language,
+                        "INPUT POWER HISTORY",
+                        input_history
+                            .iter()
+                            .map(|(time, watts)| (*time, input_display_power_w(*watts) as f64)),
+                        &settings.graph_style,
+                        "W",
+                        format_graph_axis_start(
+                            settings.graph_timespan_minutes,
+                            input_history.front().map(|(timestamp, _)| {
+                                Instant::now()
+                                    .saturating_duration_since(*timestamp)
+                                    .as_secs()
+                                    .div_ceil(60)
+                            }),
+                        ),
+                    )
+                },
+                copy_feedback,
+            ))
+            .push(widget::divider::horizontal::default())
+            .push(daily_power_metric_trends(
+                device_history,
+                &settings.input_ains,
+                settings.refresh_interval_seconds,
+                &settings.graph_style,
+                collapsed_sections,
+                copy_feedback,
+            ))
+    });
     // Match the other collapsed popup sections: one full-width disclosure
     // button containing the title, trailing live summary, and chevron.
     let mut heading_content = widget::Row::new()
@@ -11346,14 +11348,8 @@ mod history_tests {
     #[test]
     fn overview_graph_disclosures_toggle_independently_of_parent() {
         let mut collapsed = HashSet::new();
-        toggle_collapsible_state(
-            &mut collapsed,
-            "graph-overview-output-power".into(),
-        );
-        toggle_collapsible_state(
-            &mut collapsed,
-            "graph-overview-daily-ratio".into(),
-        );
+        toggle_collapsible_state(&mut collapsed, "graph-overview-output-power".into());
+        toggle_collapsible_state(&mut collapsed, "graph-overview-daily-ratio".into());
         assert!(collapsed.contains("graph-overview-output-power"));
         assert!(collapsed.contains("graph-overview-daily-ratio"));
         assert!(!collapsed.contains("graph-overview-input-power"));
@@ -11365,10 +11361,7 @@ mod history_tests {
         assert!(collapsed.contains("graph-overview-daily-ratio"));
         toggle_collapsible_state(&mut collapsed, "total-power-overview".into());
         assert!(!collapsed.contains("total-power-overview"));
-        toggle_collapsible_state(
-            &mut collapsed,
-            "graph-overview-output-power".into(),
-        );
+        toggle_collapsible_state(&mut collapsed, "graph-overview-output-power".into());
         assert!(!collapsed.contains("graph-overview-output-power"));
         assert!(collapsed.contains("graph-overview-daily-ratio"));
     }
@@ -11947,12 +11940,24 @@ mod history_tests {
         let selected = vec!["111111".into()];
         let sensors = vec![sensor.clone()];
         assert_eq!(
-            average_temperature_with_hue_c(std::slice::from_ref(&reading), &selected, &sensors, &[], false,),
+            average_temperature_with_hue_c(
+                std::slice::from_ref(&reading),
+                &selected,
+                &sensors,
+                &[],
+                false,
+            ),
             Some(22.0)
         );
         let hidden = vec![hue_device_id("sensor", &sensor.id)];
         assert_eq!(
-            average_temperature_with_hue_c(std::slice::from_ref(&reading), &selected, &sensors, &hidden, false,),
+            average_temperature_with_hue_c(
+                std::slice::from_ref(&reading),
+                &selected,
+                &sensors,
+                &hidden,
+                false,
+            ),
             Some(20.0)
         );
         let offline = HueSensor {

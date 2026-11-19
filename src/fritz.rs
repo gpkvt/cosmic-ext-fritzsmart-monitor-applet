@@ -2332,10 +2332,12 @@ mod tests {
         assert!(parse_collapsed_menu_sections("graph-overview-invalid").is_empty());
         // New graph controls are expanded by default, independently from the
         // outer Total Power Input & Output section.
-        assert!(!FritzSettings::default()
-            .collapsed_menu_sections
-            .iter()
-            .any(|id| id.starts_with("graph-overview-")));
+        assert!(
+            !FritzSettings::default()
+                .collapsed_menu_sections
+                .iter()
+                .any(|id| id.starts_with("graph-overview-"))
+        );
     }
 
     #[test]

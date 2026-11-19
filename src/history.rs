@@ -352,7 +352,11 @@ mod tests {
         assert_eq!(restored.len(), 2);
         assert_eq!(restored[0].1, 120);
         assert_eq!(restored[1].1, 175);
-        assert!(restored.iter().all(|(_, _, temperature)| temperature.is_nan()));
+        assert!(
+            restored
+                .iter()
+                .all(|(_, _, temperature)| temperature.is_nan())
+        );
         fs::remove_file(path).unwrap();
     }
 
@@ -420,8 +424,18 @@ mod tests {
         let (_, histories) = load_from_document(&doc, Duration::from_secs(60));
         let readings = histories.get("test").unwrap();
         assert_eq!(readings.len(), 2);
-        assert_eq!(readings.iter().map(|(_, power, _)| *power).collect::<Vec<_>>(), vec![5, 7]);
-        assert!(readings.iter().all(|(_, _, temperature)| temperature.is_nan()));
+        assert_eq!(
+            readings
+                .iter()
+                .map(|(_, power, _)| *power)
+                .collect::<Vec<_>>(),
+            vec![5, 7]
+        );
+        assert!(
+            readings
+                .iter()
+                .all(|(_, _, temperature)| temperature.is_nan())
+        );
     }
 
     #[test]
