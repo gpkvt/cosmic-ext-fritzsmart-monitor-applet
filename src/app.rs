@@ -2394,34 +2394,22 @@ fn total_power_overview(
         .iter()
         .map(|(timestamp, value)| (*timestamp, input_display_power_w(*value) as f64))
         .collect();
-    let graph_title = format!(
-        "{} & {}",
-        crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-        crate::i18n::tr(&settings.language, "TOTAL POWER INPUT")
+    let output_graph = interactive_graph_with_axis(
+        &settings.language,
+        &crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
+        output_values.into_iter(),
+        &settings.graph_style,
+        "W",
+        axis_start.clone(),
     );
-    let graph = if has_input_readings {
-        interactive_combined_graph_with_axis(
-            &graph_title,
-            output_values,
-            input_values,
-            &settings.graph_style,
-            "W",
-            axis_start,
-            (
-                crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-                crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
-            ),
-        )
-    } else {
-        interactive_graph_with_axis(
-            &settings.language,
-            &crate::i18n::tr(&settings.language, "TOTAL POWER OUTPUT"),
-            output_values.into_iter(),
-            &settings.graph_style,
-            "W",
-            axis_start,
-        )
-    };
+    let input_graph = interactive_graph_with_axis(
+        &settings.language,
+        &crate::i18n::tr(&settings.language, "TOTAL POWER INPUT"),
+        input_values.into_iter(),
+        &settings.graph_style,
+        "W",
+        axis_start,
+    );
     let output_ains: HashSet<String> = device_history
         .keys()
         .filter(|ain| !settings.input_ains.contains(*ain))
@@ -2444,8 +2432,11 @@ fn total_power_overview(
     let mut content = widget::Column::new()
         .spacing(10)
         .width(cosmic::iced::Length::Fill)
-        .push(graph_panel(graph))
-        .push(
+        .push(graph_panel(output_graph));
+    if has_input_readings {
+        content = content.push(graph_panel(input_graph));
+    }
+    content = content.push(
             widget::Row::new()
                 .spacing(8)
                 .width(cosmic::iced::Length::Fill)

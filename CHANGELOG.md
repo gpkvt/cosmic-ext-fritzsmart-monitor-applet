@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- Give total power input its own historical graph, matching the total power output graph, with independent history samples and input low/high readings.
+
 ### Changed
 
 - Arrange weather details in four evenly spaced information columns, grouping humidity, cloud cover, visibility and pressure above wind, direction, sunrise and sunset.
