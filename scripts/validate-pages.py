@@ -122,7 +122,7 @@ for page in pages:
         if not compatibility_section:
             fail("index.html: compatibility section is missing")
         compatibility_icons = re.findall(
-            r'<div class="detail-icon"[^>]*>\\s*<img src="icons/([a-z-]+\\.svg)" alt="" width="28" height="28"></div>',
+            r'<div class="detail-icon"[^>]*>\s*<img src="icons/([a-z-]+\.svg)" alt="" width="28" height="28"></div>',
             compatibility_section.group(1),
         )
         expected_compatibility_icons = {
