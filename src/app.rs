@@ -4615,8 +4615,11 @@ impl cosmic::Application for AppModel {
             item.push(value).into()
         };
 
+        // A Fill-sized root can make COSMIC reserve the entire available
+        // panel width for this applet once live readings change its layout.
+        // Size to the actual readings so other panel applets stay visible.
         let mut content = widget::Row::new()
-            .width(cosmic::iced::Length::Fill)
+            .width(cosmic::iced::Length::Shrink)
             .spacing(f32::from(self.settings.panel_item_spacing))
             .align_y(cosmic::iced::Alignment::Center);
         let mut panel_items: Vec<(&str, cosmic::Element<'static, Message>)> = Vec::new();
@@ -4835,6 +4838,23 @@ impl cosmic::Application for AppModel {
             }
         }
         ordered_panel_items.append(&mut panel_items);
+        // Even when all configured data is unavailable or every panel metric
+        // has been hidden, keep a small clickable applet entry. Otherwise the
+        // autosized content becomes empty and looks as if the applet crashed.
+        if ordered_panel_items.is_empty()
+            && self.error.is_none()
+            && self.weather_error.is_none()
+        {
+            ordered_panel_items.push((
+                "no-live-readings",
+                panel_item(
+                    "No live readings; click to open settings".to_string(),
+                    Some(widget::icon::from_name("view-refresh-symbolic").size(14).into()),
+                    panel_value("—".to_string()),
+                    false,
+                ),
+            ));
+        }
 
         if self.settings.panel_multiline {
             // Keep related readings together as two-line groups while each
