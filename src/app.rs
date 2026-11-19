@@ -13108,6 +13108,40 @@ mod history_tests {
     }
 
     #[test]
+    fn netatmo_temperature_average_excludes_hidden_and_unreachable_modules() {
+        let station = NetatmoSensor {
+            id: "70:ee:50:11:22:33".into(),
+            name: "Living room".into(),
+            temperature_c: Some(20.0),
+            humidity_percent: Some(50.0),
+            co2_ppm: None,
+            pressure_hpa: None,
+            noise_db: None,
+            rain_mm: None,
+            wind_kmh: None,
+            reachable: true,
+        };
+        assert_eq!(
+            average_temperature_with_hue_c(&[], &[], &[], &[], &[station.clone()], &[], false),
+            Some(20.0)
+        );
+        assert_eq!(
+            average_temperature_with_hue_c(
+                &[], &[], &[], &[], &[station.clone()], &[station.id.clone()], false
+            ),
+            None
+        );
+        let disconnected = NetatmoSensor {
+            reachable: false,
+            ..station
+        };
+        assert_eq!(
+            average_temperature_with_hue_c(&[], &[], &[], &[], &[disconnected], &[], false),
+            None
+        );
+    }
+
+    #[test]
     fn combined_power_series_aligns_output_and_input_by_timestamp() {
         let start = Instant::now();
         let output = VecDeque::from([(start, 900), (start + Duration::from_secs(60), 800)]);
