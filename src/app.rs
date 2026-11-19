@@ -117,7 +117,6 @@ pub enum Message {
     TogglePopup,
     PopupClosed(Id),
     PopupMonitorSize(Id, Option<f32>),
-    TooltipSurfaceAction(cosmic::surface::Action<Message>),
     Refresh,
     ClockTick,
     CopyFeedbackTick,
@@ -1310,6 +1309,14 @@ fn weather_detail_metric(
         .into()
 }
 
+/// Input energy as a percentage of measured output energy; absent samples or
+/// zero output must not be presented as 0%.
+fn format_daily_energy_percentage(input_wh: Option<f64>, output_wh: Option<f64>) -> String {
+    energy_input_output_ratio_percent(input_wh, output_wh)
+        .map(|ratio| format!("{ratio:.1}%"))
+        .unwrap_or_else(|| "—".to_string())
+}
+
 fn daily_energy_history_section(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     input_ains: &HashSet<String>,
@@ -1318,20 +1325,29 @@ fn daily_energy_history_section(
     copy_feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
     let history = daily_energy_history(device_history, input_ains, refresh_interval_seconds);
+    // The last entry always represents today, including a missing-data day.
+    let today_percentage = history
+        .last()
+        .map(|(_, input, output)| format_daily_energy_percentage(*input, *output))
+        .unwrap_or_else(|| "—".to_string());
+    let mut heading_content = widget::Row::new()
+        .spacing(8)
+        .align_y(cosmic::iced::Alignment::Center)
+        .push(widget::text::body("DAILY ENERGY · LAST 7 DAYS"))
+        .push(widget::Space::new().width(cosmic::iced::Length::Fill));
+    if collapsed {
+        heading_content = heading_content
+            .push(widget::text::body(format!("Today · {today_percentage}")));
+    }
     let heading = widget::button::custom(
-        widget::Row::new()
-            .spacing(8)
-            .align_y(cosmic::iced::Alignment::Center)
-            .push(widget::text::body("DAILY ENERGY · LAST 7 DAYS"))
-            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-            .push(
-                widget::icon::from_name(if collapsed {
-                    "go-next-symbolic"
-                } else {
-                    "go-down-symbolic"
-                })
-                .size(16),
-            ),
+        heading_content.push(
+            widget::icon::from_name(if collapsed {
+                "go-next-symbolic"
+            } else {
+                "go-down-symbolic"
+            })
+            .size(16),
+        ),
     )
     .on_press(Message::ToggleMenuSection("daily-energy-history".into()))
     .width(cosmic::iced::Length::Fill)
@@ -1358,7 +1374,12 @@ fn daily_energy_history_section(
             .padding([4, 12])
             .push(widget::text::caption("DAY").width(cosmic::iced::Length::Fill))
             .push(widget::text::caption("SOLAR INPUT").width(value_width))
-            .push(widget::text::caption("GRID USE").width(value_width));
+            .push(widget::text::caption("GRID USE").width(value_width))
+            .push(
+                widget::text::caption("IN / OUT %")
+                    .width(cosmic::iced::Length::Fixed(96.0))
+                    .align_x(cosmic::iced::Alignment::End),
+            );
         let mut rows = widget::Column::new()
             .spacing(2)
             .push(header)
@@ -1381,7 +1402,12 @@ fn daily_energy_history_section(
                     .padding([3, 12])
                     .push(widget::text::body(date_label).width(cosmic::iced::Length::Fill))
                     .push(widget::text::body(format_wh(solar_wh)).width(value_width))
-                    .push(widget::text::body(format_wh(grid_wh)).width(value_width)),
+                    .push(widget::text::body(format_wh(grid_wh)).width(value_width))
+                    .push(
+                        widget::text::body(format_daily_energy_percentage(solar_wh, grid_wh))
+                            .width(cosmic::iced::Length::Fixed(96.0))
+                            .align_x(cosmic::iced::Alignment::End),
+                    ),
             );
         }
         section = section.push(rows);
@@ -4398,10 +4424,11 @@ impl cosmic::Application for AppModel {
 
         // Keep every reading at its intrinsic width. Expanding each child to
         // Fill inside the horizontal panel row pushes later readings off-screen.
-        let panel_item = |label: &'static str,
+        let panel_item = |_label: &'static str,
                           icon: Option<cosmic::Element<'static, Message>>,
                           value: cosmic::Element<'static, Message>,
-                          icon_at_top: bool| {
+                          icon_at_top: bool|
+         -> cosmic::Element<'static, Message> {
             let multiline_row_height = (panel_text_size * 1.15).clamp(16.0, 22.0);
             let item_height = if self.settings.panel_multiline {
                 // A two-line value occupies exactly two standard panel rows.
@@ -4455,13 +4482,10 @@ impl cosmic::Application for AppModel {
                 value = value.center_y(item_height as u16);
             }
             item = item.height(cosmic::iced::Length::Fixed(item_height));
-            self.core.applet.applet_tooltip(
-                item.push(value),
-                label,
-                false,
-                Message::TooltipSurfaceAction,
-                self.core.main_window_id(),
-            )
+            // Panel hover should not spawn an XDG tooltip popup or interact
+            // with the main menu's outside-click dismissal. The button below
+            // is the only event that opens or closes the applet menu.
+            item.push(value).into()
         };
 
         let mut content = widget::Row::new()
@@ -9112,9 +9136,6 @@ impl cosmic::Application for AppModel {
 
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
-            Message::TooltipSurfaceAction(action) => {
-                return Task::done(cosmic::Action::Surface(action));
-            }
             Message::ShowGraph(title, values, unit, _axis_start) => {
                 self.history_graph_devices.clear();
                 self.history_graph_index = None;
@@ -11348,10 +11369,10 @@ impl cosmic::Application for AppModel {
                     .max_width(720.0)
                     .min_width(720.0)
                     .max_height(max_height);
-                // A grabbed XDG popup is dismissed by the compositor when
-                // focus moves to another window. Leave it ungrabbed so only
-                // explicit panel/header clicks close the menu.
-                settings.grab = false;
+                // XDG popup grabs let the compositor dismiss the menu on
+                // an actual pointer click outside its surface. Panel hover
+                // is deliberately not an opening/closing event.
+                settings.grab = true;
                 return get_popup(settings);
             }
             Message::PopupClosed(id) => {
@@ -12733,6 +12754,16 @@ mod daily_energy_history_tests {
         assert_eq!(*date, chrono::Local::now().date_naive());
         assert!((solar_wh.unwrap() - 1000.0 / 60.0).abs() < 0.01);
         assert!((grid_wh.unwrap() - 300.0 / 60.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn daily_energy_percentages_match_overview_and_preserve_unavailable_values() {
+        assert_eq!(format_daily_energy_percentage(Some(250.0), Some(500.0)), "50.0%");
+        assert_eq!(format_daily_energy_percentage(Some(750.0), Some(500.0)), "150.0%");
+        assert_eq!(format_daily_energy_percentage(Some(0.0), Some(200.0)), "0.0%");
+        assert_eq!(format_daily_energy_percentage(None, Some(200.0)), "—");
+        assert_eq!(format_daily_energy_percentage(Some(100.0), None), "—");
+        assert_eq!(format_daily_energy_percentage(Some(100.0), Some(0.0)), "—");
     }
 
     #[test]
