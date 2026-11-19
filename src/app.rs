@@ -7866,6 +7866,118 @@ impl cosmic::Application for AppModel {
                 content = content.push(weather_card);
             }
 
+            // Hue is a separate light-control section: it must not contribute
+            // fictitious wattage, temperature or historical energy samples.
+            if !self.settings.hue_bridge_ip.trim().is_empty() {
+                let collapsed = self.collapsed_menu_sections.contains("hue-lights");
+                let heading = widget::button::custom(
+                    widget::Row::new()
+                        .spacing(8)
+                        .align_y(cosmic::iced::Alignment::Center)
+                        .push(widget::text::body("PHILIPS HUE"))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                        .push(widget::text::caption(self.hue_lights.len().to_string()))
+                        .push(
+                            widget::icon::from_name(if collapsed {
+                                "go-next-symbolic"
+                            } else {
+                                "go-down-symbolic"
+                            })
+                            .size(16),
+                        ),
+                )
+                .on_press(Message::ToggleMenuSection("hue-lights".into()))
+                .width(cosmic::iced::Length::Fill)
+                .padding([8, 12])
+                .class(cosmic::theme::Button::Text);
+                let mut hue_section = widget::Column::new()
+                    .spacing(0)
+                    .width(cosmic::iced::Length::Fill)
+                    .push(
+                        widget::Row::new()
+                            .width(cosmic::iced::Length::Fill)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(heading)
+                            .push(copy_menu_title_button(
+                                "PHILIPS HUE".to_string(),
+                                self.copy_feedback.as_ref(),
+                            )),
+                    );
+                if !collapsed {
+                    hue_section = hue_section.push(
+                        widget::container(widget::text::caption(
+                            "Lights and switches · on/off state only · no measured W",
+                        ))
+                        .padding([4, 12]),
+                    );
+                    if self.hue_loading {
+                        hue_section = hue_section.push(
+                            widget::container(widget::text::caption("Refreshing Hue lights…"))
+                                .padding([4, 12]),
+                        );
+                    }
+                    if let Some(error) = &self.hue_error {
+                        hue_section = hue_section.push(
+                            widget::container(widget::text::caption(format!(
+                                "Hue Bridge: {error}"
+                            )))
+                            .padding([4, 12]),
+                        );
+                    }
+                    if self.hue_lights.is_empty() && !self.hue_loading && self.hue_error.is_none() {
+                        hue_section = hue_section.push(
+                            widget::container(widget::text::caption(
+                                "No Hue lights found. Pair and refresh from Connection settings.",
+                            ))
+                            .padding([4, 12]),
+                        );
+                    }
+                    for light in &self.hue_lights {
+                        let state: cosmic::Element<'_, Message> = if light.reachable
+                            && light.on.is_some()
+                            && !self.hue_pending.contains(&light.id)
+                        {
+                            let id = light.id.clone();
+                            widget::toggler(light.on.unwrap_or(false))
+                                .on_toggle(move |enabled| Message::SetHueLightPower(id.clone(), enabled))
+                                .into()
+                        } else {
+                            widget::toggler(light.on.unwrap_or(false)).into()
+                        };
+                        hue_section = hue_section
+                            .push(widget::divider::horizontal::default())
+                            .push(
+                                widget::Row::new()
+                                    .spacing(8)
+                                    .width(cosmic::iced::Length::Fill)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .padding([6, 12])
+                                    .push(
+                                        widget::Column::new()
+                                            .spacing(2)
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::text::body(light.name.clone()))
+                                            .push(widget::text::caption(if light.on.is_none() {
+                                                "Unavailable"
+                                            } else if light.on == Some(true) {
+                                                "On"
+                                            } else {
+                                                "Off"
+                                            })),
+                                    )
+                                    .push(copy_menu_title_button(
+                                        light.name.clone(),
+                                        self.copy_feedback.as_ref(),
+                                    ))
+                                    .push(state),
+                            );
+                    }
+                }
+                content = content
+                    .push(widget::divider::horizontal::default())
+                    .push(hue_section);
+            }
+
             content = content.push(
                 widget::Row::new()
                     .spacing(8)
@@ -8800,7 +8912,14 @@ impl cosmic::Application for AppModel {
                             &mut self.diagnostic_events,
                             format!("FRITZ!Box refresh failed: {error}"),
                         );
-                        self.error = Some(error);
+                        self.error = if self.selected_ains.is_empty()
+                            && !self.settings.hue_application_key.is_empty()
+                            && !self.settings.hue_bridge_ip.is_empty()
+                        {
+                            None
+                        } else {
+                            Some(error)
+                        };
                     }
                 }
                 self.next_refresh_at = Some(
