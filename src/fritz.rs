@@ -144,6 +144,7 @@ pub struct FritzSettings {
     pub password: String,
     pub tasmota_username: String,
     pub tasmota_password: String,
+    pub tasmota_subnet_scan: bool,
     pub ain: String,
     pub ains: Vec<String>,
     /// Persisted inventory; discovery only adds/updates entries and never prunes them.
@@ -195,6 +196,7 @@ impl Default for FritzSettings {
             password: String::new(),
             tasmota_username: String::new(),
             tasmota_password: String::new(),
+            tasmota_subnet_scan: true,
             ain: String::new(),
             ains: Vec::new(),
             known_devices: Vec::new(),
@@ -506,6 +508,8 @@ impl FritzSettings {
             password: get("PASSWORD"),
             tasmota_username: get("TASMOTA_USERNAME"),
             tasmota_password: get("TASMOTA_PASSWORD"),
+            tasmota_subnet_scan: !values.contains_key("TASMOTA_SUBNET_SCAN")
+                || get("TASMOTA_SUBNET_SCAN").eq_ignore_ascii_case("true"),
             ain: get("AIN"),
             ains: {
                 let legacy_ain = get("AIN");
@@ -664,7 +668,7 @@ impl FritzSettings {
             parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
         let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
-            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
             match self.language.as_str() {
                 "de" => "de",
                 "en" => "en",
@@ -675,6 +679,7 @@ impl FritzSettings {
             self.password,
             self.tasmota_username,
             self.tasmota_password,
+            if self.tasmota_subnet_scan { "true" } else { "false" },
             first_ain,
             selected_ains,
             known_devices,
@@ -1082,6 +1087,7 @@ pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<FritzDevice
         settings.tasmota_username.clone(),
         settings.tasmota_password.clone(),
         settings.url.clone(),
+        settings.tasmota_subnet_scan,
     )
     .await;
     let mut devices = fritz_result.unwrap_or_default();
