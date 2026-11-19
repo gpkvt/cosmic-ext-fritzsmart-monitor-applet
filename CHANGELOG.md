@@ -1,5 +1,7 @@
 # Changelog
 
+- Always show input LOW/HIGH next to output LOW/HIGH stats in Total Power Input & Output, including while input readings are unavailable; represent missing input history as `— W` instead of zero. Share the metric tile row rendering and add regression coverage.
+
 - Remove the unused `graph_panel` helper left behind after deduplicating the power history graph, eliminating the release-build dead-code warning.
 
 - Remove the redundant graph from Total Power Input & Output; keep the combined graph under Current Power History and preserve the numeric readings, low/high values, and energy summaries.
