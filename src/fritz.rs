@@ -491,6 +491,12 @@ fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
                             .chars()
                             .all(|character| character.is_ascii_alphanumeric())
                 })
+                || ["hue-sensor-graph-temperature-", "hue-sensor-graph-lux-"]
+                    .iter()
+                    .any(|prefix| {
+                        id.strip_prefix(prefix)
+                            .is_some_and(crate::hue::valid_sensor_id)
+                    })
         })
         .map(str::to_string)
         .collect::<Vec<_>>();
@@ -2334,6 +2340,21 @@ mod tests {
                 .collapsed_menu_sections
                 .iter()
                 .any(|id| id.starts_with("graph-overview-"))
+        );
+    }
+
+    #[test]
+    fn hue_sensor_graph_disclosures_are_persisted_only_for_valid_ids() {
+        let valid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+        let value = format!(
+            "hue-sensor-graph-temperature-{valid},hue-sensor-graph-lux-{valid},hue-sensor-graph-temperature-invalid,other-graph-{valid}"
+        );
+        assert_eq!(
+            parse_collapsed_menu_sections(&value),
+            vec![
+                format!("hue-sensor-graph-temperature-{valid}"),
+                format!("hue-sensor-graph-lux-{valid}"),
+            ]
         );
     }
 
