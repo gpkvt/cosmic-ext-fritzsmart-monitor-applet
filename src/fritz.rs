@@ -178,6 +178,9 @@ pub struct FritzSettings {
     pub hidden_panel_items: Vec<String>,
     pub panel_order: Vec<String>,
     pub device_order: Vec<String>,
+    /// Popup device list sorting (saved, name, power, temperature).
+    pub device_sort: String,
+    pub device_sort_descending: bool,
     pub collapsed_menu_sections: Vec<String>,
     pub daily_energy_history_default_applied: bool,
     pub expanded_devices: Vec<String>,
@@ -232,6 +235,8 @@ impl Default for FritzSettings {
             hidden_panel_items: Vec::new(),
             panel_order: default_panel_order(),
             device_order: Vec::new(),
+            device_sort: "saved".into(),
+            device_sort_descending: false,
             collapsed_menu_sections: vec![
                 "internet-bandwidth".into(),
                 "daily-energy-history".into(),
@@ -603,6 +608,13 @@ impl FritzSettings {
             hidden_panel_items: parse_hidden_panel_items(&get("HIDDEN_PANEL_ITEMS")),
             panel_order: parse_panel_order(&get("PANEL_ORDER")),
             device_order: parse_device_order(&get("DEVICE_ORDER")),
+            device_sort: match get("DEVICE_SORT").as_str() {
+                "name" => "name".into(),
+                "power" => "power".into(),
+                "temperature" => "temperature".into(),
+                _ => "saved".into(),
+            },
+            device_sort_descending: get("DEVICE_SORT_DESCENDING").eq_ignore_ascii_case("true"),
             collapsed_menu_sections: {
                 let mut sections = if values.contains_key("COLLAPSED_MENU_SECTIONS") {
                     parse_collapsed_menu_sections(&get("COLLAPSED_MENU_SECTIONS"))
@@ -704,7 +716,7 @@ impl FritzSettings {
             parse_collapsed_menu_sections(&self.collapsed_menu_sections.join(",")).join(",");
         let expanded_devices = parse_expanded_devices(&self.expanded_devices.join(",")).join(",");
         let contents = format!(
-            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nTEMPERATURE_UNIT={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nCOLLAPSED_MENU_SECTIONS={}\nDAILY_ENERGY_HISTORY_DEFAULT_APPLIED={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nGRAPH_HISTORY_DIAGNOSTICS_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
+            "LANGUAGE={}\nFRITZ_URL={}\nUSERNAME={}\nPASSWORD={}\nTASMOTA_USERNAME={}\nTASMOTA_PASSWORD={}\nTASMOTA_SUBNET_SCAN={}\nAIN={}\nAINS={}\nKNOWN_DEVICES={}\nALLOW_INVALID_CERTS={}\nCA_CERT_PATH={}\nPANEL_TEXT_SIZE={}\nPANEL_ITEM_SPACING={}\nPANEL_MULTILINE={}\nPANEL_REFRESH_BUTTON={}\nPANEL_AVERAGE_TEMPERATURE={}\nPANEL_EXCLUDE_SOLAR_TEMPERATURE={}\nPANEL_INTERNET_BANDWIDTH={}\nPANEL_NET_POWER={}\nGRAPH_TIMESPAN_MINUTES={}\nGRAPH_STYLE={}\nTEMPERATURE_UNIT={}\nREFRESH_INTERVAL_SECONDS={}\nTEMPERATURE_ALERTS={}\nWEATHER_ENABLED={}\nOPENWEATHERMAP_API_KEY={}\nWEATHER_LOCATION={}\nWEATHER_TEMPERATURE_AIN={}\nWEATHER_TEMPERATURE_SOURCE_INITIALIZED={}\nWEATHER_REFRESH_INTERVAL_MINUTES={}\nWEATHER_SLIDESHOW_INTERVAL_SECONDS={}\nINPUT_AINS={}\nINPUT_DEFAULTS_INITIALIZED={}\nMENU_ORDER={}\nHIDDEN_MENU_ELEMENTS={}\nHIDDEN_PANEL_ITEMS={}\nPANEL_ORDER={}\nDEVICE_ORDER={}\nDEVICE_SORT={}\nDEVICE_SORT_DESCENDING={}\nCOLLAPSED_MENU_SECTIONS={}\nDAILY_ENERGY_HISTORY_DEFAULT_APPLIED={}\nEXPANDED_DEVICES={}\nQUICK_OPTIONS_EXPANDED={}\nWEATHER_FORECAST_EXPANDED={}\nWEATHER_ATTRIBUTION_EXPANDED={}\nGRAPH_HISTORY_DIAGNOSTICS_EXPANDED={}\nSETTINGS_SECTION={}\nSETUP_COMPLETED={}\nDEVICE_SELECTION_INITIALIZED={}\n",
             match self.language.as_str() {
                 "de" => "de",
                 "en" => "en",
@@ -800,6 +812,13 @@ impl FritzSettings {
             hidden_panel_items,
             panel_order,
             device_order,
+            match self.device_sort.as_str() {
+                "name" => "name",
+                "power" => "power",
+                "temperature" => "temperature",
+                _ => "saved",
+            },
+            if self.device_sort_descending { "true" } else { "false" },
             collapsed_menu_sections,
             if self.daily_energy_history_default_applied {
                 "true"
