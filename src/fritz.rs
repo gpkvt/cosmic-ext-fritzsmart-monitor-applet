@@ -403,7 +403,7 @@ fn parse_settings_section(value: &str) -> String {
 }
 
 fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
-    const SECTION_IDS: [&str; 9] = [
+    const SECTION_IDS: [&str; 10] = [
         "summary",
         "weather",
         "internet-bandwidth",
@@ -2113,7 +2113,7 @@ mod tests {
     fn parses_persisted_collapsed_menu_sections_safely() {
         assert_eq!(
             parse_collapsed_menu_sections(
-                "weather,unknown,summary,weather,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature,graph-total-output-pair,graph-total-input-pair,graph-bandwidth-pair,device-graph-pair-0876101234567890,device-graph-pair-invalid!"
+                "weather,unknown,summary,weather,internet-bandwidth,total-power-output,total-power-input,current-power-history,graph-current-power,graph-current-temperature,graph-total-power-output,graph-total-output-temperature,graph-total-power-input,graph-total-input-temperature,graph-total-output-pair,graph-total-input-pair,graph-bandwidth-pair,total-power-overview,daily-energy-history,device-graph-pair-0876101234567890,device-graph-pair-invalid!"
             ),
             vec![
                 "weather".to_string(),
@@ -2121,6 +2121,8 @@ mod tests {
                 "internet-bandwidth".to_string(),
                 "total-power-output".to_string(),
                 "total-power-input".to_string(),
+                "total-power-overview".to_string(),
+                "daily-energy-history".to_string(),
                 "current-power-history".to_string(),
                 "graph-total-output-pair".to_string(),
                 "graph-total-input-pair".to_string(),
@@ -2680,8 +2682,7 @@ mod tests {
                 "weather",
                 "internet-bandwidth",
                 "devices",
-                "total-power-output",
-                "total-power-input"
+                "total-power-output"
             ]
             .into_iter()
             .map(str::to_string)
@@ -2712,7 +2713,6 @@ mod tests {
                 "internet-bandwidth",
                 "devices",
                 "total-power-output",
-                "total-power-input",
                 "summary",
                 "weather",
             ]
@@ -2723,9 +2723,8 @@ mod tests {
         assert_eq!(
             parse_menu_order("total-power-input,summary,total-power-output"),
             vec![
-                "total-power-input",
-                "summary",
                 "total-power-output",
+                "summary",
                 "internet-bandwidth",
                 "weather",
                 "devices",
