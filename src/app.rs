@@ -951,27 +951,30 @@ fn daily_energy_history(
         .collect()
 }
 
-fn today_energy_wh_for_ains(
+fn yesterday_and_today_energy_wh_for_ains(
     device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     selected_ains: &HashSet<String>,
     input_ains: &HashSet<String>,
     refresh_interval_seconds: u32,
     input_energy: bool,
-) -> Option<f64> {
+) -> (Option<f64>, Option<f64>) {
     let selected_history: HashMap<_, _> = device_history
         .iter()
         .filter(|(ain, _)| selected_ains.contains(*ain))
         .map(|(ain, samples)| (ain.clone(), samples.clone()))
         .collect();
-    let (_, solar_wh, grid_wh) =
-        daily_energy_history(&selected_history, input_ains, refresh_interval_seconds)
-            .into_iter()
-            .last()?;
-    if input_energy { solar_wh } else { grid_wh }
+    let history = daily_energy_history(&selected_history, input_ains, refresh_interval_seconds);
+    let energy_for_day = |entry: &(chrono::NaiveDate, Option<f64>, Option<f64>)| {
+        if input_energy { entry.1 } else { entry.2 }
+    };
+    let yesterday = history.iter().rev().nth(1).and_then(energy_for_day);
+    let today = history.last().and_then(energy_for_day);
+    (yesterday, today)
 }
 
 fn menu_energy_summary(
     power_samples: impl Iterator<Item = f64>,
+    yesterday_wh: Option<f64>,
     today_wh: Option<f64>,
 ) -> cosmic::Element<'static, Message> {
     let values: Vec<f64> = power_samples.collect();
@@ -1010,21 +1013,24 @@ fn menu_energy_summary(
     )
     .width(cosmic::iced::Length::Fill)
     .into();
-    let energy = today_wh
-        .map(|value| format!("{value:.0} Wh"))
-        .unwrap_or_else(|| "— Wh".to_string());
-    let today = widget::Column::new()
-        .spacing(2)
-        .align_x(cosmic::iced::Alignment::End)
-        .width(cosmic::iced::Length::Fixed(112.0))
-        .push(widget::text::caption("TODAY"))
-        .push(widget::text::title3(keep_value_unit_together(energy)));
+    let energy_column = |label: &'static str, value: Option<f64>| {
+        let energy = value
+            .map(|value| format!("{value:.0} Wh"))
+            .unwrap_or_else(|| "— Wh".to_string());
+        widget::Column::new()
+            .spacing(2)
+            .align_x(cosmic::iced::Alignment::End)
+            .width(cosmic::iced::Length::Fixed(104.0))
+            .push(widget::text::caption(label))
+            .push(widget::text::title3(keep_value_unit_together(energy)))
+    };
     widget::Row::new()
         .spacing(12)
         .align_y(cosmic::iced::Alignment::Center)
         .width(cosmic::iced::Length::Fill)
         .push(graph)
-        .push(today)
+        .push(energy_column("YESTERDAY", yesterday_wh))
+        .push(energy_column("TODAY", today_wh))
         .into()
 }
 
@@ -2395,7 +2401,7 @@ fn total_power_overview(
         .filter(|ain| !settings.input_ains.contains(*ain))
         .cloned()
         .collect();
-    let output_today_wh = today_energy_wh_for_ains(
+    let (output_yesterday_wh, output_today_wh) = yesterday_and_today_energy_wh_for_ains(
         device_history,
         &output_ains,
         &settings.input_ains,
@@ -2404,6 +2410,7 @@ fn total_power_overview(
     );
     let output_summary = menu_energy_summary(
         history.iter().map(|(_, value)| *value as f64),
+        output_yesterday_wh,
         output_today_wh,
     );
     let output_section = total_power_section(
@@ -2487,7 +2494,7 @@ fn total_power_overview(
                     ),
             )
             .push(graph_panel(input_graph.into()));
-        let input_today_wh = today_energy_wh_for_ains(
+        let (input_yesterday_wh, input_today_wh) = yesterday_and_today_energy_wh_for_ains(
             device_history,
             &settings.input_ains,
             &settings.input_ains,
@@ -2498,6 +2505,7 @@ fn total_power_overview(
             input_history
                 .iter()
                 .map(|(_, value)| input_display_power_w(*value) as f64),
+            input_yesterday_wh,
             input_today_wh,
         );
         let input_section = total_power_section(
@@ -6774,17 +6782,19 @@ impl cosmic::Application for AppModel {
                     // Use COSMIC's list-column disclosure pattern so the
                     // header, separator, and expanded content share native list spacing.
                     let device_ains = HashSet::from([device_key.clone()]);
-                    let device_today_wh = today_energy_wh_for_ains(
-                        &self.device_history,
-                        &device_ains,
-                        &self.settings.input_ains,
-                        self.settings.refresh_interval_seconds,
-                        self.settings.input_ains.contains(&device_key),
-                    );
+                    let (device_yesterday_wh, device_today_wh) =
+                        yesterday_and_today_energy_wh_for_ains(
+                            &self.device_history,
+                            &device_ains,
+                            &self.settings.input_ains,
+                            self.settings.refresh_interval_seconds,
+                            self.settings.input_ains.contains(&device_key),
+                        );
                     let device_summary = menu_energy_summary(
                         device_history
                             .into_iter()
                             .flat_map(|samples| samples.iter().map(|(_, power, _)| *power as f64)),
+                        device_yesterday_wh,
                         device_today_wh,
                     );
                     let mut card_column = widget::list::list_column()
