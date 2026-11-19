@@ -19,7 +19,7 @@
   <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues">Issues</a>
 </p>
 
-FRITZ!Power Monitor is an independent, native [COSMIC](https://system76.com/cosmic) panel applet for monitoring compatible FRITZ!Box Smart Home and Tasmota power meters, controlling supported devices, and viewing optional Philips Hue, Netatmo and weather data. Core power monitoring runs on your local network; **no third-party monitoring account is required**.
+FRITZ!Power Monitor is an independent, native [COSMIC](https://system76.com/cosmic) panel applet for monitoring compatible FRITZ!Box Smart Home meters, switches, temperature sensors and thermostats, plus Tasmota power meters, controlling supported devices, and viewing optional Philips Hue, Netatmo and weather data. Core power monitoring runs on your local network; **no third-party monitoring account is required**.
 
 <p align="center">
   <a href="docs/Screenshot_2026-11-16_18-17-17.png"><img src="docs/Screenshot_2026-11-16_18-17-17.png" alt="Real screenshot of the applet's power overview" width="760"></a>
