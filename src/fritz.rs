@@ -1101,7 +1101,9 @@ async fn read_xml_response_with_method(
         .content_length()
         .is_some_and(|length| length > MAX_FRITZ_XML_BYTES as u64)
     {
-        return Err(format!("{context}: response exceeds the 4 MiB safety limit"));
+        return Err(format!(
+            "{context}: response exceeds the 4 MiB safety limit"
+        ));
     }
 
     // Read incrementally: Response::bytes() discards already-received bytes
@@ -1113,7 +1115,9 @@ async fn read_xml_response_with_method(
         match response.chunk().await {
             Ok(Some(chunk)) => {
                 if !xml_chunk_fits(bytes.len(), chunk.len()) {
-                    return Err(format!("{context}: response exceeds the 4 MiB safety limit"));
+                    return Err(format!(
+                        "{context}: response exceeds the 4 MiB safety limit"
+                    ));
                 }
                 bytes.extend_from_slice(&chunk);
             }
@@ -1335,12 +1339,11 @@ fn parse_device_reading(device: Node<'_, '_>) -> Result<FritzReading, String> {
         .and_then(|switch| switch.children().find(|child| child.has_tag_name("lock")))
         .and_then(|lock| lock.text())
         .is_some_and(|lock| lock.trim() == "0");
-    let power_state =
-        child_text(device, "switch", "state").and_then(|state| match state.trim() {
-            "1" => Some(true),
-            "0" => Some(false),
-            _ => None,
-        });
+    let power_state = child_text(device, "switch", "state").and_then(|state| match state.trim() {
+        "1" => Some(true),
+        "0" => Some(false),
+        _ => None,
+    });
     Ok(FritzReading {
         ain: ain.to_string(),
         name,

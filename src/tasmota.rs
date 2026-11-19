@@ -284,7 +284,9 @@ async fn query_status(
         .content_length()
         .is_some_and(|length| length > MAX_TASMOTA_STATUS_BYTES as u64)
     {
-        return Err(format!("Tasmota at {address} returned an oversized status response"));
+        return Err(format!(
+            "Tasmota at {address} returned an oversized status response"
+        ));
     }
     let mut bytes = Vec::new();
     while let Some(chunk) = response.chunk().await.map_err(|error| {
@@ -294,7 +296,9 @@ async fn query_status(
         )
     })? {
         if chunk.len() > MAX_TASMOTA_STATUS_BYTES.saturating_sub(bytes.len()) {
-            return Err(format!("Tasmota at {address} returned an oversized status response"));
+            return Err(format!(
+                "Tasmota at {address} returned an oversized status response"
+            ));
         }
         bytes.extend_from_slice(&chunk);
     }
