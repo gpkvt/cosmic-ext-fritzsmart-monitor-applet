@@ -1057,6 +1057,13 @@ fn is_complete_protocol_payload(bytes: &[u8]) -> bool {
     body == "0" || body == "1" || Document::parse(body).is_ok()
 }
 
+// Avoid unbounded device-info responses exhausting the panel process.
+const MAX_FRITZ_XML_BYTES: usize = 4 * 1024 * 1024;
+
+fn xml_chunk_fits(current: usize, incoming: usize) -> bool {
+    incoming <= MAX_FRITZ_XML_BYTES.saturating_sub(current)
+}
+
 async fn read_xml_response(response: reqwest::Response, context: &str) -> Result<String, String> {
     read_xml_response_with_method(response, context, "GET").await
 }
@@ -1090,6 +1097,13 @@ async fn read_xml_response_with_method(
         .and_then(|value| value.to_str().ok())
         .map(str::to_owned);
 
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_FRITZ_XML_BYTES as u64)
+    {
+        return Err(format!("{context}: response exceeds the 4 MiB safety limit"));
+    }
+
     // Read incrementally: Response::bytes() discards already-received bytes
     // when the TLS layer reports an unclean EOF. Keeping chunks lets us verify
     // that the complete application payload arrived before accepting that one
@@ -1097,7 +1111,12 @@ async fn read_xml_response_with_method(
     let mut bytes = Vec::new();
     loop {
         match response.chunk().await {
-            Ok(Some(chunk)) => bytes.extend_from_slice(&chunk),
+            Ok(Some(chunk)) => {
+                if !xml_chunk_fits(bytes.len(), chunk.len()) {
+                    return Err(format!("{context}: response exceeds the 4 MiB safety limit"));
+                }
+                bytes.extend_from_slice(&chunk);
+            }
             Ok(None) => break,
             Err(error)
                 if content_length.is_none()
@@ -1285,6 +1304,54 @@ fn parse_devices_xml(xml: &str) -> Result<Vec<FritzDevice>, String> {
     Ok(devices)
 }
 
+fn parse_device_reading(device: Node<'_, '_>) -> Result<FritzReading, String> {
+    let ain = device
+        .attribute("identifier")
+        .ok_or_else(|| "Device is missing an identifier".to_string())?;
+    let power_mw = child_text(device, "powermeter", "power")
+        .ok_or_else(|| format!("Device {} does not expose power measurements", ain))?
+        .parse::<i64>()
+        .map_err(|_| format!("Device {} returned an invalid power measurement", ain))?;
+    let temperature_c = child_text(device, "temperature", "celsius")
+        .ok_or_else(|| format!("Device {} does not expose temperature measurements", ain))?
+        .parse::<i64>()
+        .map_err(|_| format!("Device {} returned an invalid temperature measurement", ain))?
+        as f64
+        / 10.0;
+    let name = device
+        .children()
+        .find(|child| child.has_tag_name("name"))
+        .and_then(|child| child.text())
+        .filter(|name| !name.trim().is_empty())
+        .or_else(|| device.attribute("name"))
+        .unwrap_or("FRITZ!Box device")
+        .trim()
+        .to_string();
+    let switch_node = device.children().find(|child| child.has_tag_name("switch"));
+    let power_controllable = switch_node.is_some();
+    // AVM exposes the switch key lock as <switch><lock>0|1</lock>.
+    // Only explicitly unlocked devices may be controlled.
+    let power_toggle_allowed = switch_node
+        .and_then(|switch| switch.children().find(|child| child.has_tag_name("lock")))
+        .and_then(|lock| lock.text())
+        .is_some_and(|lock| lock.trim() == "0");
+    let power_state =
+        child_text(device, "switch", "state").and_then(|state| match state.trim() {
+            "1" => Some(true),
+            "0" => Some(false),
+            _ => None,
+        });
+    Ok(FritzReading {
+        ain: ain.to_string(),
+        name,
+        power_w: power_mw / 1000,
+        temperature_c,
+        power_state,
+        power_controllable,
+        power_toggle_allowed,
+    })
+}
+
 fn parse_device_readings_xml(
     xml: &str,
     selected_ains: &[String],
@@ -1309,48 +1376,7 @@ fn parse_device_readings_xml(
         {
             continue;
         }
-        let power_mw = child_text(device, "powermeter", "power")
-            .ok_or_else(|| format!("Device {} does not expose power measurements", ain))?
-            .parse::<i64>()
-            .map_err(|_| format!("Device {} returned an invalid power measurement", ain))?;
-        let temperature_c = child_text(device, "temperature", "celsius")
-            .ok_or_else(|| format!("Device {} does not expose temperature measurements", ain))?
-            .parse::<i64>()
-            .map_err(|_| format!("Device {} returned an invalid temperature measurement", ain))?
-            as f64
-            / 10.0;
-        let name = device
-            .children()
-            .find(|child| child.has_tag_name("name"))
-            .and_then(|child| child.text())
-            .filter(|name| !name.trim().is_empty())
-            .or_else(|| device.attribute("name"))
-            .unwrap_or("FRITZ!Box device")
-            .trim()
-            .to_string();
-        let switch_node = device.children().find(|child| child.has_tag_name("switch"));
-        let power_controllable = switch_node.is_some();
-        // AVM exposes the switch key lock as <switch><lock>0|1</lock>.
-        // Only explicitly unlocked devices may be controlled.
-        let power_toggle_allowed = switch_node
-            .and_then(|switch| switch.children().find(|child| child.has_tag_name("lock")))
-            .and_then(|lock| lock.text())
-            .is_some_and(|lock| lock.trim() == "0");
-        let power_state =
-            child_text(device, "switch", "state").and_then(|state| match state.trim() {
-                "1" => Some(true),
-                "0" => Some(false),
-                _ => None,
-            });
-        readings.push(FritzReading {
-            ain: ain.to_string(),
-            name,
-            power_w: power_mw / 1000,
-            temperature_c,
-            power_state,
-            power_controllable,
-            power_toggle_allowed,
-        });
+        readings.push(parse_device_reading(device)?);
     }
     readings.sort_by_key(|reading| {
         wanted
@@ -1412,33 +1438,43 @@ async fn fetch_switch_state(
 
 fn parse_fetch_result_xml(xml: &str, selected_ains: &[String]) -> Result<FritzFetchResult, String> {
     let document = Document::parse(xml).map_err(|error| format!("Invalid device XML: {error}"))?;
+    // Parse the returned document exactly once, regardless of how many
+    // devices are selected. Bad individual readings stay on the missing list.
+    let mut devices_by_key: HashMap<String, Node<'_, '_>> = HashMap::new();
+    for node in document
+        .descendants()
+        .filter(|node| node.has_tag_name("device"))
+    {
+        if let Some(ain) = node.attribute("identifier") {
+            let key = normalize_ain_for_selection(ain);
+            if !key.is_empty() {
+                devices_by_key.entry(key).or_insert(node);
+            }
+        }
+    }
     let mut readings = Vec::new();
     let mut missing_devices = Vec::new();
     for ain in selected_ains {
-        match parse_device_readings_xml(xml, std::slice::from_ref(ain)) {
-            Ok(mut device_readings) => readings.append(&mut device_readings),
-            Err(_) => {
-                let key = normalize_ain_for_selection(ain);
-                let name = document
-                    .descendants()
-                    .find(|node| {
-                        node.has_tag_name("device")
-                            && node
-                                .attribute("identifier")
-                                .is_some_and(|id| normalize_ain_for_selection(id) == key)
-                    })
-                    .and_then(|node| {
-                        node.children()
-                            .find(|child| child.has_tag_name("name"))
-                            .and_then(|child| child.text())
-                            .or_else(|| node.attribute("name"))
-                    })
-                    .map(str::trim)
-                    .filter(|name| !name.is_empty())
-                    .unwrap_or(ain)
-                    .to_string();
-                missing_devices.push((ain.clone(), name));
-            }
+        let key = normalize_ain_for_selection(ain);
+        if let Some(reading) = devices_by_key
+            .get(&key)
+            .and_then(|node| parse_device_reading(*node).ok())
+        {
+            readings.push(reading);
+        } else {
+            let name = devices_by_key
+                .get(&key)
+                .and_then(|node| {
+                    node.children()
+                        .find(|child| child.has_tag_name("name"))
+                        .and_then(|child| child.text())
+                        .or_else(|| node.attribute("name"))
+                })
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .unwrap_or(ain)
+                .to_string();
+            missing_devices.push((ain.clone(), name));
         }
     }
     // Keep an empty reading set when every selected device is missing. The
@@ -2246,6 +2282,15 @@ pub async fn set_device_power(ain: String, on: bool) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn oversized_xml_chunks_are_rejected_before_allocation() {
+        assert!(xml_chunk_fits(0, MAX_FRITZ_XML_BYTES));
+        assert!(xml_chunk_fits(MAX_FRITZ_XML_BYTES - 1, 1));
+        assert!(!xml_chunk_fits(MAX_FRITZ_XML_BYTES - 1, 2));
+        assert!(!xml_chunk_fits(MAX_FRITZ_XML_BYTES, 1));
+        assert!(!xml_chunk_fits(usize::MAX, usize::MAX));
+    }
+
     use super::*;
 
     #[test]
