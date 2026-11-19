@@ -2498,7 +2498,7 @@ fn total_power_overview(
             .width(cosmic::iced::Length::Shrink)
             .into()
     };
-    // Copy sits beside the title; the disclosure control remains at the right.
+    // Keep the disclosure area flexible and anchor the copy action at the far right.
     let title_button = widget::button::custom(widget::text::caption("TOTAL POWER INPUT & OUTPUT"))
         .on_press(Message::ToggleMenuSection("total-power-overview".into()))
         .padding([4, 0])
@@ -2527,11 +2527,11 @@ fn total_power_overview(
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
         .push(title_button)
+        .push(disclosure_button)
         .push(copy_menu_title_button(
             "TOTAL POWER INPUT & OUTPUT".to_string(),
             copy_feedback,
-        ))
-        .push(disclosure_button);
+        ));
     let mut section = widget::Column::new()
         .spacing(4)
         .width(cosmic::iced::Length::Fill)

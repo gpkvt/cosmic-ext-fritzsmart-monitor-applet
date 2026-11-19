@@ -1,5 +1,7 @@
 # Changelog
 
+- Align the Total Power Input & Output title copy button to the far right of its header, keeping the expandable summary and disclosure control intact.
+
 - Remove obsolete `input_low`/`input_high` local bindings after consolidating the Total Power Input & Output metric rows, eliminating release-build unused-variable warnings.
 
 - Always show input LOW/HIGH next to output LOW/HIGH stats in Total Power Input & Output, including while input readings are unavailable; represent missing input history as `— W` instead of zero. Share the metric tile row rendering and add regression coverage.
