@@ -6992,17 +6992,55 @@ impl cosmic::Application for AppModel {
                         .position(|candidate| candidate == element)
                         .unwrap_or(usize::MAX)
                 });
+                let device_count = menu_cards
+                    .iter()
+                    .filter(|(key, _)| key.starts_with("2-"))
+                    .count();
+                let mut device_section_started = false;
                 let mut device_cards = widget::Column::new().spacing(0);
                 for (index, (key, card)) in menu_cards.into_iter().enumerate() {
                     if index > 0 {
                         device_cards = device_cards.push(widget::divider::horizontal::default());
                     }
-                    if key.starts_with("2-")
-                        || key.starts_with("3-")
+                    if key.starts_with("2-") {
+                        if !device_section_started {
+                            let collapsed = self.collapsed_menu_sections.contains("devices");
+                            let heading = widget::button::custom(
+                                widget::Row::new()
+                                    .spacing(8)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(widget::text::body(crate::i18n::tr(
+                                        &self.settings.language,
+                                        "DEVICES",
+                                    )))
+                                    .push(widget::Space::new().width(cosmic::iced::Length::Fill))
+                                    .push(widget::text::caption(device_count.to_string()))
+                                    .push(
+                                        widget::icon::from_name(if collapsed {
+                                            "go-next-symbolic"
+                                        } else {
+                                            "go-down-symbolic"
+                                        })
+                                        .size(16),
+                                    ),
+                            )
+                            .on_press(Message::ToggleMenuSection("devices".to_string()))
+                            .width(cosmic::iced::Length::Fill)
+                            .padding([8, 12])
+                            .class(cosmic::theme::Button::Text);
+                            device_cards = device_cards.push(heading);
+                            device_section_started = true;
+                        }
+                        if !self.collapsed_menu_sections.contains("devices") {
+                            device_cards = device_cards.push(card);
+                        }
+                        continue;
+                    }
+                    if key.starts_with("3-")
                         || key.starts_with("4-")
                         || key.starts_with("5-")
                     {
-                        // Device and total-power rows already provide their own disclosure controls.
+                        // Total-power and history rows provide their own disclosure controls.
                         device_cards = device_cards.push(card);
                         continue;
                     }
