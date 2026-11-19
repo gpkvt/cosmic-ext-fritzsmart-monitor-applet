@@ -2496,6 +2496,22 @@ mod tests {
     }
 
     #[test]
+    fn netatmo_sensor_graph_disclosures_survive_restart() {
+        let module = "70:ee:50:11:22:33";
+        let selections = format!(
+            "netatmo-sensor-graph-temperature-{module},netatmo-sensor-graph-co2-{module},netatmo-sensor-graph-rain-{module},netatmo-sensor-graph-co2-invalid/,netatmo-graph-unknown-{module}"
+        );
+        assert_eq!(
+            parse_collapsed_menu_sections(&selections),
+            vec![
+                format!("netatmo-sensor-graph-temperature-{module}"),
+                format!("netatmo-sensor-graph-co2-{module}"),
+                format!("netatmo-sensor-graph-rain-{module}"),
+            ]
+        );
+    }
+
+    #[test]
     fn canonical_device_keys_are_case_insensitive() {
         assert_eq!(
             canonical_device_key("tasmota:aa:bb:cc:dd:ee:ff"),
