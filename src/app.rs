@@ -8400,6 +8400,21 @@ impl cosmic::Application for AppModel {
                     cosmic::Action::App(Message::Updated(Box::new(result)))
                 })];
 
+                if !self.settings.hue_bridge_ip.trim().is_empty()
+                    && !self.settings.hue_application_key.trim().is_empty()
+                    && !self.hue_loading
+                {
+                    self.hue_loading = true;
+                    self.hue_next_refresh_at = None;
+                    tasks.push(Task::perform(
+                        crate::hue::fetch_lights(
+                            self.settings.hue_bridge_ip.clone(),
+                            self.settings.hue_application_key.clone(),
+                        ),
+                        |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                    ));
+                }
+
                 // Device discovery is deliberately separate from normal refreshes
                 // and is available only through the explicit action in Settings → Devices.
 
@@ -8474,6 +8489,21 @@ impl cosmic::Application for AppModel {
                     .is_some_and(|deadline| Instant::now() >= deadline)
                 {
                     self.settings_saved_until = None;
+                }
+                if !self.hue_loading
+                    && !self.settings.hue_application_key.trim().is_empty()
+                    && !self.settings.hue_bridge_ip.trim().is_empty()
+                    && self.hue_next_refresh_at.is_some_and(|deadline| Instant::now() >= deadline)
+                {
+                    self.hue_loading = true;
+                    self.hue_next_refresh_at = None;
+                    return Task::perform(
+                        crate::hue::fetch_lights(
+                            self.settings.hue_bridge_ip.clone(),
+                            self.settings.hue_application_key.clone(),
+                        ),
+                        |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                    );
                 }
                 if self.settings.weather_enabled
                     && self.next_weather_refresh_at.is_none()
@@ -9498,6 +9528,124 @@ impl cosmic::Application for AppModel {
             Message::PasswordChanged(value) => {
                 self.settings.password = value;
                 self.persist_settings();
+            }
+            Message::HueBridgeIpChanged(value) => {
+                self.settings.hue_bridge_ip = value;
+                self.hue_lights.clear();
+                self.hue_error = None;
+                self.hue_next_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::HueApplicationKeyChanged(value) => {
+                self.settings.hue_application_key = value;
+                self.hue_lights.clear();
+                self.hue_error = None;
+                self.hue_next_refresh_at = None;
+                self.persist_settings();
+            }
+            Message::PairHueBridge => {
+                if self.hue_pairing {
+                    return Task::none();
+                }
+                self.hue_pairing = true;
+                self.hue_error = None;
+                return Task::perform(
+                    crate::hue::pair(self.settings.hue_bridge_ip.clone()),
+                    |result| cosmic::Action::App(Message::HueBridgePaired(result)),
+                );
+            }
+            Message::HueBridgePaired(result) => {
+                self.hue_pairing = false;
+                match result {
+                    Ok(key) => {
+                        // Never put the secret in status messages or diagnostics.
+                        self.settings.hue_application_key = key;
+                        self.persist_settings();
+                        self.hue_loading = true;
+                        self.hue_next_refresh_at = None;
+                        self.hue_error = None;
+                        return Task::perform(
+                            crate::hue::fetch_lights(
+                                self.settings.hue_bridge_ip.clone(),
+                                self.settings.hue_application_key.clone(),
+                            ),
+                            |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                        );
+                    }
+                    Err(error) => self.hue_error = Some(error),
+                }
+            }
+            Message::RefreshHueLights => {
+                if self.hue_loading {
+                    return Task::none();
+                }
+                if self.settings.hue_bridge_ip.trim().is_empty()
+                    || self.settings.hue_application_key.trim().is_empty()
+                {
+                    self.hue_error = Some("Configure the bridge IP and pair it first".into());
+                    return Task::none();
+                }
+                self.hue_loading = true;
+                self.hue_next_refresh_at = None;
+                return Task::perform(
+                    crate::hue::fetch_lights(
+                        self.settings.hue_bridge_ip.clone(),
+                        self.settings.hue_application_key.clone(),
+                    ),
+                    |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                );
+            }
+            Message::HueLightsLoaded(result) => {
+                self.hue_loading = false;
+                self.hue_next_refresh_at = Some(Instant::now() + Duration::from_secs(60));
+                match result {
+                    Ok(lights) => {
+                        self.hue_lights = lights;
+                        self.hue_error = None;
+                    }
+                    Err(error) => {
+                        // A bridge outage never leaves stale light states on-screen
+                        // and cannot invalidate FRITZ!/Tasmota power readings.
+                        self.hue_lights.clear();
+                        self.hue_error = Some(error);
+                    }
+                }
+            }
+            Message::SetHueLightPower(id, on) => {
+                if self.hue_pending.contains(&id)
+                    || !self.hue_lights.iter().any(|light| {
+                        light.id == id && light.reachable && light.on.is_some()
+                    })
+                {
+                    return Task::none();
+                }
+                self.hue_pending.insert(id.clone());
+                return Task::perform(
+                    crate::hue::set_light_power(
+                        self.settings.hue_bridge_ip.clone(),
+                        self.settings.hue_application_key.clone(),
+                        id.clone(),
+                        on,
+                    ),
+                    move |result| cosmic::Action::App(Message::HueLightPowerFinished(id, result)),
+                );
+            }
+            Message::HueLightPowerFinished(id, result) => {
+                self.hue_pending.remove(&id);
+                match result {
+                    Ok(()) => {
+                        self.hue_loading = true;
+                        self.hue_next_refresh_at = None;
+                        return Task::perform(
+                            crate::hue::fetch_lights(
+                                self.settings.hue_bridge_ip.clone(),
+                                self.settings.hue_application_key.clone(),
+                            ),
+                            |result| cosmic::Action::App(Message::HueLightsLoaded(result)),
+                        );
+                    }
+                    Err(error) => self.hue_error = Some(error),
+                }
             }
             Message::TasmotaUsernameChanged(value) => {
                 self.settings.tasmota_username = value;
