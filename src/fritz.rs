@@ -437,7 +437,7 @@ fn parse_collapsed_menu_sections(value: &str) -> Vec<String> {
         .map(str::trim)
         .filter(|id| {
             SECTION_IDS.contains(id)
-                || id == "daily-energy-history"
+                || *id == "daily-energy-history"
                 || id.strip_prefix("device-graph-pair-").is_some_and(|ain| {
                     !ain.is_empty()
                         && ain
