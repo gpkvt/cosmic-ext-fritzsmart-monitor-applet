@@ -4570,17 +4570,13 @@ impl cosmic::Application for AppModel {
             } else {
                 24.0
             };
-            // Paired multiline rows share their group's available width so
-            // their value columns start at the same left edge. Standalone
-            // readings retain their natural width to avoid pushing later items
-            // out of the panel.
-            let align_value_column = self.settings.panel_multiline && !icon_at_top;
+            // This row is nested in an autosized/shrink-wrapped panel.
+            // Never request Fill width from within that tree: an unbounded
+            // Fill constraint can propagate into the Wayland surface resize
+            // after live measurements replace the initial placeholder.
+            // The shared 16 px icon slot aligns the values in paired rows.
             let mut item = widget::Row::new()
-                .width(if align_value_column {
-                    cosmic::iced::Length::Fill
-                } else {
-                    cosmic::iced::Length::Shrink
-                })
+                .width(cosmic::iced::Length::Shrink)
                 .spacing(5)
                 .align_y(if icon_at_top {
                     cosmic::iced::Alignment::Start
@@ -4599,10 +4595,8 @@ impl cosmic::Application for AppModel {
                     .center_y(icon_height as u16);
                 item = item.push(icon_column);
             }
-            // Give the value the remaining item width and align its contents
-            // to the left. In paired rows this creates a shared left edge;
-            // standalone rows retain their intrinsic width because the row
-            // itself remains shrink-wrapped.
+            // The numeric value already has a fixed-width text slot; avoid
+            // expanding its tooltip container beyond that intrinsic width.
             // Keep hover help inside the panel's own widget tree. A separate
             // Wayland tooltip popup can race the grabbed XDG menu and cause a
             // fatal popup protocol error in some COSMIC compositor versions.
@@ -4613,11 +4607,7 @@ impl cosmic::Application for AppModel {
                 widget::tooltip::Position::Bottom,
             );
             let mut value = widget::container(tooltip_value)
-                .width(if align_value_column {
-                    cosmic::iced::Length::Fill
-                } else {
-                    cosmic::iced::Length::Shrink
-                })
+                .width(cosmic::iced::Length::Shrink)
                 .align_x(cosmic::iced::Alignment::Start);
             if !icon_at_top {
                 value = value.center_y(item_height as u16);
