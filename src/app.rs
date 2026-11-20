@@ -37,6 +37,56 @@ pub(crate) fn diagnostic_event_counts() -> (u64, u64) {
 }
 pub type GraphSamples = Vec<(Instant, f64)>;
 type CopyFeedback = (String, Instant);
+
+/// History samples use monotonic ages rather than guessed wall-clock timestamps.
+/// Only user-visible readings are included; never export API tokens or passwords.
+fn json_power_samples(
+    samples: &VecDeque<(Instant, i64)>,
+    now: Instant,
+) -> Vec<serde_json::Value> {
+    samples.iter().map(|(at, watts)| serde_json::json!({
+        "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+        "watts": watts,
+    })).collect()
+}
+
+fn json_device_samples(
+    samples: &VecDeque<(Instant, i64, f64)>,
+    now: Instant,
+) -> Vec<serde_json::Value> {
+    samples.iter().map(|(at, watts, temperature)| serde_json::json!({
+        "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+        "watts": watts,
+        "temperature_c": temperature.is_finite().then_some(*temperature),
+    })).collect()
+}
+
+fn json_bandwidth_samples(
+    samples: &VecDeque<(Instant, u64, u64)>,
+    now: Instant,
+) -> Vec<serde_json::Value> {
+    samples.iter().map(|(at, download, upload)| serde_json::json!({
+        "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+        "download_bits_per_second": download,
+        "upload_bits_per_second": upload,
+    })).collect()
+}
+
+fn json_daily_energy_rows(
+    history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    settings: &FritzSettings,
+) -> Vec<serde_json::Value> {
+    daily_energy_history(history, &settings.input_ains, settings.refresh_interval_seconds)
+        .into_iter()
+        .map(|(day, input, output)| serde_json::json!({
+            "date": day.format("%Y-%m-%d").to_string(),
+            "input_wh": input,
+            "output_wh": output,
+            "input_output_percent": energy_input_output_ratio_percent(input, output),
+        }))
+        .collect()
+}
+
 const COPY_FEEDBACK_DURATION: Duration = Duration::from_millis(900);
 
 #[derive(Default)]
@@ -231,7 +281,7 @@ pub enum Message {
     ToggleWeatherAttribution,
     TestNotification,
     CopyDiagnosticUrl(String),
-    CopyMenuTitle(String),
+    CopySectionJson(String),
     ClearDiagnosticEvents,
     WriteDebugFile,
     DebugDumpGenerated(String),
@@ -1542,10 +1592,7 @@ fn daily_energy_history_section(
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
         .push(heading)
-        .push(copy_menu_title_button(
-            "DAILY ENERGY · LAST 7 DAYS".to_string(),
-            copy_feedback,
-        ));
+        .push(copy_section_button("daily-energy-history".to_string(), copy_feedback));
     let mut section = widget::Column::new()
         .spacing(0)
         .width(cosmic::iced::Length::Fill)
@@ -2826,10 +2873,7 @@ fn live_power_summary(
             .width(cosmic::iced::Length::Fill)
             .align_y(cosmic::iced::Alignment::Center)
             .push(history_heading)
-            .push(copy_menu_title_button(
-                crate::i18n::tr(&language, "CURRENT POWER HISTORY").to_string(),
-                copy_feedback,
-            )),
+            .push(copy_section_button("current-power-history".to_string(), copy_feedback)),
     );
     if !history_collapsed {
         let output_label = crate::i18n::tr(&language, "TOTAL POWER OUTPUT");
@@ -2915,7 +2959,7 @@ fn collapsible_graph_with_current_value(
             .size(16),
         ),
     )
-    .on_press(Message::ToggleMenuSection(section_id))
+    .on_press(Message::ToggleMenuSection(section_id.clone()))
     .width(cosmic::iced::Length::Fill)
     .padding([4, 0])
     .class(cosmic::theme::Button::Text);
@@ -2923,7 +2967,7 @@ fn collapsible_graph_with_current_value(
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
         .push(heading)
-        .push(copy_menu_title_button(title.to_string(), copy_feedback));
+        .push(copy_section_button(section_id, copy_feedback));
     let mut section = widget::Column::new()
         .spacing(4)
         .width(cosmic::iced::Length::Fill)
@@ -3369,15 +3413,7 @@ fn total_power_overview(
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
         .push(heading)
-        .push(copy_menu_title_button(
-            if has_input {
-                "TOTAL POWER INPUT & OUTPUT"
-            } else {
-                "TOTAL POWER OUTPUT"
-            }
-            .to_string(),
-            copy_feedback,
-        ));
+        .push(copy_section_button("total-power-overview".to_string(), copy_feedback));
     let mut section = widget::Column::new()
         .spacing(0)
         .width(cosmic::iced::Length::Fill)
@@ -4157,13 +4193,13 @@ fn copy_feedback_icon(
         .into()
 }
 
-fn copy_menu_title_button(
-    title: String,
+fn copy_section_button(
+    section_key: String,
     feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
-    let icon = copy_feedback_icon(&title, feedback);
+    let icon = copy_feedback_icon(&section_key, feedback);
     widget::button::custom(icon)
-        .on_press(Message::CopyMenuTitle(title))
+        .on_press(Message::CopySectionJson(section_key))
         .padding([4, 6])
         .class(cosmic::theme::Button::Text)
         .into()
@@ -4275,6 +4311,377 @@ impl AppModel {
     /// Single source of truth for removing saved FRITZ!/Tasmota device
     /// references. Called once per device for both individual and bulk removal;
     /// callers persist after their entire operation is complete.
+    fn json_device_data(&self, canonical: &str, now: Instant) -> Option<serde_json::Value> {
+        let id_matches = |id: &str| crate::fritz::canonical_device_key(id) == canonical;
+        let known = self.devices.iter().find(|device| id_matches(&device.ain));
+        let live = self.readings.iter().find(|reading| id_matches(&reading.ain));
+        if known.is_none() && live.is_none() {
+            return None;
+        }
+        let history = self.device_history.iter()
+            .find(|(id, _)| id_matches(id))
+            .map(|(_, history)| json_device_samples(history, now))
+            .unwrap_or_default();
+        Some(serde_json::json!({
+            "id": live.map(|reading| reading.ain.as_str())
+                .or_else(|| known.map(|device| device.ain.as_str())),
+            "name": live.map(|reading| reading.name.as_str())
+                .or_else(|| known.map(|device| device.name.as_str())),
+            "reachable": live.is_some(),
+            "selected": self.selected_ains.iter().any(|id| id_matches(id)),
+            "is_power_input": self.settings.input_ains.iter().any(|id| id_matches(id)),
+            "power_w": live.and_then(|reading|
+                reading.has_power_meter.then_some(reading.power_w)),
+            "temperature_c": live.and_then(|reading|
+                reading.temperature_c.is_finite().then_some(reading.temperature_c)),
+            "power_state": live.and_then(|reading| reading.power_state),
+            "power_controllable": live.is_some_and(|reading| reading.power_controllable),
+            "power_toggle_allowed": live.is_some_and(|reading| reading.power_toggle_allowed),
+            "history": history,
+        }))
+    }
+
+    fn json_hue_light(&self, id: &str) -> Option<serde_json::Value> {
+        let light = self.hue_lights.iter().find(|light| light.id == id)?;
+        Some(serde_json::json!({
+            "id": &light.id,
+            "name": &light.name,
+            "reachable": light.reachable,
+            "on": light.reachable.then_some(light.on).flatten(),
+        }))
+    }
+
+    fn json_hue_sensor(&self, id: &str, now: Instant) -> Option<serde_json::Value> {
+        let sensor = self.hue_sensors.iter().find(|sensor| sensor.id == id)?;
+        let history: Vec<serde_json::Value> = self.hue_sensor_history.get(id)
+            .into_iter().flat_map(|samples| samples.iter())
+            .map(|(at, temperature, lux)| serde_json::json!({
+                "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+                "temperature_c": temperature.filter(|value| value.is_finite()),
+                "illuminance_lux": lux.filter(|value| value.is_finite() && *value >= 0.0),
+            }))
+            .collect();
+        Some(serde_json::json!({
+            "id": &sensor.id,
+            "name": &sensor.name,
+            "reachable": sensor.reachable,
+            "temperature_c": sensor.reachable.then_some(sensor.temperature_c)
+                .flatten().filter(|value| value.is_finite()),
+            "illuminance_lux": sensor.reachable.then_some(sensor.illuminance_lux)
+                .flatten().filter(|value| value.is_finite() && *value >= 0.0),
+            "motion": sensor.reachable.then_some(sensor.motion).flatten(),
+            "history": history,
+        }))
+    }
+
+    fn json_netatmo_metric(
+        &self,
+        sensor: &NetatmoSensor,
+        metric: &str,
+        now: Instant,
+    ) -> Option<serde_json::Value> {
+        let (_, label, unit) = crate::netatmo::METRICS.iter()
+            .find(|(key, _, _)| *key == metric)?;
+        let samples: Vec<serde_json::Value> = self.netatmo_history.get(&sensor.id)
+            .and_then(|by_metric| by_metric.get(metric))
+            .into_iter().flat_map(|samples| samples.iter())
+            .filter(|(_, value)| value.is_finite())
+            .map(|(at, value)| serde_json::json!({
+                "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+                "value": value,
+            })).collect();
+        Some(serde_json::json!({
+            "metric": metric,
+            "label": label,
+            "unit": unit,
+            "current": crate::netatmo::metric_value(sensor, metric),
+            "history": samples,
+        }))
+    }
+
+    fn json_netatmo_sensor(&self, id: &str, now: Instant) -> Option<serde_json::Value> {
+        let sensor = self.netatmo_sensors.iter().find(|sensor| sensor.id == id)?;
+        let metrics: Vec<_> = crate::netatmo::METRICS.iter()
+            .filter_map(|(metric, _, _)| self.json_netatmo_metric(sensor, metric, now))
+            .collect();
+        Some(serde_json::json!({
+            "id": &sensor.id,
+            "name": &sensor.name,
+            "reachable": sensor.reachable,
+            "is_outdoor": sensor.is_outdoor,
+            "metrics": metrics,
+        }))
+    }
+
+    /// Build a fresh, section-scoped snapshot even for collapsed sections.
+    /// The stable section key distinguishes duplicate names and translations.
+    fn section_json(&self, key: &str) -> Option<serde_json::Value> {
+        let now = Instant::now();
+        let power_history = || json_power_samples(&self.history, now);
+        let input_history = || {
+            let samples = rebuild_input_power_history(
+                &self.device_history, &self.settings.input_ains,
+            );
+            json_power_samples(&samples, now)
+        };
+        let power_totals = || {
+            let is_input = |ain: &str| self.settings.input_ains.iter().any(|id| {
+                crate::fritz::canonical_device_key(id)
+                    == crate::fritz::canonical_device_key(ain)
+            });
+            let input_available = self.readings.iter()
+                .any(|reading| reading.has_power_meter && is_input(&reading.ain));
+            let output_available = self.readings.iter()
+                .any(|reading| reading.has_power_meter && !is_input(&reading.ain));
+            serde_json::json!({
+                "input_w": input_available.then_some(input_display_power_w(
+                    input_power_w(&self.readings, &self.settings.input_ains))),
+                "output_w": output_available.then_some(output_power_w(
+                    &self.readings, &self.settings.input_ains)),
+            })
+        };
+        let router = || self.fritzbox_system_info.as_ref().map(|info| serde_json::json!({
+            "manufacturer": &info.manufacturer,
+            "model": &info.model,
+            "product_class": &info.product_class,
+            "hardware_version": &info.hardware_version,
+            "software_version": &info.software_version,
+            "uptime_seconds": info.uptime_seconds,
+            "wan": info.wan.as_ref().map(|wan| serde_json::json!({
+                "access_type": &wan.access_type,
+                "physical_link_status": &wan.physical_link_status,
+                "download_bits_per_second": wan.download_bits_per_second,
+                "upload_bits_per_second": wan.upload_bits_per_second,
+            })),
+        }));
+        let bandwidth = || self.internet_bandwidth.as_ref().map(|bandwidth| serde_json::json!({
+            "download_bits_per_second": bandwidth.download_bits_per_second,
+            "upload_bits_per_second": bandwidth.upload_bits_per_second,
+        }));
+        let data = match key {
+            "summary" => serde_json::json!({
+                "totals": power_totals(),
+                "readings": self.readings.iter().filter_map(|reading| {
+                    self.json_device_data(&crate::fritz::canonical_device_key(&reading.ain), now)
+                }).collect::<Vec<_>>(),
+                "router": router(),
+                "last_updated": &self.updated,
+            }),
+            "total-power-overview" => {
+                let inputs = rebuild_input_power_history(
+                    &self.device_history, &self.settings.input_ains,
+                );
+                serde_json::json!({
+                    "totals": power_totals(),
+                    "output_low_w": self.history.iter().map(|(_, watts)| *watts).min(),
+                    "output_high_w": self.history.iter().map(|(_, watts)| *watts).max(),
+                    "input_low_w": inputs.iter().map(|(_, watts)|
+                        input_display_power_w(*watts)).min(),
+                    "input_high_w": inputs.iter().map(|(_, watts)|
+                        input_display_power_w(*watts)).max(),
+                    "output_history": power_history(),
+                    "input_history": input_history(),
+                    "daily_energy": json_daily_energy_rows(&self.device_history, &self.settings),
+                    "power_unit": "W",
+                    "energy_unit": "Wh",
+                })
+            },
+            "current-power-history" => serde_json::json!({
+                "totals": power_totals(),
+                "output_history": power_history(),
+                "input_history": input_history(),
+                "unit": "W",
+            }),
+            "graph-overview-output-power" => serde_json::json!({
+                "unit": "W", "output_history": power_history(),
+            }),
+            "graph-overview-input-power" => serde_json::json!({
+                "unit": "W", "input_history": input_history(),
+            }),
+            "daily-energy-history" => serde_json::json!({
+                "daily_energy": json_daily_energy_rows(&self.device_history, &self.settings),
+                "energy_unit": "Wh",
+            }),
+            "graph-overview-daily-input" | "graph-overview-daily-output"
+                | "graph-overview-daily-ratio" => {
+                let field = match key {
+                    "graph-overview-daily-input" => "input_wh",
+                    "graph-overview-daily-output" => "output_wh",
+                    _ => "input_output_percent",
+                };
+                let rows = json_daily_energy_rows(&self.device_history, &self.settings);
+                serde_json::json!({
+                    "metric": field,
+                    "unit": if field == "input_output_percent" { "%" } else { "Wh" },
+                    "days": rows.iter().map(|day| serde_json::json!({
+                        "date": &day["date"],
+                        "value": &day[field],
+                    })).collect::<Vec<_>>(),
+                })
+            }
+            "internet-bandwidth" | "graph-bandwidth-pair" => serde_json::json!({
+                "current": bandwidth(),
+                "history": json_bandwidth_samples(&self.bandwidth_history, now),
+                "unit": "bits/s",
+            }),
+            "devices" => {
+                // Export the same visible selection as the popup, rather
+                // than silently including unrelated or deliberately hidden
+                // devices from the saved configuration.
+                let selected: HashSet<String> = self.selected_ains.iter()
+                    .map(|id| crate::fritz::canonical_device_key(id))
+                    .collect();
+                let mut fritz_ids: Vec<String> = Vec::new();
+                for device in &self.devices {
+                    let id = crate::fritz::canonical_device_key(&device.ain);
+                    if selected.contains(&id) && !fritz_ids.contains(&id) {
+                        fritz_ids.push(id);
+                    }
+                }
+                for reading in &self.readings {
+                    let id = crate::fritz::canonical_device_key(&reading.ain);
+                    if !fritz_ids.contains(&id) {
+                        fritz_ids.push(id);
+                    }
+                }
+                serde_json::json!({
+                    "fritz_tasmota": fritz_ids.iter()
+                        .filter_map(|id| self.json_device_data(id, now))
+                        .collect::<Vec<_>>(),
+                    "hue_lights": self.hue_lights.iter()
+                        .filter(|light| hue_device_is_visible(
+                            &self.settings.hidden_hue_devices,
+                            &hue_device_id("light", &light.id),
+                        ))
+                        .filter_map(|light| self.json_hue_light(&light.id))
+                        .collect::<Vec<_>>(),
+                    "hue_sensors": self.hue_sensors.iter()
+                        .filter(|sensor| hue_device_is_visible(
+                            &self.settings.hidden_hue_devices,
+                            &hue_device_id("sensor", &sensor.id),
+                        ))
+                        .filter_map(|sensor| self.json_hue_sensor(&sensor.id, now))
+                        .collect::<Vec<_>>(),
+                    "netatmo": self.netatmo_sensors.iter()
+                        .filter(|sensor| !self.settings.hidden_netatmo_devices
+                            .contains(&sensor.id))
+                        .filter_map(|sensor| self.json_netatmo_sensor(&sensor.id, now))
+                        .collect::<Vec<_>>(),
+                })
+            }
+            "weather" => serde_json::json!({
+                "current": self.weather.as_ref().map(|weather| serde_json::json!({
+                    "source": "OpenWeatherMap",
+                    "location": &weather.location_name,
+                    "description": &weather.description,
+                    "temperature_c": weather.temperature_c,
+                    "feels_like_c": weather.feels_like_c,
+                    "humidity_percent": weather.humidity_percent,
+                    "pressure_hpa": weather.pressure_hpa,
+                    "wind_speed_mps": weather.wind_speed_mps,
+                    "wind_direction_degrees": weather.wind_direction_degrees,
+                    "cloudiness_percent": weather.cloudiness_percent,
+                    "visibility_m": weather.visibility_m,
+                    "sunrise_unix": weather.sunrise_unix,
+                    "sunset_unix": weather.sunset_unix,
+                    "outdoor_air_pollution": weather.air_pollution.as_ref().map(|air| {
+                        serde_json::json!({
+                            "source": "OpenWeatherMap Air Pollution",
+                            "aqi_1_to_5": air.aqi,
+                            "pm2_5_ug_m3": air.pm2_5,
+                            "pm10_ug_m3": air.pm10,
+                            "no2_ug_m3": air.no2,
+                            "o3_ug_m3": air.o3,
+                        })
+                    }),
+                    "image_attributions": weather.image_attributions.iter().map(|credit|
+                        serde_json::json!({
+                            "title": &credit.title,
+                            "artist": &credit.artist,
+                            "license": &credit.license,
+                            "license_url": &credit.license_url,
+                            "page_url": &credit.page_url,
+                        })
+                    ).collect::<Vec<_>>(),
+                })),
+                "forecast": self.weather_forecast.as_ref().map(|forecast|
+                    forecast.days.iter().map(|day| serde_json::json!({
+                        "date": &day.date,
+                        "weather_code": day.weather_code,
+                        "description": &day.description,
+                        "min_temperature_c": day.min_temperature_c,
+                        "max_temperature_c": day.max_temperature_c,
+                        "precipitation_probability_percent": day.precipitation_probability_percent,
+                        "wind_speed_kmh": day.wind_speed_kmh,
+                    })).collect::<Vec<_>>()),
+                "netatmo_extras_enabled": self.settings.weather_netatmo_extra_metrics,
+                "netatmo_extras": self.settings.weather_netatmo_extra_metrics.then(|| {
+                    self.netatmo_sensors.iter()
+                        .filter(|sensor| !self.settings.hidden_netatmo_devices
+                            .contains(&sensor.id))
+                        .filter_map(|sensor| self.json_netatmo_sensor(&sensor.id, now))
+                        .collect::<Vec<_>>()
+                }),
+                // External request errors may contain request URLs with API
+                // tokens: export availability only, never unredacted errors.
+                "available": self.weather.is_some(),
+            }),
+            _ => {
+                if let Some(id) = key.strip_prefix("device:") {
+                    self.json_device_data(id, now)?
+                } else if let Some(id) = key.strip_prefix("hue-light:") {
+                    self.json_hue_light(id)?
+                } else if let Some(id) = key.strip_prefix("hue-sensor:") {
+                    self.json_hue_sensor(id, now)?
+                } else if let Some(id) = key.strip_prefix("netatmo:") {
+                    self.json_netatmo_sensor(id, now)?
+                } else if let Some(id) = key.strip_prefix("hue-sensor-graph-temperature-") {
+                    let sensor = self.json_hue_sensor(id, now)?;
+                    serde_json::json!({
+                        "metric": "temperature_c",
+                        "unit": "°C",
+                        "current": &sensor["temperature_c"],
+                        "samples": sensor["history"].as_array().into_iter().flatten()
+                            .map(|sample| serde_json::json!({
+                                "age_seconds": &sample["age_seconds"],
+                                "value": &sample["temperature_c"],
+                            })).collect::<Vec<_>>(),
+                    })
+                } else if let Some(id) = key.strip_prefix("hue-sensor-graph-lux-") {
+                    let sensor = self.json_hue_sensor(id, now)?;
+                    serde_json::json!({
+                        "metric": "illuminance_lux",
+                        "unit": "lx",
+                        "current": &sensor["illuminance_lux"],
+                        "samples": sensor["history"].as_array().into_iter().flatten()
+                            .map(|sample| serde_json::json!({
+                                "age_seconds": &sample["age_seconds"],
+                                "value": &sample["illuminance_lux"],
+                            })).collect::<Vec<_>>(),
+                    })
+                } else {
+                    let metric_match = crate::netatmo::METRICS.iter()
+                        .find_map(|(metric, _, _)| key.strip_prefix(
+                            &format!("netatmo-sensor-graph-{metric}-")
+                        ).map(|id| (*metric, id)));
+                    if let Some((metric, id)) = metric_match {
+                        let sensor = self.netatmo_sensors.iter().find(|s| s.id == id)?;
+                        self.json_netatmo_metric(sensor, metric, now)?
+                    } else {
+                        return None;
+                    }
+                }
+            }
+        };
+        Some(serde_json::json!({
+            "format": "fritz-power-monitor.section.v1",
+            "section": key,
+            "exported_at_utc": chrono::Utc::now().to_rfc3339(),
+            "graph_timespan_minutes": self.settings.graph_timespan_minutes,
+            "data": data,
+        }))
+    }
+
     fn forget_saved_device(&mut self, ain: &str) {
         let canonical = crate::fritz::canonical_device_key(ain);
         let same_device = |id: &str| crate::fritz::canonical_device_key(id) == canonical;
@@ -7892,10 +8299,7 @@ impl cosmic::Application for AppModel {
                             .width(cosmic::iced::Length::Fill)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(weather_heading)
-                            .push(copy_menu_title_button(
-                                crate::i18n::tr(&self.settings.language, "Weather").to_string(),
-                                self.copy_feedback.as_ref(),
-                            )),
+                            .push(copy_section_button("weather".to_string(), self.copy_feedback.as_ref())),
                     )
                     .push(date_row);
                 weather_section = weather_section.push(
@@ -8261,10 +8665,7 @@ impl cosmic::Application for AppModel {
                             &self.settings.language,
                             "Weather",
                         )))
-                        .push(copy_menu_title_button(
-                            crate::i18n::tr(&self.settings.language, "Weather").to_string(),
-                            self.copy_feedback.as_ref(),
-                        )),
+                        .push(copy_section_button("weather".to_string(), self.copy_feedback.as_ref())),
                 );
                 if let Some(error) = &self.weather_error {
                     weather_section = weather_section.push(error_notice(
@@ -8597,8 +8998,8 @@ impl cosmic::Application for AppModel {
                             .align_x(cosmic::iced::Alignment::End),
                         )
                         .push(history_button)
-                        .push(copy_menu_title_button(
-                            reading.name.clone(),
+                        .push(copy_section_button(
+                            format!("device:{}", crate::fritz::canonical_device_key(&reading.ain)),
                             self.copy_feedback.as_ref(),
                         ))
                         .push(
@@ -8951,8 +9352,8 @@ impl cosmic::Application for AppModel {
                                 .push(
                                     widget::Space::new().width(cosmic::iced::Length::Fixed(108.0)),
                                 )
-                                .push(copy_menu_title_button(
-                                    device.name.clone(),
+                                .push(copy_section_button(
+                                    format!("device:{}", crate::fritz::canonical_device_key(&device.ain)),
                                     self.copy_feedback.as_ref(),
                                 ))
                                 .push(
@@ -9054,8 +9455,8 @@ impl cosmic::Application for AppModel {
                                 .align_x(cosmic::iced::Alignment::End),
                         )
                         .push(widget::Space::new().width(cosmic::iced::Length::Fixed(108.0)))
-                        .push(copy_menu_title_button(
-                            light.name.clone(),
+                        .push(copy_section_button(
+                            format!("hue-light:{}", light.id),
                             self.copy_feedback.as_ref(),
                         ))
                         .push(widget::container(toggle).width(cosmic::iced::Length::Fixed(52.0)));
@@ -9166,8 +9567,8 @@ impl cosmic::Application for AppModel {
                                 .width(cosmic::iced::Length::Fixed(108.0))
                                 .align_x(cosmic::iced::Alignment::End),
                         )
-                        .push(copy_menu_title_button(
-                            sensor.name.clone(),
+                        .push(copy_section_button(
+                            format!("hue-sensor:{}", sensor.id),
                             self.copy_feedback.as_ref(),
                         ))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fixed(52.0)));
@@ -9267,8 +9668,8 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::caption(humidity)
                             .width(cosmic::iced::Length::Fixed(108.0))
                             .align_x(cosmic::iced::Alignment::End))
-                        .push(copy_menu_title_button(
-                            sensor.name.clone(), self.copy_feedback.as_ref()))
+                        .push(copy_section_button(
+                            format!("netatmo:{}", sensor.id), self.copy_feedback.as_ref()))
                         .push(widget::Space::new()
                             .width(cosmic::iced::Length::Fixed(52.0)));
                     let mut card = widget::list::list_column()
@@ -9516,11 +9917,7 @@ impl cosmic::Application for AppModel {
                                     .width(cosmic::iced::Length::Fill)
                                     .align_y(cosmic::iced::Alignment::Center)
                                     .push(heading)
-                                    .push(copy_menu_title_button(
-                                        crate::i18n::tr(&self.settings.language, "DEVICES")
-                                            .to_string(),
-                                        self.copy_feedback.as_ref(),
-                                    )),
+                                    .push(copy_section_button("devices".to_string(), self.copy_feedback.as_ref())),
                             );
                             if !collapsed {
                                 device_cards = device_cards.push(device_sort_header(
@@ -9694,10 +10091,7 @@ impl cosmic::Application for AppModel {
                         .width(cosmic::iced::Length::Fill)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(heading)
-                        .push(copy_menu_title_button(
-                            section.1.to_string(),
-                            self.copy_feedback.as_ref(),
-                        ));
+                        .push(copy_section_button(section.0.to_string(), self.copy_feedback.as_ref()));
                     let mut section_column = widget::Column::new().spacing(0).push(heading_row);
                     if !collapsed {
                         section_column = section_column.push(card);
@@ -10817,9 +11211,24 @@ impl cosmic::Application for AppModel {
                 self.copy_feedback = Some((url.clone(), Instant::now()));
                 return cosmic::iced::clipboard::write(url);
             }
-            Message::CopyMenuTitle(title) => {
-                self.copy_feedback = Some((title.clone(), Instant::now()));
-                return cosmic::iced::clipboard::write(title);
+            Message::CopySectionJson(section_key) => {
+                if let Some(snapshot) = self.section_json(&section_key) {
+                    match serde_json::to_string_pretty(&snapshot) {
+                        Ok(json) => {
+                            self.copy_feedback = Some((section_key, Instant::now()));
+                            return cosmic::iced::clipboard::write(json);
+                        }
+                        Err(error) => record_diagnostic_event(
+                            &mut self.diagnostic_events,
+                            format!("Could not encode section JSON: {error}"),
+                        ),
+                    }
+                } else {
+                    record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        "No exportable data available for this section.",
+                    );
+                }
             }
             Message::ClearDiagnosticEvents => {
                 self.diagnostic_events.clear();
@@ -14485,6 +14894,175 @@ mod energy_input_output_ratio_tests {
 #[cfg(test)]
 mod copy_feedback_tests {
     use super::*;
+
+    #[test]
+    fn copy_sections_export_structured_json_instead_of_heading_text() {
+        let mut app = AppModel::default();
+        app.settings.password = "router-password-do-not-copy".into();
+        app.settings.netatmo_client_secret = "oauth-client-secret-do-not-copy".into();
+        app.settings.openweathermap_api_key = "weather-api-key-do-not-copy".into();
+        app.settings.hue_application_key = "hue-token-do-not-copy".into();
+        app.devices.push(FritzDevice {
+            ain: "12:34-56".into(),
+            name: "Kitchen meter".into(),
+        });
+        app.selected_ains.push("12:34-56".into());
+        app.readings.push(FritzReading {
+            ain: "123456".into(),
+            name: "Kitchen meter".into(),
+            power_w: 42,
+            has_power_meter: true,
+            temperature_c: 22.5,
+            power_state: Some(true),
+            power_controllable: true,
+            power_toggle_allowed: true,
+        });
+        app.device_history.insert(
+            "123456".into(),
+            VecDeque::from([(Instant::now(), 42, 22.5)]),
+        );
+        let device = app.section_json("device:123456").unwrap();
+        assert_eq!(device["data"]["power_w"], 42);
+        assert_eq!(device["data"]["temperature_c"], 22.5);
+        assert_eq!(device["data"]["history"][0]["watts"], 42);
+        assert_eq!(device["data"]["reachable"], true);
+        assert_eq!(device["format"], "fritz-power-monitor.section.v1");
+        let all = app.section_json("devices").unwrap();
+        assert_eq!(all["data"]["fritz_tasmota"][0]["power_w"], 42);
+        let json = serde_json::to_string_pretty(&all).unwrap();
+        assert!(serde_json::from_str::<serde_json::Value>(&json).is_ok());
+        for secret in [
+            "router-password-do-not-copy",
+            "oauth-client-secret-do-not-copy",
+            "weather-api-key-do-not-copy",
+            "hue-token-do-not-copy",
+        ] {
+            assert!(!json.contains(secret), "export leaked a credential");
+        }
+    }
+
+    #[test]
+    fn graph_copy_uses_unique_section_ids_and_includes_recorded_samples() {
+        let mut app = AppModel::default();
+        let now = Instant::now();
+        app.history.push_back((now, 88));
+        app.bandwidth_history.push_back((now, 1200, 800));
+        app.hue_sensors.push(HueSensor {
+            id: "hue-42".into(),
+            name: "Hall motion sensor".into(),
+            temperature_c: Some(20.2),
+            illuminance_lux: Some(200.0),
+            motion: Some(false),
+            reachable: true,
+        });
+        app.hue_sensor_history.insert(
+            "hue-42".into(),
+            VecDeque::from([(now, Some(20.2), Some(200.0))]),
+        );
+        app.netatmo_sensors.push(NetatmoSensor {
+            id: "netatmo-42".into(),
+            name: "Bedroom".into(),
+            is_outdoor: false,
+            temperature_c: Some(19.0),
+            humidity_percent: Some(42.0),
+            co2_ppm: Some(900.0),
+            pressure_hpa: None,
+            noise_db: None,
+            rain_mm: None,
+            wind_kmh: None,
+            reachable: false,
+        });
+        app.netatmo_history.entry("netatmo-42".into()).or_default()
+            .entry("co2".into()).or_default().push_back((now, 900.0));
+
+        let hue = app.section_json("hue-sensor-graph-lux-hue-42").unwrap();
+        assert_eq!(hue["data"]["current"], 200.0);
+        assert_eq!(hue["data"]["samples"][0]["value"], 200.0);
+        let netatmo = app.section_json("netatmo-sensor-graph-co2-netatmo-42").unwrap();
+        assert!(netatmo["data"]["current"].is_null());
+        assert_eq!(netatmo["data"]["history"][0]["value"], 900.0);
+        let bandwidth = app.section_json("graph-bandwidth-pair").unwrap();
+        assert_eq!(bandwidth["data"]["history"][0]["download_bits_per_second"], 1200);
+        let output = app.section_json("graph-overview-output-power").unwrap();
+        assert_eq!(output["data"]["output_history"][0]["watts"], 88);
+        for key in [
+            "summary", "weather", "total-power-overview", "current-power-history",
+            "daily-energy-history", "graph-overview-daily-input",
+            "graph-overview-daily-output", "graph-overview-daily-ratio",
+            "internet-bandwidth", "devices", "hue-sensor:hue-42", "netatmo:netatmo-42",
+        ] {
+            assert!(app.section_json(key).is_some(), "missing JSON section {key}");
+        }
+        assert!(app.section_json("UNKNOWN HEADING").is_none());
+        assert!(app.section_json("hue-light:no-such-id").is_none());
+    }
+
+    #[test]
+    fn copy_device_list_excludes_hidden_and_unselected_inventory() {
+        let mut app = AppModel::default();
+        app.devices.push(FritzDevice {
+            ain: "111".into(),
+            name: "Unselected device".into(),
+        });
+        app.devices.push(FritzDevice {
+            ain: "222".into(),
+            name: "Selected offline device".into(),
+        });
+        app.selected_ains.push("222".into());
+        app.hue_lights.push(HueLight {
+            id: "hue-hidden".into(),
+            name: "Hidden light".into(),
+            reachable: true,
+            on: Some(true),
+        });
+        app.settings.hidden_hue_devices.push(hue_device_id("light", "hue-hidden"));
+        app.netatmo_sensors.push(NetatmoSensor {
+            id: "netatmo-hidden".into(),
+            name: "Hidden station".into(),
+            is_outdoor: false,
+            temperature_c: Some(20.0),
+            humidity_percent: None,
+            co2_ppm: None,
+            pressure_hpa: None,
+            noise_db: None,
+            rain_mm: None,
+            wind_kmh: None,
+            reachable: true,
+        });
+        app.settings.hidden_netatmo_devices.push("netatmo-hidden".into());
+        let exported = app.section_json("devices").unwrap();
+        assert_eq!(exported["data"]["fritz_tasmota"].as_array().unwrap().len(), 1);
+        assert_eq!(exported["data"]["fritz_tasmota"][0]["name"], "Selected offline device");
+        assert!(exported["data"]["fritz_tasmota"][0]["power_w"].is_null());
+        assert_eq!(exported["data"]["hue_lights"].as_array().unwrap().len(), 0);
+        assert_eq!(exported["data"]["netatmo"].as_array().unwrap().len(), 0);
+        app.settings.weather_netatmo_extra_metrics = true;
+        assert_eq!(
+            app.section_json("weather").unwrap()["data"]["netatmo_extras"]
+                .as_array().unwrap().len(), 0
+        );
+    }
+
+    #[test]
+    fn copy_sections_never_invent_zero_output_from_only_input_meters() {
+        let mut app = AppModel::default();
+        app.settings.input_ains.insert("123456".into());
+        app.readings.push(FritzReading {
+            ain: "12:34-56".into(),
+            name: "Solar input".into(),
+            power_w: 500,
+            has_power_meter: true,
+            temperature_c: f64::NAN,
+            power_state: None,
+            power_controllable: false,
+            power_toggle_allowed: false,
+        });
+        let section = app.section_json("total-power-overview").unwrap();
+        assert!(section["data"]["totals"]["output_w"].is_null());
+        assert_eq!(section["data"]["totals"]["input_w"], 500);
+        let detail = app.section_json("device:123456").unwrap();
+        assert!(detail["data"]["temperature_c"].is_null());
+    }
 
     #[test]
     fn copy_icon_pulses_and_returns_to_idle_without_affecting_other_buttons() {

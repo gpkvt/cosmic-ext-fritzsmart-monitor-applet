@@ -28,7 +28,7 @@ FRITZ!Power Monitor is an independent, native [COSMIC](https://system76.com/cosm
 
 - **Live power at a glance.** Independent input and output readings (W), device-level graphs and estimated daily energy (Wh). Input power is *not* subtracted from output power.
 - **One device list.** Search, reorder, hide, expand and sort connected devices; switch compatible FRITZ!Box, Tasmota and Hue lights.
-- **Useful histories.** Collapsible power and sensor graphs, selectable retention, seven-day energy summaries and temperature alerts.
+- **Useful histories and JSON export.** Collapsible power and sensor graphs, selectable retention, seven-day energy summaries and temperature alerts. Use a section or device's copy icon to copy all its current readings and recorded history as structured JSON, not just its title.
 - **More than power.** Temperature from supported devices; Hue light level and motion; Netatmo humidity, CO₂, pressure, noise, rain and wind where supplied. Optional CO₂ threshold notifications for Netatmo modules.
 - **COSMIC-native behavior.** Click-to-open panel popup, configurable panel metrics, scrollable details, saved disclosure states and accessible tooltips.
 - **Optional outdoor weather.** OpenWeatherMap conditions, outdoor air pollution (1–5 AQI and PM2.5/PM10, NO₂, O₃ concentrations where available), and forecasts with credited Wikimedia Commons imagery. The photo/table section grows to show available readings without a second scrollbar; optional internet upload/download statistics.
