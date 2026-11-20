@@ -221,7 +221,7 @@ import sys
 icon = Path(sys.argv[1]).read_bytes()
 if (
     len(icon) < 33
-    or icon[:8] != b"\\x89PNG\\r\\n\\x1a\\n"
+    or icon[:8] != bytes((137, 80, 78, 71, 13, 10, 26, 10))
     or icon[12:16] != b"IHDR"
     or struct.unpack(">II", icon[16:24]) != (128, 128)
 ):
