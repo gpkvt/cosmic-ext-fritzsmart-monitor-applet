@@ -8,10 +8,27 @@ use std::process::{Command, Stdio};
 
 /// Disable terminal echo for secrets. If stty is unavailable, fail closed:
 /// showing a password in the terminal is not an acceptable fallback.
-struct HiddenInput;
+struct HiddenInput {
+    original_settings: String,
+}
 
 impl HiddenInput {
     fn new() -> Result<Self, String> {
+        let original = Command::new("stty")
+            .arg("-g")
+            .stdin(Stdio::inherit())
+            .output()
+            .map_err(|_| "Cannot read terminal settings (stty unavailable)")?;
+        if !original.status.success() {
+            return Err("Cannot read terminal settings. Use an interactive terminal.".into());
+        }
+        let original_settings = String::from_utf8(original.stdout)
+            .map_err(|_| "Unexpected terminal settings encoding")?
+            .trim()
+            .to_string();
+        if original_settings.is_empty() {
+            return Err("Cannot save terminal settings".into());
+        }
         let status = Command::new("stty")
             .arg("-echo")
             .stdin(Stdio::inherit())
@@ -22,14 +39,14 @@ impl HiddenInput {
         if !status.success() {
             return Err("Cannot hide terminal input. Use an interactive terminal.".into());
         }
-        Ok(Self)
+        Ok(Self { original_settings })
     }
 }
 
 impl Drop for HiddenInput {
     fn drop(&mut self) {
         let _ = Command::new("stty")
-            .arg("echo")
+            .arg(&self.original_settings)
             .stdin(Stdio::inherit())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
