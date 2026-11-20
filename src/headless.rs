@@ -38,11 +38,12 @@ pub fn parse_command_line(args: &[String]) -> Result<Command, String> {
     if args.is_empty() {
         return Ok(Command::Applet);
     }
-    if args == ["--help"] || args == ["-h"] {
-        return Ok(Command::Help);
-    }
-    if args == ["--version"] || args == ["-V"] {
-        return Ok(Command::Version);
+    if args.len() == 1 {
+        match args[0].as_str() {
+            "--help" | "-h" => return Ok(Command::Help),
+            "--version" | "-V" => return Ok(Command::Version),
+            _ => {}
+        }
     }
     let mut headless = false;
     let mut listen = None;
@@ -289,9 +290,14 @@ pub fn run(listen_override: Option<&str>) -> Result<(), String> {
     )?;
     if !listener.ip().is_loopback() {
         crate::diagnostics::warn(
-            "Headless Prometheus is exposed on a non-loopback interface; it has no authentication or TLS"
+            "Headless Prometheus is exposed on a non-loopback interface; it has no authentication or TLS",
         );
     }
+    // Detect conflicts with another applet/service before entering an infinite
+    // polling loop with an unreachable exporter. The actual server binds next.
+    let probe = std::net::TcpListener::bind(listener)
+        .map_err(|error| format!("Cannot bind Prometheus to {listener}: {error}"))?;
+    drop(probe);
     let state = Arc::new(Mutex::new(Measurements {
         fritz_error: true,
         hue_error: true,
@@ -301,14 +307,15 @@ pub fn run(listen_override: Option<&str>) -> Result<(), String> {
     }));
     // Publish a marked-unavailable initial snapshot before any network reply.
     publish(&state, &settings, &address);
-    std::thread::Builder::new()
+    let _exporter_thread = std::thread::Builder::new()
         .name("fritz-headless-prometheus".to_string())
         .spawn(crate::prometheus::serve)
         .map_err(|error| format!("Cannot start Prometheus listener thread: {error}"))?;
-    crate::diagnostics::info(format!(
-        "headless monitoring started; Prometheus endpoint: {}",
+    crate::diagnostics::info("headless monitoring started (Prometheus enabled)");
+    println!(
+        "Headless monitoring running: {}",
         crate::prometheus::endpoint_url(&address).unwrap_or_default()
-    ));
+    );
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
