@@ -34,6 +34,19 @@ def render(source: Path, destination: Path, title: str) -> None:
     # README images are written relative to the repository root, while the
     # generated page is served from docs/.
     body = re.sub(r'((?:src|href)=")docs/', r'\1', body)
+    # Repository Markdown links use uppercase filenames, but generated
+    # Pages routes are intentionally lowercase on case-sensitive hosts.
+    for source_name, page_name in (
+        ("README.md", "readme.html"),
+        ("SECURITY.md", "security.html"),
+        ("CHANGELOG.md", "changelog.html"),
+    ):
+        body = re.sub(
+            rf'((?:src|href)="){re.escape(source_name)}(?=([?#][^"]*)?")',
+            lambda match: match.group(1) + page_name,
+            body,
+            flags=re.IGNORECASE,
+        )
     body = re.sub(
         r'((?:src|href)=")([^"#?]+)\.md([?#][^"]*)?"',
         lambda match: match.group(1) + match.group(2) + ".html" + (match.group(3) or "") + '"',
@@ -120,6 +133,7 @@ def main() -> None:
     sources = {
         ROOT / "README.md": DOCS / "readme.html",
         ROOT / "SECURITY.md": DOCS / "security.html",
+        ROOT / "CHANGELOG.md": DOCS / "changelog.html",
     }
     for source in sorted(DOCS.rglob("*.md")):
         relative = source.relative_to(DOCS)
@@ -127,7 +141,7 @@ def main() -> None:
 
     for source, destination in sources.items():
         default_title = source.stem.replace("-", " ").replace("_", " ").title()
-        title = {ROOT / "README.md": "Cosmic FRITZ!Power Monitor Applet", ROOT / "SECURITY.md": "Security Policy"}.get(source, default_title)
+        title = {ROOT / "README.md": "Cosmic FRITZ!Power Monitor Applet", ROOT / "SECURITY.md": "Security Policy", ROOT / "CHANGELOG.md": "Changelog"}.get(source, default_title)
         render(source, destination, title)
         print(f"Rendered {source.relative_to(ROOT)} -> {destination.relative_to(ROOT)}")
 
