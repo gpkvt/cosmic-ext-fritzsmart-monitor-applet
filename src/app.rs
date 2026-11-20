@@ -1116,13 +1116,15 @@ fn daily_energy_history(
     input_ains: &HashSet<String>,
     refresh_interval_seconds: u32,
 ) -> Vec<(chrono::NaiveDate, Option<f64>, Option<f64>)> {
+    let wall_now = SystemTime::now();
+    let local_now: chrono::DateTime<chrono::Local> = wall_now.into();
     daily_energy_history_at(
         device_history,
         input_ains,
         refresh_interval_seconds,
         Instant::now(),
-        SystemTime::now(),
-        chrono::Local::now().date_naive(),
+        wall_now,
+        local_now.date_naive(),
     )
 }
 
