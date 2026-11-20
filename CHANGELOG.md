@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Improved
+
+- Make every popup section, device and graph copy button copy the full relevant readings and history as structured JSON instead of only copying a title. Use stable section/device IDs, encode missing measurements as null, include seven-day energy, weather forecasts and air pollution where relevant, and exclude all credentials and image bytes. Add regression tests for JSON validity, section-specific values, stale sensors and secret leakage.
+
 ### Added
 
 - Provide a terminal-only headless configuration wizard with `--headless --setup` / `--setup-headless`: configure FRITZ!Box/Tasmota discovery and selection, Hue Bridge pairing, Netatmo, weather, poll interval and Prometheus bind address. Keep existing values on Enter, hide passwords/tokens, validate inputs, and save only on final confirmation. The optional systemd service now respects the wizard's saved Prometheus bind address.
