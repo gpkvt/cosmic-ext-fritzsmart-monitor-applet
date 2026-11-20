@@ -1,7 +1,9 @@
 //! Long-running telemetry mode: no COSMIC applet, Wayland connection or
 //! weather imagery. Each configured integration refreshes independently and
 //! publishes the same cached Prometheus metrics as the panel applet.
-use crate::fritz::{FritzBoxSystemInfo, FritzInternetBandwidth, FritzReading, FritzSettings};
+use crate::fritz::{
+    FritzBoxSystemInfo, FritzInternetBandwidth, FritzReading, FritzSettings,
+};
 use crate::hue::{HueLight, HueSensor};
 use crate::netatmo::NetatmoSensor;
 use crate::weather::WeatherData;
@@ -149,7 +151,9 @@ async fn poll_devices(state: Shared, settings: FritzSettings, address: String) {
                 missing
             }
             Err(error) => {
-                crate::diagnostics::warn(format!("Headless FRITZ/Tasmota refresh failed: {error}"));
+                crate::diagnostics::warn(format!(
+                    "Headless FRITZ/Tasmota refresh failed: {error}"
+                ));
                 apply(&state, &settings, &address, |state| {
                     state.devices.clear();
                     state.bandwidth = None;
@@ -161,7 +165,11 @@ async fn poll_devices(state: Shared, settings: FritzSettings, address: String) {
         };
         // Recheck unreachable devices every minute without changing the
         // interval configured for healthy devices.
-        tokio::time::sleep(device_refresh_delay(settings.refresh_interval_seconds, missing)).await;
+        tokio::time::sleep(device_refresh_delay(
+            settings.refresh_interval_seconds,
+            missing,
+        ))
+        .await;
     }
 }
 
@@ -179,7 +187,9 @@ async fn poll_hue(state: Shared, settings: FritzSettings, address: String) {
                 state.hue_error = false;
             }),
             Err(error) => {
-                crate::diagnostics::warn(format!("Headless Hue refresh failed: {error}"));
+                crate::diagnostics::warn(format!(
+                    "Headless Hue refresh failed: {error}"
+                ));
                 apply(&state, &settings, &address, |state| {
                     state.hue_lights.clear();
                     state.hue_sensors.clear();
@@ -201,7 +211,9 @@ fn persist_rotated_netatmo_token(previous: &str, rotated: &str) {
         Ok(mut latest) if latest.netatmo_refresh_token == previous => {
             latest.netatmo_refresh_token = rotated.to_string();
             if let Err(error) = latest.save() {
-                crate::diagnostics::warn(format!("Could not persist rotated Netatmo token: {error}"));
+                crate::diagnostics::warn(format!(
+                    "Could not persist rotated Netatmo token: {error}"
+                ));
             }
         }
         Ok(_) => crate::diagnostics::warn(
@@ -232,7 +244,9 @@ async fn poll_netatmo(state: Shared, settings: FritzSettings, address: String) {
                         state.netatmo_error = false;
                     }),
                     Err(error) => {
-                        crate::diagnostics::warn(format!("Headless Netatmo refresh failed: {error}"));
+                        crate::diagnostics::warn(format!(
+                            "Headless Netatmo refresh failed: {error}"
+                        ));
                         apply(&state, &settings, &address, |state| {
                             state.netatmo_sensors.clear();
                             state.netatmo_error = true;
@@ -241,7 +255,9 @@ async fn poll_netatmo(state: Shared, settings: FritzSettings, address: String) {
                 }
             }
             Err(error) => {
-                crate::diagnostics::warn(format!("Headless Netatmo refresh failed: {error}"));
+                crate::diagnostics::warn(format!(
+                    "Headless Netatmo refresh failed: {error}"
+                ));
                 apply(&state, &settings, &address, |state| {
                     state.netatmo_sensors.clear();
                     state.netatmo_error = true;
@@ -263,7 +279,9 @@ async fn poll_weather(state: Shared, settings: FritzSettings, address: String) {
                 state.weather_error = false;
             }),
             Err(error) => {
-                crate::diagnostics::warn(format!("Headless weather refresh failed: {error}"));
+                crate::diagnostics::warn(format!(
+                    "Headless weather refresh failed: {error}"
+                ));
                 apply(&state, &settings, &address, |state| {
                     state.weather = None;
                     state.weather_error = true;
@@ -277,13 +295,30 @@ async fn poll_weather(state: Shared, settings: FritzSettings, address: String) {
 }
 
 pub fn run(listen_override: Option<&str>) -> Result<(), String> {
-    let settings = FritzSettings::load()?;
+    let mut settings = FritzSettings::load()?;
+    if settings.ains.is_empty()
+        && settings.ain.trim().is_empty()
+        && !settings.known_devices.is_empty()
+    {
+        // Mirror the applet's migration for old installs whose saved
+        // inventory exists but whose selected IDs were left empty.
+        settings.ains = settings
+            .known_devices
+            .iter()
+            .map(|device| device.ain.clone())
+            .collect();
+        settings.ain = settings.ains.first().cloned().unwrap_or_default();
+        settings.device_selection_initialized = true;
+        settings.save()?;
+    }
     let address = match listen_override {
         Some(address) => address.to_string(),
         None if settings.prometheus_enabled => settings.prometheus_bind_address.clone(),
-        None => return Err(
-            "Headless mode requires an enabled Prometheus exporter in saved settings, or --listen IP:PORT".into()
-        ),
+        None => {
+            return Err(
+                "Headless mode requires an enabled Prometheus exporter in saved settings, or --listen IP:PORT".into()
+            );
+        }
     };
     let listener = crate::prometheus::parse_bind_address(&address).ok_or(
         "Invalid Prometheus listen address; use an IP literal and a nonzero port"
@@ -345,8 +380,10 @@ pub fn run(listen_override: Option<&str>) -> Result<(), String> {
 
         // systemd sends SIGTERM, terminals send SIGINT. Both stop polling and
         // disable the exporter without starting a graphical event loop.
-        let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .map_err(|error| format!("Cannot register SIGTERM handler: {error}"))?;
+        let mut terminate = tokio::signal::unix::signal(
+            tokio::signal::unix::SignalKind::terminate(),
+        )
+        .map_err(|error| format!("Cannot register SIGTERM handler: {error}"))?;
         tokio::select! {
             result = tokio::signal::ctrl_c() => {
                 result.map_err(|error| format!("Cannot register SIGINT handler: {error}"))?;
