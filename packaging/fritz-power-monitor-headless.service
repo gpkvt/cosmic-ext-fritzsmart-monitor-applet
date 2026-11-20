@@ -1,0 +1,16 @@
+[Unit]
+Description=FRITZ!Power Monitor (headless Prometheus exporter)
+After=network.target
+Documentation=https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/guide.html
+
+[Service]
+Type=simple
+# This is a non-GUI user service. Change --listen to a trusted local address
+# if necessary; never expose the unauthenticated endpoint to the Internet.
+ExecStart=/usr/bin/fritz-power-monitor --headless --listen 127.0.0.1:9817
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target
