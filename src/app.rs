@@ -1116,9 +1116,27 @@ fn daily_energy_history(
     input_ains: &HashSet<String>,
     refresh_interval_seconds: u32,
 ) -> Vec<(chrono::NaiveDate, Option<f64>, Option<f64>)> {
-    let now = Instant::now();
-    let wall_now = SystemTime::now();
-    let today = chrono::Local::now().date_naive();
+    daily_energy_history_at(
+        device_history,
+        input_ains,
+        refresh_interval_seconds,
+        Instant::now(),
+        SystemTime::now(),
+        chrono::Local::now().date_naive(),
+    )
+}
+
+/// Allow fixed local wall-clock and monotonic time in boundary regression tests.
+/// The calculation groups samples by the machine's local calendar date, not
+/// by a rolling 24-hour window.
+fn daily_energy_history_at(
+    device_history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    input_ains: &HashSet<String>,
+    refresh_interval_seconds: u32,
+    now: Instant,
+    wall_now: SystemTime,
+    today: chrono::NaiveDate,
+) -> Vec<(chrono::NaiveDate, Option<f64>, Option<f64>)> {
     let first_day = today - chrono::Duration::days(6);
     let max_gap = Duration::from_secs(u64::from(refresh_interval_seconds.max(30)) * 3);
     let mut totals = BTreeMap::<chrono::NaiveDate, (Option<f64>, Option<f64>)>::new();
@@ -15060,6 +15078,75 @@ mod daily_energy_history_tests {
         assert_eq!(*date, chrono::Local::now().date_naive());
         assert!((solar_wh.unwrap() - 1000.0 / 60.0).abs() < 0.01);
         assert!((grid_wh.unwrap() - 300.0 / 60.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn today_starts_at_local_midnight_not_24_hours_ago() {
+        // A deterministic noon clock lets this test run at any time of day.
+        // There is one 60-W interval wholly yesterday and another crossing
+        // midnight. A rolling 24-hour sum would incorrectly include both
+        // intervals under Today.
+        let today = chrono::NaiveDate::from_ymd_opt(2026, 11, 20).unwrap();
+        let local_noon = today
+            .and_hms_opt(12, 0, 0)
+            .unwrap()
+            .and_local_timezone(chrono::Local)
+            .single()
+            .unwrap();
+        let now = Instant::now();
+        let seconds = |age| now - Duration::from_secs(age);
+        let devices = HashMap::from([(
+            "grid".to_string(),
+            VecDeque::from([
+                (seconds(21 * 3600), 60, 20.0),
+                (seconds(21 * 3600 - 60), 60, 20.0),
+                (seconds(12 * 3600 + 30), 60, 20.0),
+                (seconds(12 * 3600 - 30), 60, 20.0),
+            ]),
+        )]);
+        let history = daily_energy_history_at(
+            &devices,
+            &HashSet::new(),
+            60,
+            now,
+            SystemTime::from(local_noon),
+            today,
+        );
+        let (_, _, yesterday_wh) = &history[5];
+        let (today_date, _, today_wh) = &history[6];
+        assert_eq!(*today_date, today);
+        assert!((today_wh.unwrap() - 0.5).abs() < 0.001);
+        assert!((yesterday_wh.unwrap() - 1.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn today_does_not_count_yesterdays_readings_even_within_24_hours() {
+        let today = chrono::NaiveDate::from_ymd_opt(2026, 11, 20).unwrap();
+        let local_noon = today
+            .and_hms_opt(12, 0, 0)
+            .unwrap()
+            .and_local_timezone(chrono::Local)
+            .single()
+            .unwrap();
+        let now = Instant::now();
+        let devices = HashMap::from([(
+            "grid".to_string(),
+            VecDeque::from([
+                (now - Duration::from_secs(20 * 3600), 120, 20.0),
+                (now - Duration::from_secs(20 * 3600 - 60), 120, 20.0),
+            ]),
+        )]);
+        let history = daily_energy_history_at(
+            &devices,
+            &HashSet::new(),
+            60,
+            now,
+            SystemTime::from(local_noon),
+            today,
+        );
+        assert_eq!(history[6].0, today);
+        assert!(history[6].2.is_none());
+        assert!((history[5].2.unwrap() - 2.0).abs() < 0.001);
     }
 
     #[test]
