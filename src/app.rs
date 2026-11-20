@@ -4521,11 +4521,15 @@ impl AppModel {
                     .map(|id| crate::fritz::canonical_device_key(id))
                     .collect();
                 let mut fritz_ids: Vec<String> = Vec::new();
-                for id in self.devices.iter().map(|device| &device.ain)
-                    .chain(self.readings.iter().map(|reading| &reading.ain))
-                {
-                    let id = crate::fritz::canonical_device_key(id);
+                for device in &self.devices {
+                    let id = crate::fritz::canonical_device_key(&device.ain);
                     if selected.contains(&id) && !fritz_ids.contains(&id) {
+                        fritz_ids.push(id);
+                    }
+                }
+                for reading in &self.readings {
+                    let id = crate::fritz::canonical_device_key(&reading.ain);
+                    if !fritz_ids.contains(&id) {
                         fritz_ids.push(id);
                     }
                 }
@@ -14978,6 +14982,52 @@ mod copy_feedback_tests {
         }
         assert!(app.section_json("UNKNOWN HEADING").is_none());
         assert!(app.section_json("hue-light:no-such-id").is_none());
+    }
+
+    #[test]
+    fn copy_device_list_excludes_hidden_and_unselected_inventory() {
+        let mut app = AppModel::default();
+        app.devices.push(FritzDevice {
+            ain: "111".into(),
+            name: "Unselected device".into(),
+        });
+        app.devices.push(FritzDevice {
+            ain: "222".into(),
+            name: "Selected offline device".into(),
+        });
+        app.selected_ains.push("222".into());
+        app.hue_lights.push(HueLight {
+            id: "hue-hidden".into(),
+            name: "Hidden light".into(),
+            reachable: true,
+            on: Some(true),
+        });
+        app.settings.hidden_hue_devices.push(hue_device_id("light", "hue-hidden"));
+        app.netatmo_sensors.push(NetatmoSensor {
+            id: "netatmo-hidden".into(),
+            name: "Hidden station".into(),
+            is_outdoor: false,
+            temperature_c: Some(20.0),
+            humidity_percent: None,
+            co2_ppm: None,
+            pressure_hpa: None,
+            noise_db: None,
+            rain_mm: None,
+            wind_kmh: None,
+            reachable: true,
+        });
+        app.settings.hidden_netatmo_devices.push("netatmo-hidden".into());
+        let exported = app.section_json("devices").unwrap();
+        assert_eq!(exported["data"]["fritz_tasmota"].as_array().unwrap().len(), 1);
+        assert_eq!(exported["data"]["fritz_tasmota"][0]["name"], "Selected offline device");
+        assert!(exported["data"]["fritz_tasmota"][0]["power_w"].is_null());
+        assert_eq!(exported["data"]["hue_lights"].as_array().unwrap().len(), 0);
+        assert_eq!(exported["data"]["netatmo"].as_array().unwrap().len(), 0);
+        app.settings.weather_netatmo_extra_metrics = true;
+        assert_eq!(
+            app.section_json("weather").unwrap()["data"]["netatmo_extras"]
+                .as_array().unwrap().len(), 0
+        );
     }
 
     #[test]
