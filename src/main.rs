@@ -18,7 +18,7 @@ fn main() -> cosmic::iced::Result {
     let command = match headless::parse_command_line(&arguments) {
         Ok(command) => command,
         Err(error) => {
-            eprintln!("{error}\\n\\n{}", headless::HELP);
+            eprintln!("{error}\n\n{}", headless::HELP);
             std::process::exit(2);
         }
     };
