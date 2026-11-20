@@ -12676,7 +12676,43 @@ impl cosmic::Application for AppModel {
                 if self.settings.history_retention_minutes != minutes {
                     self.settings.history_retention_minutes = minutes;
                     let window = graph_history_storage_window(minutes);
-                    prune_history_to_window(self, window, Instant::now());
+                    let now = Instant::now();
+                    prune_history_to_window(self, window, now);
+                    // The separate graph surface caches plot samples. Apply
+                    // the retention limit there too so it cannot display
+                    // data that has already been deleted from history.
+                    if let Some(samples) = self.expanded_graph_full_values.as_mut() {
+                        samples.retain(|(at, _)| now.saturating_duration_since(*at) <= window);
+                    }
+                    if let Some(samples) = self.expanded_graph_full_secondary.as_mut() {
+                        samples.retain(|(at, _)| now.saturating_duration_since(*at) <= window);
+                    }
+                    if let Some((title, _, unit, _)) = self.expanded_graph.as_ref() {
+                        if let Some(full) = self.expanded_graph_full_values.as_ref() {
+                            let visible = graph_values_for_timespan(
+                                full,
+                                self.expanded_graph_view_timespan_minutes,
+                            );
+                            let axis = graph_axis_start_for_samples(
+                                &visible,
+                                self.expanded_graph_view_timespan_minutes,
+                            );
+                            self.expanded_graph =
+                                Some((title.clone(), visible, unit.clone(), Some(axis)));
+                        }
+                    }
+                    if let (Some(series), Some((_, labels))) = (
+                        self.expanded_graph_full_secondary.as_ref(),
+                        self.expanded_graph_secondary.as_ref(),
+                    ) {
+                        self.expanded_graph_secondary = Some((
+                            graph_values_for_timespan(
+                                series,
+                                self.expanded_graph_view_timespan_minutes,
+                            ),
+                            labels.clone(),
+                        ));
+                    }
                     if let Err(error) = crate::history::save(&self.history, &self.device_history) {
                         eprintln!("Could not save pruned graph history: {error}");
                     }
