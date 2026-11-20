@@ -1,6 +1,7 @@
 mod app;
 mod diagnostics;
 mod fritz;
+mod headless;
 mod history;
 mod hue;
 mod netatmo;
@@ -11,6 +12,35 @@ mod updater;
 mod weather;
 
 fn main() -> cosmic::iced::Result {
+    // Parse the process mode before creating any Wayland/COSMIC UI resources.
+    // Headless services must run in an ordinary user session without DISPLAY.
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let command = match headless::parse_command_line(&arguments) {
+        Ok(command) => command,
+        Err(error) => {
+            eprintln!("{error}\\n\\n{}", headless::HELP);
+            std::process::exit(2);
+        }
+    };
+    match command {
+        headless::Command::Help => {
+            print!("{}", headless::HELP);
+            return Ok(());
+        }
+        headless::Command::Version => {
+            println!("fritz-power-monitor v{}", env!("CARGO_PKG_VERSION"));
+            return Ok(());
+        }
+        headless::Command::Headless { listen } => {
+            // No window, panel watchdog, event loop or COSMIC initialization.
+            if let Err(error) = headless::run(listen.as_deref()) {
+                eprintln!("Headless monitor failed: {error}");
+                std::process::exit(1);
+            }
+            return Ok(());
+        }
+        headless::Command::Applet => {}
+    }
     // Give compositor/panel restarts a durable, privacy-safe journal marker.
     // The default hook still prints the complete backtrace to captured stderr.
     let previous_panic_hook = std::panic::take_hook();
