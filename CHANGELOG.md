@@ -4,6 +4,9 @@
 
 ### Improved
 
+- Add a separate **Maximum history retention** control in Graph settings (5 minutes to 4 years; 30 days by default). Persist the limit, prune old FRITZ!Box/Tasmota, Hue, Netatmo and in-memory bandwidth history when reduced, and keep changing the graph display range from deleting saved samples. Add cross-source retention regression tests.
+
+
 - Add a History graph shortcut to every visible Netatmo Weather Station device row, matching the standard device-list action. Use recorded temperature where available, otherwise another recorded sensor metric, and show device details when samples are not yet present. Preserve the independent per-metric graphs in expanded details and respect temperature display units.
 
 
