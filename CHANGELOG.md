@@ -4,6 +4,9 @@
 
 ### Improved
 
+- Verify that TODAY and Y'DAY energy totals (including the seven-day and per-device views) use the local midnight-to-midnight calendar boundaries rather than rolling 24-hour windows. Keep the reference clock consistent across midnight and add deterministic tests for intervals entirely yesterday and intervals crossing local midnight.
+
+
 - Add a separate **Maximum history retention** control in Graph settings (5 minutes to 4 years; 30 days by default). Persist the limit, prune old FRITZ!Box/Tasmota, Hue, Netatmo and in-memory bandwidth history when reduced, and keep changing the graph display range from deleting saved samples. Add cross-source retention regression tests.
 
 
