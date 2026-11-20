@@ -711,7 +711,13 @@ impl FritzSettings {
             panel_internet_bandwidth: get("PANEL_INTERNET_BANDWIDTH").eq_ignore_ascii_case("true"),
             panel_net_power: get("PANEL_NET_POWER").eq_ignore_ascii_case("true"),
             graph_timespan_minutes: parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")),
-            history_retention_minutes: parse_history_retention_minutes(&get("HISTORY_RETENTION_MINUTES")),
+            history_retention_minutes: if values.contains_key("HISTORY_RETENTION_MINUTES") {
+                parse_history_retention_minutes(&get("HISTORY_RETENTION_MINUTES"))
+            } else {
+                // Backward compatibility: earlier versions retained at least
+                // 30 days or the user's longer selected graph timespan.
+                parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")).max(43_200)
+            },
             graph_style: if get("GRAPH_STYLE") == "bar" {
                 "bar".into()
             } else {
