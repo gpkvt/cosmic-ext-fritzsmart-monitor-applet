@@ -19,325 +19,226 @@ main{padding:54px 0 100px}article{max-width:860px;margin:auto}h1{font-size:clamp
 <body>
 <header class="topbar"><div class="wrap nav"><a class="brand" href="index.html"><img src="logo.svg" alt="">FRITZ!Power Monitor</a><nav class="nav-links" aria-label="Main navigation"><a href="index.html">Overview</a><a href="guide.html">User guide</a><a href="readme.html">README</a><a href="security.html">Security</a></nav></div></header>
 <main class="wrap"><article><h1>Cosmic FRITZ!Power Monitor Applet</h1>
-<p>A native COSMIC panel applet for monitoring power, temperature and optional weather data from FRITZ!Box Smart Home devices.</p>
-<p>FRITZ!Power Monitor connects directly to your router. It brings household power readings, device status and historical graphs into the COSMIC desktop without requiring an external monitoring service.</p>
 <p align="center">
-  <img src="Screenshot_2026-11-16_18-17-17.png" alt="FRITZ!Power Monitor showing the live overview" width="720">
+  <img src="data/com.gpkvt.FritzPowerMonitor.svg" alt="FRITZ!Power Monitor icon" width="88">
+</p>
+
+<p align="center"><strong>Power, smart-home devices and weather — right in your COSMIC panel.</strong></p>
+
+<p align="center">
+  <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/latest"><img src="https://img.shields.io/github/v/release/gpkvt/cosmic-ext-fritzsmart-monitor-applet?label=release" alt="Latest GitHub release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/gpkvt/cosmic-ext-fritzsmart-monitor-applet" alt="MIT license"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases">Downloads</a> ·
-  <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues">Report a problem</a> ·
-  <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/blob/main/LICENSE">MIT license</a>
+  <a href="https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/">Website</a> ·
+  <a href="https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/#downloads">Downloads</a> ·
+  <a href="https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/guide.html">User guide</a> ·
+  <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues">Issues</a>
 </p>
 
-<h2 id="at-a-glance">At a glance<a class="headerlink" href="#at-a-glance" title="Permanent link">&para;</a></h2>
+<p>FRITZ!Power Monitor is an independent, native <a href="https://system76.com/cosmic">COSMIC</a> panel applet for monitoring compatible FRITZ!Box Smart Home meters, switches, temperature sensors and thermostats, plus Tasmota power meters, controlling supported devices, and viewing optional Philips Hue, Netatmo and weather data. Core power monitoring runs on your local network; <strong>no third-party monitoring account is required</strong>.</p>
+<p align="center">
+  <a href="Screenshot_2026-11-16_18-17-17.png"><img src="Screenshot_2026-11-16_18-17-17.png" alt="Real screenshot of the applet's power overview" width="760"></a>
+</p>
+
+<h2 id="highlights">Highlights<a class="headerlink" href="#highlights" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Live power and temperature readings from selected FRITZ!Box Smart Home devices.</li>
-<li>Separate power input, output and net-difference summaries, with device-level history.</li>
-<li>Optional internet download and upload rates in the COSMIC panel.</li>
-<li>Optional OpenWeatherMap conditions, forecast and weather-matched Wikimedia Commons imagery.</li>
-<li>Configurable refresh intervals, graph retention, panel display and popup layout.</li>
-<li>Temperature alerts and supported smart-home device switching.</li>
-<li>Optional local Philips Hue Bridge lights with on/off controls and Hue motion sensors with temperature (°C/°F), ambient light (lux), motion-state readings, collapsible history graphs and per-sensor high/low temperature notifications; Hue devices do not contribute to wattage totals.</li>
-<li>Interface translations for English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish, Norwegian, Japanese and Korean. All 121 interface strings are covered; technical names and URLs remain unchanged where appropriate.</li>
+<li><strong>Live power at a glance.</strong> Independent input and output readings (W), device-level graphs and estimated daily energy (Wh). Input power is <em>not</em> subtracted from output power.</li>
+<li><strong>One device list.</strong> Search, reorder, hide, expand and sort connected devices; switch compatible FRITZ!Box, Tasmota and Hue lights.</li>
+<li><strong>Useful histories and JSON export.</strong> Collapsible power and sensor graphs, selectable retention, seven-day energy summaries and temperature alerts. Use a section or device's copy icon to copy all its current readings and recorded history as structured JSON, not just its title.</li>
+<li><strong>More than power.</strong> Temperature from supported devices; Hue light level and motion; Netatmo humidity, CO₂, pressure, noise, rain and wind where supplied. Optional CO₂ threshold notifications for Netatmo modules.</li>
+<li><strong>COSMIC-native behavior.</strong> Click-to-open panel popup, configurable panel metrics, scrollable details, saved disclosure states and accessible tooltips.</li>
+<li><strong>Optional outdoor weather.</strong> OpenWeatherMap conditions, outdoor air pollution (1–5 AQI and PM2.5/PM10, NO₂, O₃ concentrations where available), and forecasts with credited Wikimedia Commons imagery. The photo/table section grows to show available readings without a second scrollbar; optional internet upload/download statistics.</li>
+<li><strong>Independent connections.</strong> An unavailable integration does not have to interrupt the others. Missing or offline sensor values are not presented as fresh measurements.</li>
 </ul>
-<h2 id="philips-hue-bridge-optional">Philips Hue Bridge (optional)<a class="headerlink" href="#philips-hue-bridge-optional" title="Permanent link">&para;</a></h2>
-<p>The applet supports Philips Hue Bridges on the local network through the <strong>CLIP v2 API</strong>. This integration is independent of the FRITZ!Box and Tasmota connections.</p>
-<ol>
-<li>Open <strong>Settings → Connection → Philips Hue Bridge</strong>. The applet looks for local bridges via mDNS and fills in the IP automatically if it finds exactly one. Use <strong>Find Hue Bridge automatically</strong> to rescan, or choose a bridge if several are found.</li>
-<li>If mDNS cannot find the bridge, enter its <strong>local IP address</strong> from the Hue app or your router, without a scheme or port. Discovery stays on the local network; no Hue cloud lookup is used.</li>
-<li>Select <strong>Pair Hue Bridge</strong>, then press the physical link button on the bridge (or press the button first). Pairing retries for about 30 seconds while waiting for button authorization. A clear error appears directly below the pairing controls if authorization fails. Alternatively, paste an existing Hue application key into the secure field.</li>
-<li>Open <strong>Settings → Devices</strong> to manage FRITZ!Box, Tasmota and Hue devices in one searchable list. Discovered Hue lights and sensors have persistent visibility checkboxes and share the saved +/− order controls with power meters; lights can also be switched here. Open <strong>Devices</strong> in the popup to view the same selected Hue devices alongside the metered devices, with temperature (°C/°F), lux and motion details where reported. <strong>Discover devices</strong> also refreshes the paired Hue Bridge; Bridge pairing and credentials remain under <strong>Settings → Connection</strong>.</li>
-</ol>
-<p>Hue sensor cards offer independent <strong>Temperature</strong> and <strong>Illuminance</strong> graphs. Only real temperature and lux samples are recorded in a separate <code>hue-sensors.json</code> history file; the selected graph time range and °C/°F unit are respected. Each graph can be collapsed independently and its state survives restarts. In <strong>Settings → Devices</strong>, each Hue sensor has optional <strong>Temperature alerts</strong>, with upper/lower threshold sliders and native notifications when valid readings cross a limit. Alerts are off by default and do not trigger on missing or offline measurements. The menu opens on a panel click, closes when clicking outside the popup, and can also be dismissed through its Close button or by clicking the panel entry again. Hovering a panel reading shows a COSMIC tooltip with its device name (or <strong>Average temperature</strong> for averaged readings) over the value only. Hovering does not open the main menu; clicking the panel opens or closes it. The installed desktop entry deliberately omits <code>X-CosmicHoverPopup</code> because COSMIC Panel otherwise generates synthetic pointer clicks on hover; the panel row and its multiline children are shrink-wrapped after readings change. The installed desktop entry deliberately omits <code>X-CosmicHoverPopup</code>: COSMIC Panel treats the presence of that key as permission to <strong>synthesize a click on hover</strong>, including when the value is <code>Auto</code>. Omitting the key avoids unexpected popup grabs and keeps menu activation strictly click-only.</p>
-<p>When <strong>Average temperature</strong> is enabled for the panel, valid readings from visible, reachable Hue temperature sensors are included alongside selected FRITZ!Box readings. Sensors without live temperatures are excluded rather than counted as zero. Hue light and sensor readings refresh independently once per minute, as well as on manual refresh and after switching a light. When a bridge is unreachable, its known Hue devices remain listed as unavailable, their stale switch states and sensor readings are cleared, and an error appears without affecting power monitoring. Only private/local bridge IP addresses are accepted.</p>
-<p><strong>Measurements:</strong> Hue lights typically provide switching state, not measured electricity usage. The applet <strong>does not</strong> invent watts or add Hue lights to consumption graphs or energy totals. Temperature, light level and motion are read directly from separate Hue CLIP v2 sensor resources and grouped under each physical sensor; their values are read-only, not used for metered power/energy. Hue scenes, brightness, rooms, sensor configuration and groups are not yet supported.</p>
-<p><strong>Security:</strong> Hue's bridge certificate is signed by the Hue-specific CA and uses the bridge ID as its hostname rather than the configured IP. The Hue-only HTTPS client currently bypasses certificate-chain and hostname validation. On older bridges that do not support HTTPS pairing, the registration request can fall back to HTTP; it transmits only the application name and receives the new key without TLS protection. Connect only on a trusted local network. The FRITZ!Box and other HTTPS clients retain their existing certificate validation. The Hue application key is saved in the existing owner-only configuration file and must be treated as a secret.</p>
+<blockquote>
+<p><strong>Know the difference:</strong> FRITZ!Box and compatible Tasmota meters supply electricity measurements. Hue lights and Netatmo weather stations <strong>do not</strong> measure watts or contribute to energy totals. Solar/input summaries appear when at least one meter is designated as an input.</p>
+</blockquote>
 <h2 id="screenshots">Screenshots<a class="headerlink" href="#screenshots" title="Permanent link">&para;</a></h2>
-<p>The screenshots below show the applet in the COSMIC desktop. Open the <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/tree/main/docs">screenshot gallery</a> for the complete set.</p>
+<p>These are real screenshots of the applet.</p>
 <table>
 <thead>
 <tr>
-<th>Live overview</th>
-<th>Weather</th>
+<th style="text-align: center;">Power and devices</th>
+<th style="text-align: center;">Weather</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><img alt="Live overview" src="Screenshot_2026-11-16_18-17-17.png"></td>
-<td><img alt="Weather details" src="Screenshot_2026-11-16_18-17-33.png"></td>
+<td style="text-align: center;"><a href="Screenshot_2026-11-16_18-17-17.png"><img alt="Power overview" src="Screenshot_2026-11-16_18-17-17.png"></a></td>
+<td style="text-align: center;"><a href="Screenshot_2026-11-16_18-17-33.png"><img alt="Weather details" src="Screenshot_2026-11-16_18-17-33.png"></a></td>
 </tr>
 <tr>
-<td><strong>Power history</strong></td>
-<td><strong>Device settings</strong></td>
+<td style="text-align: center;"><strong>History</strong></td>
+<td style="text-align: center;"><strong>Settings</strong></td>
 </tr>
 <tr>
-<td><img alt="Power history" src="Screenshot_2026-11-16_18-17-51.png"></td>
-<td><img alt="Device settings" src="Screenshot_2026-11-16_18-18-04.png"></td>
+<td style="text-align: center;"><a href="Screenshot_2026-11-16_18-17-51.png"><img alt="Power history" src="Screenshot_2026-11-16_18-17-51.png"></a></td>
+<td style="text-align: center;"><a href="Screenshot_2026-11-16_18-18-04.png"><img alt="Device settings" src="Screenshot_2026-11-16_18-18-04.png"></a></td>
 </tr>
 </tbody>
 </table>
-<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
-<h3 id="download-and-install">Download and install<a class="headerlink" href="#download-and-install" title="Permanent link">&para;</a></h3>
-<p>Download the latest portable <code>.tar.gz</code> archive from the <a href="https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/#downloads">project website</a>. The archive contains the executable, COSMIC desktop entry, application icon, README and license.</p>
-<p>Extract it and install the files for your user:</p>
-<pre><code class="language-sh">tar -xzf fritz-power-monitor-vVERSION-x86_64-unknown-linux-gnu.tar.gz
+<p><a href="https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/">View the project website and gallery</a></p>
+<h2 id="supported-integrations">Supported integrations<a class="headerlink" href="#supported-integrations" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Integration</th>
+<th>What it provides</th>
+<th>Connection</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>FRITZ!Box Smart Home</strong></td>
+<td>Device state, power/energy and temperature where supported; switching for compatible devices</td>
+<td>Local FRITZ!Box API</td>
+</tr>
+<tr>
+<td><strong>Tasmota</strong></td>
+<td>Power readings and supported switching; mDNS discovery and targeted LAN scanning</td>
+<td>Local HTTP</td>
+</tr>
+<tr>
+<td><strong>Philips Hue Bridge</strong></td>
+<td>Light switching; compatible sensor temperature, illuminance and motion; sensor history</td>
+<td>Local CLIP v2 API</td>
+</tr>
+<tr>
+<td><strong>Netatmo Weather Stations</strong></td>
+<td>Read-only station/module readings and sensor graphs; no power data</td>
+<td>Netatmo cloud HTTPS API, OAuth <code>read_station</code></td>
+</tr>
+<tr>
+<td><strong>OpenWeatherMap</strong></td>
+<td>Conditions, outdoor pollutant concentrations and 1–5 air pollution index, plus forecast</td>
+<td>Internet API key</td>
+</tr>
+<tr>
+<td><strong>Wikimedia Commons</strong></td>
+<td>Attributed, weather-related background images</td>
+<td>Internet</td>
+</tr>
+</tbody>
+</table>
+<p>Actual measurements depend on each device and its firmware/API. Hue scenes, dimming, rooms and groups are not implemented. The Netatmo integration is limited to Weather Stations and their supported modules, not thermostats, cameras or other Netatmo product families.</p>
+<p>For setup specifics and compatibility limits, use the <a href="https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/guide.html">user guide</a>.</p>
+<h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
+<p><strong>Requirements:</strong> COSMIC Desktop with applet support, plus a reachable FRITZ!Box Smart Home account for core router monitoring. Optional integrations require their corresponding devices and credentials.</p>
+<h3 id="option-a-prebuilt-downloads">Option A — prebuilt downloads<a class="headerlink" href="#option-a-prebuilt-downloads" title="Permanent link">&para;</a></h3>
+<p>Get the latest available artifacts on the <a href="https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/#downloads">downloads page</a> or <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases">GitHub Releases</a>. Available release formats may include a portable Linux archive, Debian package, AppImage and Flatpak; inspect the actual release assets before choosing a format.</p>
+<p>For the <strong>portable Linux archive</strong>, replace <code>VERSION</code> with the release version in its filename:</p>
+<pre><code class="language-bash">tar -xzf fritz-power-monitor-vVERSION-x86_64-unknown-linux-gnu.tar.gz
 cd fritz-power-monitor-vVERSION-x86_64-unknown-linux-gnu
-
-install -Dm0755 bin/fritz-power-monitor ~/.local/bin/fritz-power-monitor
-install -Dm0644 share/applications/com.gpkvt.FritzPowerMonitor.desktop ~/.local/share/applications/com.gpkvt.FritzPowerMonitor.desktop
-install -Dm0644 share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg ~/.local/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg
+install -Dm755 bin/fritz-power-monitor ~/.local/bin/fritz-power-monitor
+install -Dm644 share/applications/com.gpkvt.FritzPowerMonitor.desktop ~/.local/share/applications/com.gpkvt.FritzPowerMonitor.desktop
+install -Dm644 share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg ~/.local/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg
 </code></pre>
-<p>Replace <code>VERSION</code> with the version in the downloaded filename. No root access is needed. Open <strong>COSMIC Settings → Desktop → Panel</strong>, choose <strong>Configure panel applets</strong> or <strong>Add applet</strong>, then add <strong>FRITZ!Power Monitor</strong>. If it is not listed, reopen Settings or log out and back in.</p>
-<h3 id="debian-package">Debian package<a class="headerlink" href="#debian-package" title="Permanent link">&para;</a></h3>
-<p>The <code>.deb</code> installs the executable, desktop entry and icon in their standard system locations:</p>
-<ul>
-<li><code>/usr/bin/fritz-power-monitor</code></li>
-<li><code>/usr/share/applications/com.gpkvt.FritzPowerMonitor.desktop</code></li>
-<li><code>/usr/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg</code></li>
-</ul>
-<p>When installed through <code>sudo apt install</code> or a graphical package installer that supplies the invoking user's identity, package setup also creates symlinks to these files in that user's <code>~/.local</code> profile. Existing files or unrelated symlinks are never overwritten. Removing the package removes only profile symlinks that still point to the package's system files.</p>
-<p>If the package manager does not expose the installing desktop user (for example, installation from a root shell), the system-wide entries remain available and no home directory is guessed or modified.</p>
-<h3 id="build-and-install-from-source">Build and install from source<a class="headerlink" href="#build-and-install-from-source" title="Permanent link">&para;</a></h3>
-<p><strong>Requirements</strong></p>
-<ul>
-<li>A COSMIC desktop session with panel applet support.</li>
-<li>Rust and Cargo compatible with the project's Rust 2024 edition and current <code>libcosmic</code> Git dependency.</li>
-<li>GNU Make and standard GNU installation utilities.</li>
-<li>A FRITZ!Box with Smart Home support and a user account authorized to access it.</li>
-</ul>
-<p>Clone the repository and install:</p>
-<pre><code class="language-sh">git clone https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet.git
+<p>The Debian package instead installs its files system-wide. Depending on the install context, it may create user-local symlinks; it does not replace unrelated files. Use the <a href="https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/guide.html#install">installation guide</a> for package-specific details.</p>
+<h3 id="option-b-build-from-source">Option B — build from source<a class="headerlink" href="#option-b-build-from-source" title="Permanent link">&para;</a></h3>
+<p>Requires Rust/Cargo (Rust 2024 edition), GNU Make and standard install utilities.</p>
+<pre><code class="language-bash">git clone https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet.git
 cd cosmic-ext-fritzsmart-monitor-applet
 make install
 </code></pre>
-<p>The default install target updates the checkout with <code>git pull --ff-only</code>, builds the optimized executable and installs it for the current user. It then restarts the COSMIC panel so the applet can be reloaded; panel configuration and applet placement are preserved.</p>
-<p>To build without updating the checkout first:</p>
-<pre><code class="language-sh">make install UPDATE=0
-</code></pre>
-<p>To build only:</p>
-<pre><code class="language-sh">cargo build --release
-</code></pre>
-<p>The default user-local installation uses:</p>
-<table>
-<thead>
-<tr>
-<th>Item</th>
-<th>Location</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Executable</td>
-<td><code>~/.local/bin/fritz-power-monitor</code></td>
-</tr>
-<tr>
-<td>Desktop entry</td>
-<td><code>~/.local/share/applications/com.gpkvt.FritzPowerMonitor.desktop</code></td>
-</tr>
-<tr>
-<td>Application icon</td>
-<td><code>~/.local/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg</code></td>
-</tr>
-</tbody>
-</table>
-<p>After installation, open <strong>COSMIC Settings → Desktop → Panel</strong> (wording may vary by COSMIC version) and add <strong>FRITZ!Power Monitor</strong> to a panel. If it is not listed immediately, reopen Settings or log out and back in.</p>
-<p>To reload the panel manually after a build:</p>
-<pre><code class="language-sh">make reload
-</code></pre>
-<p>To remove the user-local installation:</p>
-<pre><code class="language-sh">make uninstall
-</code></pre>
-<h2 id="first-time-setup">First-time setup<a class="headerlink" href="#first-time-setup" title="Permanent link">&para;</a></h2>
+<p><code>make install</code> fast-forwards your current branch, builds a release binary, installs the applet for the current user and reloads COSMIC Panel. To install without pulling remote changes, use <code>make install UPDATE=0</code>. To compile without installing, use <code>make build</code>.</p>
+<p><strong>After installing:</strong> open <strong>COSMIC Settings → Desktop → Panel → Configure panel applets</strong> (labels depend on COSMIC version), then add <strong>FRITZ!Power Monitor</strong>. Reopen COSMIC Settings or log out and back in if it is not listed immediately.</p>
+<h2 id="first-launch">First launch<a class="headerlink" href="#first-launch" title="Permanent link">&para;</a></h2>
 <ol>
-<li>Add <strong>FRITZ!Power Monitor</strong> to a COSMIC panel.</li>
-<li>Open the applet and choose <strong>Settings</strong>.</li>
-<li>In <strong>Connection</strong>, enter the FRITZ!Box URL, username and password.</li>
-<li>Select <strong>Load devices</strong>, then choose the devices to monitor.</li>
-<li>Configure the panel display, refresh intervals and graph history to suit your setup.</li>
+<li>Open the applet's <strong>Settings → Connection</strong> and enter your FRITZ!Box URL and authorized Smart Home account credentials.</li>
+<li>Choose <strong>Load devices</strong>, select visible devices in <strong>Settings → Devices</strong>, and designate any solar/production meter as an <strong>Input device</strong>.</li>
+<li>Customize panel readings, popup sections, graphs, refresh rates and temperature notifications.</li>
+<li>Optionally pair a local Hue Bridge, discover Tasmota devices, connect Netatmo or enable OpenWeatherMap. Each integration can be configured separately.</li>
 </ol>
-<p>Use a router hostname that resolves on your local network. HTTPS is supported and certificate validation is enabled by default.</p>
-<h2 id="features-and-configuration">Features and configuration<a class="headerlink" href="#features-and-configuration" title="Permanent link">&para;</a></h2>
-<h3 id="power-monitoring">Power monitoring<a class="headerlink" href="#power-monitoring" title="Permanent link">&para;</a></h3>
-<p>The popup provides a live overview and individual cards for selected devices. Power readings are grouped into independent views:</p>
+<p>The panel menu opens on <strong>click</strong>, not hover, and closes when clicked outside or toggled from the panel entry. No separate close button is required.</p>
+<p><strong>Prometheus exporter:</strong> Under <strong>Settings → Connection → Prometheus exporter</strong>, enable <strong>Enable /metrics endpoint</strong> and choose a <strong>Bind address (IP:port)</strong>. The default is <code>127.0.0.1:9817</code> (local only; exporter disabled by default). To allow a Prometheus server on your LAN or in Docker to connect, explicitly bind a specific local-interface address such as <code>192.168.1.10:9817</code> or all IPv4 interfaces with <code>0.0.0.0:9817</code>. IPv6 literals are supported in bracketed notation, for example <code>[::1]:9817</code>. Changes apply without restarting the applet; the old listener is closed before rebinding, and invalid addresses never create an exposed listener. Prometheus text exposition includes FRITZ!Box/Tasmota device watts, temperatures, switches, separate input/output totals, selected and inactive device status; Hue lights/sensors; Netatmo weather modules/CO₂ and alert thresholds; OpenWeatherMap conditions; WAN bandwidth/capacity; router uptime and integration availability. Missing measurements are omitted, not converted to 0. Each scrape reads a cached snapshot and <strong>does not send any router, Hue, weather or Netatmo requests</strong>. Labels include local device names and identifiers. The HTTP endpoint has <strong>no authentication or TLS</strong>; on non-loopback addresses, only allow trusted clients using your firewall. Example same-host Prometheus scrape config:</p>
+<pre><code class="language-yaml">scrape_configs:
+  - job_name: fritz_power_monitor
+    static_configs:
+      - targets: ['127.0.0.1:9817']
+</code></pre>
+<p>When Prometheus runs in Docker or on another machine, <code>127.0.0.1</code> refers to that service, not the desktop applet. For remote scraping, bind to the applet machine's trusted LAN IP (or <code>0.0.0.0</code>), then set the scrape target to that machine's <strong>actual reachable IP and selected port</strong>, not <code>0.0.0.0</code>. Limit inbound access to your Prometheus host through a firewall or authenticated proxy; never make this unauthenticated endpoint internet-facing. Prometheus stores historical samples itself; this endpoint exports only the latest applet readings, not the saved graph history. The bind address is stored as <code>PROMETHEUS_BIND_ADDRESS</code> in <code>~/.config/fritz_solar.cfg</code>.</p>
+<p><strong>Outdoor air pollution:</strong> The Weather section also shows outdoor air quality data from OpenWeatherMap where the configured weather location supports it: AQI on OpenWeatherMap's 1–5 scale, plus PM2.5, PM10, NO₂ and O₃ in µg/m³. These are location-based air pollution estimates, <strong>not</strong> measurements from Netatmo's hardware and <strong>not</strong> CO₂ concentrations in ppm. Netatmo's app obtains its outdoor AQI from a separate third-party provider; that data is not available through the station's <code>read_station</code> sensor API. If the air pollution service is unavailable, regular weather continues to work.</p>
+<p><strong>Optional Netatmo weather details:</strong> Under <strong>Settings → Weather</strong>, enable <strong>Show additional Netatmo weather readings</strong> to add CO₂-based air quality (Good / Moderate / Elevated / Very high, with measured ppm), sound level (dB), and rainfall (mm) to the Weather details, each labeled with its Netatmo module. It is off by default; only visible, reachable modules contribute, and humidity, wind and pressure are not duplicated from OpenWeatherMap.</p>
+<p><strong>CO₂ notifications:</strong> In <strong>Settings → Devices</strong>, a Netatmo module with CO₂ measurements exposes a toggle and an adjustable high threshold (600–5,000 ppm; default 1,200 ppm). Alerts are disabled by default, notify only when a valid reading rises from safe to above the limit, and re-arm after returning to the safe range. Missing or stale readings do not notify. Threshold changes reset the alarm baseline.</p>
+<p><strong>Outdoor temperature source:</strong> In <strong>Settings → Devices</strong>, enable <strong>Outdoor temperature source</strong> on a Netatmo outdoor module (NAModule1) or a supported FRITZ!Box temperature device. Only one source can be active. The selected live value replaces the OpenWeatherMap temperature in the panel and Weather heading. If the source becomes unavailable, the OpenWeatherMap reading is used instead.</p>
+<p><a href="https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/guide.html#first-launch">Detailed first-time setup</a></p>
+<h2 id="headless-mode-no-cosmic-desktop-required">Headless mode (no COSMIC desktop required)<a class="headerlink" href="#headless-mode-no-cosmic-desktop-required" title="Permanent link">&para;</a></h2>
+<p>Run the installed binary without a panel, Wayland session or graphical display. Headless mode polls the saved FRITZ!Box/Tasmota devices, connected Hue Bridge, Netatmo stations and optional OpenWeatherMap data independently, and serves their latest available measurements through the same Prometheus exporter. It skips weather photographs and does not launch COSMIC.</p>
+<p>Run the <strong>interactive terminal setup wizard</strong> first (no desktop required):</p>
+<pre><code class="language-bash">fritz-power-monitor --headless --setup
+</code></pre>
+<p>The wizard guides you through optional FRITZ!Box and Tasmota connections (including device discovery and selection), Hue Bridge pairing (press its physical link button), Netatmo, weather, refresh interval, and the Prometheus listening address. Sensitive credentials are entered without terminal echo, blank answers retain saved values, and <strong>nothing is written until you confirm Save</strong>. It refuses non-interactive input to avoid accidental configuration changes. The alternative command <code>fritz-power-monitor --setup-headless</code> starts the same wizard.</p>
+<p>The wizard stores the configuration alongside regular applet preferences at <code>~/.config/fritz_solar.cfg</code>, so you may also configure devices using the COSMIC applet if you prefer. After setup, start the headless exporter:</p>
+<pre><code class="language-bash">fritz-power-monitor --headless --listen 127.0.0.1:9817
+curl -fsS http://127.0.0.1:9817/metrics
+</code></pre>
+<p>Alternatively, <code>fritz-power-monitor --headless</code> uses the exporter enabled by the wizard or in <strong>Settings → Connection</strong>, together with its saved bind address. The <code>--listen IP:PORT</code> option enables the exporter for that run without changing saved settings. With no options, the executable starts the normal COSMIC applet as before. Use <code>--help</code> to see all switches.</p>
+<p>For unattended startup on a systemd-based desktop, an <strong>optional user service</strong> is supplied with the Debian package, the portable archive and <code>make install</code>. If you installed the portable archive manually, copy <code>share/systemd/user/fritz-power-monitor-headless.service</code> to <code>~/.config/systemd/user/</code> and adjust <code>ExecStart</code> to the installed binary. Then:</p>
+<pre><code class="language-bash">systemctl --user daemon-reload
+systemctl --user enable --now fritz-power-monitor-headless.service
+systemctl --user status fritz-power-monitor-headless.service
+</code></pre>
+<p>The service is <strong>not enabled automatically</strong>. Avoid running the panel exporter and the headless exporter on the same IP/port. To stop it, run <code>systemctl --user disable --now fritz-power-monitor-headless.service</code>. Headless monitoring requires a running user service session; <code>loginctl enable-linger "$USER"</code> is optional if you need it to continue after logout.</p>
+<p><strong>Security:</strong> The exporter has no authentication or TLS. The default <code>127.0.0.1</code> binding is local only. Bind to a LAN interface only if access is restricted. Netatmo OAuth refresh tokens may be updated in the saved configuration during headless operation. The process needs normal user access to its settings and network; root is not required. Headless mode exports current readings, not the interactive panel UI or its graphs and notifications.</p>
+<h2 id="privacy-and-security">Privacy and security<a class="headerlink" href="#privacy-and-security" title="Permanent link">&para;</a></h2>
+<p><strong>Local by default for power monitoring.</strong> FRITZ!Box, Tasmota and Hue operate on the local network. Netatmo, OpenWeatherMap and Wikimedia Commons require external requests only when their respective integrations are enabled.</p>
 <ul>
-<li><strong>Total power output</strong> — current output power and its recorded history.</li>
-<li><strong>Total power input</strong> — current input power and its recorded history, shown alongside output in the <strong>Current Power History</strong> graph. The separate <strong>Total Power Input &amp; Output</strong> section combines the large daily IN/OUT/percentage readings, input/output LOW/HIGH/NOW values, and individual full-width input and output power-history graphs. Each of the five graphs—output watts, input watts, daily input Wh, daily output Wh, and daily input/output percentage—can be collapsed separately using its own chevron. The state is remembered after restarting and is independent of the entire section's collapse state. Input-related tiles remain visible if a configured input device disconnects; missing history is displayed as <code>— W</code>, not zero. When no input device is configured, the popup uses output-only summaries and graphs. Mark any FRITZ!Box or Tasmota device as an <strong>Input device</strong> under Settings → Devices to reveal input/solar features. Power-only device history is preserved across restarts even if the device does not provide temperature readings.</li>
-<li><strong>Today and yesterday</strong> — two rows of three large values: input energy (Wh), output energy (Wh), and the input/output percentage. Missing readings display a dash, not a zero.</li>
+<li>Settings and secrets are kept in the user's configuration (<code>~/.config/fritz_solar.cfg</code>); graph samples are stored under <code>~/.local/share/fritz-power-monitor/</code>.</li>
+<li>FRITZ!Box HTTPS validates certificates by default. <strong>Allow invalid TLS certificates (FRITZ!Box only)</strong> appears beside the trusted CA certificate field in <strong>Settings → Connection</strong>. It affects only the FRITZ!Box client; prefer adding a trusted CA to disabling verification.</li>
+<li><strong>Hue TLS caveat:</strong> The Hue-specific HTTPS client does not currently validate the Bridge's certificate chain or hostname, and some older bridges may use HTTP for pairing. Pair only on a trusted LAN.</li>
+<li>Netatmo requires a developer client ID, client secret and refresh token with <code>read_station</code> permission. Refresh tokens may rotate automatically. Treat credentials as private.</li>
+<li>Never paste configuration files, tokens, router passwords or unredacted diagnostics into a public issue.</li>
 </ul>
-<p>Input and output totals are displayed independently; the applet does not subtract one from the other in the shared overview. Set each device's <strong>Input</strong> option according to what it measures. Devices with “solar” in their name are initially suggested as inputs when discovered; manual choices are retained.</p>
-<p>Depending on the device and firmware, the popup can also provide a supported power switch. The control is verified against the router and refreshed device state.</p>
-<h3 id="panel-and-popup">Panel and popup<a class="headerlink" href="#panel-and-popup" title="Permanent link">&para;</a></h3>
-<p>Panel settings control the displayed text size and optional metrics:</p>
-<ul>
-<li>Show internet download and upload rates separately.</li>
-<li>Show an average temperature across selected devices.</li>
-<li>Exclude devices whose names contain “solar” from that average.</li>
-<li>Optionally combine consumption and solar generation into a net panel value.</li>
-</ul>
-<p>The popup's section order and device order can be changed separately in Settings. Each device row now keeps the name and expand arrow together, followed by aligned wattage, temperature, History, Copy and power-toggle controls. Select the <strong>Name</strong>, <strong>W</strong>, or <strong>°C/°F</strong> column heading to sort ascending or descending; the saved manual order remains the default and can be adjusted in Settings. The selected sort persists across restarts. The popup uses the available monitor height rather than a fixed 85% cap. It is anchored outside the COSMIC panel, and Wayland can resize it vertically to fit the remaining area around the panel and dock; the title bar and footer remain visible while the menu or settings body scrolls. Sections, individual device cards and their graphs can be collapsed independently. Their expanded/collapsed states, Quick Settings disclosure, weather forecast/attribution disclosure and diagnostics history JSON disclosure are saved in the local configuration and restored on restart. The scroll position is not saved. Device cards show live power and temperature when available, and support individual history graphs. Click the copy icon next to a menu heading to copy its title without expanding the section.</p>
-<h3 id="device-reachability">Device reachability<a class="headerlink" href="#device-reachability" title="Permanent link">&para;</a></h3>
-<p>A failed device reading is retried up to three times before its entry appears under <strong>Inactive devices</strong> with no stale live wattage or temperature. The applet notifies you when a device becomes inactive and when a successful reading restores it to the active list. When any device is inactive, readings are checked at least once per minute, even if the normal refresh interval is longer. Tasmota devices are also briefly rediscovered via mDNS to recover from changed local IP addresses. Router or authentication failures remain separate connection errors rather than being treated as individual device outages.</p>
-<h3 id="refresh-and-history">Refresh and history<a class="headerlink" href="#refresh-and-history" title="Permanent link">&para;</a></h3>
-<p>Power monitoring and weather use independent refresh schedules. Power refresh can be configured from 30 seconds to one hour (default: 60 seconds); weather refresh can be configured from 5 to 60 minutes (default: 10 minutes).</p>
-<p>The <strong>Daily Energy · Last 7 Days</strong> list shows solar input (Wh), grid usage (Wh), and their <strong>input/output percentage</strong> for each day when at least one device is configured as an input. The collapsed heading shows <strong>today's percentage</strong>. Without an input device the list shows <strong>output Wh only</strong>, including today's output energy in its collapsed heading. Solar-specific panel options, energy tiles, charts, and percentages remain hidden until an input role is configured. Percentages use solar input ÷ grid usage × 100 and can exceed 100%; missing input, missing output, or zero output is displayed as <strong>—</strong>, not 0%.</p>
-<p>Graph history retention is configurable from 5 minutes up to 4 years. Samples are stored locally and restored after restarting the applet. Sampling adapts to the selected retention period and is bounded to keep storage manageable. The popup also estimates solar-input and grid-consumption energy in Wh per day for the most recent 7 days from available samples; this is historical estimation, not an inverter yield forecast.</p>
-<p>History and settings are stored separately:</p>
-<pre><code class="language-text">~/.local/share/fritz-power-monitor/history.json  # recorded samples
-~/.config/fritz_solar.cfg                     # settings and disclosure state
-</code></pre>
-<p>Configuration is written atomically with owner-only file permissions. An unreadable or invalid setting may fall back to its safe default; unsupported section identifiers are filtered. Back up the configuration file before manually editing it.</p>
-<h3 id="temperature-alerts">Temperature alerts<a class="headerlink" href="#temperature-alerts" title="Permanent link">&para;</a></h3>
-<p>Temperature alerts can be enabled per device. Notifications are sent when a reading crosses the configured upper or lower limit. An alert is re-armed after the device returns to the safe range.</p>
-<h3 id="weather">Weather<a class="headerlink" href="#weather" title="Permanent link">&para;</a></h3>
-<p>Weather is optional and requires an <a href="https://openweathermap.org/api">OpenWeatherMap API key</a>.</p>
-<ol>
-<li>Enable the weather integration in <strong>Weather</strong> settings.</li>
-<li>Enter the API key.</li>
-<li>Enter a location as a city name or <code>latitude,longitude</code>.</li>
-<li>Set the independent weather refresh interval.</li>
-</ol>
-<p>To replace OpenWeatherMap's outdoor temperature, open <strong>Devices</strong> settings and enable <strong>Outdoor temperature source</strong> on the desired device. Only one device can be selected; the first device whose name contains “solar” is selected by default. Selecting a source automatically includes that device in monitored readings. Disable the option on that device to return to OpenWeatherMap.</p>
-<p>The weather card can show current conditions, feels-like temperature, humidity, wind, pressure, cloud cover, visibility, sunrise and sunset, and the forecast. When a Wikimedia Commons background has an attributed source, the source file link stays visible immediately below the photograph and opens that file's page. The attribution expander reveals photo credits, individual source links (for combined frames) and license terms below the clipped image rather than hiding them behind it. Its illustrative background image is selected to match the reported weather condition and is sourced from Wikimedia Commons; it is not a live camera view of the configured location. If image lookup is unavailable, the card falls back to its normal appearance.</p>
-<p>Weather is optional. Weather service failures are independent of FRITZ!Box monitoring.</p>
-<h3 id="connection-tls-and-diagnostics">Connection, TLS and diagnostics<a class="headerlink" href="#connection-tls-and-diagnostics" title="Permanent link">&para;</a></h3>
-<p>FRITZ!Box login uses the router's challenge-response authentication. HTTPS certificate verification is enabled by default.</p>
-<p>For a router using a self-signed certificate, provide its PEM certificate as a trusted CA certificate in <strong>Connection</strong> settings. This adds a trust anchor while retaining certificate-chain and hostname validation. The option to allow invalid certificates is provided for compatibility, but disabling verification is not recommended.</p>
-<p>The <strong>Diagnostics</strong> settings category provides connection and device information to help investigate problems. Do not share diagnostic output containing private network details or credentials publicly.</p>
-<h4 id="device-loading-logs-in-syslog-systemd-journal">Device-loading logs in syslog / systemd journal<a class="headerlink" href="#device-loading-logs-in-syslog-systemd-journal" title="Permanent link">&para;</a></h4>
-<p>On Linux, the applet writes startup, discovery, FRITZ!Box/Tasmota/Hue device-loading progress, outcomes and Rust panic <strong>locations</strong> to the syslog socket (facility <code>user</code>, tag <code>fritz-power-monitor</code>). Debug-level stage messages are enabled by default to help diagnose an applet that exits while loading device information. Journal timestamps identify where a load stopped. These records intentionally include <strong>only static stage names, counts and outcomes</strong>, not router URLs, device names, credentials, AINs, Hue keys, XML or raw JSON.</p>
-<pre><code class="language-sh">journalctl -b -t fritz-power-monitor -p debug --no-pager | tail -n 150
-</code></pre>
-<p>If your account cannot read the system journal, use <code>sudo journalctl -b -t fritz-power-monitor -p debug --no-pager</code>.</p>
-<p>If the applet disappears shortly after loading data, look for <code>first populated panel widget tree constructed</code> followed by <code>process alive (UI progress: ..., updates: ..., panel views: ...)</code>. The watchdog writes to syslog independently from the UI: if the process stays alive but update/view counters stop changing for more than a few seconds, its event loop may be blocked; if counters advance but the applet is invisible, investigate panel surface placement/overflow. <strong>No heartbeat</strong> can mean the process exited or syslog is unavailable—verify separately with <code>pgrep -af fritz-power-monitor</code> and COSMIC Panel logs. Watchdog output is every five seconds during the first minute and every minute thereafter. When a sandbox cannot access either syslog socket, diagnostics fall back to stderr, which COSMIC Panel normally captures:</p>
-<pre><code class="language-sh">journalctl --user -b --no-pager | grep -F 'fritz-power-monitor:' | tail -n 150
-</code></pre>
-<p>An applet terminating without a Rust panic message can also mean that the panel process was killed or restarted externally. Check the matching <code>cosmic-panel</code> and <code>cosmic-session</code> journal entries.</p>
-<h3 id="language">Language<a class="headerlink" href="#language" title="Permanent link">&para;</a></h3>
-<p>The interface supports English, German, Spanish, Dutch, French, Italian, Swedish, Portuguese, Polish, Danish and Norwegian. By default, it follows the COSMIC desktop language; an explicit language can also be selected in Settings. Translation coverage is being expanded, and strings not yet translated fall back to English.</p>
-<h2 id="checks">Checks<a class="headerlink" href="#checks" title="Permanent link">&para;</a></h2>
-<p>Run the basic project checks locally:</p>
-<pre><code class="language-sh">cargo fmt --all -- --check
-cargo check --locked --all-targets
-cargo clippy --locked --all-targets -- -D warnings
-cargo test --locked --all-targets
-cargo build --release
-</code></pre>
-<p>GitHub Actions runs the project checks and validates release artifacts. A separate <strong>Cargo release build</strong> workflow runs <code>cargo build --locked --release</code> on pull requests and Rust source changes to <code>main</code> (and can be started manually). It verifies the binary and uploads it as a 7-day build artifact; this is separate from the packaged release.</p>
-<h2 id="request-changes-with-chatgpt">Request changes with ChatGPT<a class="headerlink" href="#request-changes-with-chatgpt" title="Permanent link">&para;</a></h2>
-<p>Prepare a change request from your local checkout without an API key or paid API usage:</p>
-<pre><code class="language-bash">make chatgpt-change REQUEST=&quot;Describe the change you want&quot;
-</code></pre>
-<p>The helper gathers the current branch, working-tree status, recent commits and a bounded diff, copies a ready-to-use implementation prompt to your clipboard, and opens ChatGPT in your browser. Review the prompt before sharing it. Nothing is sent automatically; you choose what to paste into ChatGPT. It uses <code>wl-copy</code> on Wayland or <code>xclip</code>/<code>xsel</code> on X11.</p>
-<h2 id="repository-maintenance">Repository maintenance<a class="headerlink" href="#repository-maintenance" title="Permanent link">&para;</a></h2>
-<p>The repository includes a small command-line helper for common development and
-publishing tasks. Run it from the checkout; GitHub operations require the
-<a href="https://cli.github.com/">GitHub CLI</a> and an authenticated session
-(<code>gh auth login</code>).</p>
-<table>
-<thead>
-<tr>
-<th>Command</th>
-<th>Action</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>make update</code></td>
-<td>Fast-forward the current branch from its configured upstream (<code>git pull --ff-only</code>).</td>
-</tr>
-<tr>
-<td><code>make check</code></td>
-<td>Run Rust formatting, compilation, Clippy and tests locally.</td>
-</tr>
-<tr>
-<td><code>make publish-pages</code></td>
-<td>Dispatch the Pages workflow to rebuild, validate and publish <code>docs/</code> to <code>gh-pages</code>.</td>
-</tr>
-<tr>
-<td><code>make publish-release</code></td>
-<td>Start a patch release (version bump, Linux packages, GitHub release and Pages publication).</td>
-</tr>
-<tr>
-<td><code>make publish-release BUMP=minor</code></td>
-<td>Start a minor or major release; accepted values are <code>patch</code>, <code>minor</code> and <code>major</code>.</td>
-</tr>
-<tr>
-<td><code>make build-release</code></td>
-<td>Build Debian, AppImage and Flatpak packages from <code>main</code> as workflow artifacts without publishing a release.</td>
-</tr>
-<tr>
-<td><code>make build-release REF=v2.0.0</code></td>
-<td>Build packages from a specific branch, tag or commit.</td>
-</tr>
-<tr>
-<td><code>make workflows</code></td>
-<td>List configured GitHub Actions workflows.</td>
-</tr>
-<tr>
-<td><code>make workflow-runs</code></td>
-<td>List recent workflow runs. Use <code>WORKFLOW=release.yml</code> to filter.</td>
-</tr>
-<tr>
-<td><code>make workflow-watch RUN_ID=123456789</code></td>
-<td>Follow a workflow run and return a failing exit status if it fails.</td>
-</tr>
-</tbody>
-</table>
-<p>The same operations are available directly through <code>bash scripts/repo.sh help</code>.
-The release workflow creates an immutable version tag and publishes the
-portable archive, Debian package, AppImage, Flatpak and checksums. Package-only
-builds are retained as GitHub Actions artifacts for 14 days. Pages publication
-is also triggered automatically after a successful release, so the website's
-download links follow the latest published version.</p>
-<h2 id="data-security-and-privacy">Data, security and privacy<a class="headerlink" href="#data-security-and-privacy" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Core monitoring communicates directly with the configured FRITZ!Box on your network.</li>
-<li>Router authentication uses the FRITZ!Box challenge-response mechanism.</li>
-<li>HTTPS certificate validation is enabled by default; a custom CA can be configured.</li>
-<li>Router credentials and the optional weather API key are stored in the user's configuration with owner-only permissions.</li>
-<li>Graph history is stored locally in the user's data directory.</li>
-<li>The optional weather integration contacts OpenWeatherMap. Weather imagery is retrieved from Wikimedia Commons.</li>
-</ul>
-<p>The applet does not need a third-party cloud service for its core FRITZ!Box monitoring. Keep credentials, API keys, router addresses and diagnostic details private when reporting issues.</p>
+<p>Read <a href="security.html">SECURITY.md</a> for security boundaries, reporting guidance and current upstream dependency advisories.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
-<h3 id="panel-readings-briefly-appear-then-the-applet-disappears">Panel readings briefly appear, then the applet disappears<a class="headerlink" href="#panel-readings-briefly-appear-then-the-applet-disappears" title="Permanent link">&para;</a></h3>
-<p><strong>Resolved in the reported COSMIC setup with v2.0.45.</strong> The fix removes the <code>X-CosmicHoverPopup</code> desktop-entry key and conflicting <code>Fill</code> sizing from nested multiline panel rows. COSMIC Panel treats the <strong>presence</strong> of that desktop-entry key as a request for synthetic hover clicks, even when its value is <code>Auto</code>; the applet's menu is meant to open on <strong>click</strong>, not hover. Panel rows are now shrink-wrapped so live readings do not request incompatible surface widths.</p>
-<p>If updating from an older version, <strong>reinstall the applet</strong>, not just the executable: the corrected <code>.desktop</code> entry must replace the old copy. From a clean source checkout:</p>
-<pre><code class="language-sh">make install
-grep -H '^X-CosmicHoverPopup=' ~/.local/share/applications/com.gpkvt.FritzPowerMonitor.desktop \
-  || echo 'Click-only panel entry is installed'
-</code></pre>
-<p>The <code>grep</code> command should find <strong>no matching key</strong>. If you installed a system-wide Debian package, update that package and check <code>/usr/share/applications/com.gpkvt.FritzPowerMonitor.desktop</code> instead. A stale user-local desktop entry can override the system entry, so remove or update an outdated local override when applicable. Reload COSMIC Panel after updating the entry.</p>
-<p>If the applet still disappears, collect the applet's privacy-safe syslog stages and compare its PID with the panel process. The last successful device refresh is <strong>not</strong> by itself evidence that device loading caused the exit:</p>
-<pre><code class="language-sh">journalctl -b -t fritz-power-monitor -p debug -n 120 --no-pager
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>First check</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Applet missing from panel settings</td>
+<td>Confirm the desktop entry was installed; reopen COSMIC Settings or relog</td>
+</tr>
+<tr>
+<td>Applet disappears after loading</td>
+<td>Reinstall <strong>both</strong> the binary and desktop entry; an old <code>X-CosmicHoverPopup</code> entry can cause unexpected synthetic hover clicks</td>
+</tr>
+<tr>
+<td>FRITZ!Box connection error</td>
+<td>Check URL, authorized Smart Home account, certificate hostname and configured CA</td>
+</tr>
+<tr>
+<td>Missing wattage or temperature</td>
+<td>Check whether the physical device exposes that measurement; missing is not zero</td>
+</tr>
+<tr>
+<td>Hue bridge not found</td>
+<td>Rescan via mDNS or enter its private IP; press the bridge link button during pairing</td>
+</tr>
+<tr>
+<td>Netatmo readings missing</td>
+<td>Verify Internet connectivity and OAuth <code>read_station</code> scope</td>
+</tr>
+<tr>
+<td>Weather unavailable</td>
+<td>Check OpenWeatherMap API key and location; core power monitoring remains independent</td>
+</tr>
+</tbody>
+</table>
+<p>For a disappearing applet, collect privacy-conscious diagnostics:</p>
+<pre><code class="language-bash">journalctl -b -t fritz-power-monitor -p debug -n 120 --no-pager
 pgrep -af 'fritz-power-monitor|cosmic-panel'
 </code></pre>
-<p><strong>The applet does not appear in COSMIC Settings</strong></p>
-<p>Confirm that the installation completed, then reopen COSMIC Settings or log out and back in. The panel reload target can also restart the running panel:</p>
-<pre><code class="language-sh">make reload
-</code></pre>
-<p><strong>No devices are listed</strong></p>
-<p>Check that the FRITZ!Box URL is reachable, the account is allowed to access Smart Home data, and the router has compatible devices paired. Then use <strong>Load devices</strong> again.</p>
-<p><strong>HTTPS connection fails</strong></p>
-<p>Use a hostname covered by the router certificate. If the router uses a self-signed certificate, configure its PEM certificate as a trusted CA rather than disabling TLS verification.</p>
-<p><strong>A device has no power or temperature value</strong></p>
-<p>The applet can only display measurements exposed by the device and FRITZ!Box firmware. Confirm that the device provides the relevant measurement and inspect the Diagnostics settings.</p>
-<p><strong>Weather is unavailable</strong></p>
-<p>Check the API key, location and network access. Weather is optional and can be disabled without affecting FRITZ!Box monitoring.</p>
-<h2 id="contributing-and-support">Contributing and support<a class="headerlink" href="#contributing-and-support" title="Permanent link">&para;</a></h2>
-<p>Bug reports, feature requests and contributions are welcome:</p>
-<ul>
-<li><a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues">Open an issue</a></li>
-<li><a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet">Browse the source</a></li>
-<li><a href="https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/#downloads">Download the latest archive</a></li>
-</ul>
-<p>When reporting a problem, include your COSMIC version, FRITZ!OS version, applet version and relevant diagnostics. Redact passwords, API keys, public IP addresses and other private information.</p>
+<p>The known COSMIC hover-popup/size regression was corrected in v2.0.45, but an outdated local desktop entry can override a newer system installation. See the <a href="https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/guide.html#troubleshooting">troubleshooting guide</a> before sharing logs.</p>
+<p>For updates and help, see <a href="changelog.html">release notes</a>, the <a href="https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/guide.html">user guide</a>, and <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/issues">report an issue</a>. Include relevant versions and redacted diagnostics when reporting a problem.</p>
 <h2 id="license-and-trademarks">License and trademarks<a class="headerlink" href="#license-and-trademarks" title="Permanent link">&para;</a></h2>
-<p>FRITZ!Power Monitor is released under the <a href="LICENSE">MIT License</a>.</p>
-<p>This is an independent, community-developed project. It is not affiliated with, sponsored, authorized or endorsed by FRITZ! GmbH. FRITZ!, FRITZ!Box and related marks are trademarks or registered trademarks of their respective owners and are used only to identify compatible products.</p>
-<h2 id="netatmo-weather-stations">Netatmo Weather Stations</h2><p><strong>Netatmo support is available in the current source checkout.</strong> Connect via the Netatmo HTTPS cloud API with a developer client ID, client secret and OAuth refresh token with <code>read_station</code> scope. Compatible stations and modules provide available temperature, humidity, CO₂, pressure, noise, rain and wind readings, with independently collapsible local history graphs and optional temperature alerts. A supported outdoor module (<code>NAModule1</code>) can be selected in <strong>Settings → Devices → Outdoor temperature source</strong> to replace the displayed weather temperature; stale and offline readings fall back to OpenWeatherMap. Netatmo is read-only, requires Internet access and <strong>never contributes to W/Wh power totals</strong>. See the <a href="guide.html#netatmo">full Netatmo guide</a> or the <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/blob/main/README.md">latest README</a>.</p>
+<p>Licensed under the <a href="LICENSE">MIT License</a>. FRITZ!Power Monitor is a community project <strong>not affiliated with, sponsored, approved or endorsed by FRITZ! GmbH, Philips Hue, Netatmo or their manufacturers</strong>. FRITZ!, FRITZ!Box, Philips Hue, Netatmo and related names are trademarks of their respective owners and are used solely to identify compatibility.</p>
 <div class="page-foot"><a href="index.html">← Back to project overview</a></div>
 </article></main>
 </body>

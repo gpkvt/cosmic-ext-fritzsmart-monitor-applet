@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#10131a">
+<meta name="description" content="Changelog — FRITZ!Power Monitor documentation.">
+<title>Changelog — FRITZ!Power Monitor</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<style>
+:root{color-scheme:dark;--bg:#0b0e14;--surface:#121722;--text:#f2f5fa;--muted:#a2adbd;--line:#293344;--mint:#8be0c4;--max:1040px}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:90px}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.75 system-ui,sans-serif}
+a{color:var(--mint);text-underline-offset:3px}.wrap{width:min(var(--max),calc(100% - 40px));margin:auto}
+.topbar{position:sticky;top:0;z-index:5;border-bottom:1px solid #ffffff18;background:#0b0e14ed;backdrop-filter:blur(16px)}.nav{min-height:68px;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}.brand{display:flex;align-items:center;gap:10px;color:var(--text);font-weight:800;text-decoration:none}.brand img{width:32px;height:32px}.nav-links{display:flex;gap:18px;flex-wrap:wrap;font-size:14px}
+main{padding:54px 0 100px}article{max-width:860px;margin:auto}h1{font-size:clamp(38px,6vw,64px);line-height:1.05;letter-spacing:-.06em;margin:0 0 32px}h2{font-size:27px;letter-spacing:-.04em;margin:42px 0 14px;padding-top:12px;border-top:1px solid var(--line)}h3{font-size:19px;margin:28px 0 8px}h4{font-size:16px;margin:22px 0 8px}p,li{color:#c5ceda}ul,ol{padding-left:25px}li{margin:7px 0}img{max-width:100%;height:auto;border-radius:12px}code{padding:2px 6px;border-radius:5px;background:#ffffff12;color:#d7e8e2;font:.9em monospace}pre{overflow:auto;padding:18px;border:1px solid var(--line);border-radius:12px;background:#080c12;color:#d7e8e2;line-height:1.6}pre code{padding:0;background:none}blockquote{margin:24px 0;padding:12px 18px;border-left:3px solid var(--mint);background:#8be0c40d;color:var(--muted)}table{width:100%;border-collapse:collapse;display:block;overflow-x:auto;margin:22px 0}th,td{padding:10px 13px;border:1px solid var(--line);text-align:left}th{background:var(--surface);color:var(--text)}td{color:#c5ceda}hr{border:0;border-top:1px solid var(--line);margin:32px 0}.page-foot{margin-top:54px;padding-top:22px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+@media(max-width:650px){.nav{padding:12px 0}.nav-links{gap:12px}main{padding-top:36px}}
+</style>
+</head>
+<body>
+<header class="topbar"><div class="wrap nav"><a class="brand" href="index.html"><img src="logo.svg" alt="">FRITZ!Power Monitor</a><nav class="nav-links" aria-label="Main navigation"><a href="index.html">Overview</a><a href="guide.html">User guide</a><a href="readme.html">README</a><a href="security.html">Security</a></nav></div></header>
+<main class="wrap"><article><h1>Changelog</h1>
+<h2 id="unreleased">Unreleased<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="improved">Improved<a class="headerlink" href="#improved" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Make every popup section, device and graph copy button copy the full relevant readings and history as structured JSON instead of only copying a title. Use stable section/device IDs, encode missing measurements as null, include seven-day energy, weather forecasts and air pollution where relevant, and exclude all credentials and image bytes. Add regression tests for JSON validity, section-specific values, stale sensors and secret leakage.</li>
+</ul>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li>
+<p>Provide a terminal-only headless configuration wizard with <code>--headless --setup</code> / <code>--setup-headless</code>: configure FRITZ!Box/Tasmota discovery and selection, Hue Bridge pairing, Netatmo, weather, poll interval and Prometheus bind address. Keep existing values on Enter, hide passwords/tokens, validate inputs, and save only on final confirmation. The optional systemd service now respects the wizard's saved Prometheus bind address.</p>
+</li>
+<li>
+<p>Add an opt-in <code>--headless</code> monitoring mode with no COSMIC/Wayland UI: independently refresh FRITZ!Box, Tasmota, Hue, Netatmo and weather readings and publish cached Prometheus metrics. <code>--listen IP:PORT</code> enables a temporary bind override; regular applet startup remains unchanged. Keep current Netatmo OAuth tokens saved, avoid stale readings and weather image traffic.</p>
+</li>
+<li>Provide an optional systemd user service for Debian, portable archives and user-local source installs. The service is not enabled automatically; document local-only default, CLI operation and security limits.</li>
+</ul>
+<h3 id="improved_1">Improved<a class="headerlink" href="#improved_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add a <strong>Remove inactive devices</strong> button in Settings → Devices. It is shown only for saved FRITZ!Box/Tasmota devices confirmed unreachable by a successful refresh, and removes those entries, selections and related preferences in one operation without touching active devices, Hue/Netatmo modules or historical graphs. Devices may be rediscovered later.</li>
+</ul>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>
+<p>Restore manual GitHub Releases and Linux package workflows for checked semantic version bumps, Debian, AppImage, Flatpak and portable archive artifacts with SHA256 checksums. Release tags and source versions are published only after checks and packaging succeed.</p>
+</li>
+<li>
+<p>Display actual outdoor ambient air pollution from OpenWeatherMap's Air Pollution API in the weather photo metric grid: 1–5 AQI plus PM2.5, PM10, NO₂ and O₃ in µg/m³. Keep this source clearly separate from indoor Netatmo CO₂ (ppm), ignore stale or invalid values, and leave normal weather functioning independently if pollution lookup fails. Export available pollution values to Prometheus.</p>
+</li>
+</ul>
+<h3 id="improved_2">Improved<a class="headerlink" href="#improved_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>
+<p>Reduce the weather photograph and its unified four-column table area by about 25% without restoring an internal table scrollbar. Preserve dynamic height growth for additional OpenWeatherMap and Netatmo readings.</p>
+</li>
+<li>
+<p>Show current values and native units in each collapsed Netatmo device <strong>graph heading</strong>, including temperature, humidity, CO₂, pressure, noise, rain and wind. Restore the device rows from PR #859; offline and invalid graph values appear as unavailable.</p>
+</li>
+<li>
+<p>Allow a configurable Prometheus exporter bind address (<code>IP:port</code>), including loopback, specific LAN interfaces and wildcard listeners. Preserve disabled-by-default, loopback-default behavior; validate the address, rebind without restarting and document unauthenticated network access risks.</p>
+</li>
+<li>
+<p>Show an indicative CO₂-based air quality category (Good, Moderate, Elevated or Very high) alongside optional Netatmo ppm readings in the shared weather metrics grid; omit readings when the sensor is hidden or stale. CO₂ is a ventilation indicator, not a complete air quality index.</p>
+</li>
+</ul>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add an opt-in localhost-only Prometheus <code>/metrics</code> exporter for live FRITZ!Box, Tasmota, Hue, Netatmo, weather, router and WAN monitoring, with safe labels, unavailable-value handling and no network request per scrape.</li>
+<li>Keep the weather photograph confined to its middle section with the header above and a unified four-column OpenWeatherMap/Netatmo readings grid inside the photo. Grow that section only when more weather/pollution/Netatmo rows are present, removing the inner table scrollbar; Wikimedia Commons attribution remains outside the image.</li>
+</ul>
+<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Discover more FRITZ!Box Smart Home devices, including switch-only, temperature-only, thermostat and simple on/off modules. Show available readings without inventing wattage, restrict switching to explicitly unlocked switch interfaces, and exclude non-meter devices from power totals and history.</li>
+</ul>
+<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add an opt-in <strong>Settings → Weather</strong> toggle for additional live Netatmo weather details: module-labeled CO₂ / air quality (ppm), noise (dB) and rainfall (mm). Hide stale/unreachable and hidden sensors, without duplicating OpenWeatherMap values.</li>
+</ul>
+<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add per-Netatmo CO₂ threshold notifications, off by default, with adjustable 600–5,000 ppm limit (1,200 ppm default), saved preferences and safe-range re-arming. Missing and stale measurements do not fire notifications.</li>
+</ul>
+<h3 id="automation">Automation<a class="headerlink" href="#automation" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Restore <strong>manual-only GitHub Pages publication</strong> via Actions <code>workflow_dispatch</code> or <code>make publish-pages</code>: build static documentation, validate assets and links, then deploy to the existing <code>gh-pages</code> branch. Regular pushes and release workflows remain disabled.</li>
+</ul>
+<h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Refresh the GitHub Pages homepage, compatibility and FAQ content for Netatmo Weather Stations, including the new outdoor temperature source, OAuth setup, cloud/credential boundaries, sensor histories and unsupported device types; expand the user guide and refresh the deployed Pages copy.</li>
+</ul>
+<h3 id="added_6">Added<a class="headerlink" href="#added_6" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Support selecting a Netatmo outdoor (NAModule1) sensor as the outdoor weather temperature, sharing the single saved source setting with FRITZ!Box devices and falling back to OpenWeatherMap when Netatmo data is unavailable.</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Place the invalid-certificate toggle beside the FRITZ!Box trusted CA configuration, explicitly label it FRITZ!Box-only, and keep other integrations' TLS policies independent.</li>
+</ul>
+<h3 id="added_7">Added<a class="headerlink" href="#added_7" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Optional <strong>Netatmo Weather Station API</strong> integration with OAuth2 refresh-token authentication (read_station), independently refreshed station and module readings for temperature, humidity, CO₂, pressure, noise, rain and wind, read-only device cards, searchable/ordered visibility controls, per-device temperature alerts, panel-average temperatures and persisted collapsible metric history graphs. Missing and stale measurements are never presented as current data, and Netatmo does not contribute W or Wh to power totals.</li>
+<li>Netatmo developer credentials and automatically rotated refresh tokens are saved with owner-only permissions. Document cloud/API requirements, the independent connection, limitations and Netatmo data security in the README, user guide, compatibility page and SECURITY.md.</li>
+</ul>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Remove the separate menu/header <strong>Close</strong> icon (previously shown as truncated <code>win-</code> on some systems). The menu continues to toggle from its panel entry and closes when clicking outside it, as COSMIC normally does.</li>
+</ul>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Render symbolic toolbar icons as actual COSMIC icons instead of their literal identifier text; the close-menu action no longer appears as a truncated <code>win-</code> button. Use the native settings icon alongside it.</li>
+<li>Make repository publishing helper commands fail early with clear guidance while their GitHub Actions workflow files are intentionally absent.</li>
+</ul>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Stop Dependabot from proposing GitHub Actions dependency updates when the repository has no workflows.</li>
+<li>Correct documentation about independent input/output power, CodeQL's separately managed default setup, the Hue Bridge's distinct TLS limitations and manual RustSec auditing. Track unresolved upstream COSMIC/Iced advisories in issue #270 without claiming they are fixed.</li>
+</ul>
+<p>All notable changes to FRITZ!Power Monitor are recorded below. See <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases">GitHub Releases</a> for published versions.</p>
+<h2 id="v301-2026-11-19">v3.0.1 — 2026-11-19<a class="headerlink" href="#v301-2026-11-19" title="Permanent link">&para;</a></h2>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Use the available monitor height for the applet menu instead of limiting it to 85%, keeping it anchored outside its source panel and allowing the Wayland compositor to resize it vertically around display constraints such as the COSMIC dock. Preserve the fixed header/footer and scrollable menu and settings content.</li>
+<li>Restore Wikimedia Commons links for weather backgrounds: keep the current image's source-file link visible beneath the photo and move expanded credits, file links and license terms outside the fixed-height clipped image overlay.</li>
+</ul>
+<h2 id="v300-2026-11-19">v3.0.0 — 2026-11-19<a class="headerlink" href="#v300-2026-11-19" title="Permanent link">&para;</a></h2>
+<h3 id="highlights">Highlights<a class="headerlink" href="#highlights" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Major stable milestone with local Philips Hue Bridge compatibility alongside FRITZ!Box Smart Home and Tasmota devices, and the previously delivered COSMIC panel stability correction confirmed by users.</li>
+<li>Hue lights support on/off control; compatible environment sensors provide temperature, illuminance (lux) and motion readings. Real Hue sensor samples drive independent history graphs, optional temperature alerts and eligible panel-average temperatures. Hue devices are not power meters and do not contribute watts or energy to power totals.</li>
+</ul>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Refresh the project website hero, feature overview, compatibility checks, FAQ and user guide to make Hue capabilities, local bridge pairing and unsupported features clear.</li>
+<li>Consolidate the changelog into one set of Added, Changed and Fixed headings for each historical period, including a single November 17 entry; preserve earlier change descriptions rather than deleting history.</li>
+</ul>
+<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Carry forward the v2.0.45 COSMIC Panel fix: no synthetic hover-click metadata and no conflicting nested Fill sizing in the shrink-wrapped panel.</li>
+<li>Correct older website statements about stale measurements, power input subtraction and the requirement for a device to expose both power and temperature.</li>
+</ul>
+<h3 id="release">Release<a class="headerlink" href="#release" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Major stable version 3.0.0, published through the repository's Linux packaging and GitHub Pages workflows.</li>
+</ul>
+<h2 id="v2046-2026-11-19">v2.0.46 — 2026-11-19<a class="headerlink" href="#v2046-2026-11-19" title="Permanent link">&para;</a></h2>
+<h3 id="documentation_1">Documentation<a class="headerlink" href="#documentation_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Document the <strong>user-confirmed resolution</strong> of the COSMIC Panel applet disappearing just after live readings appeared. The correction was first installed and confirmed in <strong>v2.0.45</strong>, and is now explained in the README and website guide.</li>
+<li>Describe why <code>X-CosmicHoverPopup</code> must be <strong>absent</strong>, not set to <code>Auto</code>, <code>false</code> or another value: COSMIC Panel treats the key's presence as an opt-in to synthetic pointer clicks on hover. Record the complementary shrink-wrapped multiline panel layout fix.</li>
+<li>Add installation and verification instructions for the packaged desktop entry, including the distinction between user-local and system-wide copies and a small privacy-conscious troubleshooting command.</li>
+</ul>
+<h3 id="release_1">Release<a class="headerlink" href="#release_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Document-only patch release using the existing automated stable Linux release pipeline (portable archive, Debian package, AppImage, Flatpak and SHA256 sums), followed by Pages publication.</li>
+</ul>
+<h2 id="earlier-v2x-changes-november-2026">Earlier v2.x changes — November 2026<a class="headerlink" href="#earlier-v2x-changes-november-2026" title="Permanent link">&para;</a></h2>
+<h3 id="highlights_1">Highlights<a class="headerlink" href="#highlights_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix unexpected hover-triggered menu actions in COSMIC Panel: remove <code>X-CosmicHoverPopup</code> from the installed desktop entry (COSMIC synthesizes pointer clicks whenever this key is present), keep the menu click-only and add a packaging CI regression check. Shrink-wrap every multiline panel item instead of requesting nested <code>Fill</code> widths during live device refreshes, preventing conflicting autosize constraints.</li>
+<li>Add an independent syslog watchdog for disappearing panel items: sample process liveness, UI update count and panel view count every five seconds during startup, then once per minute. The watchdog remains active if the COSMIC event loop stalls, helping distinguish UI deadlock, surface invisibility and process termination without logging device identities.</li>
+<li>Improve disappearing-applet diagnostics: log the first panel widget tree populated with meter readings, emit periodic liveness markers with separate metered/Hue counts, and record clean COSMIC event-loop shutdowns distinctly from Rust panics or runtime errors.</li>
+<li>Keep the COSMIC panel applet shrink-wrapped to its displayed values after device refreshes, avoiding full-width autosize claims that can push neighboring panel items off-screen. Preserve a small clickable placeholder when no live value or connection-warning entry is available, instead of rendering an invisible empty button.</li>
+<li>Route privacy-safe device-loading debug checkpoints to Linux syslog/systemd journal under the <code>fritz-power-monitor</code> tag, including startup, FRITZ!Box and Tasmota device refreshes, Hue CLIP v2 resource status, discovery, and Rust panic locations. Fall back to captured stderr if syslog is unavailable; document <code>journalctl</code> commands.</li>
+<li>Harden device-information loading: cap FRITZ!Box XML, Tasmota status and Hue resource bodies to avoid unbounded memory allocation; parse FRITZ!Box device XML once per refresh while keeping broken devices inactive independently. Add regression coverage and privacy-safe journal checkpoints for each device refresh stage to help diagnose panel restarts.</li>
+<li>Prevent COSMIC/Wayland crashes caused by competing XDG popup surfaces: keep panel value hover tooltips in the existing widget surface instead of creating secondary Wayland tooltip popups. Preserve click-only menu opening and outside-click dismissal.</li>
+<li>Hide solar/input options and live/daily input values when no device is configured as an input; show output-only summaries, graphs, and daily energy instead. Keep the Input-device setting discoverable and preserve input UI when a configured device is offline.</li>
+<li>Add COSMIC tooltips scoped to individual panel values, showing device names, summed power contributors or average temperature without opening the applet menu on hover.</li>
+<li>Show per-day solar input/grid use percentages in Daily Energy · Last 7 Days, and display today's percentage in its collapsed heading; missing/zero-denominator ratios remain unavailable, never silently 0%.</li>
+<li>Restore native Wayland outside-click dismissal for the applet menu and remove hover-triggered panel tooltip popup surfaces; the panel entry opens/closes only on clicks, and explicit menu Close buttons remain available.</li>
+<li>Add Hue sensor-specific temperature and illuminance history graphs to expanded device cards, with separate persisted sample history, configurable time range, units and independent collapse state. Do not fabricate measurements when the bridge or sensor is unavailable.</li>
+<li>Add per-Hue-sensor temperature alarms under Settings → Devices using the shared COSMIC temperature-alert controls, independent high/low limits and crossing notifications.</li>
+<li>Keep the main applet popup open when window focus changes by disabling its implicit Wayland grab; add explicit Close buttons to the menu and settings headers while preserving panel click-to-close.</li>
+<li>Give each of the five graphs in Total Power Input &amp; Output its own COSMIC-style disclosure control. Persist their independent states without affecting the parent section, avoid rendering hidden graphs, and keep the overview visible before the first history sample.</li>
+<li>Fix persisted power-only device history (including Tasmota): JSON null/missing temperatures no longer discard valid watt readings on restart; add round-trip regression coverage.</li>
+<li>Harden Debian install/remove maintainer scripts by dropping root privileges before touching paths beneath the installing user's home directory, and lint these scripts in CI.</li>
+<li>Fix Clippy warnings in the Hue temperature-average regression tests (<code>std::slice::from_ref</code> instead of redundant clones).</li>
+<li>Integrate Hue lights and environment sensors into Settings → Devices with visibility controls, searchable unified inventory, per-light switches, and persistent +/− ordering shared with FRITZ!Box and Tasmota devices; refresh the paired Hue Bridge during device discovery.</li>
+<li>Include measured temperatures from visible, reachable Hue sensors in the panel average, excluding invalid and offline readings.</li>
+<li>Add full-width input/output watt history and recorded seven-day input, output and input/output percentage trends inside Total Power Input &amp; Output without fabricating missing data. Show the installed version in the popup title bar.</li>
+<li>Unify Philips Hue light and motion/environment sensor rows with the sortable popup Devices list. Preserve their own disclosure, copy, switches, °C/°F and lux display, keep unsupported W and history empty, and show Hue devices unavailable without stale measurements during bridge outages. Remove the duplicate standalone Hue section.</li>
+<li>Fix three quality-test expectations: preserve saved collapsed-section order, correct the 158° compass boundary, and allow native translations that exactly match English spelling while retaining translation coverage checks.</li>
+<li>Read Philips Hue motion/proximity sensor temperature, ambient light level (converted to lux) and motion state from CLIP v2; group service resources by physical device, filter invalid/disabled/offline readings, and show sensors alongside Hue lights without fabricating power measurements. Refresh both together and add parser regression tests.</li>
+<li>Find Hue Bridges automatically via local mDNS on startup and when opening Connection settings, with a manual rescan and selection when multiple bridges are discovered; never overwrite a configured bridge silently.</li>
+<li>Fix Hue pairing usability: make pairing retry while the physical link button is pressed, fall back to legacy HTTP registration only when HTTPS pairing is unsupported, and show errors and progress beside the pairing button. Include discovery/pairing regression tests.</li>
+<li>Add optional Philips Hue Bridge (CLIP v2) integration with local IP setup, physical link-button pairing, secure application-key storage, independently refreshed light discovery, reachability awareness and individual on/off switches. Keep Hue states separate from power/temperature totals; document the Hue-only TLS trust limitation.</li>
+<li>Hide redundant dividers between device rows when the Devices section is collapsed, retaining separators around the section and all row dividers when expanded.</li>
+<li>Align the collapsed Total Power Input &amp; Output heading with other popup sections, using the same title, summary, disclosure icon, padding and copy-button placement.</li>
+<li>Remove the Custom sort button from Devices while keeping existing saved device order available through Settings. Reorder device rows as name/disclosure, W, temperature, History, Copy and Toggle; keep inactive devices in the same aligned columns.</li>
+<li>Combine current (NOW) input and output readings with their LOW/HIGH metrics into two three-column rows, matching the daily energy grid and keeping current power at the bottom of the section.</li>
+<li>Unify the Total Power Input &amp; Output large-value layout: daily IN/OUT/percentage values first, input/output LOW/HIGH in the same visual style, and larger NOW readings last at the bottom without nested metric cards.</li>
+<li>Add a standalone Cargo release-build workflow for Rust changes, pull requests and manual runs, verifying the binary and retaining a short-lived build artifact.</li>
+<li>Show TODAY and Y'DAY input, output and input/output percentage as large values in a two-row, three-column grid in Total Power Input &amp; Output, retaining the low/high readings.</li>
+<li>Keep device power (W) and temperature in separate, single-line aligned columns. Add sortable Name, W, and temperature column headings with ascending/descending toggles and a Custom button to restore the saved manual order; persist sorting preferences.</li>
+<li>Retry missing device readings up to three times before marking devices inactive. Show a separate inactive list and notify on transitions into and back out of that list; recheck inactive devices at least every minute. Preserve healthy readings and retry changed Tasmota addresses using short mDNS rediscovery.</li>
+<li>Clear stale live readings on refresh errors and add regression coverage for sorting, outage transitions, and retry intervals.</li>
+<li>Make compact power, temperature, and bandwidth graphs use the full available popup width; place device readings below their graphs rather than beside them, and adjust compact SVG proportions for the wider layout.</li>
+<li>Align the Total Power Input &amp; Output title copy button to the far right of its header, keeping the expandable summary and disclosure control intact.</li>
+<li>Remove obsolete <code>input_low</code>/<code>input_high</code> local bindings after consolidating the Total Power Input &amp; Output metric rows, eliminating release-build unused-variable warnings.</li>
+<li>Always show input LOW/HIGH next to output LOW/HIGH stats in Total Power Input &amp; Output, including while input readings are unavailable; represent missing input history as <code>— W</code> instead of zero. Share the metric tile row rendering and add regression coverage.</li>
+<li>Remove the unused <code>graph_panel</code> helper left behind after deduplicating the power history graph, eliminating the release-build dead-code warning.</li>
+<li>Remove the redundant graph from Total Power Input &amp; Output; keep the combined graph under Current Power History and preserve the numeric readings, low/high values, and energy summaries.</li>
+<li>Move the Total Power Input &amp; Output copy icon beside its heading and animate copy buttons with a brief pulsing checkmark, without moving the button hit targets.</li>
+<li>Show TODAY and Y'DAY input/output percentages side by side on one row in the shared power history summary.</li>
+</ul>
+<h3 id="added_8">Added<a class="headerlink" href="#added_8" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add one-click copy controls beside menu section and device titles, copying the displayed title text without triggering disclosure actions.</li>
+<li>Give total power input its own historical graph, matching the total power output graph, with independent history samples and input low/high readings.</li>
+<li>Show daily input-to-output energy percentages for today and yesterday in Current Power History; omit the ratio when output energy is unavailable or zero.</li>
+<li>Add a per-device external-temperature source. The first device with “solar” in its name is selected by default; selecting a source automatically includes it in monitored readings, and only one device can be active.</li>
+</ul>
+<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Unify device identity handling for menu ordering and expanded/collapsed state, including Tasmota and differently formatted AINs; keep device and graph state clean on removal.</li>
+<li>Remove obsolete tests referencing deleted power-energy helpers; existing graph energy tests cover integration and single-sample behavior.</li>
+<li>Document current unified input/output history, 7-day energy estimates and persisted layout settings across README and website guide. Add regression coverage for ordering and disclosure toggles.</li>
+<li>Preserve collapsible states across restarts, including Devices and diagnostics JSON; reliably restore device cards with mixed-case IDs. Existing menu and device ordering remains saved.</li>
+<li>Right-align the Quick Settings label and icon in the popup action row.</li>
+<li>Use smaller body-sized values for the total input/output NOW, TODAY, and Y'DAY summary.</li>
+<li>Combine total input and output power histories into one interactive graph with distinct series, while retaining independent input/output energy summaries and low/high metrics. Keep the live input/output readings visible in the collapsed heading.</li>
+<li>Keep live total input and output power readings visible in the collapsed Current Power History section.</li>
+<li>Simplify large graph time-axis labels to whole-hour intervals (for example, <code>6h ago</code>) instead of showing minute-level elapsed durations.</li>
+<li>Arrange weather details in four evenly spaced information columns, grouping humidity, cloud cover, visibility and pressure above wind, direction, sunrise and sunset.</li>
+<li>Display the weather pressure label and its hPa value on one horizontal line.</li>
+<li>Increased vertical spacing between weather condition, humidity/cloud cover, wind/pressure, and visibility/sunrise details.</li>
+</ul>
+<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Scope the safeguard-icon check to the details section so compatibility-card icons are validated separately instead of being counted twice.</li>
+<li>Convert the total power overview section to a COSMIC element before wrapping it in the shared surface card, fixing the release build type mismatch.</li>
+<li>Remove obsolete, unused power-history helper functions reported by the release compiler.</li>
+<li>Treat paired readings as single ordering units in two-line panel mode, and hide movement controls that cannot change the visible group order.</li>
+<li>Reduce weather slideshow CPU and memory use by downscaling source photos to the weather-card display limit and applying photo opacity during frame encoding, avoiding a second full decode/encode pass for every frame.</li>
+<li>Reduce idle CPU usage by polling scheduled refresh deadlines every five seconds, switching to one-second updates only near deadlines or while settings feedback is active.</li>
+<li>Reduce CPU usage by limiting refresh-spinner redraws to four per second and using the existing app clock for the weather countdown instead of a separate 10 fps timer.</li>
+<li>Keep weather image refresh ticks running when the initial weather response contains no usable background, and advance Wikimedia search results by a full page on each fetch so short slideshow intervals do not repeat the same result window.</li>
+<li>Remove an obsolete panel line-height calculation left behind by the enlarged odd-item icon layout.</li>
+<li>Rotate through different Wikimedia Commons search-result windows on weather image refresh, retain the current background when no new matching image is found, and report empty results in Diagnostics.</li>
+<li>Enlarge the icon of an unpaired two-line panel item to 28 px and reserve a matching layout slot so the icon is not clipped.</li>
+<li>Keep the weather slideshow deadline timer active when only one background image is available, so its timeout can still trigger a replacement fetch.</li>
+<li>Trigger weather background image reloads directly from the configured slideshow deadline instead of relying on crossfade-frame detection, so refresh also works with a single image or images with differing dimensions.</li>
+<li>Animate the weather background countdown as a low-overhead 10 fps sweep over the full image duration; hold it at zero during image fetching and restart after the request completes.</li>
+<li>Drive the weather image countdown from the configured slideshow image duration and the next Commons background-image fetch, independently of the OpenWeatherMap data refresh interval.</li>
+<li>Fetch fresh weather background images whenever the configured per-image slideshow duration expires, independently of the weather-data refresh schedule.</li>
+<li>Advance the weather background after every successful weather reload, including scheduled reloads, using the configured weather refresh interval.</li>
+<li>Align values in paired multiline panel rows to a shared right edge while keeping icons left-aligned and standalone items naturally sized.</li>
+<li>Apply the configured panel text size consistently to split and multiline values; remove the hidden 10% font enlargement.</li>
+</ul>
+<h2 id="17112026">17.11.2026<a class="headerlink" href="#17112026" title="Permanent link">&para;</a></h2>
+<h3 id="added_9">Added<a class="headerlink" href="#added_9" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Added a 2 px progress line beneath the weather background image to show the time remaining until the next weather and image refresh.</li>
+<li>Added an optional outdoor-temperature source that uses a selected FRITZ!Box device sensor instead of OpenWeatherMap's reported temperature.</li>
+<li>Added a first-run setup assistant for FRITZ!Box credentials, device discovery and optional weather configuration (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/498">#498</a>).</li>
+<li>Added an animated solar/grid energy-flow view showing household consumption, solar generation, self-consumption and grid import/export (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/461">#461</a>).</li>
+<li>Added one-click application updates in Diagnostics for Flatpak, Debian packages, AppImages and source checkouts, with checksum verification where applicable (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/464">#464</a>).</li>
+<li>Added a timestamped Diagnostics activity timeline covering refreshes, device discovery, weather requests, release checks and update installation, including recent FRITZ!Box HTTP response details (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/479">#479</a>).</li>
+</ul>
+<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Unified internet bandwidth readings with the shared panel-item renderer, removing their separate icon, spacing and alignment layout.</li>
+<li>Unified all panel text rendering through one shared renderer so temperature, power, bandwidth and status values use identical typography, alignment and line spacing.</li>
+<li>Tightened line height and vertical spacing for stacked two-line panel readings.</li>
+<li>Right-aligned text within stacked two-line panel readings.</li>
+<li>Vertically aligned the upper line to the bottom and the lower line to the top of separate line slots.</li>
+<li>Halved panel reading font sizes in two-line mode to keep stacked values compact.</li>
+<li>Redesigned the settings overview into clearly grouped Interface, Display &amp; updates, Data sources, Layout and Support sections (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/497">#497</a>).</li>
+<li>Translated the first-run setup assistant and settings overview across all supported interface languages.</li>
+<li>Displayed forecast high and low temperatures on separate, right-aligned lines for easier scanning (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/495">#495</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/496">#496</a>).</li>
+<li>Restored paired weather/temperature and consumption/solar readings in two-line panel mode while preserving configured item order (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/499">#499</a>).</li>
+<li>Stacked the unit below an unpaired panel value in two-line mode, keeping paired values and single-line mode compact (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/501">#501</a>).</li>
+<li>Made history graphs collapsible, individually or in related pairs, and persisted disclosure states across applet restarts; this includes current-power history, total input/output and temperature graphs, bandwidth graphs, and per-device power/temperature pairs (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/480">#480</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/484">#484</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/486">#486</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/488">#488</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/489">#489</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/490">#490</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/493">#493</a>).</li>
+<li>Reduced popup CPU usage by preprocessing and caching weather images and reducing redundant diagnostics, slideshow and energy-flow redraws (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/481">#481</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/482">#482</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/487">#487</a>).</li>
+<li>Changed the weather background on every manual reload while preserving the selected slideshow position when refreshed images arrive (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/477">#477</a>).</li>
+<li>Added metric axes and MIN/MAX/CURRENT values to compact and expanded graphs, simplified power and temperature unit labels, and aligned expanded graph layout with compact graphs (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/462">#462</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/467">#467</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/469">#469</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/470">#470</a>).</li>
+<li>Restricted Wikimedia weather backgrounds to natural scenery and astronomy, removed the chessboard overlay and made photo backgrounds translucent (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/448">#448</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/449">#449</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/483">#483</a>).</li>
+</ul>
+<h3 id="fixed_5">Fixed<a class="headerlink" href="#fixed_5" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Make the weather image refresh indicator a minimal 1 px countdown line that recedes as refresh approaches.</li>
+<li>Remove the gap between the weather background image and its refresh progress indicator while preserving spacing around the weather section.</li>
+<li>Use libcosmic's <code>progress_bar::linear::Linear</code> widget API for the 2 px weather refresh indicator.</li>
+<li>Construct the weather refresh indicator using libcosmic's <code>progress_bar::ProgressBar</code> widget type, avoiding a call to the module as though it were a function.</li>
+<li>Replaced a full-vector <code>extend(drain(..))</code> with <code>append</code> in panel-item ordering to satisfy Clippy's <code>extend_with_drain</code> lint.</li>
+<li>Restored two-line grouping for weather/temperature and consumption/solar in multiline panel mode while retaining horizontal icon/value pairs within each line.</li>
+<li>Flattened multiline panel items into one horizontal sequence of icon/value pairs; icons align left and values align right independently.</li>
+<li>Left-aligned icon columns in paired panel readings and stacked download/upload rows while retaining right-aligned values.</li>
+<li>Unified single-line and multiline panel value rendering with the same fixed-width, right-aligned text slot; multiline slots use their longest line to calculate width.</li>
+<li>Right-aligned the rows inside paired panel columns so their readings share a common right edge.</li>
+<li>Reduced the fixed row height of paired multiline panel readings; their vertical spacing now follows the configured text size instead of reserving 24 px per line.</li>
+<li>Tightened the line spacing of paired two-line panel readings.</li>
+<li>Increased the line spacing of the enlarged unpaired two-line panel value.</li>
+<li>Increased the font and icon sizes for the unpaired item in two-line panel mode.</li>
+<li>Increased line spacing between the number and unit in unpaired two-line panel values while keeping other panel readings compact.</li>
+<li>Removed the residual vertical gap between the two lines of multiline panel values while preserving the configured font size.</li>
+<li>Aligned the unit line of split panel values directly beneath the number, without adding a second indentation on top of the icon column.</li>
+<li>Corrected split-unit formatting for unpaired readings in two-line panel mode while keeping the two lines tightly stacked.</li>
+<li>Removed the visible gap between the two lines in the compact panel layout by rendering the stepped value as one multiline text widget.</li>
+<li>Indented the second line of two-line panel values by two non-breaking spaces for the requested stepped layout.</li>
+<li>Right-aligned single-line panel values using the same fixed-width value container as two-line values.</li>
+<li>Vertically aligned panel icons with their corresponding values; in two-line mode, icons now align with the first text line while single-line values remain vertically centered.</li>
+<li>Preserved the configured panel text size in two-line mode instead of reducing it by half.</li>
+<li>Align each split panel line to the shared value-column edge using explicit container and fill-width text alignment, rather than the legacy right-alignment helper.</li>
+<li>Right-align split panel values through their fixed-width containers, keeping naturally sized text flush to the same right edge.</li>
+<li>Matched the spacing between split number/unit lines to the configured panel text line height, removing the oversized gap in odd multiline panel items.</li>
+<li>Right-aligned panel values within content-sized columns, including matching right edges for both lines of multiline readings.</li>
+<li>Fixed panel readings disappearing beyond the right edge by allowing each item and value to use its natural width instead of expanding to the full panel width.</li>
+<li>Fixed repository selection in the workflow CLI and release lockfile resolution; corrected the AppImage updater's asynchronous permission update (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/466">#466</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/471">#471</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/476">#476</a>).</li>
+<li>Fixed TLS diagnostics severity when certificate validation is explicitly disabled, and clarified installed/latest version status indicators (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/472">#472</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/475">#475</a>).</li>
+<li>Fixed broken README and security-policy links on the website and user guide (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/474">#474</a>).</li>
+</ul>
+<h3 id="documentation-and-website">Documentation and Website<a class="headerlink" href="#documentation-and-website" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Added persistent light/dark/system theme and German/English language controls to the landing page and user guide (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/444">#444</a>, <a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/454">#454</a>).</li>
+<li>Added CLI commands and Make targets for publishing Pages, publishing releases, building packages, listing workflows and watching workflow runs (<a href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/pull/468">#468</a>).</li>
+</ul>
+<div class="page-foot"><a href="index.html">← Back to project overview</a></div>
+</article></main>
+</body>
+</html>
