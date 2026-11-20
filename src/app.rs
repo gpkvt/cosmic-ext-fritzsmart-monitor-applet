@@ -4622,7 +4622,9 @@ impl AppModel {
                         .filter_map(|sensor| self.json_netatmo_sensor(&sensor.id, now))
                         .collect::<Vec<_>>()
                 }),
-                "error": &self.weather_error,
+                // External request errors may contain request URLs with API
+                // tokens: export availability only, never unredacted errors.
+                "available": self.weather.is_some(),
             }),
             _ => {
                 if let Some(id) = key.strip_prefix("device:") {
