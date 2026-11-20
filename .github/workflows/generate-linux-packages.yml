@@ -2,18 +2,12 @@ name: Build Linux packages
 
 on:
   workflow_dispatch:
-    inputs:
-      ref:
-        description: Branch, tag or commit SHA to package without publishing a release
-        type: string
-        required: true
-        default: main
 
 permissions:
   contents: read
 
 concurrency:
-  group: linux-packages-${{ github.ref }}-${{ inputs.ref }}
+  group: linux-packages-${{ github.ref }}-main
   cancel-in-progress: false
 
 jobs:
@@ -25,7 +19,7 @@ jobs:
       - name: Checkout selected revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: main
           persist-credentials: false
 
       - name: Install Linux packaging dependencies
