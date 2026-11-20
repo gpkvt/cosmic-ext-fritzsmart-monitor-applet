@@ -137,7 +137,7 @@ Run the **interactive terminal setup wizard** first (no desktop required):
 fritz-power-monitor --headless --setup
 ```
 
-The wizard guides you through optional FRITZ!Box and Tasmota connections (including device discovery and selection), Hue Bridge, Netatmo, weather, refresh interval, and the Prometheus listening address. Sensitive credentials are entered without terminal echo, blank answers retain saved values, and **nothing is written until you confirm Save**. It refuses non-interactive input to avoid accidental configuration changes. The alternative command `fritz-power-monitor --setup-headless` starts the same wizard.
+The wizard guides you through optional FRITZ!Box and Tasmota connections (including device discovery and selection), Hue Bridge pairing (press its physical link button), Netatmo, weather, refresh interval, and the Prometheus listening address. Sensitive credentials are entered without terminal echo, blank answers retain saved values, and **nothing is written until you confirm Save**. It refuses non-interactive input to avoid accidental configuration changes. The alternative command `fritz-power-monitor --setup-headless` starts the same wizard.
 
 The wizard stores the configuration alongside regular applet preferences at `~/.config/fritz_solar.cfg`, so you may also configure devices using the COSMIC applet if you prefer. After setup, start the headless exporter:
 
