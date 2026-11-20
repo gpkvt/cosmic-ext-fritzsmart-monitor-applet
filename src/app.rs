@@ -4514,12 +4514,18 @@ impl AppModel {
                 "unit": "bits/s",
             }),
             "devices" => {
-                let mut fritz_ids: Vec<String> = self.devices.iter()
-                    .map(|device| crate::fritz::canonical_device_key(&device.ain))
+                // Export the same visible selection as the popup, rather
+                // than silently including unrelated or deliberately hidden
+                // devices from the saved configuration.
+                let selected: HashSet<String> = self.selected_ains.iter()
+                    .map(|id| crate::fritz::canonical_device_key(id))
                     .collect();
-                for reading in &self.readings {
-                    let id = crate::fritz::canonical_device_key(&reading.ain);
-                    if !fritz_ids.contains(&id) {
+                let mut fritz_ids: Vec<String> = Vec::new();
+                for id in self.devices.iter().map(|device| &device.ain)
+                    .chain(self.readings.iter().map(|reading| &reading.ain))
+                {
+                    let id = crate::fritz::canonical_device_key(id);
+                    if selected.contains(&id) && !fritz_ids.contains(&id) {
                         fritz_ids.push(id);
                     }
                 }
@@ -4528,12 +4534,22 @@ impl AppModel {
                         .filter_map(|id| self.json_device_data(id, now))
                         .collect::<Vec<_>>(),
                     "hue_lights": self.hue_lights.iter()
+                        .filter(|light| hue_device_is_visible(
+                            &self.settings.hidden_hue_devices,
+                            &hue_device_id("light", &light.id),
+                        ))
                         .filter_map(|light| self.json_hue_light(&light.id))
                         .collect::<Vec<_>>(),
                     "hue_sensors": self.hue_sensors.iter()
+                        .filter(|sensor| hue_device_is_visible(
+                            &self.settings.hidden_hue_devices,
+                            &hue_device_id("sensor", &sensor.id),
+                        ))
                         .filter_map(|sensor| self.json_hue_sensor(&sensor.id, now))
                         .collect::<Vec<_>>(),
                     "netatmo": self.netatmo_sensors.iter()
+                        .filter(|sensor| !self.settings.hidden_netatmo_devices
+                            .contains(&sensor.id))
                         .filter_map(|sensor| self.json_netatmo_sensor(&sensor.id, now))
                         .collect::<Vec<_>>(),
                 })
@@ -4585,9 +4601,11 @@ impl AppModel {
                     })).collect::<Vec<_>>()),
                 "netatmo_extras_enabled": self.settings.weather_netatmo_extra_metrics,
                 "netatmo_extras": self.settings.weather_netatmo_extra_metrics.then(|| {
-                    self.netatmo_sensors.iter().filter_map(|sensor|
-                        self.json_netatmo_sensor(&sensor.id, now)
-                    ).collect::<Vec<_>>()
+                    self.netatmo_sensors.iter()
+                        .filter(|sensor| !self.settings.hidden_netatmo_devices
+                            .contains(&sensor.id))
+                        .filter_map(|sensor| self.json_netatmo_sensor(&sensor.id, now))
+                        .collect::<Vec<_>>()
                 }),
                 "error": &self.weather_error,
             }),
