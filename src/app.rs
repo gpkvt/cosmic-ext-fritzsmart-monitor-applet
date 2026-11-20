@@ -3062,25 +3062,30 @@ fn netatmo_device_history_graph(
     settings: &FritzSettings,
 ) -> Option<(String, GraphSamples, String)> {
     let metrics = history.get(&sensor.id)?;
-    crate::netatmo::METRICS.iter().find_map(|(metric, label, native_unit)| {
-        let samples = metrics.get(*metric).filter(|samples| !samples.is_empty())?;
-        let values: GraphSamples = samples.iter().map(|(time, value)| {
-            (
-                *time,
-                if *metric == "temperature" {
-                    temperature_in_unit(*value, &settings.temperature_unit)
-                } else {
-                    *value
-                },
-            )
-        }).collect();
-        let unit = if *metric == "temperature" {
-            temperature_unit_label(&settings.temperature_unit)
-        } else {
-            native_unit
-        };
-        Some((format!("{} · {label}", sensor.name), values, unit.to_string()))
-    })
+    crate::netatmo::METRICS
+        .iter()
+        .find_map(|(metric, label, native_unit)| {
+            let samples = metrics.get(*metric).filter(|samples| !samples.is_empty())?;
+            let values: GraphSamples = samples
+                .iter()
+                .map(|(time, value)| {
+                    (
+                        *time,
+                        if *metric == "temperature" {
+                            temperature_in_unit(*value, &settings.temperature_unit)
+                        } else {
+                            *value
+                        },
+                    )
+                })
+                .collect();
+            let unit = if *metric == "temperature" {
+                temperature_unit_label(&settings.temperature_unit)
+            } else {
+                *native_unit
+            };
+            Some((format!("{} · {label}", sensor.name), values, unit.to_string()))
+        })
 }
 
 /// Netatmo modules are read-only. Only recorded, finite measurements
@@ -9666,18 +9671,23 @@ impl cosmic::Application for AppModel {
                     // Match the standard device-list History action. When no
                     // samples exist yet, open details so the user can see the
                     // available live values and the graph's empty state.
-                    let history_action = netatmo_device_history_graph(
-                        &self.netatmo_history, sensor, &self.settings,
-                    )
-                    .map(|(title, values, unit)| Message::ShowGraph(title, values, unit, None))
-                    .unwrap_or_else(|| Message::ToggleDeviceDetails(id.clone()));
+                    let history_action =
+                        netatmo_device_history_graph(&self.netatmo_history, sensor, &self.settings)
+                            .map(|(title, values, unit)| {
+                                Message::ShowGraph(title, values, unit, None)
+                            })
+                            .unwrap_or_else(|| Message::ToggleDeviceDetails(id.clone()));
                     let history_button = widget::button::custom(
                         widget::Row::new()
                             .spacing(5)
                             .align_y(cosmic::iced::Alignment::Center)
-                            .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(16))
+                            .push(
+                                widget::icon::from_name("utilities-system-monitor-symbolic")
+                                    .size(16),
+                            )
                             .push(widget::text::caption(crate::i18n::tr(
-                                &self.settings.language, "History",
+                                &self.settings.language,
+                                "History",
                             ))),
                     )
                     .on_press(history_action)
@@ -14198,17 +14208,19 @@ mod history_tests {
         let mut history = crate::netatmo::NetatmoHistory::default();
         assert!(netatmo_device_history_graph(&history, &sensor, &settings).is_none());
         let now = Instant::now();
-        history.entry(sensor.id.clone()).or_default().insert(
-            "co2".into(), VecDeque::from([(now, 825.0)]),
-        );
+        history
+            .entry(sensor.id.clone())
+            .or_default()
+            .insert("co2".into(), VecDeque::from([(now, 825.0)]));
         let (title, values, unit) =
             netatmo_device_history_graph(&history, &sensor, &settings).unwrap();
         assert_eq!(title, "Living room · CO₂");
         assert_eq!(unit, "ppm");
         assert_eq!(values[0].1, 825.0);
-        history.get_mut(&sensor.id).unwrap().insert(
-            "temperature".into(), VecDeque::from([(now, 22.0)]),
-        );
+        history
+            .get_mut(&sensor.id)
+            .unwrap()
+            .insert("temperature".into(), VecDeque::from([(now, 22.0)]));
         let (title, values, unit) =
             netatmo_device_history_graph(&history, &sensor, &settings).unwrap();
         assert_eq!(title, "Living room · Temperature");
