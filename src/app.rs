@@ -37,6 +37,56 @@ pub(crate) fn diagnostic_event_counts() -> (u64, u64) {
 }
 pub type GraphSamples = Vec<(Instant, f64)>;
 type CopyFeedback = (String, Instant);
+
+/// History samples use monotonic ages rather than guessed wall-clock timestamps.
+/// Only user-visible readings are included; never export API tokens or passwords.
+fn json_power_samples(
+    samples: &VecDeque<(Instant, i64)>,
+    now: Instant,
+) -> Vec<serde_json::Value> {
+    samples.iter().map(|(at, watts)| serde_json::json!({
+        "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+        "watts": watts,
+    })).collect()
+}
+
+fn json_device_samples(
+    samples: &VecDeque<(Instant, i64, f64)>,
+    now: Instant,
+) -> Vec<serde_json::Value> {
+    samples.iter().map(|(at, watts, temperature)| serde_json::json!({
+        "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+        "watts": watts,
+        "temperature_c": temperature.is_finite().then_some(*temperature),
+    })).collect()
+}
+
+fn json_bandwidth_samples(
+    samples: &VecDeque<(Instant, u64, u64)>,
+    now: Instant,
+) -> Vec<serde_json::Value> {
+    samples.iter().map(|(at, download, upload)| serde_json::json!({
+        "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+        "download_bits_per_second": download,
+        "upload_bits_per_second": upload,
+    })).collect()
+}
+
+fn json_daily_energy_rows(
+    history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
+    settings: &FritzSettings,
+) -> Vec<serde_json::Value> {
+    daily_energy_history(history, &settings.input_ains, settings.refresh_interval_seconds)
+        .into_iter()
+        .map(|(day, input, output)| serde_json::json!({
+            "date": day.format("%Y-%m-%d").to_string(),
+            "input_wh": input,
+            "output_wh": output,
+            "input_output_percent": energy_input_output_ratio_percent(input, output),
+        }))
+        .collect()
+}
+
 const COPY_FEEDBACK_DURATION: Duration = Duration::from_millis(900);
 
 #[derive(Default)]
