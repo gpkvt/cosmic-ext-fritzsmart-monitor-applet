@@ -231,7 +231,7 @@ pub enum Message {
     ToggleWeatherAttribution,
     TestNotification,
     CopyDiagnosticUrl(String),
-    CopyMenuTitle(String),
+    CopySectionJson(String),
     ClearDiagnosticEvents,
     WriteDebugFile,
     DebugDumpGenerated(String),
@@ -1542,10 +1542,7 @@ fn daily_energy_history_section(
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
         .push(heading)
-        .push(copy_menu_title_button(
-            "DAILY ENERGY · LAST 7 DAYS".to_string(),
-            copy_feedback,
-        ));
+        .push(copy_section_button("daily-energy-history".to_string(), copy_feedback));
     let mut section = widget::Column::new()
         .spacing(0)
         .width(cosmic::iced::Length::Fill)
@@ -2826,10 +2823,7 @@ fn live_power_summary(
             .width(cosmic::iced::Length::Fill)
             .align_y(cosmic::iced::Alignment::Center)
             .push(history_heading)
-            .push(copy_menu_title_button(
-                crate::i18n::tr(&language, "CURRENT POWER HISTORY").to_string(),
-                copy_feedback,
-            )),
+            .push(copy_section_button("current-power-history".to_string(), copy_feedback)),
     );
     if !history_collapsed {
         let output_label = crate::i18n::tr(&language, "TOTAL POWER OUTPUT");
@@ -2915,7 +2909,7 @@ fn collapsible_graph_with_current_value(
             .size(16),
         ),
     )
-    .on_press(Message::ToggleMenuSection(section_id))
+    .on_press(Message::ToggleMenuSection(section_id.clone()))
     .width(cosmic::iced::Length::Fill)
     .padding([4, 0])
     .class(cosmic::theme::Button::Text);
@@ -2923,7 +2917,7 @@ fn collapsible_graph_with_current_value(
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
         .push(heading)
-        .push(copy_menu_title_button(title.to_string(), copy_feedback));
+        .push(copy_section_button(section_id, copy_feedback));
     let mut section = widget::Column::new()
         .spacing(4)
         .width(cosmic::iced::Length::Fill)
@@ -3369,15 +3363,7 @@ fn total_power_overview(
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
         .push(heading)
-        .push(copy_menu_title_button(
-            if has_input {
-                "TOTAL POWER INPUT & OUTPUT"
-            } else {
-                "TOTAL POWER OUTPUT"
-            }
-            .to_string(),
-            copy_feedback,
-        ));
+        .push(copy_section_button("total-power-overview".to_string(), copy_feedback));
     let mut section = widget::Column::new()
         .spacing(0)
         .width(cosmic::iced::Length::Fill)
@@ -4157,13 +4143,13 @@ fn copy_feedback_icon(
         .into()
 }
 
-fn copy_menu_title_button(
-    title: String,
+fn copy_section_button(
+    section_key: String,
     feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
-    let icon = copy_feedback_icon(&title, feedback);
+    let icon = copy_feedback_icon(&section_key, feedback);
     widget::button::custom(icon)
-        .on_press(Message::CopyMenuTitle(title))
+        .on_press(Message::CopySectionJson(section_key))
         .padding([4, 6])
         .class(cosmic::theme::Button::Text)
         .into()
@@ -7892,10 +7878,7 @@ impl cosmic::Application for AppModel {
                             .width(cosmic::iced::Length::Fill)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(weather_heading)
-                            .push(copy_menu_title_button(
-                                crate::i18n::tr(&self.settings.language, "Weather").to_string(),
-                                self.copy_feedback.as_ref(),
-                            )),
+                            .push(copy_section_button("weather".to_string(), self.copy_feedback.as_ref())),
                     )
                     .push(date_row);
                 weather_section = weather_section.push(
@@ -8261,10 +8244,7 @@ impl cosmic::Application for AppModel {
                             &self.settings.language,
                             "Weather",
                         )))
-                        .push(copy_menu_title_button(
-                            crate::i18n::tr(&self.settings.language, "Weather").to_string(),
-                            self.copy_feedback.as_ref(),
-                        )),
+                        .push(copy_section_button("weather".to_string(), self.copy_feedback.as_ref())),
                 );
                 if let Some(error) = &self.weather_error {
                     weather_section = weather_section.push(error_notice(
@@ -8597,8 +8577,8 @@ impl cosmic::Application for AppModel {
                             .align_x(cosmic::iced::Alignment::End),
                         )
                         .push(history_button)
-                        .push(copy_menu_title_button(
-                            reading.name.clone(),
+                        .push(copy_section_button(
+                            format!("device:{}", crate::fritz::canonical_device_key(&reading.ain)),
                             self.copy_feedback.as_ref(),
                         ))
                         .push(
@@ -8951,8 +8931,8 @@ impl cosmic::Application for AppModel {
                                 .push(
                                     widget::Space::new().width(cosmic::iced::Length::Fixed(108.0)),
                                 )
-                                .push(copy_menu_title_button(
-                                    device.name.clone(),
+                                .push(copy_section_button(
+                                    format!("device:{}", crate::fritz::canonical_device_key(&device.ain)),
                                     self.copy_feedback.as_ref(),
                                 ))
                                 .push(
@@ -9054,8 +9034,8 @@ impl cosmic::Application for AppModel {
                                 .align_x(cosmic::iced::Alignment::End),
                         )
                         .push(widget::Space::new().width(cosmic::iced::Length::Fixed(108.0)))
-                        .push(copy_menu_title_button(
-                            light.name.clone(),
+                        .push(copy_section_button(
+                            format!("hue-light:{}", light.id),
                             self.copy_feedback.as_ref(),
                         ))
                         .push(widget::container(toggle).width(cosmic::iced::Length::Fixed(52.0)));
@@ -9166,8 +9146,8 @@ impl cosmic::Application for AppModel {
                                 .width(cosmic::iced::Length::Fixed(108.0))
                                 .align_x(cosmic::iced::Alignment::End),
                         )
-                        .push(copy_menu_title_button(
-                            sensor.name.clone(),
+                        .push(copy_section_button(
+                            format!("hue-sensor:{}", sensor.id),
                             self.copy_feedback.as_ref(),
                         ))
                         .push(widget::Space::new().width(cosmic::iced::Length::Fixed(52.0)));
@@ -9267,8 +9247,8 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::caption(humidity)
                             .width(cosmic::iced::Length::Fixed(108.0))
                             .align_x(cosmic::iced::Alignment::End))
-                        .push(copy_menu_title_button(
-                            sensor.name.clone(), self.copy_feedback.as_ref()))
+                        .push(copy_section_button(
+                            format!("netatmo:{}", sensor.id), self.copy_feedback.as_ref()))
                         .push(widget::Space::new()
                             .width(cosmic::iced::Length::Fixed(52.0)));
                     let mut card = widget::list::list_column()
@@ -9516,11 +9496,7 @@ impl cosmic::Application for AppModel {
                                     .width(cosmic::iced::Length::Fill)
                                     .align_y(cosmic::iced::Alignment::Center)
                                     .push(heading)
-                                    .push(copy_menu_title_button(
-                                        crate::i18n::tr(&self.settings.language, "DEVICES")
-                                            .to_string(),
-                                        self.copy_feedback.as_ref(),
-                                    )),
+                                    .push(copy_section_button("devices".to_string(), self.copy_feedback.as_ref())),
                             );
                             if !collapsed {
                                 device_cards = device_cards.push(device_sort_header(
@@ -9694,10 +9670,7 @@ impl cosmic::Application for AppModel {
                         .width(cosmic::iced::Length::Fill)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(heading)
-                        .push(copy_menu_title_button(
-                            section.1.to_string(),
-                            self.copy_feedback.as_ref(),
-                        ));
+                        .push(copy_section_button(section.0.to_string(), self.copy_feedback.as_ref()));
                     let mut section_column = widget::Column::new().spacing(0).push(heading_row);
                     if !collapsed {
                         section_column = section_column.push(card);
