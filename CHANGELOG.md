@@ -4,6 +4,8 @@
 
 ### Improved
 
+- Rebuild the Linux release workflow with separate immutable-source preparation, strict validation/four-format packaging and atomic publication jobs. Use identical versioned sources across builds and tags, verify every asset and checksum before publishing, and keep valid Flatpak metainfo without invoking the broken Ubuntu host AppStream compose step.
+
 - Fix Linux release and package workflows failing during Flatpak bundling because `eu-strip` was missing on Ubuntu 24.04 runners. Install `elfutils` explicitly and check both `eu-strip` and `eu-elfcompress` before the expensive package build.
 
 - Correct the Netatmo stale-reading regression fixture: timestamp 1 with clock 1050 is only 1049 seconds old (within the 30-minute freshness window). Verify a genuinely expired sample and a separately disconnected recent sample.
