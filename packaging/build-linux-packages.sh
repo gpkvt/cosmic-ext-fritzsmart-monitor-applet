@@ -152,11 +152,20 @@ chmod +x "$TEMP_DIR/linuxdeploy-plugin-appimage-x86_64.AppImage"
         --icon-file "$ICON" \
         --output appimage
 )
-APPIMAGE_SOURCE="$(find "$TEMP_DIR" -maxdepth 1 -type f -name '*.AppImage' ! -name 'linuxdeploy-x86_64.AppImage' -print -quit)"
-if [[ -z "$APPIMAGE_SOURCE" ]]; then
-    echo "linuxdeploy did not produce an AppImage" >&2
+# Do not confuse the downloaded linuxdeploy plugin with the AppImage it
+# generates. Only the generated application artifact may be packaged.
+mapfile -t APPIMAGE_CANDIDATES < <(
+    find "$TEMP_DIR" -maxdepth 1 -type f -name '*.AppImage' \
+        ! -name 'linuxdeploy-x86_64.AppImage' \
+        ! -name 'linuxdeploy-plugin-appimage-x86_64.AppImage' \
+        -print
+)
+if [[ "${#APPIMAGE_CANDIDATES[@]}" -ne 1 ]]; then
+    printf 'Expected exactly one generated AppImage, found %s:\n' "${#APPIMAGE_CANDIDATES[@]}" >&2
+    printf '  %s\n' "${APPIMAGE_CANDIDATES[@]}" >&2
     exit 1
 fi
+APPIMAGE_SOURCE="${APPIMAGE_CANDIDATES[0]}"
 APPIMAGE_FILE="$OUTPUT_DIR/fritz-power-monitor-$APP_VERSION-x86_64.AppImage"
 install -m0755 "$APPIMAGE_SOURCE" "$APPIMAGE_FILE"
 file "$APPIMAGE_FILE"
