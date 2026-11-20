@@ -341,9 +341,9 @@ mod tests {
     fn disconnected_or_old_readings_are_not_presented_as_live() {
         let response = json!({"body":{"devices":[
             {"_id":"old","dashboard_data":{"time_utc":1,"Temperature":20}},
-            {"_id":"offline","reachable":false,"dashboard_data":{"time_utc":1000,"Temperature":30}}
+            {"_id":"offline","reachable":false,"dashboard_data":{"time_utc":2950,"Temperature":30}}
         ]}});
-        let sensors = parse_stations(&response, 1050).unwrap();
+        let sensors = parse_stations(&response, 3000).unwrap();
         assert_eq!(sensors.len(), 2);
         assert!(!sensors[0].reachable);
         assert!(!sensors[1].reachable);
