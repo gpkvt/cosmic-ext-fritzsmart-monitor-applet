@@ -162,6 +162,7 @@ pub struct AppModel {
     collapsed_menu_sections: HashSet<String>,
     quick_refresh_interval: u32,
     quick_graph_timespan: u32,
+    history_retention_preview: u32,
     expanded_graph: Option<(String, GraphSamples, String, Option<String>)>,
     expanded_graph_secondary: Option<(GraphSamples, String)>,
     expanded_graph_full_values: Option<GraphSamples>,
@@ -243,7 +244,8 @@ pub enum Message {
     PanelExcludeSolarTemperatureChanged(bool),
     PanelNetPowerChanged(bool),
     GraphTimespanChanged(u32),
-    HistoryRetentionChanged(u32),
+    HistoryRetentionPreview(u32),
+    CommitHistoryRetention,
     GraphStyleChanged(String),
     TemperatureUnitChanged(String),
     ShowGraph(String, GraphSamples, String, Option<String>),
@@ -5033,6 +5035,7 @@ impl cosmic::Application for AppModel {
         // before showing devices restored from the user's settings.
         let saved_devices_loaded = !known_devices.is_empty();
         let quick_graph_timespan = settings.graph_timespan_minutes;
+        let history_retention_preview = settings.history_retention_minutes;
         let restore_forecast = weather_forecast_expanded
             && settings.weather_enabled
             && !settings.weather_location.trim().is_empty();
@@ -5116,6 +5119,7 @@ impl cosmic::Application for AppModel {
                 graph_history_diagnostics_expanded,
                 quick_refresh_interval,
                 quick_graph_timespan,
+                history_retention_preview,
                 weather_forecast_days: restore_forecast.then_some(7),
                 weather_forecast_loading: restore_forecast,
                 refresh_started_at: Some(Instant::now()),
@@ -6479,23 +6483,24 @@ impl cosmic::Application for AppModel {
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::caption(format!(
                         "MAXIMUM HISTORY RETENTION: {}",
-                        format_graph_timespan(self.settings.history_retention_minutes)
+                        format_graph_timespan(self.history_retention_preview)
                     )))
                     .push(
                         widget::slider(
                             0.0..=4.0,
                             quick_slider_position(
-                                self.settings.history_retention_minutes as f32,
+                                self.history_retention_preview as f32,
                                 [5.0, 60.0, 1440.0, 43200.0, 2102400.0],
                             ),
-                            |position| Message::HistoryRetentionChanged(
+                            |position| Message::HistoryRetentionPreview(
                                 quick_slider_value(
                                     position,
                                     [5.0, 60.0, 1440.0, 43200.0, 2102400.0],
                                 ).round() as u32
                             ),
                         )
-                        .step(0.01_f32),
+                        .step(0.01_f32)
+                        .on_release(Message::CommitHistoryRetention),
                     )
                     .push(quick_slider_anchor_labels(["5m", "1h", "1d", "30d", "4y"]))
                     .push(widget::text::caption(
@@ -12624,8 +12629,11 @@ impl cosmic::Application for AppModel {
                 self.settings.panel_net_power = value;
                 self.persist_settings();
             }
-            Message::HistoryRetentionChanged(value) => {
-                let minutes = value.clamp(5, 2_102_400);
+            Message::HistoryRetentionPreview(value) => {
+                self.history_retention_preview = value.clamp(5, 2_102_400);
+            }
+            Message::CommitHistoryRetention => {
+                let minutes = self.history_retention_preview.clamp(5, 2_102_400);
                 if self.settings.history_retention_minutes != minutes {
                     self.settings.history_retention_minutes = minutes;
                     let window = graph_history_storage_window(minutes);
