@@ -803,6 +803,30 @@ fn graph_history_storage_window(minutes: u32) -> Duration {
     graph_history_window(minutes)
 }
 
+/// Remove samples older than the configured maximum from every in-memory
+/// history source, including readings from devices that are now offline.
+fn prune_history_to_window(app: &mut AppModel, window: Duration, now: Instant) {
+    app.history
+        .retain(|(at, _)| now.saturating_duration_since(*at) <= window);
+    app.bandwidth_history
+        .retain(|(at, _, _)| now.saturating_duration_since(*at) <= window);
+    app.device_history.retain(|_, samples| {
+        samples.retain(|(at, _, _)| now.saturating_duration_since(*at) <= window);
+        !samples.is_empty()
+    });
+    app.hue_sensor_history.retain(|_, samples| {
+        samples.retain(|(at, _, _)| now.saturating_duration_since(*at) <= window);
+        !samples.is_empty()
+    });
+    app.netatmo_history.retain(|_, metrics| {
+        metrics.retain(|_, samples| {
+            samples.retain(|(at, _)| now.saturating_duration_since(*at) <= window);
+            !samples.is_empty()
+        });
+        !metrics.is_empty()
+    });
+}
+
 fn rebuild_device_history_graph(
     device_history: &crate::history::DeviceHistory,
     ain: &str,
@@ -11233,6 +11257,11 @@ impl cosmic::Application for AppModel {
                                 }
                             }
 
+                            prune_history_to_window(
+                                self,
+                                graph_history_storage_window(self.settings.history_retention_minutes),
+                                Instant::now(),
+                            );
                             if let Err(error) =
                                 crate::history::save(&self.history, &self.device_history)
                             {
@@ -12189,6 +12218,11 @@ impl cosmic::Application for AppModel {
                                         self.temperature_alert_state.remove(&key);
                                     }
                                 }
+                                prune_history_to_window(
+                                    self,
+                                    graph_history_storage_window(self.settings.history_retention_minutes),
+                                    Instant::now(),
+                                );
                                 if let Err(error) = crate::netatmo::save_history(&self.netatmo_history) {
                                     eprintln!("Could not save Netatmo sensor history: {error}");
                                 }
@@ -12510,6 +12544,11 @@ impl cosmic::Application for AppModel {
                                 self.temperature_alert_state.remove(&key);
                             }
                         }
+                        prune_history_to_window(
+                            self,
+                            graph_history_storage_window(self.settings.history_retention_minutes),
+                            Instant::now(),
+                        );
                         if let Err(error) =
                             crate::history::save_hue_sensors(&self.hue_sensor_history)
                         {
@@ -12637,33 +12676,7 @@ impl cosmic::Application for AppModel {
                 if self.settings.history_retention_minutes != minutes {
                     self.settings.history_retention_minutes = minutes;
                     let window = graph_history_storage_window(minutes);
-                    let now = Instant::now();
-                    self.history
-                        .retain(|(at, _)| now.saturating_duration_since(*at) <= window);
-                    self.bandwidth_history.retain(|(at, _, _)| {
-                        now.saturating_duration_since(*at) <= window
-                    });
-                    self.device_history.retain(|_, samples| {
-                        samples.retain(|(at, _, _)| {
-                            now.saturating_duration_since(*at) <= window
-                        });
-                        !samples.is_empty()
-                    });
-                    self.hue_sensor_history.retain(|_, samples| {
-                        samples.retain(|(at, _, _)| {
-                            now.saturating_duration_since(*at) <= window
-                        });
-                        !samples.is_empty()
-                    });
-                    self.netatmo_history.retain(|_, metrics| {
-                        metrics.retain(|_, samples| {
-                            samples.retain(|(at, _)| {
-                                now.saturating_duration_since(*at) <= window
-                            });
-                            !samples.is_empty()
-                        });
-                        !metrics.is_empty()
-                    });
+                    prune_history_to_window(self, window, Instant::now());
                     if let Err(error) = crate::history::save(&self.history, &self.device_history) {
                         eprintln!("Could not save pruned graph history: {error}");
                     }
@@ -14616,6 +14629,35 @@ mod history_tests {
         assert_eq!(history.len(), 13);
         assert_eq!(history.front().unwrap().1, 2);
         assert_eq!(history.back().unwrap().1, 14);
+    }
+
+    #[test]
+    fn unified_retention_prunes_old_samples_from_every_source() {
+        let now = Instant::now();
+        let old = now - Duration::from_secs(7200);
+        let recent = now - Duration::from_secs(120);
+        let mut app = AppModel::default();
+        app.history = VecDeque::from([(old, 1), (recent, 2)]);
+        app.bandwidth_history =
+            VecDeque::from([(old, 1, 1), (recent, 2, 2)]);
+        app.device_history.insert(
+            "device".into(),
+            VecDeque::from([(old, 1, 20.0), (recent, 2, 21.0)]),
+        );
+        app.hue_sensor_history.insert(
+            "hue".into(),
+            VecDeque::from([(old, Some(20.0), None), (recent, None, Some(50.0))]),
+        );
+        app.netatmo_history.entry("netatmo".into()).or_default().insert(
+            "co2".into(),
+            VecDeque::from([(old, 900.0), (recent, 800.0)]),
+        );
+        prune_history_to_window(&mut app, Duration::from_secs(300), now);
+        assert_eq!(app.history.len(), 1);
+        assert_eq!(app.bandwidth_history.len(), 1);
+        assert_eq!(app.device_history["device"].len(), 1);
+        assert_eq!(app.hue_sensor_history["hue"].len(), 1);
+        assert_eq!(app.netatmo_history["netatmo"]["co2"].len(), 1);
     }
 
     #[test]
