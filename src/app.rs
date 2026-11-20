@@ -6501,12 +6501,14 @@ impl cosmic::Application for AppModel {
                         .step(0.01_f32),
                     )
                     .push(quick_slider_anchor_labels(["5m", "1h", "1d", "30d", "4y"]))
-                    .push(widget::text::caption(
-                        "Visible graph range: 5 minutes to 4 years. This does not delete saved readings.",
-                    ))
+                    .push(widget::text::caption(crate::i18n::tr(
+                        &self.settings.language,
+                        "Graph range only changes what is shown; it never deletes saved samples.",
+                    )))
                     .push(widget::divider::horizontal::default())
                     .push(widget::text::caption(format!(
-                        "MAXIMUM HISTORY RETENTION: {}",
+                        "{}: {}",
+                        crate::i18n::tr(&self.settings.language, "MAXIMUM HISTORY RETENTION"),
                         format_graph_timespan(self.history_retention_preview)
                     )))
                     .push(
@@ -6527,9 +6529,10 @@ impl cosmic::Application for AppModel {
                         .on_release(Message::CommitHistoryRetention),
                     )
                     .push(quick_slider_anchor_labels(["5m", "1h", "1d", "30d", "4y"]))
-                    .push(widget::text::caption(
-                        "Maximum age of stored FRITZ!Box, Tasmota, Hue, Netatmo and bandwidth readings. Reducing this value permanently deletes older saved samples.",
-                    ))
+                    .push(widget::text::caption(crate::i18n::tr(
+                        &self.settings.language,
+                        "Reducing this limit permanently deletes older samples from every history source.",
+                    )))
                     .push(widget::divider::horizontal::default())
             }
             if self.active_settings_section == Some("refresh") {
