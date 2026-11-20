@@ -1,6 +1,18 @@
 name: Publish GitHub Pages
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'SECURITY.md'
+      - 'CHANGELOG.md'
+      - 'Cargo.toml'
+      - 'scripts/build-pages.py'
+      - 'scripts/validate-pages.py'
+      - '.github/workflows/gh-pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -45,4 +57,4 @@ jobs:
           publish_dir: ./docs
           keep_files: false
           enable_jekyll: false
-          commit_message: 'docs(pages): manual publish from ${{ github.sha }}'
+          commit_message: 'docs(pages): publish from ${{ github.sha }}'
