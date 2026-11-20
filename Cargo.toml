@@ -13,7 +13,7 @@ libcosmic = { git = "https://github.com/pop-os/libcosmic.git", features = [
     "wayland",
     "winit",
 ] }
-tokio = { version = "1", features = ["fs", "process", "time"] }
+tokio = { version = "1", features = ["fs", "process", "rt-multi-thread", "signal", "time"] }
 sha2 = "0.11"
 zbus = "6.3"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
