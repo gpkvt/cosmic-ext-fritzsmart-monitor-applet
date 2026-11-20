@@ -322,6 +322,7 @@ pub fn run(listen_override: Option<&str>) -> Result<(), String> {
     if settings.ains.is_empty()
         && settings.ain.trim().is_empty()
         && !settings.known_devices.is_empty()
+        && !settings.device_selection_initialized
     {
         // Mirror the applet's migration for old installs whose saved
         // inventory exists but whose selected IDs were left empty.
