@@ -107,6 +107,16 @@ def main() -> None:
     shutil.copyfile(license_source, DOCS / "LICENSE")
     print("Copied LICENSE -> docs/LICENSE")
 
+    # The repository README embeds its application icon from data/.
+    # GitHub Pages publishes only docs/, so stage this asset there as well.
+    icon_source = ROOT / "data" / "com.gpkvt.FritzPowerMonitor.svg"
+    if not icon_source.is_file():
+        raise FileNotFoundError(f"Required README icon is missing: {icon_source}")
+    icon_destination = DOCS / "data" / icon_source.name
+    icon_destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(icon_source, icon_destination)
+    print(f"Copied {icon_source.relative_to(ROOT)} -> {icon_destination.relative_to(ROOT)}")
+
     sources = {
         ROOT / "README.md": DOCS / "readme.html",
         ROOT / "SECURITY.md": DOCS / "security.html",
