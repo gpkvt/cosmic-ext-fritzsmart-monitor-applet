@@ -101,10 +101,10 @@ pub fn parse_stations(value: &Value, now_epoch: i64) -> Result<Vec<NetatmoSensor
         }
         if let Some(modules) = device.get("modules").and_then(Value::as_array) {
             for module in modules.iter().take(40) {
-                if let Some(sensor) = parse_module(module, station, now_epoch) {
-                    if !sensors.iter().any(|existing| existing.id == sensor.id) {
-                        sensors.push(sensor);
-                    }
+                if let Some(sensor) = parse_module(module, station, now_epoch)
+                    && !sensors.iter().any(|existing| existing.id == sensor.id)
+                {
+                    sensors.push(sensor);
                 }
             }
         }
