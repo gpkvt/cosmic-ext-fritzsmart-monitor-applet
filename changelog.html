@@ -23,6 +23,9 @@ main{padding:54px 0 100px}article{max-width:860px;margin:auto}h1{font-size:clamp
 <h3 id="improved">Improved<a class="headerlink" href="#improved" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
+<p>Fix Linux release and package workflows failing during Flatpak bundling because <code>eu-strip</code> was missing on Ubuntu 24.04 runners. Install <code>elfutils</code> explicitly and check both <code>eu-strip</code> and <code>eu-elfcompress</code> before the expensive package build.</p>
+</li>
+<li>
 <p>Correct the Netatmo stale-reading regression fixture: timestamp 1 with clock 1050 is only 1049 seconds old (within the 30-minute freshness window). Verify a genuinely expired sample and a separately disconnected recent sample.</p>
 </li>
 <li>
