@@ -1016,7 +1016,7 @@ impl FritzSettings {
             },
         );
         contents.push_str(&format!(
-            "HISTORY_RETENTION_MINUTES={}\\n",
+            "HISTORY_RETENTION_MINUTES={}\n",
             self.history_retention_minutes.clamp(5, 2_102_400)
         ));
         contents.push_str(&format!("PROMETHEUS_ENABLED={}\n", if self.prometheus_enabled { "true" } else { "false" }));
