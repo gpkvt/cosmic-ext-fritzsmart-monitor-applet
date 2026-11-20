@@ -73,6 +73,13 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
+      # Keep release builds reproducible even when earlier source commits
+      # were not rustfmt-clean. Persist the formatted sources in the same
+      # release commit as the version bump, so the published tag matches
+      # exactly what was checked and packaged.
+      - name: Format Rust sources for the release
+        run: cargo fmt --all
+
       - name: Verify formatting, compilation, Clippy and tests
         run: |
           cargo fmt --all -- --check
@@ -108,7 +115,12 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # cargo fmt may have changed tracked Rust sources. Include those
+          # files in the release commit: otherwise the tag differs from the
+          # tested and packaged binary, and the next release fails again.
           git add Cargo.toml Cargo.lock
+          git add -u -- '*.rs'
+          git diff --exit-code
           git commit -m "chore(release): $TAG"
           git tag -a "$TAG" -m "FRITZ!Power Monitor $TAG"
           # If main moves or a tag collides, push neither ref.
