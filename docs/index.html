@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#10131a">
-  <meta name="description" content="FRITZ!Power Monitor for COSMIC — FRITZ!Box and Tasmota power meters, Philips Hue lights and sensors, and Netatmo Weather Station API monitoring.">
-  <meta property="og:title" content="FRITZ!Power Monitor — Power readings in your COSMIC panel">
-  <meta property="og:description" content="Now with Netatmo Weather Station support: see temperature, CO₂, humidity, pressure, rain and wind alongside FRITZ!Box, Tasmota and Philips Hue devices.">
-  <title>FRITZ!Power Monitor — Power readings in your COSMIC panel</title>
+  <meta name="description" content="FRITZ!Power Monitor: monitor FRITZ!Box, Tasmota, Hue and Netatmo devices from the COSMIC panel or headlessly with a terminal setup wizard and Prometheus exporter.">
+  <meta property="og:title" content="FRITZ!Power Monitor — COSMIC panel and headless monitoring">
+  <meta property="og:description" content="Live power and smart-home readings with or without a desktop. Use the COSMIC panel or headless Prometheus monitoring with a guided terminal setup.">
+  <title>FRITZ!Power Monitor — COSMIC panel and headless monitoring</title>
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <style>
     :root{color-scheme:dark;--bg:#0b0e14;--surface:#121722;--surface2:#171e2b;--surface3:#202a39;--text:#f2f5fa;--muted:#a2adbd;--soft:#748195;--line:#293344;--mint:#8be0c4;--blue:#8bb9ff;--amber:#f6c779;--violet:#c4a6ff;--max:1160px;--radius:24px}
@@ -43,6 +43,20 @@
     .showcase{display:grid;grid-template-columns:.82fr 1.18fr;gap:70px;align-items:center;margin:78px 0}.showcase:nth-of-type(even){grid-template-columns:1.18fr .82fr}.showcase:nth-of-type(even) .showcase-copy{order:2}.showcase h3{font-size:32px;line-height:1.1;letter-spacing:-.055em;margin:14px 0}.showcase p{color:var(--muted)}.checklist{list-style:none;padding:0;margin:22px 0}.checklist li{display:flex;gap:11px;padding:8px 0;color:#c5ceda;font-size:14px}.checklist li:before{content:"✓";color:var(--mint);font-weight:800}
     .shot{position:relative;padding:15px;border-radius:25px;background:linear-gradient(145deg,#273447,#111722);border:1px solid #ffffff20;box-shadow:0 28px 80px #0007;overflow:hidden}.shot:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,#ffffff08,transparent 35%,transparent 70%,#8be0c408)}.shot-top{display:flex;align-items:center;justify-content:space-between;padding:3px 5px 14px;color:#9caabd;font:10px "DM Mono",monospace;letter-spacing:.1em}.shot-window{border-radius:15px;background:#111824;border:1px solid #ffffff13;padding:17px}.shot-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.shot-title strong{font-size:14px}.shot-title span{font:10px "DM Mono",monospace;color:#91a0b4}.metric-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{padding:12px;border:1px solid #ffffff12;background:#ffffff06;border-radius:12px}.metric small{display:block;color:#91a0b4;font-size:9px;letter-spacing:.1em}.metric b{font:22px "DM Mono",monospace}.graph{margin-top:12px;padding:12px;border-radius:12px;background:#ffffff05;border:1px solid #ffffff0e}.graph-head{display:flex;justify-content:space-between;color:#aab6c7;font-size:10px}.graph svg{display:block;width:100%;height:80px;margin-top:6px}.device-card{margin-top:10px;padding:12px;border-radius:12px;background:#ffffff06;border:1px solid #ffffff12}.device-card-head{display:flex;justify-content:space-between;font-size:11px}.device-card-head b{color:var(--mint);font:12px "DM Mono",monospace}.mini-bars{display:flex;gap:4px;align-items:end;height:30px;margin-top:8px}.mini-bars i{display:block;flex:1;background:#8be0c477;border-radius:3px 3px 0 0}.mini-bars i:nth-child(3n){background:#8bb9ff88}
     .settings-shot{display:grid;grid-template-columns:120px 1fr;gap:12px}.settings-menu{display:grid;gap:6px}.settings-menu span{padding:9px 8px;border-radius:8px;color:#a6b2c2;font-size:9px}.settings-menu span:first-child{background:#8be0c41a;color:var(--mint)}.setting-panel{padding:13px;border-radius:12px;background:#ffffff06;border:1px solid #ffffff12}.setting-panel h4{font-size:12px;margin:0 0 10px}.setting-line{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-top:1px solid #ffffff0d;color:#aebaca;font-size:9px}.toggle{width:27px;height:15px;border-radius:20px;background:#8be0c4;position:relative}.toggle:after{content:"";position:absolute;right:2px;top:2px;width:11px;height:11px;border-radius:50%;background:#14251f}
+
+    .headless-layout{display:grid;grid-template-columns:minmax(0,1.07fr) minmax(0,.93fr);gap:38px;align-items:center;padding:44px;border:1px solid #8be0c44d;border-radius:30px;background:linear-gradient(125deg,#1a302e,#151e2a 62%,#1b2034);box-shadow:0 30px 80px #0003}
+    .headless-copy h2{font-size:clamp(32px,4.2vw,53px);line-height:1.06;letter-spacing:-.065em;margin:15px 0 17px}
+    .headless-copy p{color:var(--muted);font-size:16px;margin:0}
+    .headless-benefits{display:grid;gap:10px;margin:24px 0 0;padding:0;list-style:none}
+    .headless-benefits li{display:flex;gap:10px;align-items:flex-start;color:#d1dae4;font-size:14px;line-height:1.55}
+    .headless-benefits li:before{content:"✓";color:var(--mint);font-weight:800;flex:none}
+    .headless-actions{margin-top:24px}
+    .headless-terminal pre{padding:20px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.85}
+    .headless-terminal .comment{color:#8a9aaf}
+    .headless-terminal .prompt{color:var(--mint)}
+    .headless-footnote{margin-top:12px;color:var(--muted);font-size:12px;line-height:1.65}
+    @media(max-width:850px){.headless-layout{grid-template-columns:1fr;padding:30px}.headless-copy h2{max-width:650px}}
+    @media(max-width:560px){.headless-layout{padding:22px;border-radius:22px;gap:26px}.headless-terminal pre{padding:15px;font-size:11px}.headless-copy p{font-size:15px}}
 
     .install-band{display:grid;grid-template-columns:1fr .95fr;gap:50px;align-items:center;padding:40px;border-radius:30px;background:linear-gradient(130deg,#172c2a,#172130 65%,#211e31);border:1px solid #8be0c433}.install-band h2{font-size:clamp(34px,4.5vw,52px);line-height:1.05;letter-spacing:-.06em;margin:14px 0}.terminal{background:#090d13;border:1px solid #ffffff1b;border-radius:16px;overflow:hidden}.terminal-head{padding:12px 15px;border-bottom:1px solid #ffffff12;color:#8695a9;font:10px "DM Mono",monospace}.terminal pre{margin:0;padding:18px;color:#d6e4e2;font:12px/2 "DM Mono",monospace;white-space:pre-wrap}.terminal .prompt{color:var(--mint)}
     .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;counter-reset:step}.step{padding:25px;border:1px solid var(--line);border-radius:20px;background:var(--surface);counter-increment:step}.step:before{content:"0" counter(step);font:12px "DM Mono",monospace;color:var(--mint)}.step h3{font-size:18px;margin:16px 0 8px}.step p{color:var(--muted);font-size:14px;margin:0}
@@ -106,17 +120,17 @@
   <div id="scroll-progress" aria-hidden="true"></div>
   <div class="topbar"><div class="wrap nav">
     <a class="brand" href="#top"><img src="logo.svg" alt=""><span>FRITZ!Power Monitor</span></a>
-    <nav class="navlinks" aria-label="Main navigation"><a href="#features">Features</a><a href="guide.html">Documentation</a><a href="#install">Install</a><a href="#downloads">Downloads</a><a href="#compatibility">Compatibility</a><a href="#faq">FAQ</a><a class="nav-cta" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet">GitHub ↗</a></nav>
+    <nav class="navlinks" aria-label="Main navigation"><a href="#features">Features</a><a href="#headless">Headless</a><a href="guide.html">Documentation</a><a href="#install">Install</a><a href="#downloads">Downloads</a><a href="#compatibility">Compatibility</a><a href="#faq">FAQ</a><a class="nav-cta" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet">GitHub ↗</a></nav>
   </div></div>
   <main id="top">
     <div class="wrap hero">
       <div class="reveal">
-        <div class="eyebrow">A COSMIC desktop applet</div>
+        <div class="eyebrow">COSMIC applet · Headless monitoring</div>
         <h1>Your home.<br>Your power.<br><span>In real time.</span></h1>
-        <p class="hero-copy">Monitor FRITZ!Box and Tasmota power meters, Philips Hue lights and sensors, and Netatmo Weather Station measurements from one COSMIC applet.</p>
-        <div class="actions"><a class="btn" href="#downloads">Get the applet <span>↓</span></a><a class="btn secondary" href="#features">Explore the interface ↓</a></div>
-        <div class="hero-meta"><span><i class="dot"></i> Open source · MIT</span><span>Built for COSMIC</span><span>FRITZ!Box · Tasmota · Hue · Netatmo</span></div>
-        <a class="release-note" href="guide.html#netatmo"><strong>Netatmo Weather Stations · optional integration</strong><span>See live station/module readings, independent history graphs and optional Netatmo outdoor temperature in the weather view. Requires Netatmo cloud authorization. Explore setup →</span></a>
+        <p class="hero-copy">Monitor FRITZ!Box and Tasmota power meters, Philips Hue lights and sensors, and Netatmo Weather Stations — in your COSMIC panel or headlessly with Prometheus.</p>
+        <div class="actions"><a class="btn" href="#downloads">Get FRITZ!Power Monitor <span>↓</span></a><a class="btn secondary" href="#headless">Explore headless mode ↓</a></div>
+        <div class="hero-meta"><span><i class="dot"></i> Open source · MIT</span><span>COSMIC or no desktop</span><span>FRITZ!Box · Tasmota · Hue · Netatmo</span></div>
+        <a class="release-note" href="#headless"><strong>New: Headless monitoring · no COSMIC session needed</strong><span>Set up from the terminal, run continuously as an optional user service, and export live device and weather metrics to Prometheus. See how it works →</span></a>
       </div>
       <div class="hero-gallery" aria-label="Featured FRITZ!Power Monitor screenshots">
         <a class="hero-shot" href="Screenshot_2026-11-18_13-45-46.png" aria-label="View live overview screenshot screenshot" data-hero-lightbox><img src="Screenshot_2026-11-18_13-45-46.png" alt="Live FRITZ!Power Monitor overview with current household power readings and weather" fetchpriority="high"><span class="hero-card-title">Live overview</span><span class="hero-card-type">Power · Live</span><span class="hero-card-description">Check power readings and optional weather from the COSMIC panel.</span></a>
@@ -131,7 +145,7 @@
         <a class="hero-shot" href="Screenshot_2026-11-18_13-49-28.png" aria-label="View device details screenshot screenshot" data-hero-lightbox><img src="Screenshot_2026-11-18_13-49-28.png" alt="Device details with individual power and temperature monitoring information" loading="lazy"><span class="hero-card-title">Device details</span><span class="hero-card-type">Devices · Details</span><span class="hero-card-description">Review individual device readings and monitoring details.</span></a>
       </div>
     </div>
-    <div class="trustline"><div class="wrap trust-inner"><span>⌁ Live FRITZ!Box readings</span><span>◌ Device-level history</span><span>⌂ Native COSMIC panel</span><span>↗ No cloud account required for core monitoring</span></div></div>
+    <div class="trustline"><div class="wrap trust-inner"><span>⌁ Live FRITZ!Box readings</span><span>◌ Device-level history</span><span>⌂ COSMIC panel or headless service</span><span>↗ No cloud account required for core monitoring</span></div></div>
 
     <section id="features"><div class="wrap">
       <div class="section-head reveal"><div class="eyebrow">At a glance</div><h2>Power readings without the clutter.<br>A quick look, with more detail when you need it.</h2><p>The panel shows the current readings. Open the popup for device details, graphs and weather. Sections can be collapsed independently, and their main readings stay visible.</p></div>
@@ -145,6 +159,36 @@
       </div>
     </div></section>
 
+    <section id="headless"><div class="wrap">
+      <div class="headless-layout reveal">
+        <div class="headless-copy">
+          <div class="eyebrow">Monitoring without a desktop</div>
+          <h2>Your readings. <span style="color:var(--mint)">No panel required.</span></h2>
+          <p>Run FRITZ!Power Monitor on a Linux machine without launching COSMIC or Wayland. The headless collector refreshes your configured devices and weather independently and exposes current measurements through the Prometheus <code>/metrics</code> endpoint.</p>
+          <ul class="headless-benefits">
+            <li>Guided terminal wizard for connections, device discovery, Hue pairing and exporter settings.</li>
+            <li>FRITZ!Box, Tasmota, Hue, Netatmo and optional OpenWeatherMap telemetry.</li>
+            <li>Optional systemd user service for unattended monitoring — enabled only when you choose.</li>
+          </ul>
+          <div class="actions headless-actions"><a class="btn" href="guide.html#headless">Headless setup guide ↗</a><a class="btn secondary" href="#downloads">Get the app ↓</a></div>
+        </div>
+        <div>
+          <div class="terminal headless-terminal" aria-label="Headless mode quick start commands">
+            <div class="terminal-head">TERMINAL — HEADLESS QUICK START</div>
+            <pre><span class="comment"># Configure your data sources and exporter</span>
+<span class="prompt">$</span> fritz-power-monitor --headless --setup
+
+<span class="comment"># Start monitoring without a desktop</span>
+<span class="prompt">$</span> fritz-power-monitor --headless
+
+<span class="comment"># From another terminal: inspect metrics</span>
+<span class="prompt">$</span> curl http://127.0.0.1:9817/metrics</pre>
+          </div>
+          <p class="headless-footnote">Default endpoint: <code>127.0.0.1:9817</code> · Local-only by default. The metrics endpoint has no authentication or TLS; restrict access if binding to a network interface.</p>
+        </div>
+      </div>
+    </div></section>
+
     <section id="install"><div class="wrap">
       <div class="install-band reveal"><div><div class="eyebrow">Get started</div><h2>Install FRITZ!Power Monitor</h2><p class="muted">Build and install for your user without root privileges, or use the Debian package below for a system-wide installation.</p><div class="actions"><a class="btn" href="#downloads">Download the applet ↓</a><a class="btn secondary" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/blob/main/README.md">Full README ↗</a></div></div>
         <div class="terminal"><div class="terminal-head">TERMINAL — USER INSTALL</div><pre><span class="prompt">$</span> git clone https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet.git
@@ -154,7 +198,7 @@
 <span class="prompt">✓</span> Built release binary
 <span class="prompt">✓</span> Installed applet and desktop entry</pre></div>
       </div>
-      <div class="section-head reveal" style="margin-top:76px"><div class="eyebrow">First launch</div><h2>Getting started</h2><p>After installation, add it to the panel and connect it to your FRITZ!Box.</p></div>
+      <div class="section-head reveal" style="margin-top:76px"><div class="eyebrow">First launch</div><h2>Getting started</h2><p>For the COSMIC panel, add the applet and connect your devices here. Prefer a machine without a desktop? <a href="#headless">Use the headless setup wizard instead.</a></p></div>
       <div class="steps">
         <article class="step reveal"><h3>Add it to your panel</h3><p>Open COSMIC Settings, find the panel applet list and add <strong>FRITZ!Power Monitor</strong>. Reopen Settings or log out and in if the list has not refreshed.</p></article>
         <article class="step reveal"><h3>Connect your router</h3><p>Open the applet settings, enter the FRITZ!Box URL and a user account allowed to access Smart Home data, then choose <strong>Load devices</strong>.</p></article>
@@ -163,7 +207,7 @@
     </div></section>
 
     <section id="downloads"><div class="wrap">
-      <div class="section-head reveal"><div class="eyebrow">Latest release</div><h2>Download the applet</h2><p>Choose the Debian package for a system-wide installation, or the portable archive to install into your own user profile. Both target x86_64 Linux.</p></div>
+      <div class="section-head reveal"><div class="eyebrow">Latest release</div><h2>Download FRITZ!Power Monitor</h2><p>One binary supports both the COSMIC panel and headless monitoring. Choose the Debian package for a system-wide installation, or the portable archive for a user-local install. Both target x86_64 Linux.</p></div>
       <div class="install-band reveal">
         <div><div class="eyebrow">FRITZ!Power Monitor · v@APP_VERSION@</div><h2>Get the latest build.</h2><p class="muted">Download the archive, extract it and install the included files into your user profile. No package manager or root access is needed.</p><div class="actions"><a class="btn" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/download/v@APP_VERSION@/fritz-power-monitor_@APP_VERSION@_amd64.deb">Download .deb ↗</a><a class="btn secondary" href="https://github.com/gpkvt/cosmic-ext-fritzsmart-monitor-applet/releases/download/v@APP_VERSION@/fritz-power-monitor-v@APP_VERSION@-x86_64-unknown-linux-gnu.tar.gz">Download .tar.gz ↗</a></div></div>
         <div class="terminal"><div class="terminal-head">TERMINAL — USER INSTALL</div><pre><span class="prompt">$</span> tar -xzf fritz-power-monitor-v@APP_VERSION@-x86_64-unknown-linux-gnu.tar.gz
@@ -201,7 +245,7 @@
     <section id="compatibility"><div class="wrap">
       <div class="section-head reveal"><div class="eyebrow">Before installing</div><h2>Check that your setup is supported.</h2><p>FRITZ!Power Monitor supports local FRITZ!Box and Tasmota power meters, optional Philips Hue Bridge devices and Netatmo Weather Stations through their cloud API. Available measurements depend on each device and service.</p></div>
       <div class="details-grid">
-        <article class="detail reveal"><div class="detail-icon" aria-hidden="true"><img src="icons/monitor.svg" alt="" width="28" height="28"></div><h3>COSMIC desktop</h3><p>Requires a COSMIC session with panel applet support. The published portable archive targets <strong>x86_64 Linux</strong>; building from source requires a compatible Rust toolchain and GNU Make.</p></article>
+        <article class="detail reveal"><div class="detail-icon" aria-hidden="true"><img src="icons/monitor.svg" alt="" width="28" height="28"></div><h3>COSMIC desktop (panel mode)</h3><p>The panel applet requires a COSMIC session. <strong>Headless mode does not need COSMIC or Wayland</strong> and can export metrics from a Linux host or user service. The published portable archive targets <strong>x86_64 Linux</strong>; building from source requires a compatible Rust toolchain and GNU Make.</p></article>
         <article class="detail reveal"><div class="detail-icon" aria-hidden="true"><img src="icons/router.svg" alt="" width="28" height="28"></div><h3>FRITZ!Box Smart Home</h3><p>Requires a reachable FRITZ!Box with Smart Home support and a router account permitted to access Smart Home data. Use the router's local address or a hostname that resolves on your network.</p></article>
         <article class="detail reveal"><div class="detail-icon" aria-hidden="true"><img src="icons/plug-zap.svg" alt="" width="28" height="28"></div><h3>Power meters: FRITZ!Box and Tasmota</h3><p>FRITZ!Box Smart Home meters use the router's local Smart Home API; Tasmota meters support local mDNS discovery and manual device search. Measured watts feed per-device graphs and power totals. Supported relays can be switched; Tasmota temperature sensors are not currently supported.</p></article>
         <article class="detail reveal"><div class="detail-icon" aria-hidden="true"><img src="icons/hue-bridge.svg" alt="" width="28" height="28"></div><h3>Philips Hue Bridge: lights and sensors</h3><p>Pair a compatible Hue Bridge on your LAN using its physical link button and the local CLIP v2 API. Discover bridges with mDNS or enter an IP address. Switch supported lights, and read temperature, light level (lux) and motion from compatible Hue sensors. Temperature/lux history graphs, alerts and the panel average temperature use real sensor readings. <strong>Hue lights do not supply watts and never contribute to energy totals.</strong> <a href="guide.html#hue">Hue setup and limitations</a>.</p></article>
@@ -214,7 +258,7 @@
     <section id="faq"><div class="wrap">
       <div class="section-head reveal"><div class="eyebrow">Good to know</div><h2>Common questions</h2><p>A few answers about supported devices, data and everyday use.</p></div>
       <div class="faq reveal">
-        <details><summary>What do I need to use the applet?</summary><p>A COSMIC desktop session with panel applet support. For power monitoring, use a FRITZ!Box or Tasmota power meter; Hue Bridge lights and sensors and Netatmo Weather Station modules can be connected independently. The Netatmo cloud API requires internet access and an OAuth read_station refresh token. Building from source requires Rust and GNU Make.</p></details>
+        <details><summary>Do I need the COSMIC desktop?</summary><p>Only for the graphical panel applet. For monitoring without a desktop or Wayland, use <code>fritz-power-monitor --headless --setup</code> once to configure devices and the Prometheus endpoint, then start <code>fritz-power-monitor --headless</code> or enable the optional systemd user service. A FRITZ!Box or Tasmota meter is useful for power readings; Hue and Netatmo sensors and optional weather can also be monitored. <a href="guide.html#headless">Read the headless setup guide.</a></p></details>
         <details><summary>Does it send my router data to a cloud service?</summary><p>No. The core FRITZ!Box, Tasmota and Hue integrations use their respective local network interfaces. Optional OpenWeatherMap imagery and forecasts use external services. Separately, Netatmo Weather Station monitoring contacts Netatmo's HTTPS API to read your authorized station data; it does not upload your router's readings.</p></details>
         <details><summary>Can I monitor solar production and household consumption together?</summary><p>Yes. Configure the relevant input devices, then compare input and output in the shared graph and separate Wh summaries. These values are not subtracted from one another.</p></details>
         <details><summary>Does graph history survive a restart?</summary><p><strong>Yes. Graph history is persistent and is not limited to the current applet session or a 24-hour window.</strong> Samples are stored locally in <code>~/.local/share/fritz-power-monitor/history.json</code> and restored when the applet starts. Configure the retention period in Settings → Graph history, from 5 minutes up to 4 years; both this setting and the saved samples survive applet restarts. Sampling automatically adapts to the selected retention period and is capped at about 50,000 samples per series to keep storage bounded. The popup also estimates solar input and grid consumption in Wh per day for the last 7 days; these are not yield forecasts.</p></details>
