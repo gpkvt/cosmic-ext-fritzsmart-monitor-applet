@@ -43,7 +43,7 @@ jobs:
                   if present:
                       assert advisory in ignored, f"Untracked unsound advisory: {advisory}"
                   state = "Present — still requires remediation" if present else "Absent — review and remove exception"
-                  summary.write(f"- \`{name} {version}\` ({advisory}): {state}\n")
+                  summary.write(f"- `{name} {version}` ({advisory}): {state}\n")
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
       - name: Check dependency advisories (deny all non-allowlisted warnings)
