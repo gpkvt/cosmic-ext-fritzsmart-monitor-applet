@@ -4,6 +4,9 @@
 
 ### Improved
 
+- Add a History graph shortcut to every visible Netatmo Weather Station device row, matching the standard device-list action. Use recorded temperature where available, otherwise another recorded sensor metric, and show device details when samples are not yet present. Preserve the independent per-metric graphs in expanded details and respect temperature display units.
+
+
 - Make every popup section, device and graph copy button copy the full relevant readings and history as structured JSON instead of only copying a title. Use stable section/device IDs, encode missing measurements as null, include seven-day energy, weather forecasts and air pollution where relevant, and exclude all credentials and image bytes. Add regression tests for JSON validity, section-specific values, stale sensors and secret leakage.
 
 ### Added
