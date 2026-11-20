@@ -8,137 +8,188 @@ on:
         type: choice
         required: true
         default: patch
-        options:
-          - patch
-          - minor
-          - major
+        options: [patch, minor, major]
 
 permissions:
-  contents: write
+  contents: read
 
+# Never publish two versions based on the same main revision concurrently.
 concurrency:
-  group: main-release
+  group: fritz-power-monitor-release
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Verify, package and publish release
+  prepare:
+    name: Prepare immutable release source
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
     steps:
-      - name: Checkout main with publish permissions
+      - name: Checkout exact dispatch revision
         uses: actions/checkout@v4
         with:
-          ref: main
-          fetch-depth: 0
-          token: ${{ secrets.RELEASE_TOKEN || github.token }}
-
-      - name: Ensure main has not changed since dispatch
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA" || {
-            echo "::error::main moved after the release was requested. Dispatch the release again."
-            exit 1
-          }
-
-      - name: Install Linux packaging dependencies
-        run: bash packaging/install-ci-deps.sh
-
-      - name: Install stable Rust
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install Rust formatter
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
-
-      - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
-
+          components: rustfmt
       - name: Validate version helper
         run: python3 -m unittest discover -s packaging -p 'test_version.py'
-
-      - name: Compute new stable version
+      - name: Prepare versioned source
         id: version
-        shell: bash
         env:
           BUMP: ${{ inputs.bump_type }}
+        shell: bash
         run: |
           set -euo pipefail
           version="$(python3 packaging/version.py bump "$BUMP")"
           tag="v$version"
           if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
-            echo "::error::Release tag $tag already exists."
+            echo "::error::Release tag $tag already exists"
             exit 1
           fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          cargo fmt --all
+          cargo fmt --all -- --check
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+          printf 'tag=%s\n' "$tag" >> "$GITHUB_OUTPUT"
+          printf 'Prepared release %s from %s\n' "$tag" "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          # Archive only tracked source files. This includes the modified
+          # Cargo manifests and rustfmt results, but never build output.
+          git ls-files -z | tar --null -czf "$RUNNER_TEMP/release-source.tar.gz" --files-from -
+          test -s "$RUNNER_TEMP/release-source.tar.gz"
+      - name: Upload frozen release source
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-source
+          path: ${{ runner.temp }}/release-source.tar.gz
+          if-no-files-found: error
+          retention-days: 7
 
-      # Keep release builds reproducible even when earlier source commits
-      # were not rustfmt-clean. Persist the formatted sources in the same
-      # release commit as the version bump, so the published tag matches
-      # exactly what was checked and packaged.
-      - name: Format Rust sources for the release
-        run: cargo fmt --all
-
-      - name: Verify formatting, compilation, Clippy and tests
+  build:
+    name: Test and build all four Linux formats
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Download frozen source
+        uses: actions/download-artifact@v4
+        with:
+          name: release-source
+          path: ${{ runner.temp }}/release-source
+      - name: Extract frozen source
+        shell: bash
         run: |
+          set -euo pipefail
+          tar -xzf "$RUNNER_TEMP/release-source/release-source.tar.gz" -C "$GITHUB_WORKSPACE"
+          test -s Cargo.toml
+          test -s Cargo.lock
+          test "$(python3 packaging/version.py current)" = "${{ needs.prepare.outputs.version }}"
+      - name: Install packaging dependencies
+        run: bash packaging/install-ci-deps.sh
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Validate, lint and test
+        shell: bash
+        run: |
+          set -euo pipefail
           cargo fmt --all -- --check
           cargo check --locked --all-targets
           cargo clippy --locked --all-targets -- -D warnings
           cargo test --locked --all-targets
-
       - name: Build Debian, AppImage, Flatpak and portable archive
         env:
-          APP_VERSION: ${{ steps.version.outputs.version }}
-          APP_RELEASE_VERSION: ${{ steps.version.outputs.tag }}
+          APP_VERSION: ${{ needs.prepare.outputs.version }}
+          APP_RELEASE_VERSION: ${{ needs.prepare.outputs.tag }}
           OUTPUT_DIR: dist
         run: bash packaging/build-linux-packages.sh
-
-      - name: Verify packages and SHA256 checksums
+      - name: Verify all release assets
         shell: bash
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           set -euo pipefail
           cd dist
           sha256sum -c SHA256SUMS
-          test -s "fritz-power-monitor_${VERSION}_amd64.deb"
-          test -s "fritz-power-monitor-${VERSION}-x86_64.AppImage"
-          test -s "fritz-power-monitor-${VERSION}.flatpak"
-          test -s "fritz-power-monitor-v${VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          for name in \
+            "fritz-power-monitor_${VERSION}_amd64.deb" \
+            "fritz-power-monitor-${VERSION}-x86_64.AppImage" \
+            "fritz-power-monitor-${VERSION}.flatpak" \
+            "fritz-power-monitor-v${VERSION}-x86_64-unknown-linux-gnu.tar.gz"; do
+            test -s "$name" || { echo "::error::Missing or empty $name"; exit 1; }
+            echo "$name" >> "$GITHUB_STEP_SUMMARY"
+          done
+          test "$(wc -l < SHA256SUMS)" -eq 4
+          dpkg-deb --info "fritz-power-monitor_${VERSION}_amd64.deb"
+          tar -tzf "fritz-power-monitor-v${VERSION}-x86_64-unknown-linux-gnu.tar.gz" >/dev/null
+      - name: Upload verified packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-packages
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
 
-      - name: Commit version and publish main plus tag atomically
+  publish:
+    name: Publish verified release
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout original main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+      - name: Restore exact verified source
+        uses: actions/download-artifact@v4
+        with:
+          name: release-source
+          path: ${{ runner.temp }}/release-source
+      - name: Restore verified packages
+        uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: dist
+      - name: Confirm packages and frozen version
         shell: bash
         env:
-          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          tar -xzf "$RUNNER_TEMP/release-source/release-source.tar.gz" -C "$GITHUB_WORKSPACE"
+          test "$(python3 packaging/version.py current)" = "$VERSION"
+          (cd dist && sha256sum -c SHA256SUMS)
+      - name: Commit and atomically push version and annotated tag
+        shell: bash
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          # cargo fmt may have changed tracked Rust sources. Include those
-          # files in the release commit: otherwise the tag differs from the
-          # tested and packaged binary, and the next release fails again.
-          git add Cargo.toml Cargo.lock
-          git add -u -- '*.rs'
+          # Commit precisely the source tree that passed all build checks.
+          git add -u
           git diff --exit-code
+          git diff --cached --quiet && { echo "::error::No release version change"; exit 1; }
           git commit -m "chore(release): $TAG"
           git tag -a "$TAG" -m "FRITZ!Power Monitor $TAG"
-          # If main moves or a tag collides, push neither ref.
+          # Abort entirely if main changed since the dispatch revision.
           git push --atomic origin HEAD:refs/heads/main "refs/tags/$TAG:refs/tags/$TAG"
-
-      - name: Publish GitHub Release with downloadable packages
-        shell: bash
+      - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        shell: bash
         run: |
+          set -euo pipefail
           gh release create "$TAG" dist/* --verify-tag --title "$TAG" --generate-notes
-
-      - name: Upload packages as Actions artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-linux-packages
-          path: dist/
-          if-no-files-found: ignore
-          retention-days: 7
+          gh release view "$TAG" --json url --jq .url >> "$GITHUB_STEP_SUMMARY"
