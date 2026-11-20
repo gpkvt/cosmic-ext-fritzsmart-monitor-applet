@@ -35,7 +35,7 @@ pages = sorted(ROOT.rglob("*.html"))
 if not pages:
     fail("no HTML pages found")
 
-for generated in ("readme.html", "security.html"):
+for generated in ("readme.html", "security.html", "changelog.html"):
     if not (ROOT / generated).is_file():
         fail(f"missing generated Markdown page: {generated}")
 
