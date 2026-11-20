@@ -4,6 +4,8 @@
 
 ### Improved
 
+- Ensure Linux packaging selects the actual generated application AppImage rather than accidentally copying the downloaded linuxdeploy AppImage plugin into release artifacts.
+
 - Resolve strict Clippy errors blocking release checks in Netatmo graphs, sensor alerts and regression tests without weakening lint settings. Automatically validate full Debian, AppImage, Flatpak and portable-archive packaging on pushes to main using the same formatting and test steps as the release job.
 
 - Fix the release-blocking weather image sizing test by explicitly using `usize` for metric counts, matching `weather_photo_height` and allowing `div_ceil` to compile during `cargo check --all-targets`.
