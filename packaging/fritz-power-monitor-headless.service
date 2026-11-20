@@ -5,9 +5,9 @@ Documentation=https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/guide
 
 [Service]
 Type=simple
-# This is a non-GUI user service. Change --listen to a trusted local address
-# if necessary; never expose the unauthenticated endpoint to the Internet.
-ExecStart=/usr/bin/fritz-power-monitor --headless --listen 127.0.0.1:9817
+# This non-GUI user service uses the endpoint enabled in the saved user config.
+# Run fritz-power-monitor --headless --setup to configure it first.
+ExecStart=/usr/bin/fritz-power-monitor --headless
 Restart=on-failure
 RestartSec=10
 NoNewPrivileges=true

@@ -2,6 +2,7 @@ mod app;
 mod diagnostics;
 mod fritz;
 mod headless;
+mod headless_setup;
 mod history;
 mod hue;
 mod netatmo;
@@ -29,6 +30,13 @@ fn main() -> cosmic::iced::Result {
         }
         headless::Command::Version => {
             println!("fritz-power-monitor v{}", env!("CARGO_PKG_VERSION"));
+            return Ok(());
+        }
+        headless::Command::ConfigureHeadless => {
+            if let Err(error) = headless_setup::run() {
+                eprintln!("Headless setup failed: {error}");
+                std::process::exit(1);
+            }
             return Ok(());
         }
         headless::Command::Headless { listen } => {

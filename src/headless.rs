@@ -14,6 +14,7 @@ use std::time::Duration;
 pub enum Command {
     Applet,
     Headless { listen: Option<String> },
+    ConfigureHeadless,
     Help,
     Version,
 }
@@ -26,6 +27,8 @@ Usage:
   fritz-power-monitor --headless            Run without the desktop UI
   fritz-power-monitor --headless --listen IP:PORT
                                            Enable the metrics endpoint at IP:PORT
+  fritz-power-monitor --headless --setup     Configure headless monitoring interactively
+  fritz-power-monitor --setup-headless      Equivalent standalone setup command
   fritz-power-monitor --help                Show this help
   fritz-power-monitor --version             Show version
 
@@ -44,10 +47,12 @@ pub fn parse_command_line(args: &[String]) -> Result<Command, String> {
         match args[0].as_str() {
             "--help" | "-h" => return Ok(Command::Help),
             "--version" | "-V" => return Ok(Command::Version),
+            "--setup-headless" => return Ok(Command::ConfigureHeadless),
             _ => {}
         }
     }
     let mut headless = false;
+    let mut setup = false;
     let mut listen = None;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -56,6 +61,11 @@ pub fn parse_command_line(args: &[String]) -> Result<Command, String> {
                 return Err("--headless was specified more than once".into());
             }
             headless = true;
+        } else if arg == "--setup" || arg == "--configure" {
+            if setup {
+                return Err("Headless setup was specified more than once".into());
+            }
+            setup = true;
         } else if arg == "--listen" || arg == "--prometheus-bind" {
             let value = iter.next().ok_or("Missing IP:PORT after --listen")?;
             if listen.replace(value.clone()).is_some() {
@@ -70,7 +80,13 @@ pub fn parse_command_line(args: &[String]) -> Result<Command, String> {
         }
     }
     if !headless {
-        return Err("--listen requires --headless".into());
+        return Err("--setup and --listen require --headless".into());
+    }
+    if setup {
+        if listen.is_some() {
+            return Err("--listen cannot be used with --headless --setup".into());
+        }
+        return Ok(Command::ConfigureHeadless);
     }
     if let Some(address) = &listen
         && crate::prometheus::parse_bind_address(address).is_none()
@@ -306,6 +322,7 @@ pub fn run(listen_override: Option<&str>) -> Result<(), String> {
     if settings.ains.is_empty()
         && settings.ain.trim().is_empty()
         && !settings.known_devices.is_empty()
+        && !settings.device_selection_initialized
     {
         // Mirror the applet's migration for old installs whose saved
         // inventory exists but whose selected IDs were left empty.
@@ -416,6 +433,18 @@ mod tests {
         assert_eq!(parse_command_line(&[]).unwrap(), Command::Applet);
         assert_eq!(parse_command_line(&args(&["--help"])).unwrap(), Command::Help);
         assert_eq!(parse_command_line(&args(&["--version"])).unwrap(), Command::Version);
+        assert_eq!(
+            parse_command_line(&args(&["--headless", "--setup"])).unwrap(),
+            Command::ConfigureHeadless
+        );
+        assert_eq!(
+            parse_command_line(&args(&["--setup-headless"])).unwrap(),
+            Command::ConfigureHeadless
+        );
+        assert_eq!(
+            parse_command_line(&args(&["--configure", "--headless"])).unwrap(),
+            Command::ConfigureHeadless
+        );
         assert_eq!(parse_command_line(&args(&["--headless"])).unwrap(),
             Command::Headless { listen: None });
         assert_eq!(
@@ -431,6 +460,9 @@ mod tests {
             vec!["--headless", "--listen", "0.0.0.0:0"],
             vec!["--headless", "--listen", "fritz.box:9817"],
             vec!["--headless", "--headless"],
+            vec!["--setup"],
+            vec!["--headless", "--setup", "--listen", "127.0.0.1:9817"],
+            vec!["--headless", "--setup", "--configure"],
             vec!["--headless", "--listen"],
             vec!["--headless", "--listen=127.0.0.1:9817", "--listen=[::1]:9817"],
             vec!["--unknown"],

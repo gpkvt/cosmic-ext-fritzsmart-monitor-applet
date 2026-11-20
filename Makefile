@@ -32,7 +32,7 @@ install:
 	rm -f "$(DESKTOP_FILE).tmp"
 	install -Dm0644 data/$(APP_ID).svg "$(ICON_FILE)"
 	install -d "$(dir $(HEADLESS_UNIT))"
-	sed 's|^ExecStart=.*|ExecStart=$(abspath $(BINDIR)/$(APP_NAME)) --headless --listen 127.0.0.1:9817|' packaging/fritz-power-monitor-headless.service > "$(HEADLESS_UNIT)"
+	sed 's|^ExecStart=.*|ExecStart=$(abspath $(BINDIR)/$(APP_NAME)) --headless|' packaging/fritz-power-monitor-headless.service > "$(HEADLESS_UNIT)"
 	@if command -v systemctl >/dev/null; then systemctl --user daemon-reload >/dev/null 2>&1 || true; fi
 	$(MAKE) reload
 

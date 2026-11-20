@@ -131,14 +131,22 @@ When Prometheus runs in Docker or on another machine, `127.0.0.1` refers to that
 
 Run the installed binary without a panel, Wayland session or graphical display. Headless mode polls the saved FRITZ!Box/Tasmota devices, connected Hue Bridge, Netatmo stations and optional OpenWeatherMap data independently, and serves their latest available measurements through the same Prometheus exporter. It skips weather photographs and does not launch COSMIC.
 
-Configure devices and credentials once in the applet settings (saved in `~/.config/fritz_solar.cfg`). Then, for a local Prometheus endpoint, run:
+Run the **interactive terminal setup wizard** first (no desktop required):
+
+```bash
+fritz-power-monitor --headless --setup
+```
+
+The wizard guides you through optional FRITZ!Box and Tasmota connections (including device discovery and selection), Hue Bridge pairing (press its physical link button), Netatmo, weather, refresh interval, and the Prometheus listening address. Sensitive credentials are entered without terminal echo, blank answers retain saved values, and **nothing is written until you confirm Save**. It refuses non-interactive input to avoid accidental configuration changes. The alternative command `fritz-power-monitor --setup-headless` starts the same wizard.
+
+The wizard stores the configuration alongside regular applet preferences at `~/.config/fritz_solar.cfg`, so you may also configure devices using the COSMIC applet if you prefer. After setup, start the headless exporter:
 
 ```bash
 fritz-power-monitor --headless --listen 127.0.0.1:9817
 curl -fsS http://127.0.0.1:9817/metrics
 ```
 
-Alternatively, `fritz-power-monitor --headless` uses the exporter setting and bind address saved in **Settings → Connection**; the exporter must already be enabled. The `--listen IP:PORT` option enables the exporter for that run without changing saved settings. With no options, the executable starts the normal COSMIC applet as before. Use `--help` to see all switches.
+Alternatively, `fritz-power-monitor --headless` uses the exporter enabled by the wizard or in **Settings → Connection**, together with its saved bind address. The `--listen IP:PORT` option enables the exporter for that run without changing saved settings. With no options, the executable starts the normal COSMIC applet as before. Use `--help` to see all switches.
 
 For unattended startup on a systemd-based desktop, an **optional user service** is supplied with the Debian package, the portable archive and `make install`. If you installed the portable archive manually, copy `share/systemd/user/fritz-power-monitor-headless.service` to `~/.config/systemd/user/` and adjust `ExecStart` to the installed binary. Then:
 
