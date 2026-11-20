@@ -104,20 +104,24 @@ fn publish(state: &Shared, settings: &FritzSettings, address: &str) {
         crate::diagnostics::error("Headless metrics snapshot lock was poisoned");
         return;
     };
-    crate::prometheus::publish(true, address, Some(crate::prometheus::LiveData {
-        settings,
-        devices: &state.devices,
-        hue_lights: &state.hue_lights,
-        hue_sensors: &state.hue_sensors,
-        netatmo_sensors: &state.netatmo_sensors,
-        weather: state.weather.as_ref(),
-        bandwidth: state.bandwidth.as_ref(),
-        router: state.router.as_ref(),
-        fritz_error: state.fritz_error,
-        hue_error: state.hue_error,
-        netatmo_error: state.netatmo_error,
-        weather_error: state.weather_error,
-    }));
+    crate::prometheus::publish(
+        true,
+        address,
+        Some(crate::prometheus::LiveData {
+            settings,
+            devices: &state.devices,
+            hue_lights: &state.hue_lights,
+            hue_sensors: &state.hue_sensors,
+            netatmo_sensors: &state.netatmo_sensors,
+            weather: state.weather.as_ref(),
+            bandwidth: state.bandwidth.as_ref(),
+            router: state.router.as_ref(),
+            fritz_error: state.fritz_error,
+            hue_error: state.hue_error,
+            netatmo_error: state.netatmo_error,
+            weather_error: state.weather_error,
+        }),
+    );
 }
 
 fn apply(
@@ -217,7 +221,7 @@ fn persist_rotated_netatmo_token(previous: &str, rotated: &str) {
             }
         }
         Ok(_) => crate::diagnostics::warn(
-            "Netatmo token was modified externally; preserving the newer configuration"
+            "Netatmo token was modified externally; preserving the newer configuration",
         ),
         Err(error) => crate::diagnostics::warn(format!(
             "Could not reload settings to persist the new Netatmo token: {error}"
@@ -273,7 +277,9 @@ async fn poll_weather(state: Shared, settings: FritzSettings, address: String) {
         match crate::weather::fetch_weather_headless(
             settings.openweathermap_api_key.clone(),
             settings.weather_location.clone(),
-        ).await {
+        )
+        .await
+        {
             Ok(weather) => apply(&state, &settings, &address, move |state| {
                 state.weather = Some(weather);
                 state.weather_error = false;
@@ -289,8 +295,9 @@ async fn poll_weather(state: Shared, settings: FritzSettings, address: String) {
             }
         }
         tokio::time::sleep(Duration::from_secs(
-            u64::from(settings.weather_refresh_interval_minutes.clamp(5, 60)) * 60
-        )).await;
+            u64::from(settings.weather_refresh_interval_minutes.clamp(5, 60)) * 60,
+        ))
+        .await;
     }
 }
 
@@ -320,9 +327,8 @@ pub fn run(listen_override: Option<&str>) -> Result<(), String> {
             );
         }
     };
-    let listener = crate::prometheus::parse_bind_address(&address).ok_or(
-        "Invalid Prometheus listen address; use an IP literal and a nonzero port"
-    )?;
+    let listener = crate::prometheus::parse_bind_address(&address)
+        .ok_or("Invalid Prometheus listen address; use an IP literal and a nonzero port")?;
     if !listener.ip().is_loopback() {
         crate::diagnostics::warn(
             "Headless Prometheus is exposed on a non-loopback interface; it has no authentication or TLS",
