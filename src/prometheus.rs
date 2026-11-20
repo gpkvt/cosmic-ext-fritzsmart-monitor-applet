@@ -184,8 +184,12 @@ pub fn render(data: LiveData<'_>) -> String {
         let labels = [("source", source), ("id", id.as_str()), ("name", name)];
         e.flag("fritz_monitor_device_reachable", &labels, false);
     }
-    e.gauge("fritz_monitor_output_power_watts", &[], output_w as f64);
-    e.gauge("fritz_monitor_input_power_watts", &[], input_w as f64);
+    // Missing/offline devices are not reporting 0 W. Publish aggregate
+    // wattage only when at least one live power meter produced a sample.
+    if !data.fritz_error && data.devices.iter().any(|device| device.has_power_meter) {
+        e.gauge("fritz_monitor_output_power_watts", &[], output_w as f64);
+        e.gauge("fritz_monitor_input_power_watts", &[], input_w as f64);
+    }
     e.gauge("fritz_monitor_reading_devices", &[], data.devices.len() as f64);
     e.gauge("fritz_monitor_selected_devices", &[], data.settings.ains.len() as f64);
 
@@ -396,6 +400,28 @@ mod tests {
         assert!(rendered.contains("fritz_monitor_device_temperature_celsius{source=\"fritzbox\",id=\"sensor1\",name=\"Room sensor\"} 19.7\n"));
         assert!(!rendered.contains("fritz_monitor_device_power_watts{source=\"fritzbox\",id=\"sensor1\""));
         assert!(rendered.contains("# TYPE fritz_monitor_device_temperature_celsius gauge"));
+    }
+
+    #[test]
+    fn exporter_does_not_invent_zero_watts_when_no_live_meters_exist() {
+        let settings = FritzSettings::default();
+        let text = render(LiveData {
+            settings: &settings,
+            devices: &[],
+            hue_lights: &[],
+            hue_sensors: &[],
+            netatmo_sensors: &[],
+            weather: None,
+            bandwidth: None,
+            router: None,
+            fritz_error: true,
+            hue_error: true,
+            netatmo_error: true,
+            weather_error: true,
+        });
+        assert!(text.contains("fritz_monitor_router_up 0"));
+        assert!(!text.contains("fritz_monitor_output_power_watts"));
+        assert!(!text.contains("fritz_monitor_input_power_watts"));
     }
 
     #[test]
