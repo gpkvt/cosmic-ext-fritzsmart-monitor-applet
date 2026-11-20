@@ -23,6 +23,9 @@ main{padding:54px 0 100px}article{max-width:860px;margin:auto}h1{font-size:clamp
 <h3 id="improved">Improved<a class="headerlink" href="#improved" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
+<p>Correct the Netatmo stale-reading regression fixture: timestamp 1 with clock 1050 is only 1049 seconds old (within the 30-minute freshness window). Verify a genuinely expired sample and a separately disconnected recent sample.</p>
+</li>
+<li>
 <p>Ensure Linux packaging selects the actual generated application AppImage rather than accidentally copying the downloaded linuxdeploy AppImage plugin into release artifacts.</p>
 </li>
 <li>
