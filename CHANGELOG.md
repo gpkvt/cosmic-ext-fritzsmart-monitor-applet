@@ -4,6 +4,8 @@
 
 ### Added
 
+- Provide a terminal-only headless configuration wizard with `--headless --setup` / `--setup-headless`: configure FRITZ!Box/Tasmota discovery and selection, Hue, Netatmo, weather, poll interval and Prometheus bind address. Keep existing values on Enter, hide passwords/tokens, validate inputs, and save only on final confirmation.
+
 - Add an opt-in `--headless` monitoring mode with no COSMIC/Wayland UI: independently refresh FRITZ!Box, Tasmota, Hue, Netatmo and weather readings and publish cached Prometheus metrics. `--listen IP:PORT` enables a temporary bind override; regular applet startup remains unchanged. Keep current Netatmo OAuth tokens saved, avoid stale readings and weather image traffic.
 - Provide an optional systemd user service for Debian, portable archives and user-local source installs. The service is not enabled automatically; document local-only default, CLI operation and security limits.
 
