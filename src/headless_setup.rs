@@ -74,7 +74,7 @@ fn prompt_value(label: &str, current: &str) -> Result<String, String> {
     let display = if current.is_empty() {
         format!("{label}: ")
     } else {
-        format!("{label} [{current}]: ")
+        format!("{label} [configured; Enter keeps it]: ")
     };
     let value = read_answer(&display)?;
     Ok(if value.is_empty() {
