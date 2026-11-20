@@ -2,9 +2,8 @@ app-id: com.gpkvt.FritzPowerMonitor
 runtime: org.freedesktop.Platform
 runtime-version: "26.08"
 sdk: org.freedesktop.Sdk
-# The Ubuntu 24.04 host appstreamcli fails with E:file-read-error during
-# compose even though the installed XML, desktop entry and icon are valid.
-# Preserve the AppStream metadata in the Flatpak and validate it separately.
+# Preserve AppStream metainfo in the bundle. The host composer is disabled
+# for Ubuntu 24.04 CI; metadata is validated explicitly by the packaging script.
 appstream-compose: false
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
@@ -29,7 +28,7 @@ modules:
       - install -Dm0755 target/release/fritz-power-monitor /app/bin/fritz-power-monitor
       - install -Dm0644 data/com.gpkvt.FritzPowerMonitor.desktop /app/share/applications/com.gpkvt.FritzPowerMonitor.desktop
       - install -Dm0644 data/com.gpkvt.FritzPowerMonitor.metainfo.xml /app/share/metainfo/com.gpkvt.FritzPowerMonitor.metainfo.xml
-      - install -Dm0644 data/com.gpkvt.FritzPowerMonitor.svg /app/share/icons/hicolor/scalable/apps/com.gpkvt.FritzPowerMonitor.svg
+      - install -Dm0644 data/com.gpkvt.FritzPowerMonitor.png /app/share/icons/hicolor/128x128/apps/com.gpkvt.FritzPowerMonitor.png
     sources:
       - type: dir
         path: flatpak-source
