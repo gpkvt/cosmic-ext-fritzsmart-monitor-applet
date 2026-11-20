@@ -4467,14 +4467,25 @@ impl AppModel {
                 "router": router(),
                 "last_updated": &self.updated,
             }),
-            "total-power-overview" => serde_json::json!({
-                "totals": power_totals(),
-                "output_history": power_history(),
-                "input_history": input_history(),
-                "daily_energy": json_daily_energy_rows(&self.device_history, &self.settings),
-                "power_unit": "W",
-                "energy_unit": "Wh",
-            }),
+            "total-power-overview" => {
+                let inputs = rebuild_input_power_history(
+                    &self.device_history, &self.settings.input_ains,
+                );
+                serde_json::json!({
+                    "totals": power_totals(),
+                    "output_low_w": self.history.iter().map(|(_, watts)| *watts).min(),
+                    "output_high_w": self.history.iter().map(|(_, watts)| *watts).max(),
+                    "input_low_w": inputs.iter().map(|(_, watts)|
+                        input_display_power_w(*watts)).min(),
+                    "input_high_w": inputs.iter().map(|(_, watts)|
+                        input_display_power_w(*watts)).max(),
+                    "output_history": power_history(),
+                    "input_history": input_history(),
+                    "daily_energy": json_daily_energy_rows(&self.device_history, &self.settings),
+                    "power_unit": "W",
+                    "energy_unit": "Wh",
+                })
+            },
             "current-power-history" => serde_json::json!({
                 "totals": power_totals(),
                 "output_history": power_history(),
