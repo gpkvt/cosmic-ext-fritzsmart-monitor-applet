@@ -218,9 +218,7 @@ async fn install_source_update(source: &Path) -> Result<String, String> {
 
 async fn install_flatpak_update() -> Result<String, String> {
     use std::collections::HashMap;
-    use zbus::{
-        Connection, OwnedObjectPath, OwnedVariant, Proxy,
-    };
+    use zbus::{Connection, OwnedObjectPath, OwnedVariant, Proxy};
 
     let connection = Connection::session()
         .await

@@ -82,7 +82,8 @@ impl Encoder {
         if self.defined.insert(name) {
             self.buffer.push_str("# HELP ");
             self.buffer.push_str(name);
-            self.buffer.push_str(" Current measurement from FRITZ!Power Monitor.\n# TYPE ");
+            self.buffer
+                .push_str(" Current measurement from FRITZ!Power Monitor.\n# TYPE ");
             self.buffer.push_str(name);
             self.buffer.push_str(" gauge\n");
         }
@@ -118,15 +119,39 @@ impl Encoder {
 
 pub fn render(data: LiveData<'_>) -> String {
     let mut e = Encoder::default();
-    e.gauge("fritz_monitor_info", &[("version", env!("CARGO_PKG_VERSION"))], 1.0);
-    e.flag("fritz_monitor_router_up", &[], !data.fritz_error &&
-        (data.router.is_some() || data.bandwidth.is_some() || data.devices.iter().any(|device| !device.ain.to_ascii_uppercase().starts_with("TASMOTA:"))));
-    e.flag("fritz_monitor_hue_up", &[], !data.hue_error &&
-        (data.hue_lights.iter().any(|item| item.reachable) ||
-         data.hue_sensors.iter().any(|item| item.reachable)));
-    e.flag("fritz_monitor_netatmo_up", &[], !data.netatmo_error &&
-        data.netatmo_sensors.iter().any(|sensor| sensor.reachable));
-    e.flag("fritz_monitor_weather_up", &[], !data.weather_error && data.weather.is_some());
+    e.gauge(
+        "fritz_monitor_info",
+        &[("version", env!("CARGO_PKG_VERSION"))],
+        1.0,
+    );
+    e.flag(
+        "fritz_monitor_router_up",
+        &[],
+        !data.fritz_error
+            && (data.router.is_some()
+                || data.bandwidth.is_some()
+                || data
+                    .devices
+                    .iter()
+                    .any(|device| !device.ain.to_ascii_uppercase().starts_with("TASMOTA:"))),
+    );
+    e.flag(
+        "fritz_monitor_hue_up",
+        &[],
+        !data.hue_error
+            && (data.hue_lights.iter().any(|item| item.reachable)
+                || data.hue_sensors.iter().any(|item| item.reachable)),
+    );
+    e.flag(
+        "fritz_monitor_netatmo_up",
+        &[],
+        !data.netatmo_error && data.netatmo_sensors.iter().any(|sensor| sensor.reachable),
+    );
+    e.flag(
+        "fritz_monitor_weather_up",
+        &[],
+        !data.weather_error && data.weather.is_some(),
+    );
 
     let mut output_w = 0_i64;
     let mut input_w = 0_i64;
@@ -137,29 +162,66 @@ pub fn render(data: LiveData<'_>) -> String {
             "fritzbox"
         };
         let id = device.ain.as_str();
-        let labels = [("source", source), ("id", id), ("name", device.name.as_str())];
+        let labels = [
+            ("source", source),
+            ("id", id),
+            ("name", device.name.as_str()),
+        ];
         e.flag("fritz_monitor_device_reachable", &labels, true);
-        let input = data.settings.input_ains.contains(&crate::fritz::normalize_ain_for_selection(id));
+        let input = data
+            .settings
+            .input_ains
+            .contains(&crate::fritz::normalize_ain_for_selection(id));
         e.flag("fritz_monitor_device_is_input", &labels, input);
-        e.flag("fritz_monitor_device_has_power_meter", &labels, device.has_power_meter);
+        e.flag(
+            "fritz_monitor_device_has_power_meter",
+            &labels,
+            device.has_power_meter,
+        );
         if device.has_power_meter {
-            e.gauge("fritz_monitor_device_power_watts", &labels, device.power_w as f64);
+            e.gauge(
+                "fritz_monitor_device_power_watts",
+                &labels,
+                device.power_w as f64,
+            );
             if input {
                 input_w = input_w.saturating_add(-device.power_w.saturating_abs());
             } else {
                 output_w = output_w.saturating_add(device.power_w);
             }
         }
-        e.optional("fritz_monitor_device_temperature_celsius", &labels,
-            device.temperature_c.is_finite().then_some(device.temperature_c));
-        e.optional("fritz_monitor_device_switch_on", &labels,
-            device.power_state.map(|value| if value { 1.0 } else { 0.0 }));
-        e.flag("fritz_monitor_device_switch_controllable", &labels,
-            device.power_controllable && device.power_toggle_allowed);
+        e.optional(
+            "fritz_monitor_device_temperature_celsius",
+            &labels,
+            device
+                .temperature_c
+                .is_finite()
+                .then_some(device.temperature_c),
+        );
+        e.optional(
+            "fritz_monitor_device_switch_on",
+            &labels,
+            device
+                .power_state
+                .map(|value| if value { 1.0 } else { 0.0 }),
+        );
+        e.flag(
+            "fritz_monitor_device_switch_controllable",
+            &labels,
+            device.power_controllable && device.power_toggle_allowed,
+        );
         let alert_key = crate::fritz::normalize_ain_for_selection(id);
         if let Some(thresholds) = data.settings.temperature_alerts.get(&alert_key) {
-            e.gauge("fritz_monitor_temperature_alert_high_celsius", &labels, thresholds.high_c as f64);
-            e.gauge("fritz_monitor_temperature_alert_low_celsius", &labels, thresholds.low_c as f64);
+            e.gauge(
+                "fritz_monitor_temperature_alert_high_celsius",
+                &labels,
+                thresholds.high_c as f64,
+            );
+            e.gauge(
+                "fritz_monitor_temperature_alert_low_celsius",
+                &labels,
+                thresholds.low_c as f64,
+            );
         }
     }
     // Include selected but unavailable devices with an explicit 0 reachability
@@ -177,10 +239,16 @@ pub fn render(data: LiveData<'_>) -> String {
         } else {
             "fritzbox"
         };
-        let name = data.settings.known_devices.iter().find(|device| {
-            crate::fritz::normalize_ain_for_selection(&device.ain)
-                == crate::fritz::normalize_ain_for_selection(id)
-        }).map(|device| device.name.as_str()).unwrap_or(id.as_str());
+        let name = data
+            .settings
+            .known_devices
+            .iter()
+            .find(|device| {
+                crate::fritz::normalize_ain_for_selection(&device.ain)
+                    == crate::fritz::normalize_ain_for_selection(id)
+            })
+            .map(|device| device.name.as_str())
+            .unwrap_or(id.as_str());
         let labels = [("source", source), ("id", id.as_str()), ("name", name)];
         e.flag("fritz_monitor_device_reachable", &labels, false);
     }
@@ -190,76 +258,222 @@ pub fn render(data: LiveData<'_>) -> String {
         e.gauge("fritz_monitor_output_power_watts", &[], output_w as f64);
         e.gauge("fritz_monitor_input_power_watts", &[], input_w as f64);
     }
-    e.gauge("fritz_monitor_reading_devices", &[], data.devices.len() as f64);
-    e.gauge("fritz_monitor_selected_devices", &[], data.settings.ains.len() as f64);
+    e.gauge(
+        "fritz_monitor_reading_devices",
+        &[],
+        data.devices.len() as f64,
+    );
+    e.gauge(
+        "fritz_monitor_selected_devices",
+        &[],
+        data.settings.ains.len() as f64,
+    );
 
     for light in data.hue_lights {
         let labels = [("id", light.id.as_str()), ("name", light.name.as_str())];
-        e.flag("fritz_monitor_hue_light_reachable", &labels, light.reachable);
+        e.flag(
+            "fritz_monitor_hue_light_reachable",
+            &labels,
+            light.reachable,
+        );
         if light.reachable {
-            e.optional("fritz_monitor_hue_light_on", &labels,
-                light.on.map(|on| if on { 1.0 } else { 0.0 }));
+            e.optional(
+                "fritz_monitor_hue_light_on",
+                &labels,
+                light.on.map(|on| if on { 1.0 } else { 0.0 }),
+            );
         }
     }
     for sensor in data.hue_sensors {
         let labels = [("id", sensor.id.as_str()), ("name", sensor.name.as_str())];
-        e.flag("fritz_monitor_hue_sensor_reachable", &labels, sensor.reachable);
+        e.flag(
+            "fritz_monitor_hue_sensor_reachable",
+            &labels,
+            sensor.reachable,
+        );
         if sensor.reachable {
-            e.optional("fritz_monitor_hue_temperature_celsius", &labels, sensor.temperature_c);
-            e.optional("fritz_monitor_hue_illuminance_lux", &labels, sensor.illuminance_lux);
-            e.optional("fritz_monitor_hue_motion", &labels,
-                sensor.motion.map(|motion| if motion { 1.0 } else { 0.0 }));
+            e.optional(
+                "fritz_monitor_hue_temperature_celsius",
+                &labels,
+                sensor.temperature_c,
+            );
+            e.optional(
+                "fritz_monitor_hue_illuminance_lux",
+                &labels,
+                sensor.illuminance_lux,
+            );
+            e.optional(
+                "fritz_monitor_hue_motion",
+                &labels,
+                sensor.motion.map(|motion| if motion { 1.0 } else { 0.0 }),
+            );
         }
     }
     for sensor in data.netatmo_sensors {
         let labels = [("id", sensor.id.as_str()), ("name", sensor.name.as_str())];
-        e.flag("fritz_monitor_netatmo_sensor_reachable", &labels, sensor.reachable);
-        e.flag("fritz_monitor_netatmo_sensor_outdoor", &labels, sensor.is_outdoor);
+        e.flag(
+            "fritz_monitor_netatmo_sensor_reachable",
+            &labels,
+            sensor.reachable,
+        );
+        e.flag(
+            "fritz_monitor_netatmo_sensor_outdoor",
+            &labels,
+            sensor.is_outdoor,
+        );
         if sensor.reachable {
-            e.optional("fritz_monitor_netatmo_temperature_celsius", &labels, sensor.temperature_c);
-            e.optional("fritz_monitor_netatmo_humidity_percent", &labels, sensor.humidity_percent);
+            e.optional(
+                "fritz_monitor_netatmo_temperature_celsius",
+                &labels,
+                sensor.temperature_c,
+            );
+            e.optional(
+                "fritz_monitor_netatmo_humidity_percent",
+                &labels,
+                sensor.humidity_percent,
+            );
             e.optional("fritz_monitor_netatmo_co2_ppm", &labels, sensor.co2_ppm);
-            e.optional("fritz_monitor_netatmo_pressure_hectopascals", &labels, sensor.pressure_hpa);
-            e.optional("fritz_monitor_netatmo_noise_decibels", &labels, sensor.noise_db);
-            e.optional("fritz_monitor_netatmo_rain_millimeters", &labels, sensor.rain_mm);
-            e.optional("fritz_monitor_netatmo_wind_kilometers_per_hour", &labels, sensor.wind_kmh);
+            e.optional(
+                "fritz_monitor_netatmo_pressure_hectopascals",
+                &labels,
+                sensor.pressure_hpa,
+            );
+            e.optional(
+                "fritz_monitor_netatmo_noise_decibels",
+                &labels,
+                sensor.noise_db,
+            );
+            e.optional(
+                "fritz_monitor_netatmo_rain_millimeters",
+                &labels,
+                sensor.rain_mm,
+            );
+            e.optional(
+                "fritz_monitor_netatmo_wind_kilometers_per_hour",
+                &labels,
+                sensor.wind_kmh,
+            );
         }
         if let Some(threshold) = data.settings.netatmo_co2_alerts.get(&sensor.id) {
-            e.gauge("fritz_monitor_netatmo_co2_alarm_threshold_ppm", &labels, *threshold as f64);
+            e.gauge(
+                "fritz_monitor_netatmo_co2_alarm_threshold_ppm",
+                &labels,
+                *threshold as f64,
+            );
         }
     }
     if let Some(weather) = data.weather.filter(|_| !data.weather_error) {
         // Do not label by user-entered location: it is configuration and may
         // contain identifying address details.
-        e.gauge("fritz_monitor_weather_temperature_celsius", &[], weather.temperature_c);
-        e.gauge("fritz_monitor_weather_feels_like_celsius", &[], weather.feels_like_c);
-        e.gauge("fritz_monitor_weather_humidity_percent", &[], f64::from(weather.humidity_percent));
-        e.gauge("fritz_monitor_weather_pressure_hectopascals", &[], f64::from(weather.pressure_hpa));
-        e.gauge("fritz_monitor_weather_wind_meters_per_second", &[], weather.wind_speed_mps);
-        e.optional("fritz_monitor_weather_wind_degrees", &[], weather.wind_direction_degrees.map(f64::from));
-        e.gauge("fritz_monitor_weather_cloudiness_percent", &[], f64::from(weather.cloudiness_percent));
-        e.gauge("fritz_monitor_weather_visibility_meters", &[], f64::from(weather.visibility_m));
-        e.gauge("fritz_monitor_weather_sunrise_timestamp_seconds", &[], weather.sunrise_unix as f64);
-        e.gauge("fritz_monitor_weather_sunset_timestamp_seconds", &[], weather.sunset_unix as f64);
+        e.gauge(
+            "fritz_monitor_weather_temperature_celsius",
+            &[],
+            weather.temperature_c,
+        );
+        e.gauge(
+            "fritz_monitor_weather_feels_like_celsius",
+            &[],
+            weather.feels_like_c,
+        );
+        e.gauge(
+            "fritz_monitor_weather_humidity_percent",
+            &[],
+            f64::from(weather.humidity_percent),
+        );
+        e.gauge(
+            "fritz_monitor_weather_pressure_hectopascals",
+            &[],
+            f64::from(weather.pressure_hpa),
+        );
+        e.gauge(
+            "fritz_monitor_weather_wind_meters_per_second",
+            &[],
+            weather.wind_speed_mps,
+        );
+        e.optional(
+            "fritz_monitor_weather_wind_degrees",
+            &[],
+            weather.wind_direction_degrees.map(f64::from),
+        );
+        e.gauge(
+            "fritz_monitor_weather_cloudiness_percent",
+            &[],
+            f64::from(weather.cloudiness_percent),
+        );
+        e.gauge(
+            "fritz_monitor_weather_visibility_meters",
+            &[],
+            f64::from(weather.visibility_m),
+        );
+        e.gauge(
+            "fritz_monitor_weather_sunrise_timestamp_seconds",
+            &[],
+            weather.sunrise_unix as f64,
+        );
+        e.gauge(
+            "fritz_monitor_weather_sunset_timestamp_seconds",
+            &[],
+            weather.sunset_unix as f64,
+        );
         // OWM ambient pollutants: not Netatmo CO₂ (ppm) and not the
         // 0–500 US AQI scale. Missing/stale measurements are omitted.
         if let Some(pollution) = &weather.air_pollution {
-            e.gauge("fritz_monitor_weather_air_pollution_owm_index", &[], f64::from(pollution.aqi));
-            e.optional("fritz_monitor_weather_pm2_5_micrograms_per_cubic_meter", &[], pollution.pm2_5);
-            e.optional("fritz_monitor_weather_pm10_micrograms_per_cubic_meter", &[], pollution.pm10);
-            e.optional("fritz_monitor_weather_no2_micrograms_per_cubic_meter", &[], pollution.no2);
-            e.optional("fritz_monitor_weather_o3_micrograms_per_cubic_meter", &[], pollution.o3);
+            e.gauge(
+                "fritz_monitor_weather_air_pollution_owm_index",
+                &[],
+                f64::from(pollution.aqi),
+            );
+            e.optional(
+                "fritz_monitor_weather_pm2_5_micrograms_per_cubic_meter",
+                &[],
+                pollution.pm2_5,
+            );
+            e.optional(
+                "fritz_monitor_weather_pm10_micrograms_per_cubic_meter",
+                &[],
+                pollution.pm10,
+            );
+            e.optional(
+                "fritz_monitor_weather_no2_micrograms_per_cubic_meter",
+                &[],
+                pollution.no2,
+            );
+            e.optional(
+                "fritz_monitor_weather_o3_micrograms_per_cubic_meter",
+                &[],
+                pollution.o3,
+            );
         }
     }
     if let Some(bandwidth) = data.bandwidth {
-        e.gauge("fritz_monitor_internet_download_bits_per_second", &[], bandwidth.download_bits_per_second as f64);
-        e.gauge("fritz_monitor_internet_upload_bits_per_second", &[], bandwidth.upload_bits_per_second as f64);
+        e.gauge(
+            "fritz_monitor_internet_download_bits_per_second",
+            &[],
+            bandwidth.download_bits_per_second as f64,
+        );
+        e.gauge(
+            "fritz_monitor_internet_upload_bits_per_second",
+            &[],
+            bandwidth.upload_bits_per_second as f64,
+        );
     }
     if let Some(router) = data.router {
-        e.optional("fritz_monitor_router_uptime_seconds", &[], router.uptime_seconds.map(|value| value as f64));
+        e.optional(
+            "fritz_monitor_router_uptime_seconds",
+            &[],
+            router.uptime_seconds.map(|value| value as f64),
+        );
         if let Some(wan) = router.wan.as_ref() {
-            e.optional("fritz_monitor_wan_download_capacity_bits_per_second", &[], wan.download_bits_per_second.map(|value| value as f64));
-            e.optional("fritz_monitor_wan_upload_capacity_bits_per_second", &[], wan.upload_bits_per_second.map(|value| value as f64));
+            e.optional(
+                "fritz_monitor_wan_download_capacity_bits_per_second",
+                &[],
+                wan.download_bits_per_second.map(|value| value as f64),
+            );
+            e.optional(
+                "fritz_monitor_wan_upload_capacity_bits_per_second",
+                &[],
+                wan.upload_bits_per_second.map(|value| value as f64),
+            );
         }
     }
     e.buffer
@@ -285,16 +499,28 @@ fn reply(mut stream: TcpStream, enabled: bool, payload: &str) -> std::io::Result
     stream.set_write_timeout(Some(Duration::from_secs(1)))?;
     let mut request = [0_u8; 2048];
     let count = stream.read(&mut request)?;
-    let line = std::str::from_utf8(&request[..count]).unwrap_or("")
-        .split("\r\n").next().unwrap_or("");
+    let line = std::str::from_utf8(&request[..count])
+        .unwrap_or("")
+        .split("\r\n")
+        .next()
+        .unwrap_or("");
     let (status, body, content_type) = if !enabled {
-        ("503 Service Unavailable", "Exporter disabled\n", "text/plain")
+        (
+            "503 Service Unavailable",
+            "Exporter disabled\n",
+            "text/plain",
+        )
     } else if matches!(line, "GET /metrics HTTP/1.1" | "GET /metrics HTTP/1.0") {
-        ("200 OK", payload, "text/plain; version=0.0.4; charset=utf-8")
+        (
+            "200 OK",
+            payload,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )
     } else {
         ("404 Not Found", "Not found\n", "text/plain")
     };
-    write!(stream,
+    write!(
+        stream,
         "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n\r\n",
         body.len()
     )?;
@@ -309,7 +535,8 @@ pub fn serve() {
     let mut configured_address: Option<SocketAddr> = None;
     let mut bind_failed = false;
     loop {
-        let (enabled, bind_address) = SNAPSHOT.lock()
+        let (enabled, bind_address) = SNAPSHOT
+            .lock()
             .map(|state| (state.enabled, state.bind_address))
             .unwrap_or((false, None));
         let desired_address = if enabled { bind_address } else { None };
@@ -344,7 +571,8 @@ pub fn serve() {
             match socket.accept() {
                 Ok((stream, _)) => {
                     // Read fresh state in case the toggle changed while waiting.
-                    let (now_enabled, body) = SNAPSHOT.lock()
+                    let (now_enabled, body) = SNAPSHOT
+                        .lock()
                         .map(|state| (state.enabled, state.text.clone()))
                         .unwrap_or((false, String::new()));
                     let _ = reply(stream, now_enabled, &body);
@@ -368,8 +596,18 @@ mod tests {
         encoder.gauge("example_metric", &[("name", "thing\"x")], f64::NAN);
         assert!(encoder.buffer.is_empty());
         encoder.gauge("example_metric", &[("name", "thing\"x")], 3.5);
-        assert!(encoder.buffer.contains("example_metric{name=\"thing\\\"x\"} 3.5\n"));
-        assert_eq!(encoder.buffer.matches("# TYPE example_metric gauge").count(), 1);
+        assert!(
+            encoder
+                .buffer
+                .contains("example_metric{name=\"thing\\\"x\"} 3.5\n")
+        );
+        assert_eq!(
+            encoder
+                .buffer
+                .matches("# TYPE example_metric gauge")
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -377,28 +615,46 @@ mod tests {
         let settings = FritzSettings::default();
         let readings = [
             FritzReading {
-                ain: "meter1".into(), name: "Meter".into(), power_w: 42,
-                has_power_meter: true, temperature_c: 21.5,
-                power_state: Some(true), power_controllable: true,
+                ain: "meter1".into(),
+                name: "Meter".into(),
+                power_w: 42,
+                has_power_meter: true,
+                temperature_c: 21.5,
+                power_state: Some(true),
+                power_controllable: true,
                 power_toggle_allowed: true,
             },
             FritzReading {
-                ain: "sensor1".into(), name: "Room sensor".into(), power_w: 0,
-                has_power_meter: false, temperature_c: 19.7,
-                power_state: None, power_controllable: false,
+                ain: "sensor1".into(),
+                name: "Room sensor".into(),
+                power_w: 0,
+                has_power_meter: false,
+                temperature_c: 19.7,
+                power_state: None,
+                power_controllable: false,
                 power_toggle_allowed: false,
             },
         ];
         let rendered = render(LiveData {
-            settings: &settings, devices: &readings,
-            hue_lights: &[], hue_sensors: &[], netatmo_sensors: &[],
-            weather: None, bandwidth: None, router: None,
-            fritz_error: false, hue_error: false,
-            netatmo_error: false, weather_error: false,
+            settings: &settings,
+            devices: &readings,
+            hue_lights: &[],
+            hue_sensors: &[],
+            netatmo_sensors: &[],
+            weather: None,
+            bandwidth: None,
+            router: None,
+            fritz_error: false,
+            hue_error: false,
+            netatmo_error: false,
+            weather_error: false,
         });
         assert!(rendered.contains("fritz_monitor_output_power_watts 42\n"));
         assert!(rendered.contains("fritz_monitor_device_temperature_celsius{source=\"fritzbox\",id=\"sensor1\",name=\"Room sensor\"} 19.7\n"));
-        assert!(!rendered.contains("fritz_monitor_device_power_watts{source=\"fritzbox\",id=\"sensor1\""));
+        assert!(
+            !rendered
+                .contains("fritz_monitor_device_power_watts{source=\"fritzbox\",id=\"sensor1\"")
+        );
         assert!(rendered.contains("# TYPE fritz_monitor_device_temperature_celsius gauge"));
     }
 
@@ -426,8 +682,14 @@ mod tests {
 
     #[test]
     fn exporter_defaults_disabled_and_loopback_only() {
-        assert_eq!(parse_bind_address(DEFAULT_BIND_ADDRESS).unwrap().port(), 9817);
-        assert_eq!(FritzSettings::default().prometheus_bind_address, DEFAULT_BIND_ADDRESS);
+        assert_eq!(
+            parse_bind_address(DEFAULT_BIND_ADDRESS).unwrap().port(),
+            9817
+        );
+        assert_eq!(
+            FritzSettings::default().prometheus_bind_address,
+            DEFAULT_BIND_ADDRESS
+        );
         assert!(!FritzSettings::default().prometheus_enabled);
     }
 
@@ -445,8 +707,12 @@ mod tests {
             assert_eq!(endpoint_url(bind).as_deref(), Some(url));
         }
         for invalid in [
-            "", "localhost:9817", "127.0.0.1", "127.0.0.1:0",
-            "0.0.0.0:65536", "127.0.0.1:9817\\nPROMETHEUS_ENABLED=true",
+            "",
+            "localhost:9817",
+            "127.0.0.1",
+            "127.0.0.1:0",
+            "0.0.0.0:65536",
+            "127.0.0.1:9817\\nPROMETHEUS_ENABLED=true",
         ] {
             assert_eq!(parse_bind_address(invalid), None, "{invalid}");
             assert_eq!(endpoint_url(invalid), None);

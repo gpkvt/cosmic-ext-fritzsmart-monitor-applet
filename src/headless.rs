@@ -1,9 +1,7 @@
 //! Long-running telemetry mode: no COSMIC applet, Wayland connection or
 //! weather imagery. Each configured integration refreshes independently and
 //! publishes the same cached Prometheus metrics as the panel applet.
-use crate::fritz::{
-    FritzBoxSystemInfo, FritzInternetBandwidth, FritzReading, FritzSettings,
-};
+use crate::fritz::{FritzBoxSystemInfo, FritzInternetBandwidth, FritzReading, FritzSettings};
 use crate::hue::{HueLight, HueSensor};
 use crate::netatmo::NetatmoSensor;
 use crate::weather::WeatherData;
@@ -171,9 +169,7 @@ async fn poll_devices(state: Shared, settings: FritzSettings, address: String) {
                 missing
             }
             Err(error) => {
-                crate::diagnostics::warn(format!(
-                    "Headless FRITZ/Tasmota refresh failed: {error}"
-                ));
+                crate::diagnostics::warn(format!("Headless FRITZ/Tasmota refresh failed: {error}"));
                 apply(&state, &settings, &address, |state| {
                     state.devices.clear();
                     state.bandwidth = None;
@@ -207,9 +203,7 @@ async fn poll_hue(state: Shared, settings: FritzSettings, address: String) {
                 state.hue_error = false;
             }),
             Err(error) => {
-                crate::diagnostics::warn(format!(
-                    "Headless Hue refresh failed: {error}"
-                ));
+                crate::diagnostics::warn(format!("Headless Hue refresh failed: {error}"));
                 apply(&state, &settings, &address, |state| {
                     state.hue_lights.clear();
                     state.hue_sensors.clear();
@@ -275,9 +269,7 @@ async fn poll_netatmo(state: Shared, settings: FritzSettings, address: String) {
                 }
             }
             Err(error) => {
-                crate::diagnostics::warn(format!(
-                    "Headless Netatmo refresh failed: {error}"
-                ));
+                crate::diagnostics::warn(format!("Headless Netatmo refresh failed: {error}"));
                 apply(&state, &settings, &address, |state| {
                     state.netatmo_sensors.clear();
                     state.netatmo_error = true;
@@ -301,9 +293,7 @@ async fn poll_weather(state: Shared, settings: FritzSettings, address: String) {
                 state.weather_error = false;
             }),
             Err(error) => {
-                crate::diagnostics::warn(format!(
-                    "Headless weather refresh failed: {error}"
-                ));
+                crate::diagnostics::warn(format!("Headless weather refresh failed: {error}"));
                 apply(&state, &settings, &address, |state| {
                     state.weather = None;
                     state.weather_error = true;
@@ -381,7 +371,11 @@ pub fn run(listen_override: Option<&str>) -> Result<(), String> {
         .map_err(|error| format!("Cannot start asynchronous monitor runtime: {error}"))?;
     runtime.block_on(async {
         if !settings.ains.is_empty() || !settings.ain.trim().is_empty() {
-            tokio::spawn(poll_devices(state.clone(), settings.clone(), address.clone()));
+            tokio::spawn(poll_devices(
+                state.clone(),
+                settings.clone(),
+                address.clone(),
+            ));
         }
         if !settings.hue_bridge_ip.trim().is_empty()
             && !settings.hue_application_key.trim().is_empty()
@@ -392,21 +386,28 @@ pub fn run(listen_override: Option<&str>) -> Result<(), String> {
             && !settings.netatmo_client_secret.trim().is_empty()
             && !settings.netatmo_refresh_token.trim().is_empty()
         {
-            tokio::spawn(poll_netatmo(state.clone(), settings.clone(), address.clone()));
+            tokio::spawn(poll_netatmo(
+                state.clone(),
+                settings.clone(),
+                address.clone(),
+            ));
         }
         if settings.weather_enabled
             && !settings.openweathermap_api_key.trim().is_empty()
             && !settings.weather_location.trim().is_empty()
         {
-            tokio::spawn(poll_weather(state.clone(), settings.clone(), address.clone()));
+            tokio::spawn(poll_weather(
+                state.clone(),
+                settings.clone(),
+                address.clone(),
+            ));
         }
 
         // systemd sends SIGTERM, terminals send SIGINT. Both stop polling and
         // disable the exporter without starting a graphical event loop.
-        let mut terminate = tokio::signal::unix::signal(
-            tokio::signal::unix::SignalKind::terminate(),
-        )
-        .map_err(|error| format!("Cannot register SIGTERM handler: {error}"))?;
+        let mut terminate =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                .map_err(|error| format!("Cannot register SIGTERM handler: {error}"))?;
         tokio::select! {
             result = tokio::signal::ctrl_c() => {
                 result.map_err(|error| format!("Cannot register SIGINT handler: {error}"))?;
@@ -431,8 +432,14 @@ mod tests {
     #[test]
     fn command_line_keeps_default_cosmic_ui_and_requires_explicit_headless() {
         assert_eq!(parse_command_line(&[]).unwrap(), Command::Applet);
-        assert_eq!(parse_command_line(&args(&["--help"])).unwrap(), Command::Help);
-        assert_eq!(parse_command_line(&args(&["--version"])).unwrap(), Command::Version);
+        assert_eq!(
+            parse_command_line(&args(&["--help"])).unwrap(),
+            Command::Help
+        );
+        assert_eq!(
+            parse_command_line(&args(&["--version"])).unwrap(),
+            Command::Version
+        );
         assert_eq!(
             parse_command_line(&args(&["--headless", "--setup"])).unwrap(),
             Command::ConfigureHeadless
@@ -445,15 +452,21 @@ mod tests {
             parse_command_line(&args(&["--configure", "--headless"])).unwrap(),
             Command::ConfigureHeadless
         );
-        assert_eq!(parse_command_line(&args(&["--headless"])).unwrap(),
-            Command::Headless { listen: None });
+        assert_eq!(
+            parse_command_line(&args(&["--headless"])).unwrap(),
+            Command::Headless { listen: None }
+        );
         assert_eq!(
             parse_command_line(&args(&["--headless", "--listen", "127.0.0.1:9817"])).unwrap(),
-            Command::Headless { listen: Some("127.0.0.1:9817".into()) }
+            Command::Headless {
+                listen: Some("127.0.0.1:9817".into())
+            }
         );
         assert_eq!(
             parse_command_line(&args(&["--listen=[::1]:9817", "--headless"])).unwrap(),
-            Command::Headless { listen: Some("[::1]:9817".into()) }
+            Command::Headless {
+                listen: Some("[::1]:9817".into())
+            }
         );
         for input in [
             vec!["--listen", "127.0.0.1:9817"],
@@ -464,7 +477,11 @@ mod tests {
             vec!["--headless", "--setup", "--listen", "127.0.0.1:9817"],
             vec!["--headless", "--setup", "--configure"],
             vec!["--headless", "--listen"],
-            vec!["--headless", "--listen=127.0.0.1:9817", "--listen=[::1]:9817"],
+            vec![
+                "--headless",
+                "--listen=127.0.0.1:9817",
+                "--listen=[::1]:9817",
+            ],
             vec!["--unknown"],
         ] {
             assert!(parse_command_line(&args(&input)).is_err(), "{input:?}");

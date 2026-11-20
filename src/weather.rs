@@ -70,14 +70,10 @@ fn air_pollution_component(value: &serde_json::Value, key: &str) -> Option<f64> 
 
 /// Ignore old or malformed pollution samples instead of displaying stale
 /// pollution beside a fresh weather reading.
-fn parse_air_pollution(
-    payload: &serde_json::Value,
-    now_unix: i64,
-) -> Option<AirPollutionData> {
+fn parse_air_pollution(payload: &serde_json::Value, now_unix: i64) -> Option<AirPollutionData> {
     let reading = payload["list"].as_array()?.first()?;
     let timestamp = reading["dt"].as_i64()?;
-    if timestamp > now_unix.saturating_add(600)
-        || now_unix.saturating_sub(timestamp) > 3 * 60 * 60
+    if timestamp > now_unix.saturating_add(600) || now_unix.saturating_sub(timestamp) > 3 * 60 * 60
     {
         return None;
     }
@@ -105,7 +101,8 @@ async fn fetch_air_pollution(
     latitude: f64,
     longitude: f64,
 ) -> Option<AirPollutionData> {
-    if !latitude.is_finite() || !longitude.is_finite()
+    if !latitude.is_finite()
+        || !longitude.is_finite()
         || !(-90.0..=90.0).contains(&latitude)
         || !(-180.0..=180.0).contains(&longitude)
     {
@@ -455,7 +452,10 @@ async fn fetch_weather_with_images(
         fetch_air_pollution(&client, &api_key, latitude, longitude).await
     };
     let (air_pollution, (mut background_images, image_attributions)) = if include_images {
-        futures::join!(fetch_pollution, fetch_commons_background(&client, icon_code))
+        futures::join!(
+            fetch_pollution,
+            fetch_commons_background(&client, icon_code)
+        )
     } else {
         (fetch_pollution.await, (Vec::new(), Vec::new()))
     };
@@ -1194,7 +1194,10 @@ mod tests {
         assert_eq!(pollution.o3, Some(32.9));
         assert_eq!(parse_air_pollution(&payload, 12000), None);
         assert_eq!(parse_air_pollution(&payload, 200), None);
-        assert_eq!(parse_air_pollution(&serde_json::json!({"list": []}), 1100), None);
+        assert_eq!(
+            parse_air_pollution(&serde_json::json!({"list": []}), 1100),
+            None
+        );
         let invalid = serde_json::json!({
             "list": [{"dt": 1000, "main": {"aqi": 8}, "components": {}}]
         });

@@ -618,9 +618,7 @@ fn parse_netatmo_co2_alerts(value: &str) -> HashMap<String, u16> {
 fn serialize_netatmo_co2_alerts(alerts: &HashMap<String, u16>) -> String {
     let mut entries: Vec<_> = alerts
         .iter()
-        .filter(|(id, threshold)| {
-            crate::netatmo::valid_id(id) && (600..=5000).contains(*threshold)
-        })
+        .filter(|(id, threshold)| crate::netatmo::valid_id(id) && (600..=5000).contains(*threshold))
         .map(|(id, threshold)| format!("{id}:{threshold}"))
         .collect();
     entries.sort_unstable();
@@ -670,8 +668,11 @@ impl FritzSettings {
             netatmo_refresh_token: get("NETATMO_REFRESH_TOKEN"),
             netatmo_co2_alerts: parse_netatmo_co2_alerts(&get("NETATMO_CO2_ALERTS")),
             hidden_netatmo_devices: get("NETATMO_HIDDEN_DEVICES")
-                .split(',').map(str::trim).filter(|id| !id.is_empty())
-                .map(str::to_owned).collect(),
+                .split(',')
+                .map(str::trim)
+                .filter(|id| !id.is_empty())
+                .map(str::to_owned)
+                .collect(),
             hidden_hue_devices: parse_hidden_hue_devices(&get("HUE_HIDDEN_DEVICES")),
             tasmota_subnet_scan: !values.contains_key("TASMOTA_SUBNET_SCAN")
                 || get("TASMOTA_SUBNET_SCAN").eq_ignore_ascii_case("true"),
@@ -732,11 +733,14 @@ impl FritzSettings {
             input_defaults_initialized: get("INPUT_DEFAULTS_INITIALIZED")
                 .eq_ignore_ascii_case("true"),
             prometheus_enabled: get("PROMETHEUS_ENABLED").eq_ignore_ascii_case("true"),
-            prometheus_bind_address: crate::prometheus::parse_bind_address(&get("PROMETHEUS_BIND_ADDRESS"))
-                .map(|address| address.to_string())
-                .unwrap_or_else(|| crate::prometheus::DEFAULT_BIND_ADDRESS.into()),
+            prometheus_bind_address: crate::prometheus::parse_bind_address(&get(
+                "PROMETHEUS_BIND_ADDRESS",
+            ))
+            .map(|address| address.to_string())
+            .unwrap_or_else(|| crate::prometheus::DEFAULT_BIND_ADDRESS.into()),
             weather_enabled: get("WEATHER_ENABLED").eq_ignore_ascii_case("true"),
-            weather_netatmo_extra_metrics: get("WEATHER_NETATMO_EXTRA_METRICS").eq_ignore_ascii_case("true"),
+            weather_netatmo_extra_metrics: get("WEATHER_NETATMO_EXTRA_METRICS")
+                .eq_ignore_ascii_case("true"),
             openweathermap_api_key: get("OPENWEATHERMAP_API_KEY"),
             weather_location: get("WEATHER_LOCATION"),
             weather_temperature_ain: get("WEATHER_TEMPERATURE_AIN"),
@@ -1025,7 +1029,14 @@ impl FritzSettings {
             "HISTORY_RETENTION_MINUTES={}\n",
             self.history_retention_minutes.clamp(5, 2_102_400)
         ));
-        contents.push_str(&format!("PROMETHEUS_ENABLED={}\n", if self.prometheus_enabled { "true" } else { "false" }));
+        contents.push_str(&format!(
+            "PROMETHEUS_ENABLED={}\n",
+            if self.prometheus_enabled {
+                "true"
+            } else {
+                "false"
+            }
+        ));
         // Persist only parsed socket addresses to prevent newline/config injection.
         let bind_address = crate::prometheus::parse_bind_address(&self.prometheus_bind_address)
             .map(|address| address.to_string())
@@ -1035,7 +1046,11 @@ impl FritzSettings {
         // atomic settings file as the existing Hue and router credentials.
         contents.push_str(&format!(
             "WEATHER_NETATMO_EXTRA_METRICS={}\n",
-            if self.weather_netatmo_extra_metrics { "true" } else { "false" },
+            if self.weather_netatmo_extra_metrics {
+                "true"
+            } else {
+                "false"
+            },
         ));
         contents.push_str(&format!(
             "NETATMO_CLIENT_ID={}\nNETATMO_CLIENT_SECRET={}\nNETATMO_REFRESH_TOKEN={}\nNETATMO_HIDDEN_DEVICES={}\nNETATMO_CO2_ALERTS={}\n",
@@ -1391,9 +1406,7 @@ pub async fn discover_devices(settings: FritzSettings) -> Result<Vec<FritzDevice
         normalize_ain_for_selection(&left.ain) == normalize_ain_for_selection(&right.ain)
     });
     if devices.is_empty() {
-        return Err(
-            "No compatible FRITZ!Box Smart Home or Tasmota devices were discovered".into(),
-        );
+        return Err("No compatible FRITZ!Box Smart Home or Tasmota devices were discovered".into());
     }
     Ok(devices)
 }
@@ -1417,7 +1430,9 @@ fn parse_devices_xml(xml: &str) -> Result<Vec<FritzDevice>, String> {
             || child_text(node, "hkr", "tist")
                 .and_then(|value| value.parse::<u16>().ok())
                 .is_some_and(|value| (16..=56).contains(&value));
-        let has_switch = node.children().any(|child| child.has_tag_name("switch") || child.has_tag_name("simpleonoff"));
+        let has_switch = node
+            .children()
+            .any(|child| child.has_tag_name("switch") || child.has_tag_name("simpleonoff"));
         let has_thermostat = node.children().any(|child| child.has_tag_name("hkr"));
         if !has_power_meter && !has_temperature && !has_switch && !has_thermostat {
             continue;
@@ -1449,20 +1464,30 @@ fn parse_device_reading(device: Node<'_, '_>) -> Result<FritzReading, String> {
         .attribute("identifier")
         .ok_or_else(|| "Device is missing an identifier".to_string())?;
     let power_mw = child_text(device, "powermeter", "power")
-        .map(|power| power.parse::<i64>()
-            .map_err(|_| format!("Device {ain} returned an invalid power measurement")))
+        .map(|power| {
+            power
+                .parse::<i64>()
+                .map_err(|_| format!("Device {ain} returned an invalid power measurement"))
+        })
         .transpose()?;
     let temperature_c = child_text(device, "temperature", "celsius")
         .and_then(|celsius| celsius.parse::<i64>().ok())
         .map(|celsius| celsius as f64 / 10.0)
         // Thermostats can expose the current temperature in half-degree units.
-        .or_else(|| child_text(device, "hkr", "tist")
-            .and_then(|tist| tist.parse::<u16>().ok())
-            .filter(|tist| (16..=56).contains(tist))
-            .map(|tist| f64::from(tist) / 2.0))
+        .or_else(|| {
+            child_text(device, "hkr", "tist")
+                .and_then(|tist| tist.parse::<u16>().ok())
+                .filter(|tist| (16..=56).contains(tist))
+                .map(|tist| f64::from(tist) / 2.0)
+        })
         .unwrap_or(f64::NAN);
-    if power_mw.is_none() && !temperature_c.is_finite()
-        && !device.children().any(|node| node.has_tag_name("switch") || node.has_tag_name("simpleonoff") || node.has_tag_name("hkr"))
+    if power_mw.is_none()
+        && !temperature_c.is_finite()
+        && !device.children().any(|node| {
+            node.has_tag_name("switch")
+                || node.has_tag_name("simpleonoff")
+                || node.has_tag_name("hkr")
+        })
     {
         return Err(format!("Device {ain} has no supported Smart Home readings"));
     }
@@ -1486,10 +1511,10 @@ fn parse_device_reading(device: Node<'_, '_>) -> Result<FritzReading, String> {
     let power_state = child_text(device, "switch", "state")
         .or_else(|| child_text(device, "simpleonoff", "state"))
         .and_then(|state| match state.trim() {
-        "1" => Some(true),
-        "0" => Some(false),
-        _ => None,
-    });
+            "1" => Some(true),
+            "0" => Some(false),
+            _ => None,
+        });
     Ok(FritzReading {
         ain: ain.to_string(),
         name,
@@ -2465,9 +2490,9 @@ mod tests {
                 .map(|address| address.to_string()),
             Some("127.0.0.1:9817".into()),
         );
-        assert!(crate::prometheus::parse_bind_address(
-            "127.0.0.1:9817\nWEATHER_ENABLED=true"
-        ).is_none());
+        assert!(
+            crate::prometheus::parse_bind_address("127.0.0.1:9817\nWEATHER_ENABLED=true").is_none()
+        );
     }
 
     #[test]
@@ -2786,7 +2811,7 @@ mod tests {
     #[test]
     fn netatmo_co2_alert_settings_parse_and_serialize_safely() {
         let values = parse_netatmo_co2_alerts(
-            "70:ee:50:11:22:33:1200;module-2:2000;bad:abc;invalid/id:900;too-low:100;too-high:6500"
+            "70:ee:50:11:22:33:1200;module-2:2000;bad:abc;invalid/id:900;too-low:100;too-high:6500",
         );
         assert_eq!(values.len(), 2);
         assert_eq!(values.get("70:ee:50:11:22:33"), Some(&1200));
@@ -2993,21 +3018,44 @@ mod tests {
         let devices = parse_devices_xml(xml).unwrap();
         assert_eq!(devices.len(), 5);
         assert!(!devices.iter().any(|device| device.ain == "5555"));
-        let results = parse_fetch_result_xml(xml, &devices.iter().map(|device| device.ain.clone()).collect::<Vec<_>>()).unwrap();
+        let results = parse_fetch_result_xml(
+            xml,
+            &devices
+                .iter()
+                .map(|device| device.ain.clone())
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
         assert_eq!(results.readings.len(), 5);
-        let switch = results.readings.iter().find(|reading| reading.ain == "2222").unwrap();
+        let switch = results
+            .readings
+            .iter()
+            .find(|reading| reading.ain == "2222")
+            .unwrap();
         assert!(!switch.has_power_meter);
         assert!(switch.temperature_c.is_nan());
         assert_eq!(switch.power_state, Some(true));
         assert!(switch.power_toggle_allowed);
-        let sensor = results.readings.iter().find(|reading| reading.ain == "3333").unwrap();
+        let sensor = results
+            .readings
+            .iter()
+            .find(|reading| reading.ain == "3333")
+            .unwrap();
         assert!(!sensor.has_power_meter);
         assert_eq!(sensor.temperature_c, 19.8);
-        let radiator = results.readings.iter().find(|reading| reading.ain == "4444").unwrap();
+        let radiator = results
+            .readings
+            .iter()
+            .find(|reading| reading.ain == "4444")
+            .unwrap();
         assert!(!radiator.has_power_meter);
         assert_eq!(radiator.temperature_c, 20.5);
         assert!(!radiator.power_controllable);
-        let light = results.readings.iter().find(|reading| reading.ain == "6666").unwrap();
+        let light = results
+            .readings
+            .iter()
+            .find(|reading| reading.ain == "6666")
+            .unwrap();
         assert_eq!(light.power_state, Some(true));
         assert!(!light.has_power_meter);
         assert!(!light.power_controllable);
@@ -3019,7 +3067,10 @@ mod tests {
             <device identifier="off"><hkr><tist>253</tist></hkr></device>
             <device identifier="on"><hkr><tist>254</tist></hkr></device>
         </devicelist>"#;
-        for reading in parse_fetch_result_xml(xml, &["off".into(), "on".into()]).unwrap().readings {
+        for reading in parse_fetch_result_xml(xml, &["off".into(), "on".into()])
+            .unwrap()
+            .readings
+        {
             assert!(reading.temperature_c.is_nan());
             assert!(!reading.has_power_meter);
         }

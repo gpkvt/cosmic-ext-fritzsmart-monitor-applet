@@ -88,10 +88,16 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
     }
     if key == "Graph range only changes what is shown; it never deletes saved samples." {
         return match lang {
-            "de" => "Der Graphenzeitraum ändert nur die Anzeige und löscht keine gespeicherten Werte.",
+            "de" => {
+                "Der Graphenzeitraum ändert nur die Anzeige und löscht keine gespeicherten Werte."
+            }
             "es" => "El intervalo del gráfico solo cambia la vista; no elimina datos guardados.",
-            "nl" => "Het grafiekbereik verandert alleen de weergave en verwijdert geen opgeslagen metingen.",
-            "fr" => "La plage du graphique ne change que l'affichage et ne supprime aucune mesure enregistrée.",
+            "nl" => {
+                "Het grafiekbereik verandert alleen de weergave en verwijdert geen opgeslagen metingen."
+            }
+            "fr" => {
+                "La plage du graphique ne change que l'affichage et ne supprime aucune mesure enregistrée."
+            }
             "it" => "L'intervallo del grafico modifica solo la vista e non elimina i dati salvati.",
             "sv" => "Grafens tidsintervall ändrar bara visningen och raderar inga sparade värden.",
             "pt" => "O intervalo do gráfico altera apenas a vista, sem apagar dados guardados.",
@@ -106,12 +112,22 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
     if key == "Reducing this limit permanently deletes older samples from every history source." {
         return match lang {
             "de" => "Ein kürzerer Zeitraum löscht ältere Werte aus allen Verlaufsdaten dauerhaft.",
-            "es" => "Reducir este límite elimina permanentemente los datos antiguos de todos los historiales.",
-            "nl" => "Een kortere bewaartermijn verwijdert oudere gegevens uit alle geschiedenissen definitief.",
-            "fr" => "Réduire cette limite supprime définitivement les anciennes mesures de tous les historiques.",
-            "it" => "Ridurre questo limite elimina definitivamente i dati meno recenti da tutte le cronologie.",
+            "es" => {
+                "Reducir este límite elimina permanentemente los datos antiguos de todos los historiales."
+            }
+            "nl" => {
+                "Een kortere bewaartermijn verwijdert oudere gegevens uit alle geschiedenissen definitief."
+            }
+            "fr" => {
+                "Réduire cette limite supprime définitivement les anciennes mesures de tous les historiques."
+            }
+            "it" => {
+                "Ridurre questo limite elimina definitivamente i dati meno recenti da tutte le cronologie."
+            }
             "sv" => "Om gränsen sänks tas äldre värden permanent bort från all historik.",
-            "pt" => "Reduzir este limite elimina permanentemente os dados antigos de todos os históricos.",
+            "pt" => {
+                "Reduzir este limite elimina permanentemente os dados antigos de todos os históricos."
+            }
             "pl" => "Zmniejszenie limitu trwale usuwa starsze próbki ze wszystkich historii.",
             "da" => "En kortere grænse sletter ældre målinger permanent fra al historik.",
             "no" => "Å redusere grensen sletter eldre målinger permanent fra all historikk.",
@@ -138,21 +154,46 @@ pub fn tr(setting: &str, key: &'static str) -> &'static str {
             _ => "Remove inactive devices",
         };
     }
-    if key == "Remove confirmed-offline devices from the saved list. They can be discovered again." {
+    if key == "Remove confirmed-offline devices from the saved list. They can be discovered again."
+    {
         return match lang {
-            "de" => "Bestätigt offline befindliche Geräte aus der gespeicherten Liste entfernen. Eine erneute Suche fügt sie wieder hinzu.",
-            "es" => "Quita de la lista los dispositivos sin conexión confirmados. Puedes redescubrirlos.",
-            "nl" => "Verwijder bevestigde offline apparaten uit de opgeslagen lijst. Je kunt ze opnieuw zoeken.",
-            "fr" => "Retirez les appareils confirmés hors ligne de la liste enregistrée. Vous pourrez les redécouvrir.",
-            "it" => "Rimuove i dispositivi confermati offline dall'elenco salvato. Puoi rilevarli di nuovo.",
-            "sv" => "Ta bort bekräftat frånkopplade enheter från den sparade listan. De kan hittas igen.",
-            "pt" => "Remove os dispositivos confirmados como offline da lista guardada. Pode descobri-los novamente.",
-            "pl" => "Usuń potwierdzone urządzenia offline z zapisanej listy. Można je ponownie wykryć.",
+            "de" => {
+                "Bestätigt offline befindliche Geräte aus der gespeicherten Liste entfernen. Eine erneute Suche fügt sie wieder hinzu."
+            }
+            "es" => {
+                "Quita de la lista los dispositivos sin conexión confirmados. Puedes redescubrirlos."
+            }
+            "nl" => {
+                "Verwijder bevestigde offline apparaten uit de opgeslagen lijst. Je kunt ze opnieuw zoeken."
+            }
+            "fr" => {
+                "Retirez les appareils confirmés hors ligne de la liste enregistrée. Vous pourrez les redécouvrir."
+            }
+            "it" => {
+                "Rimuove i dispositivi confermati offline dall'elenco salvato. Puoi rilevarli di nuovo."
+            }
+            "sv" => {
+                "Ta bort bekräftat frånkopplade enheter från den sparade listan. De kan hittas igen."
+            }
+            "pt" => {
+                "Remove os dispositivos confirmados como offline da lista guardada. Pode descobri-los novamente."
+            }
+            "pl" => {
+                "Usuń potwierdzone urządzenia offline z zapisanej listy. Można je ponownie wykryć."
+            }
             "da" => "Fjern bekræftede offlineenheder fra den gemte liste. De kan findes igen.",
-            "no" => "Fjern bekreftede frakoblede enheter fra den lagrede listen. De kan oppdages igjen.",
-            "ja" => "オフラインと確認されたデバイスを保存済みリストから削除します。再検出できます。",
-            "ko" => "오프라인으로 확인된 장치를 저장된 목록에서 제거합니다. 다시 검색할 수 있습니다.",
-            _ => "Remove confirmed-offline devices from the saved list. They can be discovered again.",
+            "no" => {
+                "Fjern bekreftede frakoblede enheter fra den lagrede listen. De kan oppdages igjen."
+            }
+            "ja" => {
+                "オフラインと確認されたデバイスを保存済みリストから削除します。再検出できます。"
+            }
+            "ko" => {
+                "오프라인으로 확인된 장치를 저장된 목록에서 제거합니다. 다시 검색할 수 있습니다."
+            }
+            _ => {
+                "Remove confirmed-offline devices from the saved list. They can be discovered again."
+            }
         };
     }
     if lang != "de" {

@@ -88,7 +88,12 @@ fn discover_bridges_mdns(duration: Duration) -> Result<Vec<String>, String> {
             .saturating_duration_since(Instant::now())
             .min(Duration::from_millis(250));
         if let Ok(ServiceEvent::ServiceResolved(service)) = receiver.recv_timeout(timeout)
-            && let Some(ip) = local_service_address(service.get_addresses().iter().map(|address| address.to_ip_addr()))
+            && let Some(ip) = local_service_address(
+                service
+                    .get_addresses()
+                    .iter()
+                    .map(|address| address.to_ip_addr()),
+            )
         {
             addresses.insert(ip);
         }

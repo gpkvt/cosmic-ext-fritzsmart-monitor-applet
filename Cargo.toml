@@ -1,6 +1,6 @@
 [package]
 name = "fritz-power-monitor"
-version = "3.0.1"
+version = "3.0.2"
 edition = "2024"
 description = "FRITZ!Box power monitor for the COSMIC desktop panel"
 license = "MIT"

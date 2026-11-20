@@ -174,16 +174,11 @@ fn valid_local_hue_ip(address: &str) -> bool {
     };
     match ip {
         IpAddr::V4(ip) => ip.is_private() || ip.is_link_local() || ip.is_loopback(),
-        IpAddr::V6(ip) => {
-            ip.is_unique_local() || ip.is_unicast_link_local() || ip.is_loopback()
-        }
+        IpAddr::V6(ip) => ip.is_unique_local() || ip.is_unicast_link_local() || ip.is_loopback(),
     }
 }
 
-fn parse_selection(
-    selection: &str,
-    devices: &[FritzDevice],
-) -> Result<Vec<String>, String> {
+fn parse_selection(selection: &str, devices: &[FritzDevice]) -> Result<Vec<String>, String> {
     if selection.eq_ignore_ascii_case("all") {
         return Ok(devices.iter().map(|device| device.ain.clone()).collect());
     }
@@ -193,12 +188,13 @@ fn parse_selection(
     let mut used = HashSet::new();
     let mut selected = Vec::new();
     for value in selection.split(',') {
-        let index: usize = value.trim().parse().map_err(|_| {
-            "Enter comma-separated device numbers, 'all', or 'none'".to_string()
-        })?;
-        let device = devices.get(index.saturating_sub(1)).ok_or_else(|| {
-            format!("Device number {index} is not in the list")
-        })?;
+        let index: usize = value
+            .trim()
+            .parse()
+            .map_err(|_| "Enter comma-separated device numbers, 'all', or 'none'".to_string())?;
+        let device = devices
+            .get(index.saturating_sub(1))
+            .ok_or_else(|| format!("Device number {index} is not in the list"))?;
         if index == 0 {
             return Err("Device numbers start at 1".into());
         }
@@ -234,9 +230,10 @@ fn discover_and_select(settings: &mut FritzSettings) -> Result<(), String> {
     let mut inventory = settings.known_devices.clone();
     for device in discovered {
         let key = crate::fritz::canonical_device_key(&device.ain);
-        if let Some(existing) = inventory.iter_mut().find(|existing| {
-            crate::fritz::canonical_device_key(&existing.ain) == key
-        }) {
+        if let Some(existing) = inventory
+            .iter_mut()
+            .find(|existing| crate::fritz::canonical_device_key(&existing.ain) == key)
+        {
             *existing = device;
         } else {
             inventory.push(device);
@@ -300,7 +297,10 @@ pub fn run() -> Result<(), String> {
         && settings.tasmota_username.is_empty()
         && settings.hue_bridge_ip.is_empty()
         && settings.netatmo_client_id.is_empty();
-    if confirm("Configure FRITZ!Box?", first_setup || !settings.url.is_empty())? {
+    if confirm(
+        "Configure FRITZ!Box?",
+        first_setup || !settings.url.is_empty(),
+    )? {
         let default_url = if settings.url.is_empty() {
             "http://fritz.box"
         } else {
@@ -370,8 +370,10 @@ pub fn run() -> Result<(), String> {
             prompt_required("Netatmo client ID", &settings.netatmo_client_id)?;
         settings.netatmo_client_secret =
             prompt_required_secret("Netatmo client secret", &settings.netatmo_client_secret)?;
-        settings.netatmo_refresh_token =
-            prompt_required_secret("Netatmo OAuth refresh token", &settings.netatmo_refresh_token)?;
+        settings.netatmo_refresh_token = prompt_required_secret(
+            "Netatmo OAuth refresh token",
+            &settings.netatmo_refresh_token,
+        )?;
     }
 
     settings.weather_enabled = confirm(
@@ -381,17 +383,16 @@ pub fn run() -> Result<(), String> {
     if settings.weather_enabled {
         settings.openweathermap_api_key =
             prompt_required_secret("OpenWeatherMap API key", &settings.openweathermap_api_key)?;
-        settings.weather_location =
-            prompt_required("Weather city or latitude,longitude", &settings.weather_location)?;
+        settings.weather_location = prompt_required(
+            "Weather city or latitude,longitude",
+            &settings.weather_location,
+        )?;
     }
     settings.refresh_interval_seconds = prompt_refresh(settings.refresh_interval_seconds)?;
 
     println!("\nPrometheus /metrics endpoint (no password or TLS).");
     settings.prometheus_bind_address = loop {
-        let address = prompt_value(
-            "Listen IP:port",
-            &settings.prometheus_bind_address,
-        )?;
+        let address = prompt_value("Listen IP:port", &settings.prometheus_bind_address)?;
         if crate::prometheus::parse_bind_address(&address).is_some() {
             break address;
         }
@@ -413,13 +414,39 @@ pub fn run() -> Result<(), String> {
         && settings.netatmo_client_id.is_empty()
         && !settings.weather_enabled
     {
-        println!("No data source is configured. The /metrics endpoint will report only unavailable sources.");
+        println!(
+            "No data source is configured. The /metrics endpoint will report only unavailable sources."
+        );
     }
     println!("\nReview:");
-    println!("  Saved FRITZ!/Tasmota device selection: {}", settings.ains.len());
-    println!("  Hue Bridge: {}", if settings.hue_bridge_ip.is_empty() { "not configured" } else { "configured" });
-    println!("  Netatmo: {}", if settings.netatmo_client_id.is_empty() { "not configured" } else { "configured" });
-    println!("  Weather: {}", if settings.weather_enabled { "enabled" } else { "disabled" });
+    println!(
+        "  Saved FRITZ!/Tasmota device selection: {}",
+        settings.ains.len()
+    );
+    println!(
+        "  Hue Bridge: {}",
+        if settings.hue_bridge_ip.is_empty() {
+            "not configured"
+        } else {
+            "configured"
+        }
+    );
+    println!(
+        "  Netatmo: {}",
+        if settings.netatmo_client_id.is_empty() {
+            "not configured"
+        } else {
+            "configured"
+        }
+    );
+    println!(
+        "  Weather: {}",
+        if settings.weather_enabled {
+            "enabled"
+        } else {
+            "disabled"
+        }
+    );
     println!("  Refresh: {} seconds", settings.refresh_interval_seconds);
     println!("  Prometheus: {}", settings.prometheus_bind_address);
     if !confirm("Save this configuration?", false)? {
@@ -457,8 +484,14 @@ mod tests {
     #[test]
     fn selection_is_numbered_deduplicated_and_validated() {
         let devices = vec![
-            FritzDevice { name: "Plug".into(), ain: "12:34-56".into() },
-            FritzDevice { name: "Meter".into(), ain: "TASMOTA:AA:BB".into() },
+            FritzDevice {
+                name: "Plug".into(),
+                ain: "12:34-56".into(),
+            },
+            FritzDevice {
+                name: "Meter".into(),
+                ain: "TASMOTA:AA:BB".into(),
+            },
         ];
         assert_eq!(
             parse_selection("2,1,2", &devices).unwrap(),

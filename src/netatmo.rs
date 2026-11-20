@@ -2,9 +2,9 @@
 //! Netatmo requires an internet connection: unlike Hue this is a cloud API.
 //! Never log credentials, bearer tokens or raw server response bodies.
 
-use std::time::Duration;
 use reqwest::{Client, Response};
 use serde_json::Value;
+use std::time::Duration;
 
 const NETATMO_TOKEN_URL: &str = "https://api.netatmo.com/oauth2/token";
 const NETATMO_STATIONS_URL: &str = "https://api.netatmo.com/api/getstationsdata";
@@ -42,7 +42,11 @@ async fn limited_json(mut response: Response) -> Result<Value, String> {
         return Err("Netatmo response exceeds the size limit".into());
     }
     let mut data = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(|_| "Netatmo response interrupted")? {
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| "Netatmo response interrupted")?
+    {
         if data.len().saturating_add(chunk.len()) > MAX_RESPONSE_BYTES {
             return Err("Netatmo response exceeds the size limit".into());
         }
@@ -52,13 +56,19 @@ async fn limited_json(mut response: Response) -> Result<Value, String> {
 }
 
 fn finite(value: &Value, key: &str) -> Option<f64> {
-    value.get(key).and_then(Value::as_f64).filter(|x| x.is_finite())
+    value
+        .get(key)
+        .and_then(Value::as_f64)
+        .filter(|x| x.is_finite())
 }
 
 fn parse_module(module: &Value, fallback_name: &str, now_epoch: i64) -> Option<NetatmoSensor> {
     let id = module.get("_id")?.as_str()?.trim();
-    if id.is_empty() || id.len() > 128 { return None; }
-    let name = module.get("module_name")
+    if id.is_empty() || id.len() > 128 {
+        return None;
+    }
+    let name = module
+        .get("module_name")
         .or_else(|| module.get("station_name"))
         .and_then(Value::as_str)
         .filter(|name| !name.trim().is_empty())
@@ -71,8 +81,12 @@ fn parse_module(module: &Value, fallback_name: &str, now_epoch: i64) -> Option<N
     let fresh = time
         .and_then(|stamp| now_epoch.checked_sub(stamp))
         .is_some_and(|age| (0..=MAX_READING_AGE_SECONDS).contains(&age));
-    let reachable = module.get("reachable").and_then(Value::as_bool).unwrap_or(true)
-        && fresh && dashboard.is_object();
+    let reachable = module
+        .get("reachable")
+        .and_then(Value::as_bool)
+        .unwrap_or(true)
+        && fresh
+        && dashboard.is_object();
     let measured = |key: &str| reachable.then(|| finite(dashboard, key)).flatten();
     Some(NetatmoSensor {
         id: id.to_owned(),
@@ -90,12 +104,16 @@ fn parse_module(module: &Value, fallback_name: &str, now_epoch: i64) -> Option<N
 }
 
 pub fn parse_stations(value: &Value, now_epoch: i64) -> Result<Vec<NetatmoSensor>, String> {
-    let devices = value.pointer("/body/devices")
+    let devices = value
+        .pointer("/body/devices")
         .and_then(Value::as_array)
         .ok_or("Netatmo response contains no station inventory")?;
     let mut sensors = Vec::new();
     for device in devices.iter().take(80) {
-        let station = device.get("station_name").and_then(Value::as_str).unwrap_or("Netatmo");
+        let station = device
+            .get("station_name")
+            .and_then(Value::as_str)
+            .unwrap_or("Netatmo");
         if let Some(base) = parse_module(device, station, now_epoch) {
             sensors.push(base);
         }
@@ -117,8 +135,9 @@ pub async fn fetch_stations(
     client_secret: String,
     refresh_token: String,
 ) -> Result<NetatmoSnapshot, String> {
-    if client_id.trim().is_empty() || client_secret.trim().is_empty() ||
-        refresh_token.trim().is_empty()
+    if client_id.trim().is_empty()
+        || client_secret.trim().is_empty()
+        || refresh_token.trim().is_empty()
     {
         return Err("Configure Netatmo client ID, client secret and refresh token".into());
     }
@@ -126,34 +145,55 @@ pub async fn fetch_stations(
         .timeout(Duration::from_secs(15))
         .build()
         .map_err(|_| "Could not create Netatmo HTTPS client")?;
-    let response = client.post(NETATMO_TOKEN_URL)
+    let response = client
+        .post(NETATMO_TOKEN_URL)
         .form(&[
             ("grant_type", "refresh_token"),
             ("client_id", client_id.as_str()),
             ("client_secret", client_secret.as_str()),
             ("refresh_token", refresh_token.as_str()),
         ])
-        .send().await.map_err(|_| "Netatmo OAuth service is unavailable")?;
+        .send()
+        .await
+        .map_err(|_| "Netatmo OAuth service is unavailable")?;
     if !response.status().is_success() {
-        return Err(format!("Netatmo OAuth rejected the refresh token (HTTP {})", response.status().as_u16()));
+        return Err(format!(
+            "Netatmo OAuth rejected the refresh token (HTTP {})",
+            response.status().as_u16()
+        ));
     }
     let token = limited_json(response).await?;
-    let access = token.get("access_token").and_then(Value::as_str)
+    let access = token
+        .get("access_token")
+        .and_then(Value::as_str)
         .filter(|v| !v.is_empty())
         .ok_or("Netatmo OAuth response contains no access token")?;
-    let renewed = token.get("refresh_token").and_then(Value::as_str)
+    let renewed = token
+        .get("refresh_token")
+        .and_then(Value::as_str)
         .filter(|v| !v.is_empty())
-        .unwrap_or(&refresh_token).to_owned();
-    let stations = match client.get(NETATMO_STATIONS_URL).bearer_auth(access).send().await {
+        .unwrap_or(&refresh_token)
+        .to_owned();
+    let stations = match client
+        .get(NETATMO_STATIONS_URL)
+        .bearer_auth(access)
+        .send()
+        .await
+    {
         Err(_) => Err("Netatmo Weather Station API is unavailable".into()),
-        Ok(response) if !response.status().is_success() =>
-            Err(format!("Netatmo Weather Station API returned HTTP {}", response.status().as_u16())),
+        Ok(response) if !response.status().is_success() => Err(format!(
+            "Netatmo Weather Station API returned HTTP {}",
+            response.status().as_u16()
+        )),
         Ok(response) => match limited_json(response).await {
             Ok(json) => parse_stations(&json, chrono::Utc::now().timestamp()),
             Err(error) => Err(error),
         },
     };
-    Ok(NetatmoSnapshot { refresh_token: renewed, stations })
+    Ok(NetatmoSnapshot {
+        refresh_token: renewed,
+        stations,
+    })
 }
 
 /// Netatmo history is separate from power and Hue history. No synthetic
@@ -174,7 +214,9 @@ pub const METRICS: [(&str, &str, &str); 7] = [
 ];
 
 pub fn metric_value(sensor: &NetatmoSensor, key: &str) -> Option<f64> {
-    if !sensor.reachable { return None; }
+    if !sensor.reachable {
+        return None;
+    }
     match key {
         "temperature" => sensor.temperature_c,
         "humidity" => sensor.humidity_percent,
@@ -184,13 +226,16 @@ pub fn metric_value(sensor: &NetatmoSensor, key: &str) -> Option<f64> {
         "rain" => sensor.rain_mm,
         "wind" => sensor.wind_kmh,
         _ => None,
-    }.filter(|value| value.is_finite())
+    }
+    .filter(|value| value.is_finite())
 }
 
 pub(crate) fn valid_id(id: &str) -> bool {
-    !id.is_empty() && id.len() <= 128
-        && id.bytes().all(|byte| byte.is_ascii_alphanumeric()
-            || matches!(byte, b':' | b'-' | b'_'))
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b':' | b'-' | b'_'))
 }
 
 fn history_path() -> Result<std::path::PathBuf, String> {
@@ -209,12 +254,16 @@ pub fn record_history(
     now: std::time::Instant,
     window: Duration,
 ) {
-    if !valid_id(&sensor.id) { return; }
+    if !valid_id(&sensor.id) {
+        return;
+    }
     let keep_secs = window.as_secs().max(300);
     let interval = Duration::from_secs((keep_secs / 5000).max(300));
     let device = history.entry(sensor.id.clone()).or_default();
     for (key, _, _) in METRICS {
-        let Some(value) = metric_value(sensor, key) else { continue; };
+        let Some(value) = metric_value(sensor, key) else {
+            continue;
+        };
         let readings = device.entry(key.to_owned()).or_default();
         if let Some((previous, last)) = readings.back_mut()
             && now.saturating_duration_since(*previous) < interval
@@ -223,7 +272,10 @@ pub fn record_history(
         } else {
             readings.push_back((now, value));
         }
-        while readings.front().is_some_and(|(time, _)| now.saturating_duration_since(*time) > window) {
+        while readings
+            .front()
+            .is_some_and(|(time, _)| now.saturating_duration_since(*time) > window)
+        {
             readings.pop_front();
         }
         while readings.len() > 5000 {
@@ -233,30 +285,56 @@ pub fn record_history(
 }
 
 pub fn load_history(window: Duration) -> NetatmoHistory {
-    let Some(path) = history_path().ok() else { return NetatmoHistory::new(); };
-    let Ok(metadata) = std::fs::metadata(&path) else { return NetatmoHistory::new(); };
-    if metadata.len() > 16 * 1024 * 1024 { return NetatmoHistory::new(); }
-    let Ok(content) = std::fs::read(&path) else { return NetatmoHistory::new(); };
-    let Ok(data) = serde_json::from_slice::<Value>(&content) else { return NetatmoHistory::new(); };
-    if data.get("version").and_then(Value::as_u64) != Some(1) { return NetatmoHistory::new(); }
-    let Some(modules) = data.get("modules").and_then(Value::as_object) else { return NetatmoHistory::new(); };
+    let Some(path) = history_path().ok() else {
+        return NetatmoHistory::new();
+    };
+    let Ok(metadata) = std::fs::metadata(&path) else {
+        return NetatmoHistory::new();
+    };
+    if metadata.len() > 16 * 1024 * 1024 {
+        return NetatmoHistory::new();
+    }
+    let Ok(content) = std::fs::read(&path) else {
+        return NetatmoHistory::new();
+    };
+    let Ok(data) = serde_json::from_slice::<Value>(&content) else {
+        return NetatmoHistory::new();
+    };
+    if data.get("version").and_then(Value::as_u64) != Some(1) {
+        return NetatmoHistory::new();
+    }
+    let Some(modules) = data.get("modules").and_then(Value::as_object) else {
+        return NetatmoHistory::new();
+    };
     let now = std::time::Instant::now();
     let epoch = chrono::Utc::now().timestamp();
     let mut history = NetatmoHistory::new();
     for (id, metrics) in modules.iter().take(200) {
-        if !valid_id(id) { continue; }
-        let Some(metrics) = metrics.as_object() else { continue; };
+        if !valid_id(id) {
+            continue;
+        }
+        let Some(metrics) = metrics.as_object() else {
+            continue;
+        };
         let mut values = std::collections::HashMap::new();
         for (key, _, _) in METRICS {
-            let Some(samples) = metrics.get(key).and_then(Value::as_array) else { continue; };
+            let Some(samples) = metrics.get(key).and_then(Value::as_array) else {
+                continue;
+            };
             let mut readings = std::collections::VecDeque::new();
             for sample in samples.iter().rev().take(5000).rev() {
                 let (Some(timestamp), Some(value)) = (
                     sample.get(0).and_then(Value::as_i64),
                     sample.get(1).and_then(Value::as_f64),
-                ) else { continue; };
-                let Some(age) = epoch.checked_sub(timestamp) else { continue; };
-                if !(0..=window.as_secs() as i64).contains(&age) || !value.is_finite() { continue; }
+                ) else {
+                    continue;
+                };
+                let Some(age) = epoch.checked_sub(timestamp) else {
+                    continue;
+                };
+                if !(0..=window.as_secs() as i64).contains(&age) || !value.is_finite() {
+                    continue;
+                }
                 if let Some(instant) = now.checked_sub(Duration::from_secs(age as u64)) {
                     readings.push_back((instant, value));
                 }
@@ -265,7 +343,9 @@ pub fn load_history(window: Duration) -> NetatmoHistory {
                 values.insert(key.to_owned(), readings);
             }
         }
-        if !values.is_empty() { history.insert(id.clone(), values); }
+        if !values.is_empty() {
+            history.insert(id.clone(), values);
+        }
     }
     history
 }
@@ -278,13 +358,28 @@ pub fn save_history(history: &NetatmoHistory) -> Result<(), String> {
     let epoch = chrono::Utc::now().timestamp();
     let mut modules = serde_json::Map::new();
     for (id, metrics) in history {
-        if !valid_id(id) { continue; }
+        if !valid_id(id) {
+            continue;
+        }
         let mut series = serde_json::Map::new();
         for (key, _, _) in METRICS {
-            let Some(readings) = metrics.get(key) else { continue; };
-            let points = readings.iter().rev().take(5000).rev().map(|(instant, value)| {
-                serde_json::json!([epoch.saturating_sub(now.saturating_duration_since(*instant).as_secs() as i64), value])
-            }).collect();
+            let Some(readings) = metrics.get(key) else {
+                continue;
+            };
+            let points = readings
+                .iter()
+                .rev()
+                .take(5000)
+                .rev()
+                .map(|(instant, value)| {
+                    serde_json::json!([
+                        epoch.saturating_sub(
+                            now.saturating_duration_since(*instant).as_secs() as i64
+                        ),
+                        value
+                    ])
+                })
+                .collect();
             series.insert(key.to_owned(), Value::Array(points));
         }
         modules.insert(id.clone(), Value::Object(series));
@@ -301,7 +396,8 @@ pub fn save_history(history: &NetatmoHistory) -> Result<(), String> {
     }
     let mut file = options.open(&temp).map_err(|error| error.to_string())?;
     use std::io::Write;
-    let result = file.write_all(&data)
+    let result = file
+        .write_all(&data)
         .and_then(|_| file.sync_all())
         .and_then(|_| std::fs::rename(&temp, &path));
     if let Err(error) = result {
@@ -384,16 +480,30 @@ mod tests {
         assert_eq!(history[&sensor.id]["temperature"].len(), 1);
         sensor.reachable = false;
         sensor.temperature_c = Some(99.0);
-        record_history(&mut history, &sensor, now + Duration::from_secs(300), Duration::from_secs(3600));
+        record_history(
+            &mut history,
+            &sensor,
+            now + Duration::from_secs(300),
+            Duration::from_secs(3600),
+        );
         assert_eq!(history[&sensor.id]["temperature"].len(), 1);
         sensor.reachable = true;
-        record_history(&mut history, &sensor, now + Duration::from_secs(600), Duration::from_secs(3600));
+        record_history(
+            &mut history,
+            &sensor,
+            now + Duration::from_secs(600),
+            Duration::from_secs(3600),
+        );
         assert_eq!(history[&sensor.id]["temperature"].len(), 2);
     }
 
     #[test]
     fn incomplete_response_does_not_erase_devices() {
         assert!(parse_stations(&json!({}), 100).is_err());
-        assert!(parse_stations(&json!({"body":{"devices":[]}}), 100).unwrap().is_empty());
+        assert!(
+            parse_stations(&json!({"body":{"devices":[]}}), 100)
+                .unwrap()
+                .is_empty()
+        );
     }
 }

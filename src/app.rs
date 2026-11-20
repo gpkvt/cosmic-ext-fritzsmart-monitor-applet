@@ -40,51 +40,69 @@ type CopyFeedback = (String, Instant);
 
 /// History samples use monotonic ages rather than guessed wall-clock timestamps.
 /// Only user-visible readings are included; never export API tokens or passwords.
-fn json_power_samples(
-    samples: &VecDeque<(Instant, i64)>,
-    now: Instant,
-) -> Vec<serde_json::Value> {
-    samples.iter().map(|(at, watts)| serde_json::json!({
-        "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
-        "watts": watts,
-    })).collect()
+fn json_power_samples(samples: &VecDeque<(Instant, i64)>, now: Instant) -> Vec<serde_json::Value> {
+    samples
+        .iter()
+        .map(|(at, watts)| {
+            serde_json::json!({
+                "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+                "watts": watts,
+            })
+        })
+        .collect()
 }
 
 fn json_device_samples(
     samples: &VecDeque<(Instant, i64, f64)>,
     now: Instant,
 ) -> Vec<serde_json::Value> {
-    samples.iter().map(|(at, watts, temperature)| serde_json::json!({
-        "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
-        "watts": watts,
-        "temperature_c": temperature.is_finite().then_some(*temperature),
-    })).collect()
+    samples
+        .iter()
+        .map(|(at, watts, temperature)| {
+            serde_json::json!({
+                "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+                "watts": watts,
+                "temperature_c": temperature.is_finite().then_some(*temperature),
+            })
+        })
+        .collect()
 }
 
 fn json_bandwidth_samples(
     samples: &VecDeque<(Instant, u64, u64)>,
     now: Instant,
 ) -> Vec<serde_json::Value> {
-    samples.iter().map(|(at, download, upload)| serde_json::json!({
-        "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
-        "download_bits_per_second": download,
-        "upload_bits_per_second": upload,
-    })).collect()
+    samples
+        .iter()
+        .map(|(at, download, upload)| {
+            serde_json::json!({
+                "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+                "download_bits_per_second": download,
+                "upload_bits_per_second": upload,
+            })
+        })
+        .collect()
 }
 
 fn json_daily_energy_rows(
     history: &HashMap<String, VecDeque<(Instant, i64, f64)>>,
     settings: &FritzSettings,
 ) -> Vec<serde_json::Value> {
-    daily_energy_history(history, &settings.input_ains, settings.refresh_interval_seconds)
-        .into_iter()
-        .map(|(day, input, output)| serde_json::json!({
+    daily_energy_history(
+        history,
+        &settings.input_ains,
+        settings.refresh_interval_seconds,
+    )
+    .into_iter()
+    .map(|(day, input, output)| {
+        serde_json::json!({
             "date": day.format("%Y-%m-%d").to_string(),
             "input_wh": input,
             "output_wh": output,
             "input_output_percent": energy_input_output_ratio_percent(input, output),
-        }))
-        .collect()
+        })
+    })
+    .collect()
 }
 
 const COPY_FEEDBACK_DURATION: Duration = Duration::from_millis(900);
@@ -553,7 +571,9 @@ fn netatmo_co2_above_limit(ppm: Option<f64>, threshold: u16) -> Option<bool> {
 fn notify_netatmo_co2_alert(name: &str, ppm: f64, threshold: u16) {
     let _ = notify_rust::Notification::new()
         .summary(&format!("High CO₂: {name}"))
-        .body(&format!("{ppm:.0} ppm (limit: {threshold} ppm). Ventilate the room."))
+        .body(&format!(
+            "{ppm:.0} ppm (limit: {threshold} ppm). Ventilate the room."
+        ))
         .show();
 }
 
@@ -1514,17 +1534,26 @@ fn netatmo_weather_extra_metrics(
     hidden_ids: &[String],
 ) -> Vec<(String, String)> {
     let mut metrics = Vec::new();
-    for sensor in sensors.iter().filter(|sensor| sensor.reachable && !hidden_ids.contains(&sensor.id)) {
+    for sensor in sensors
+        .iter()
+        .filter(|sensor| sensor.reachable && !hidden_ids.contains(&sensor.id))
+    {
         if let Some(ppm) = sensor.co2_ppm.filter(|ppm| ppm.is_finite() && *ppm >= 0.0) {
             metrics.push((
                 format!("Air quality (CO₂) · {}", sensor.name),
                 format!("{} · {ppm:.0} ppm", co2_ventilation_label(ppm)),
             ));
         }
-        if let Some(noise) = sensor.noise_db.filter(|noise| noise.is_finite() && *noise >= 0.0) {
+        if let Some(noise) = sensor
+            .noise_db
+            .filter(|noise| noise.is_finite() && *noise >= 0.0)
+        {
             metrics.push((format!("Noise · {}", sensor.name), format!("{noise:.0} dB")));
         }
-        if let Some(rain) = sensor.rain_mm.filter(|rain| rain.is_finite() && *rain >= 0.0) {
+        if let Some(rain) = sensor
+            .rain_mm
+            .filter(|rain| rain.is_finite() && *rain >= 0.0)
+        {
             metrics.push((format!("Rain · {}", sensor.name), format!("{rain:.1} mm")));
         }
     }
@@ -1639,7 +1668,10 @@ fn daily_energy_history_section(
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
         .push(heading)
-        .push(copy_section_button("daily-energy-history".to_string(), copy_feedback));
+        .push(copy_section_button(
+            "daily-energy-history".to_string(),
+            copy_feedback,
+        ));
     let mut section = widget::Column::new()
         .spacing(0)
         .width(cosmic::iced::Length::Fill)
@@ -2920,7 +2952,10 @@ fn live_power_summary(
             .width(cosmic::iced::Length::Fill)
             .align_y(cosmic::iced::Alignment::Center)
             .push(history_heading)
-            .push(copy_section_button("current-power-history".to_string(), copy_feedback)),
+            .push(copy_section_button(
+                "current-power-history".to_string(),
+                copy_feedback,
+            )),
     );
     if !history_collapsed {
         let output_label = crate::i18n::tr(&language, "TOTAL POWER OUTPUT");
@@ -3129,7 +3164,11 @@ fn netatmo_device_history_graph(
             } else {
                 *native_unit
             };
-            Some((format!("{} · {label}", sensor.name), values, unit.to_string()))
+            Some((
+                format!("{} · {label}", sensor.name),
+                values,
+                unit.to_string(),
+            ))
         })
 }
 
@@ -3154,18 +3193,21 @@ fn netatmo_metric_graph(
     let graph: cosmic::Element<'static, Message> = if collapsed {
         widget::text("").into()
     } else {
-        let full: GraphSamples = history.get(&sensor.id)
+        let full: GraphSamples = history
+            .get(&sensor.id)
             .and_then(|metrics| metrics.get(metric))
             .into_iter()
             .flat_map(|values| values.iter())
-            .map(|(time, value)| (
-                *time,
-                if metric == "temperature" {
-                    temperature_in_unit(*value, &settings.temperature_unit)
-                } else {
-                    *value
-                },
-            ))
+            .map(|(time, value)| {
+                (
+                    *time,
+                    if metric == "temperature" {
+                        temperature_in_unit(*value, &settings.temperature_unit)
+                    } else {
+                        *value
+                    },
+                )
+            })
             .collect();
         let values = graph_values_for_timespan(&full, settings.graph_timespan_minutes);
         if values.len() < 2 {
@@ -3492,7 +3534,10 @@ fn total_power_overview(
         .width(cosmic::iced::Length::Fill)
         .align_y(cosmic::iced::Alignment::Center)
         .push(heading)
-        .push(copy_section_button("total-power-overview".to_string(), copy_feedback));
+        .push(copy_section_button(
+            "total-power-overview".to_string(),
+            copy_feedback,
+        ));
     let mut section = widget::Column::new()
         .spacing(0)
         .width(cosmic::iced::Length::Fill)
@@ -3865,7 +3910,8 @@ impl SettingsDeviceEntry<'_> {
             Self::Netatmo(sensor) => {
                 sensor.name.to_lowercase().contains(query.as_str())
                     || sensor.id.to_lowercase().contains(query.as_str())
-                    || "netatmo weather station temperature humidity co2 pressure".contains(query.as_str())
+                    || "netatmo weather station temperature humidity co2 pressure"
+                        .contains(query.as_str())
             }
         }
     }
@@ -4393,11 +4439,16 @@ impl AppModel {
     fn json_device_data(&self, canonical: &str, now: Instant) -> Option<serde_json::Value> {
         let id_matches = |id: &str| crate::fritz::canonical_device_key(id) == canonical;
         let known = self.devices.iter().find(|device| id_matches(&device.ain));
-        let live = self.readings.iter().find(|reading| id_matches(&reading.ain));
+        let live = self
+            .readings
+            .iter()
+            .find(|reading| id_matches(&reading.ain));
         if known.is_none() && live.is_none() {
             return None;
         }
-        let history = self.device_history.iter()
+        let history = self
+            .device_history
+            .iter()
             .find(|(id, _)| id_matches(id))
             .map(|(_, history)| json_device_samples(history, now))
             .unwrap_or_default();
@@ -4432,13 +4483,18 @@ impl AppModel {
 
     fn json_hue_sensor(&self, id: &str, now: Instant) -> Option<serde_json::Value> {
         let sensor = self.hue_sensors.iter().find(|sensor| sensor.id == id)?;
-        let history: Vec<serde_json::Value> = self.hue_sensor_history.get(id)
-            .into_iter().flat_map(|samples| samples.iter())
-            .map(|(at, temperature, lux)| serde_json::json!({
-                "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
-                "temperature_c": temperature.filter(|value| value.is_finite()),
-                "illuminance_lux": lux.filter(|value| value.is_finite() && *value >= 0.0),
-            }))
+        let history: Vec<serde_json::Value> = self
+            .hue_sensor_history
+            .get(id)
+            .into_iter()
+            .flat_map(|samples| samples.iter())
+            .map(|(at, temperature, lux)| {
+                serde_json::json!({
+                    "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+                    "temperature_c": temperature.filter(|value| value.is_finite()),
+                    "illuminance_lux": lux.filter(|value| value.is_finite() && *value >= 0.0),
+                })
+            })
             .collect();
         Some(serde_json::json!({
             "id": &sensor.id,
@@ -4459,16 +4515,23 @@ impl AppModel {
         metric: &str,
         now: Instant,
     ) -> Option<serde_json::Value> {
-        let (_, label, unit) = crate::netatmo::METRICS.iter()
+        let (_, label, unit) = crate::netatmo::METRICS
+            .iter()
             .find(|(key, _, _)| *key == metric)?;
-        let samples: Vec<serde_json::Value> = self.netatmo_history.get(&sensor.id)
+        let samples: Vec<serde_json::Value> = self
+            .netatmo_history
+            .get(&sensor.id)
             .and_then(|by_metric| by_metric.get(metric))
-            .into_iter().flat_map(|samples| samples.iter())
+            .into_iter()
+            .flat_map(|samples| samples.iter())
             .filter(|(_, value)| value.is_finite())
-            .map(|(at, value)| serde_json::json!({
-                "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
-                "value": value,
-            })).collect();
+            .map(|(at, value)| {
+                serde_json::json!({
+                    "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+                    "value": value,
+                })
+            })
+            .collect();
         Some(serde_json::json!({
             "metric": metric,
             "label": label,
@@ -4480,7 +4543,8 @@ impl AppModel {
 
     fn json_netatmo_sensor(&self, id: &str, now: Instant) -> Option<serde_json::Value> {
         let sensor = self.netatmo_sensors.iter().find(|sensor| sensor.id == id)?;
-        let metrics: Vec<_> = crate::netatmo::METRICS.iter()
+        let metrics: Vec<_> = crate::netatmo::METRICS
+            .iter()
             .filter_map(|(metric, _, _)| self.json_netatmo_metric(sensor, metric, now))
             .collect();
         Some(serde_json::json!({
@@ -4498,19 +4562,24 @@ impl AppModel {
         let now = Instant::now();
         let power_history = || json_power_samples(&self.history, now);
         let input_history = || {
-            let samples = rebuild_input_power_history(
-                &self.device_history, &self.settings.input_ains,
-            );
+            let samples =
+                rebuild_input_power_history(&self.device_history, &self.settings.input_ains);
             json_power_samples(&samples, now)
         };
         let power_totals = || {
-            let is_input = |ain: &str| self.settings.input_ains.iter().any(|id| {
-                crate::fritz::canonical_device_key(id)
-                    == crate::fritz::canonical_device_key(ain)
-            });
-            let input_available = self.readings.iter()
+            let is_input = |ain: &str| {
+                self.settings.input_ains.iter().any(|id| {
+                    crate::fritz::canonical_device_key(id)
+                        == crate::fritz::canonical_device_key(ain)
+                })
+            };
+            let input_available = self
+                .readings
+                .iter()
                 .any(|reading| reading.has_power_meter && is_input(&reading.ain));
-            let output_available = self.readings.iter()
+            let output_available = self
+                .readings
+                .iter()
                 .any(|reading| reading.has_power_meter && !is_input(&reading.ain));
             serde_json::json!({
                 "input_w": input_available.then_some(input_display_power_w(
@@ -4519,24 +4588,32 @@ impl AppModel {
                     &self.readings, &self.settings.input_ains)),
             })
         };
-        let router = || self.fritzbox_system_info.as_ref().map(|info| serde_json::json!({
-            "manufacturer": &info.manufacturer,
-            "model": &info.model,
-            "product_class": &info.product_class,
-            "hardware_version": &info.hardware_version,
-            "software_version": &info.software_version,
-            "uptime_seconds": info.uptime_seconds,
-            "wan": info.wan.as_ref().map(|wan| serde_json::json!({
-                "access_type": &wan.access_type,
-                "physical_link_status": &wan.physical_link_status,
-                "download_bits_per_second": wan.download_bits_per_second,
-                "upload_bits_per_second": wan.upload_bits_per_second,
-            })),
-        }));
-        let bandwidth = || self.internet_bandwidth.as_ref().map(|bandwidth| serde_json::json!({
-            "download_bits_per_second": bandwidth.download_bits_per_second,
-            "upload_bits_per_second": bandwidth.upload_bits_per_second,
-        }));
+        let router = || {
+            self.fritzbox_system_info.as_ref().map(|info| {
+                serde_json::json!({
+                    "manufacturer": &info.manufacturer,
+                    "model": &info.model,
+                    "product_class": &info.product_class,
+                    "hardware_version": &info.hardware_version,
+                    "software_version": &info.software_version,
+                    "uptime_seconds": info.uptime_seconds,
+                    "wan": info.wan.as_ref().map(|wan| serde_json::json!({
+                        "access_type": &wan.access_type,
+                        "physical_link_status": &wan.physical_link_status,
+                        "download_bits_per_second": wan.download_bits_per_second,
+                        "upload_bits_per_second": wan.upload_bits_per_second,
+                    })),
+                })
+            })
+        };
+        let bandwidth = || {
+            self.internet_bandwidth.as_ref().map(|bandwidth| {
+                serde_json::json!({
+                    "download_bits_per_second": bandwidth.download_bits_per_second,
+                    "upload_bits_per_second": bandwidth.upload_bits_per_second,
+                })
+            })
+        };
         let data = match key {
             "summary" => serde_json::json!({
                 "totals": power_totals(),
@@ -4547,9 +4624,8 @@ impl AppModel {
                 "last_updated": &self.updated,
             }),
             "total-power-overview" => {
-                let inputs = rebuild_input_power_history(
-                    &self.device_history, &self.settings.input_ains,
-                );
+                let inputs =
+                    rebuild_input_power_history(&self.device_history, &self.settings.input_ains);
                 serde_json::json!({
                     "totals": power_totals(),
                     "output_low_w": self.history.iter().map(|(_, watts)| *watts).min(),
@@ -4564,7 +4640,7 @@ impl AppModel {
                     "power_unit": "W",
                     "energy_unit": "Wh",
                 })
-            },
+            }
             "current-power-history" => serde_json::json!({
                 "totals": power_totals(),
                 "output_history": power_history(),
@@ -4581,8 +4657,9 @@ impl AppModel {
                 "daily_energy": json_daily_energy_rows(&self.device_history, &self.settings),
                 "energy_unit": "Wh",
             }),
-            "graph-overview-daily-input" | "graph-overview-daily-output"
-                | "graph-overview-daily-ratio" => {
+            "graph-overview-daily-input"
+            | "graph-overview-daily-output"
+            | "graph-overview-daily-ratio" => {
                 let field = match key {
                     "graph-overview-daily-input" => "input_wh",
                     "graph-overview-daily-output" => "output_wh",
@@ -4607,7 +4684,9 @@ impl AppModel {
                 // Export the same visible selection as the popup, rather
                 // than silently including unrelated or deliberately hidden
                 // devices from the saved configuration.
-                let selected: HashSet<String> = self.selected_ains.iter()
+                let selected: HashSet<String> = self
+                    .selected_ains
+                    .iter()
                     .map(|id| crate::fritz::canonical_device_key(id))
                     .collect();
                 let mut fritz_ids: Vec<String> = Vec::new();
@@ -4739,10 +4818,10 @@ impl AppModel {
                             })).collect::<Vec<_>>(),
                     })
                 } else {
-                    let metric_match = crate::netatmo::METRICS.iter()
-                        .find_map(|(metric, _, _)| key.strip_prefix(
-                            &format!("netatmo-sensor-graph-{metric}-")
-                        ).map(|id| (*metric, id)));
+                    let metric_match = crate::netatmo::METRICS.iter().find_map(|(metric, _, _)| {
+                        key.strip_prefix(&format!("netatmo-sensor-graph-{metric}-"))
+                            .map(|id| (*metric, id))
+                    });
                     if let Some((metric, id)) = metric_match {
                         let sensor = self.netatmo_sensors.iter().find(|s| s.id == id)?;
                         self.json_netatmo_metric(sensor, metric, now)?
@@ -4773,8 +4852,11 @@ impl AppModel {
         self.settings.device_selection_initialized = true;
         self.settings.device_order.retain(|id| !same_device(id));
         self.settings.input_ains.retain(|id| !same_device(id));
-        self.settings.temperature_alerts.retain(|id, _| !same_device(id));
-        self.temperature_alert_state.retain(|id, _| !same_device(id));
+        self.settings
+            .temperature_alerts
+            .retain(|id, _| !same_device(id));
+        self.temperature_alert_state
+            .retain(|id, _| !same_device(id));
         self.pending_power_changes.retain(|id| !same_device(id));
         self.pending_power_targets.retain(|id, _| !same_device(id));
         self.expanded_devices.remove(&canonical);
@@ -5037,7 +5119,8 @@ impl cosmic::Application for AppModel {
             settings.url = "http://fritz.box".into();
         }
         let history_window = graph_history_window(settings.history_retention_minutes);
-        let history_storage_window = graph_history_storage_window(settings.history_retention_minutes);
+        let history_storage_window =
+            graph_history_storage_window(settings.history_retention_minutes);
         let (mut history, device_history) = crate::history::load(history_storage_window);
         let hue_sensor_history = crate::history::load_hue_sensors(history_storage_window);
         let netatmo_history = crate::netatmo::load_history(history_storage_window);
@@ -5242,20 +5325,24 @@ impl cosmic::Application for AppModel {
     fn view(&self) -> Element<'_, Self::Message> {
         PANEL_VIEW_COUNT.fetch_add(1, Ordering::Relaxed);
         if self.settings.prometheus_enabled {
-            crate::prometheus::publish(true, &self.settings.prometheus_bind_address, Some(crate::prometheus::LiveData {
-                settings: &self.settings,
-                devices: &self.readings,
-                hue_lights: &self.hue_lights,
-                hue_sensors: &self.hue_sensors,
-                netatmo_sensors: &self.netatmo_sensors,
-                weather: self.weather.as_ref(),
-                bandwidth: self.internet_bandwidth.as_ref(),
-                router: self.fritzbox_system_info.as_ref(),
-                fritz_error: self.error.is_some(),
-                hue_error: self.hue_error.is_some(),
-                netatmo_error: self.netatmo_error.is_some(),
-                weather_error: self.weather_error.is_some(),
-            }));
+            crate::prometheus::publish(
+                true,
+                &self.settings.prometheus_bind_address,
+                Some(crate::prometheus::LiveData {
+                    settings: &self.settings,
+                    devices: &self.readings,
+                    hue_lights: &self.hue_lights,
+                    hue_sensors: &self.hue_sensors,
+                    netatmo_sensors: &self.netatmo_sensors,
+                    weather: self.weather.as_ref(),
+                    bandwidth: self.internet_bandwidth.as_ref(),
+                    router: self.fritzbox_system_info.as_ref(),
+                    fritz_error: self.error.is_some(),
+                    hue_error: self.hue_error.is_some(),
+                    netatmo_error: self.netatmo_error.is_some(),
+                    weather_error: self.weather_error.is_some(),
+                }),
+            );
         } else {
             crate::prometheus::publish(false, &self.settings.prometheus_bind_address, None);
         }
@@ -5487,12 +5574,18 @@ impl cosmic::Application for AppModel {
                                 && reading.temperature_c.is_finite()
                         })
                         .map(|reading| reading.name.clone())
-                        .or_else(|| self.netatmo_sensors.iter()
-                            .find(|sensor| sensor.is_outdoor
-                                && sensor.reachable
-                                && sensor.temperature_c.is_some_and(f64::is_finite)
-                                && self.settings.weather_temperature_ain == format!("NETATMO:{}", sensor.id))
-                            .map(|sensor| sensor.name.clone()))
+                        .or_else(|| {
+                            self.netatmo_sensors
+                                .iter()
+                                .find(|sensor| {
+                                    sensor.is_outdoor
+                                        && sensor.reachable
+                                        && sensor.temperature_c.is_some_and(f64::is_finite)
+                                        && self.settings.weather_temperature_ain
+                                            == format!("NETATMO:{}", sensor.id)
+                                })
+                                .map(|sensor| sensor.name.clone())
+                        })
                         .unwrap_or_else(|| "Outdoor weather".to_string()),
                     Some(
                         widget::icon::from_name(weather.icon_name())
@@ -6989,7 +7082,11 @@ impl cosmic::Application for AppModel {
                         .map(SettingsDeviceEntry::Metered)
                         .chain(self.hue_lights.iter().map(SettingsDeviceEntry::HueLight))
                         .chain(self.hue_sensors.iter().map(SettingsDeviceEntry::HueSensor))
-                        .chain(self.netatmo_sensors.iter().map(SettingsDeviceEntry::Netatmo))
+                        .chain(
+                            self.netatmo_sensors
+                                .iter()
+                                .map(SettingsDeviceEntry::Netatmo),
+                        )
                         .collect();
                     ordered_devices.sort_by_key(|entry| {
                         device_order_position(&self.settings.device_order, &entry.device_id())
@@ -7164,29 +7261,45 @@ impl cosmic::Application for AppModel {
                             }
                             SettingsDeviceEntry::Netatmo(sensor) => {
                                 let id = format!("NETATMO:{}", sensor.id);
-                                let visible = !self.settings.hidden_netatmo_devices.contains(&sensor.id);
+                                let visible =
+                                    !self.settings.hidden_netatmo_devices.contains(&sensor.id);
                                 let check_id = sensor.id.clone();
                                 let row = widget::Row::new()
                                     .width(cosmic::iced::Length::Fill)
                                     .spacing(8)
                                     .align_y(cosmic::iced::Alignment::Center)
-                                    .push(widget::checkbox(visible)
-                                        .label(sensor.name.clone())
-                                        .on_toggle(move |value| Message::ToggleNetatmoVisible(check_id.clone(), value)))
+                                    .push(
+                                        widget::checkbox(visible)
+                                            .label(sensor.name.clone())
+                                            .on_toggle(move |value| {
+                                                Message::ToggleNetatmoVisible(
+                                                    check_id.clone(),
+                                                    value,
+                                                )
+                                            }),
+                                    )
                                     .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                    .push(icon_action_button("+", "Move device up", Message::MoveDevice(id.clone(), true)))
-                                    .push(icon_action_button("−", "Move device down", Message::MoveDevice(id.clone(), false)));
-                                let mut details = widget::Column::new()
-                                    .spacing(8)
-                                    .push(row)
-                                    .push(widget::text::caption(if sensor.reachable {
+                                    .push(icon_action_button(
+                                        "+",
+                                        "Move device up",
+                                        Message::MoveDevice(id.clone(), true),
+                                    ))
+                                    .push(icon_action_button(
+                                        "−",
+                                        "Move device down",
+                                        Message::MoveDevice(id.clone(), false),
+                                    ));
+                                let mut details = widget::Column::new().spacing(8).push(row).push(
+                                    widget::text::caption(if sensor.reachable {
                                         "Netatmo · Weather Station · Read-only cloud sensor"
                                     } else {
                                         "Netatmo · Weather Station · Unavailable / stale"
-                                    }));
+                                    }),
+                                );
                                 if sensor.is_outdoor {
                                     let source_id = format!("NETATMO:{}", sensor.id);
-                                    let selected = self.settings.weather_temperature_ain == source_id;
+                                    let selected =
+                                        self.settings.weather_temperature_ain == source_id;
                                     let module_id = sensor.id.clone();
                                     details = details.push(
                                         widget::Row::new()
@@ -7196,10 +7309,18 @@ impl cosmic::Application for AppModel {
                                                 &self.settings.language,
                                                 "Outdoor temperature source",
                                             )))
-                                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                            .push(widget::toggler(selected).on_toggle(move |enabled| {
-                                                Message::ToggleNetatmoOutdoorTemperature(module_id.clone(), enabled)
-                                            })),
+                                            .push(
+                                                widget::Space::new()
+                                                    .width(cosmic::iced::Length::Fill),
+                                            )
+                                            .push(widget::toggler(selected).on_toggle(
+                                                move |enabled| {
+                                                    Message::ToggleNetatmoOutdoorTemperature(
+                                                        module_id.clone(),
+                                                        enabled,
+                                                    )
+                                                },
+                                            )),
                                     );
                                 }
                                 // Show CO₂ alarm configuration whenever a module has a
@@ -7207,17 +7328,27 @@ impl cosmic::Application for AppModel {
                                 if sensor.co2_ppm.is_some()
                                     || self.settings.netatmo_co2_alerts.contains_key(&sensor.id)
                                 {
-                                    let enabled_threshold = self.settings.netatmo_co2_alerts.get(&sensor.id).copied();
+                                    let enabled_threshold =
+                                        self.settings.netatmo_co2_alerts.get(&sensor.id).copied();
                                     let module_id = sensor.id.clone();
                                     details = details.push(
                                         widget::Row::new()
                                             .width(cosmic::iced::Length::Fill)
                                             .align_y(cosmic::iced::Alignment::Center)
                                             .push(widget::text::caption("CO₂ notifications"))
-                                            .push(widget::Space::new().width(cosmic::iced::Length::Fill))
-                                            .push(widget::toggler(enabled_threshold.is_some()).on_toggle(
-                                                move |enabled| Message::ToggleNetatmoCo2Alert(module_id.clone(), enabled)
-                                            )),
+                                            .push(
+                                                widget::Space::new()
+                                                    .width(cosmic::iced::Length::Fill),
+                                            )
+                                            .push(
+                                                widget::toggler(enabled_threshold.is_some())
+                                                    .on_toggle(move |enabled| {
+                                                        Message::ToggleNetatmoCo2Alert(
+                                                            module_id.clone(),
+                                                            enabled,
+                                                        )
+                                                    }),
+                                            ),
                                     );
                                     if let Some(threshold) = enabled_threshold {
                                         let module_id = sensor.id.clone();
@@ -7921,7 +8052,11 @@ impl cosmic::Application for AppModel {
                                     widget::text::body(reading.name.clone())
                                         .width(cosmic::iced::Length::Fill),
                                 )
-                                .push(widget::text::body(if reading.has_power_meter { format!("{} W", reading.power_w) } else { "— W".into() }))
+                                .push(widget::text::body(if reading.has_power_meter {
+                                    format!("{} W", reading.power_w)
+                                } else {
+                                    "— W".into()
+                                }))
                                 .push(if reading.temperature_c.is_finite() {
                                     widget::text::caption(format!(
                                         "{} · {state}",
@@ -8316,11 +8451,9 @@ impl cosmic::Application for AppModel {
                     weather_detail_metric(
                         &self.settings.language,
                         "Wind direction",
-                        crate::weather::wind_direction_compass(
-                            weather.wind_direction_degrees,
-                        )
-                        .unwrap_or("—")
-                        .to_string(),
+                        crate::weather::wind_direction_compass(weather.wind_direction_degrees)
+                            .unwrap_or("—")
+                            .to_string(),
                     ),
                     weather_detail_metric(&self.settings.language, "Sunrise", sunrise),
                     weather_detail_metric(&self.settings.language, "Sunset", sunset),
@@ -8360,7 +8493,8 @@ impl cosmic::Application for AppModel {
                 // Pad a short final row to keep every metric aligned to the
                 // same four grid columns.
                 for _ in 0..((4 - metric_count % 4) % 4) {
-                    metric_row = metric_row.push(widget::Space::new().width(cosmic::iced::Length::Fill));
+                    metric_row =
+                        metric_row.push(widget::Space::new().width(cosmic::iced::Length::Fill));
                 }
                 weather_metric_grid = weather_metric_grid.push(metric_row);
                 let weather_card_height = weather_photo_height(metric_count);
@@ -8409,7 +8543,10 @@ impl cosmic::Application for AppModel {
                             .width(cosmic::iced::Length::Fill)
                             .align_y(cosmic::iced::Alignment::Center)
                             .push(weather_heading)
-                            .push(copy_section_button("weather".to_string(), self.copy_feedback.as_ref())),
+                            .push(copy_section_button(
+                                "weather".to_string(),
+                                self.copy_feedback.as_ref(),
+                            )),
                     )
                     .push(date_row);
                 weather_section = weather_section.push(
@@ -8569,7 +8706,9 @@ impl cosmic::Application for AppModel {
                                     widget::button::custom(widget::text::caption(
                                         "Wikimedia Commons ↗",
                                     ))
-                                    .on_press(Message::OpenCommonsPage(first_credit.page_url.clone()))
+                                    .on_press(Message::OpenCommonsPage(
+                                        first_credit.page_url.clone(),
+                                    ))
                                     .padding([2, 0])
                                     .class(cosmic::theme::Button::Text),
                                 ),
@@ -8775,7 +8914,10 @@ impl cosmic::Application for AppModel {
                             &self.settings.language,
                             "Weather",
                         )))
-                        .push(copy_section_button("weather".to_string(), self.copy_feedback.as_ref())),
+                        .push(copy_section_button(
+                            "weather".to_string(),
+                            self.copy_feedback.as_ref(),
+                        )),
                 );
                 if let Some(error) = &self.weather_error {
                     weather_section = weather_section.push(error_notice(
@@ -9091,11 +9233,13 @@ impl cosmic::Application for AppModel {
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(device_heading_button)
                         .push(
-                            widget::text::body(keep_value_unit_together(if reading.has_power_meter {
-                                format!("{} W", reading.power_w)
-                            } else {
-                                "— W".to_string()
-                            }))
+                            widget::text::body(keep_value_unit_together(
+                                if reading.has_power_meter {
+                                    format!("{} W", reading.power_w)
+                                } else {
+                                    "— W".to_string()
+                                },
+                            ))
                             .width(cosmic::iced::Length::Fixed(76.0))
                             .align_x(cosmic::iced::Alignment::End),
                         )
@@ -9109,7 +9253,10 @@ impl cosmic::Application for AppModel {
                         )
                         .push(history_button)
                         .push(copy_section_button(
-                            format!("device:{}", crate::fritz::canonical_device_key(&reading.ain)),
+                            format!(
+                                "device:{}",
+                                crate::fritz::canonical_device_key(&reading.ain)
+                            ),
                             self.copy_feedback.as_ref(),
                         ))
                         .push(
@@ -9463,7 +9610,10 @@ impl cosmic::Application for AppModel {
                                     widget::Space::new().width(cosmic::iced::Length::Fixed(108.0)),
                                 )
                                 .push(copy_section_button(
-                                    format!("device:{}", crate::fritz::canonical_device_key(&device.ain)),
+                                    format!(
+                                        "device:{}",
+                                        crate::fritz::canonical_device_key(&device.ain)
+                                    ),
                                     self.copy_feedback.as_ref(),
                                 ))
                                 .push(
@@ -9741,7 +9891,9 @@ impl cosmic::Application for AppModel {
                     let temperature = sensor
                         .temperature_c
                         .filter(|_| sensor.reachable)
-                        .map(|temperature| format_temperature(temperature, &self.settings.temperature_unit))
+                        .map(|temperature| {
+                            format_temperature(temperature, &self.settings.temperature_unit)
+                        })
                         .unwrap_or_else(|| "—".into());
                     // Match the standard device-list History action. When no
                     // samples exist yet, open details so the user can see the
@@ -9773,36 +9925,50 @@ impl cosmic::Application for AppModel {
                         .spacing(8)
                         .width(cosmic::iced::Length::Fill)
                         .align_y(cosmic::iced::Alignment::Center)
-                        .push(widget::button::custom(
-                            widget::Row::new()
-                                .spacing(8)
-                                .align_y(cosmic::iced::Alignment::Center)
-                                .push(widget::Column::new()
-                                    .spacing(2)
-                                    .width(cosmic::iced::Length::Fill)
-                                    .push(widget::text::body(sensor.name.clone()))
-                                    .push(widget::text::caption("Netatmo · Weather Station")))
-                                .push(widget::icon::from_name(if expanded {
-                                    "go-up-symbolic"
-                                } else {
-                                    "go-down-symbolic"
-                                }).size(16))
+                        .push(
+                            widget::button::custom(
+                                widget::Row::new()
+                                    .spacing(8)
+                                    .align_y(cosmic::iced::Alignment::Center)
+                                    .push(
+                                        widget::Column::new()
+                                            .spacing(2)
+                                            .width(cosmic::iced::Length::Fill)
+                                            .push(widget::text::body(sensor.name.clone()))
+                                            .push(widget::text::caption(
+                                                "Netatmo · Weather Station",
+                                            )),
+                                    )
+                                    .push(
+                                        widget::icon::from_name(if expanded {
+                                            "go-up-symbolic"
+                                        } else {
+                                            "go-down-symbolic"
+                                        })
+                                        .size(16),
+                                    ),
+                            )
+                            .on_press(Message::ToggleDeviceDetails(id))
+                            .padding([8, 12])
+                            .width(cosmic::iced::Length::Fill)
+                            .class(cosmic::theme::Button::Text),
                         )
-                        .on_press(Message::ToggleDeviceDetails(id))
-                        .padding([8, 12])
-                        .width(cosmic::iced::Length::Fill)
-                        .class(cosmic::theme::Button::Text))
-                        .push(widget::text::body("—")
-                            .width(cosmic::iced::Length::Fixed(76.0))
-                            .align_x(cosmic::iced::Alignment::End))
-                        .push(widget::text::body(keep_value_unit_together(temperature))
-                            .width(cosmic::iced::Length::Fixed(90.0))
-                            .align_x(cosmic::iced::Alignment::End))
+                        .push(
+                            widget::text::body("—")
+                                .width(cosmic::iced::Length::Fixed(76.0))
+                                .align_x(cosmic::iced::Alignment::End),
+                        )
+                        .push(
+                            widget::text::body(keep_value_unit_together(temperature))
+                                .width(cosmic::iced::Length::Fixed(90.0))
+                                .align_x(cosmic::iced::Alignment::End),
+                        )
                         .push(history_button)
                         .push(copy_section_button(
-                            format!("netatmo:{}", sensor.id), self.copy_feedback.as_ref()))
-                        .push(widget::Space::new()
-                            .width(cosmic::iced::Length::Fixed(52.0)));
+                            format!("netatmo:{}", sensor.id),
+                            self.copy_feedback.as_ref(),
+                        ))
+                        .push(widget::Space::new().width(cosmic::iced::Length::Fixed(52.0)));
                     let mut card = widget::list::list_column()
                         .style(cosmic::theme::Container::Transparent)
                         .list_item_padding([0, 0])
@@ -9829,7 +9995,9 @@ impl cosmic::Application for AppModel {
                             .push(widget::text::caption("No wattage or power history: Netatmo Weather Stations do not measure mains power."));
                         for (metric, label, unit) in crate::netatmo::METRICS {
                             if crate::netatmo::metric_value(sensor, metric).is_some()
-                                || self.netatmo_history.get(&sensor.id)
+                                || self
+                                    .netatmo_history
+                                    .get(&sensor.id)
                                     .and_then(|metrics| metrics.get(metric))
                                     .is_some()
                             {
@@ -9847,11 +10015,18 @@ impl cosmic::Application for AppModel {
                     }
                     device_sort_metadata.insert(
                         row_key.clone(),
-                        (sensor.name.to_lowercase(), None,
-                            sensor.temperature_c.filter(|_| sensor.reachable)),
+                        (
+                            sensor.name.to_lowercase(),
+                            None,
+                            sensor.temperature_c.filter(|_| sensor.reachable),
+                        ),
                     );
-                    menu_cards.push((row_key, widget::container(card)
-                        .width(cosmic::iced::Length::Fill).into()));
+                    menu_cards.push((
+                        row_key,
+                        widget::container(card)
+                            .width(cosmic::iced::Length::Fill)
+                            .into(),
+                    ));
                 }
 
                 menu_cards.extend(total_power_overview(
@@ -10046,7 +10221,10 @@ impl cosmic::Application for AppModel {
                                     .width(cosmic::iced::Length::Fill)
                                     .align_y(cosmic::iced::Alignment::Center)
                                     .push(heading)
-                                    .push(copy_section_button("devices".to_string(), self.copy_feedback.as_ref())),
+                                    .push(copy_section_button(
+                                        "devices".to_string(),
+                                        self.copy_feedback.as_ref(),
+                                    )),
                             );
                             if !collapsed {
                                 device_cards = device_cards.push(device_sort_header(
@@ -10220,7 +10398,10 @@ impl cosmic::Application for AppModel {
                         .width(cosmic::iced::Length::Fill)
                         .align_y(cosmic::iced::Alignment::Center)
                         .push(heading)
-                        .push(copy_section_button(section.0.to_string(), self.copy_feedback.as_ref()));
+                        .push(copy_section_button(
+                            section.0.to_string(),
+                            self.copy_feedback.as_ref(),
+                        ));
                     let mut section_column = widget::Column::new().spacing(0).push(heading_row);
                     if !collapsed {
                         section_column = section_column.push(card);
@@ -10489,9 +10670,7 @@ impl cosmic::Application for AppModel {
             widget::Column::new()
                 .width(cosmic::iced::Length::Fill)
                 .height(cosmic::iced::Length::Fill)
-                .push(
-                    widget::container(sticky_header).padding([8, 12]),
-                )
+                .push(widget::container(sticky_header).padding([8, 12]))
                 .push(widget::divider::horizontal::default())
                 .push(scrollable_content)
         } else {
@@ -10869,7 +11048,9 @@ impl cosmic::Application for AppModel {
                             self.settings.netatmo_client_secret.clone(),
                             self.settings.netatmo_refresh_token.clone(),
                         ),
-                        move |result| cosmic::Action::App(Message::NetatmoLoaded(generation, result)),
+                        move |result| {
+                            cosmic::Action::App(Message::NetatmoLoaded(generation, result))
+                        },
                     ));
                 }
                 if !self.settings.hue_bridge_ip.trim().is_empty()
@@ -10991,7 +11172,9 @@ impl cosmic::Application for AppModel {
                             self.settings.netatmo_client_secret.clone(),
                             self.settings.netatmo_refresh_token.clone(),
                         ),
-                        move |result| cosmic::Action::App(Message::NetatmoLoaded(generation, result)),
+                        move |result| {
+                            cosmic::Action::App(Message::NetatmoLoaded(generation, result))
+                        },
                     );
                 }
                 if !self.hue_loading
@@ -11158,8 +11341,9 @@ impl cosmic::Application for AppModel {
                             let now = Instant::now();
                             let history_window =
                                 graph_history_window(self.settings.history_retention_minutes);
-                            let device_history_window =
-                                graph_history_storage_window(self.settings.history_retention_minutes);
+                            let device_history_window = graph_history_storage_window(
+                                self.settings.history_retention_minutes,
+                            );
                             record_power_sample(
                                 &mut self.history,
                                 total_power,
@@ -11277,7 +11461,9 @@ impl cosmic::Application for AppModel {
 
                             prune_history_to_window(
                                 self,
-                                graph_history_storage_window(self.settings.history_retention_minutes),
+                                graph_history_storage_window(
+                                    self.settings.history_retention_minutes,
+                                ),
                                 Instant::now(),
                             );
                             if let Err(error) =
@@ -11289,9 +11475,10 @@ impl cosmic::Application for AppModel {
                                     format!("Graph history save failed: {error}"),
                                 );
                             }
-                            self.history_storage_diagnostics = crate::history::diagnostics(
-                                graph_history_storage_window(self.settings.history_retention_minutes),
-                            );
+                            self.history_storage_diagnostics =
+                                crate::history::diagnostics(graph_history_storage_window(
+                                    self.settings.history_retention_minutes,
+                                ));
                             self.error = None;
                             self.updated =
                                 Some(chrono::Local::now().format("%H:%M:%S").to_string());
@@ -11655,7 +11842,11 @@ impl cosmic::Application for AppModel {
                             .iter()
                             .map(|sensor| hue_device_id("sensor", &sensor.id)),
                     )
-                    .chain(self.netatmo_sensors.iter().map(|sensor| format!("NETATMO:{}", sensor.id)))
+                    .chain(
+                        self.netatmo_sensors
+                            .iter()
+                            .map(|sensor| format!("NETATMO:{}", sensor.id)),
+                    )
                     .collect();
                 order.sort_by_key(|device_ain| {
                     device_order_position(&self.settings.device_order, device_ain)
@@ -11960,11 +12151,7 @@ impl cosmic::Application for AppModel {
                     )
                     .is_some();
                 if !self.settings.prometheus_enabled {
-                    crate::prometheus::publish(
-                        false,
-                        &self.settings.prometheus_bind_address,
-                        None,
-                    );
+                    crate::prometheus::publish(false, &self.settings.prometheus_bind_address, None);
                 }
                 self.persist_settings();
             }
@@ -11973,9 +12160,9 @@ impl cosmic::Application for AppModel {
                 // Permit partial text while editing, but never persist an
                 // invalid socket address. The worker closes its old listener
                 // until the configured address becomes valid again.
-                if crate::prometheus::parse_bind_address(
-                    &self.settings.prometheus_bind_address,
-                ).is_some() {
+                if crate::prometheus::parse_bind_address(&self.settings.prometheus_bind_address)
+                    .is_some()
+                {
                     self.persist_settings();
                 }
             }
@@ -12154,7 +12341,9 @@ impl cosmic::Application for AppModel {
                     || self.settings.netatmo_client_secret.trim().is_empty()
                     || self.settings.netatmo_refresh_token.trim().is_empty()
                 {
-                    self.netatmo_error = Some("Enter the Netatmo client ID, client secret and refresh token first".into());
+                    self.netatmo_error = Some(
+                        "Enter the Netatmo client ID, client secret and refresh token first".into(),
+                    );
                     return Task::none();
                 }
                 self.netatmo_loading = true;
@@ -12186,28 +12375,47 @@ impl cosmic::Application for AppModel {
                         }
                         match snapshot.stations {
                             Ok(sensors) => {
-                                let window = graph_history_storage_window(self.settings.history_retention_minutes);
+                                let window = graph_history_storage_window(
+                                    self.settings.history_retention_minutes,
+                                );
                                 let now = Instant::now();
                                 for sensor in &sensors {
-                                    crate::netatmo::record_history(&mut self.netatmo_history, sensor, now, window);
-                                    if let Some(threshold) = self.settings.netatmo_co2_alerts.get(&sensor.id).copied() {
+                                    crate::netatmo::record_history(
+                                        &mut self.netatmo_history,
+                                        sensor,
+                                        now,
+                                        window,
+                                    );
+                                    if let Some(threshold) =
+                                        self.settings.netatmo_co2_alerts.get(&sensor.id).copied()
+                                    {
                                         if let Some(above) = netatmo_co2_above_limit(
                                             sensor.reachable.then_some(sensor.co2_ppm).flatten(),
                                             threshold,
                                         ) {
                                             if should_notify_temperature_alert(
-                                                self.netatmo_co2_alert_state.get(&sensor.id).copied(),
+                                                self.netatmo_co2_alert_state
+                                                    .get(&sensor.id)
+                                                    .copied(),
                                                 above,
-                                            ) && let Some(ppm) = sensor.co2_ppm {
-                                                notify_netatmo_co2_alert(&sensor.name, ppm, threshold);
+                                            ) && let Some(ppm) = sensor.co2_ppm
+                                            {
+                                                notify_netatmo_co2_alert(
+                                                    &sensor.name,
+                                                    ppm,
+                                                    threshold,
+                                                );
                                             }
-                                            self.netatmo_co2_alert_state.insert(sensor.id.clone(), above);
+                                            self.netatmo_co2_alert_state
+                                                .insert(sensor.id.clone(), above);
                                         }
                                     } else {
                                         self.netatmo_co2_alert_state.remove(&sensor.id);
                                     }
-                                    let key = crate::fritz::normalize_ain_for_selection(
-                                        &format!("NETATMO:{}", sensor.id));
+                                    let key = crate::fritz::normalize_ain_for_selection(&format!(
+                                        "NETATMO:{}",
+                                        sensor.id
+                                    ));
                                     if let Some(thresholds) =
                                         self.settings.temperature_alerts.get(&key).copied()
                                     {
@@ -12215,7 +12423,8 @@ impl cosmic::Application for AppModel {
                                             .temperature_c
                                             .filter(|value| sensor.reachable && value.is_finite())
                                         {
-                                            let outside = temperature_outside_limits(temperature, thresholds);
+                                            let outside =
+                                                temperature_outside_limits(temperature, thresholds);
                                             if should_notify_temperature_alert(
                                                 self.temperature_alert_state.get(&key).copied(),
                                                 outside,
@@ -12236,10 +12445,14 @@ impl cosmic::Application for AppModel {
                                 }
                                 prune_history_to_window(
                                     self,
-                                    graph_history_storage_window(self.settings.history_retention_minutes),
+                                    graph_history_storage_window(
+                                        self.settings.history_retention_minutes,
+                                    ),
                                     Instant::now(),
                                 );
-                                if let Err(error) = crate::netatmo::save_history(&self.netatmo_history) {
+                                if let Err(error) =
+                                    crate::netatmo::save_history(&self.netatmo_history)
+                                {
                                     eprintln!("Could not save Netatmo sensor history: {error}");
                                 }
                                 self.netatmo_sensors = sensors;
@@ -12277,18 +12490,27 @@ impl cosmic::Application for AppModel {
                 crate::diagnostics::debug(format!(
                     "Netatmo station refresh finished (modules: {}, available: {}, failed: {})",
                     self.netatmo_sensors.len(),
-                    self.netatmo_sensors.iter().filter(|sensor| sensor.reachable).count(),
+                    self.netatmo_sensors
+                        .iter()
+                        .filter(|sensor| sensor.reachable)
+                        .count(),
                     self.netatmo_error.is_some()
                 ));
             }
             Message::ToggleNetatmoOutdoorTemperature(id, enabled) => {
-                if !self.netatmo_sensors.iter().any(|sensor| sensor.id == id && sensor.is_outdoor) {
+                if !self
+                    .netatmo_sensors
+                    .iter()
+                    .any(|sensor| sensor.id == id && sensor.is_outdoor)
+                {
                     return Task::none();
                 }
                 let source = format!("NETATMO:{id}");
                 if enabled {
                     self.settings.weather_temperature_ain = source.clone();
-                    self.settings.hidden_netatmo_devices.retain(|entry| entry != &id);
+                    self.settings
+                        .hidden_netatmo_devices
+                        .retain(|entry| entry != &id);
                 } else if self.settings.weather_temperature_ain == source {
                     self.settings.weather_temperature_ain.clear();
                 }
@@ -12296,8 +12518,11 @@ impl cosmic::Application for AppModel {
                 self.persist_settings();
             }
             Message::ToggleNetatmoCo2Alert(id, enabled) => {
-                if !self.netatmo_sensors.iter().any(|sensor| sensor.id == id
-                    && (sensor.co2_ppm.is_some() || self.settings.netatmo_co2_alerts.contains_key(&id))) {
+                if !self.netatmo_sensors.iter().any(|sensor| {
+                    sensor.id == id
+                        && (sensor.co2_ppm.is_some()
+                            || self.settings.netatmo_co2_alerts.contains_key(&id))
+                }) {
                     return Task::none();
                 }
                 self.netatmo_co2_alert_state.remove(&id);
@@ -12319,7 +12544,9 @@ impl cosmic::Application for AppModel {
                 if !self.netatmo_sensors.iter().any(|sensor| sensor.id == id) {
                     return Task::none();
                 }
-                self.settings.hidden_netatmo_devices.retain(|entry| entry != &id);
+                self.settings
+                    .hidden_netatmo_devices
+                    .retain(|entry| entry != &id);
                 if !visible {
                     self.settings.hidden_netatmo_devices.push(id);
                 }
@@ -12841,7 +13068,9 @@ impl cosmic::Application for AppModel {
                             self.settings.netatmo_client_secret.clone(),
                             self.settings.netatmo_refresh_token.clone(),
                         ),
-                        move |result| cosmic::Action::App(Message::NetatmoLoaded(generation, result)),
+                        move |result| {
+                            cosmic::Action::App(Message::NetatmoLoaded(generation, result))
+                        },
                     ));
                 }
                 if !self.hue_loading
@@ -13661,16 +13890,24 @@ mod history_tests {
     #[test]
     fn bulk_inactive_removal_targets_only_confirmed_missing_saved_devices() {
         let devices = vec![
-            FritzDevice { ain: "12:34-56".into(), name: "Offline FRITZ".into() },
-            FritzDevice { ain: "TASMOTA:AA:BB".into(), name: "Offline Tasmota".into() },
-            FritzDevice { ain: "789".into(), name: "Online".into() },
-            FritzDevice { ain: "456".into(), name: "Not selected".into() },
+            FritzDevice {
+                ain: "12:34-56".into(),
+                name: "Offline FRITZ".into(),
+            },
+            FritzDevice {
+                ain: "TASMOTA:AA:BB".into(),
+                name: "Offline Tasmota".into(),
+            },
+            FritzDevice {
+                ain: "789".into(),
+                name: "Online".into(),
+            },
+            FritzDevice {
+                ain: "456".into(),
+                name: "Not selected".into(),
+            },
         ];
-        let selected = vec![
-            "123456".into(),
-            "tasmota:aabb".into(),
-            "789".into(),
-        ];
+        let selected = vec!["123456".into(), "tasmota:aabb".into(), "789".into()];
         let missing = HashSet::from([
             "123456".to_string(),
             "TASMOTAAABB".to_string(),
@@ -13692,17 +13929,37 @@ mod history_tests {
             vec!["12:34-56".to_string(), "TASMOTA:AA:BB".to_string()],
         );
         assert!(inactive_saved_device_ids(&devices, &selected, &HashSet::new(), &[]).is_empty());
-        assert!(inactive_saved_device_ids(&devices, &selected, &missing, &[
-            live[0].clone(),
-            FritzReading { ain: "TASMOTA:AABB".into(), ..live[0].clone() },
-            FritzReading { ain: "123456".into(), ..live[0].clone() },
-        ]).is_empty());
+        assert!(
+            inactive_saved_device_ids(
+                &devices,
+                &selected,
+                &missing,
+                &[
+                    live[0].clone(),
+                    FritzReading {
+                        ain: "TASMOTA:AABB".into(),
+                        ..live[0].clone()
+                    },
+                    FritzReading {
+                        ain: "123456".into(),
+                        ..live[0].clone()
+                    },
+                ]
+            )
+            .is_empty()
+        );
     }
 
     #[test]
     fn forgetting_saved_device_clears_related_configuration_by_canonical_id() {
-        let stale = FritzDevice { ain: "TASMOTA:AA:BB".into(), name: "Old plug".into() };
-        let active = FritzDevice { ain: "12:34-56".into(), name: "Active plug".into() };
+        let stale = FritzDevice {
+            ain: "TASMOTA:AA:BB".into(),
+            name: "Old plug".into(),
+        };
+        let active = FritzDevice {
+            ain: "12:34-56".into(),
+            name: "Active plug".into(),
+        };
         let mut app = AppModel {
             devices: vec![stale.clone(), active.clone()],
             selected_ains: vec!["tasmota:aabb".into(), active.ain.clone()],
@@ -13710,14 +13967,14 @@ mod history_tests {
         };
         app.settings.device_order = vec![stale.ain.clone(), active.ain.clone()];
         app.settings.input_ains.insert("TASMOTAAABB".into());
-        app.settings.temperature_alerts.insert(
-            "TASMOTAAABB".into(),
-            TemperatureAlertThresholds::default(),
-        );
+        app.settings
+            .temperature_alerts
+            .insert("TASMOTAAABB".into(), TemperatureAlertThresholds::default());
         app.settings.weather_temperature_ain = stale.ain.clone();
         app.missing_device_ains.insert("TASMOTAAABB".into());
         app.expanded_devices.insert("TASMOTAAABB".into());
-        app.collapsed_menu_sections.insert("device-graph-pair-TASMOTAAABB".into());
+        app.collapsed_menu_sections
+            .insert("device-graph-pair-TASMOTAAABB".into());
         app.forget_saved_device(&stale.ain);
         assert_eq!(app.devices, vec![active.clone()]);
         assert_eq!(app.settings.known_devices, vec![active.clone()]);
@@ -14047,10 +14304,7 @@ mod history_tests {
             reading("33:33-33", "Solar garage"),
         ];
         let inputs = HashSet::from(["222222".to_string(), "333333".to_string()]);
-        assert_eq!(
-            panel_power_source_label(&readings, &inputs, false),
-            "Grid"
-        );
+        assert_eq!(panel_power_source_label(&readings, &inputs, false), "Grid");
         assert_eq!(
             panel_power_source_label(&readings, &inputs, true),
             "Total input: Solar roof, Solar garage"
@@ -14380,25 +14634,54 @@ mod history_tests {
             temperature_unit: "F".into(),
             ..FritzSettings::default()
         };
-        assert_eq!(netatmo_graph_current_value(&sensor, "temperature", &settings), "68 °F");
-        assert_eq!(netatmo_graph_current_value(&sensor, "humidity", &settings), "51 %");
-        assert_eq!(netatmo_graph_current_value(&sensor, "co2", &settings), "1250 ppm");
-        assert_eq!(netatmo_graph_current_value(&sensor, "pressure", &settings), "1013 hPa");
-        assert_eq!(netatmo_graph_current_value(&sensor, "noise", &settings), "43 dB");
-        assert_eq!(netatmo_graph_current_value(&sensor, "rain", &settings), "1.2 mm");
-        assert_eq!(netatmo_graph_current_value(&sensor, "wind", &settings), "12.5 km/h");
         assert_eq!(
-            netatmo_graph_current_value(&NetatmoSensor {
-                reachable: false,
-                ..sensor.clone()
-            }, "co2", &settings),
+            netatmo_graph_current_value(&sensor, "temperature", &settings),
+            "68 °F"
+        );
+        assert_eq!(
+            netatmo_graph_current_value(&sensor, "humidity", &settings),
+            "51 %"
+        );
+        assert_eq!(
+            netatmo_graph_current_value(&sensor, "co2", &settings),
+            "1250 ppm"
+        );
+        assert_eq!(
+            netatmo_graph_current_value(&sensor, "pressure", &settings),
+            "1013 hPa"
+        );
+        assert_eq!(
+            netatmo_graph_current_value(&sensor, "noise", &settings),
+            "43 dB"
+        );
+        assert_eq!(
+            netatmo_graph_current_value(&sensor, "rain", &settings),
+            "1.2 mm"
+        );
+        assert_eq!(
+            netatmo_graph_current_value(&sensor, "wind", &settings),
+            "12.5 km/h"
+        );
+        assert_eq!(
+            netatmo_graph_current_value(
+                &NetatmoSensor {
+                    reachable: false,
+                    ..sensor.clone()
+                },
+                "co2",
+                &settings
+            ),
             "—"
         );
         assert_eq!(
-            netatmo_graph_current_value(&NetatmoSensor {
-                co2_ppm: Some(f64::NAN),
-                ..sensor
-            }, "co2", &settings),
+            netatmo_graph_current_value(
+                &NetatmoSensor {
+                    co2_ppm: Some(f64::NAN),
+                    ..sensor
+                },
+                "co2",
+                &settings
+            ),
             "—"
         );
     }
@@ -14431,16 +14714,21 @@ mod history_tests {
         assert_eq!(
             metrics,
             vec![
-                ("Outdoor air pollution · OWM".into(), "3 / 5 · Moderate".into()),
+                (
+                    "Outdoor air pollution · OWM".into(),
+                    "3 / 5 · Moderate".into()
+                ),
                 ("PM2.5".into(), "12.5 µg/m³".into()),
                 ("PM10".into(), "24.2 µg/m³".into()),
                 ("NO₂".into(), "16.0 µg/m³".into()),
                 ("O₃".into(), "35.3 µg/m³".into()),
             ]
         );
-        assert!(!metrics.iter().any(|(label, value)| {
-            label.contains("CO₂") || value.contains("ppm")
-        }));
+        assert!(
+            !metrics
+                .iter()
+                .any(|(label, value)| { label.contains("CO₂") || value.contains("ppm") })
+        );
         let partial = outdoor_air_pollution_metrics(&AirPollutionData {
             aqi: 1,
             pm2_5: Some(f64::NAN),
@@ -14448,7 +14736,10 @@ mod history_tests {
             no2: None,
             o3: None,
         });
-        assert_eq!(partial, vec![("Outdoor air pollution · OWM".into(), "1 / 5 · Good".into())]);
+        assert_eq!(
+            partial,
+            vec![("Outdoor air pollution · OWM".into(), "1 / 5 · Good".into())]
+        );
     }
 
     #[test]
@@ -14469,20 +14760,50 @@ mod history_tests {
         assert_eq!(
             netatmo_weather_extra_metrics(std::slice::from_ref(&sensor), &[]),
             vec![
-                ("Air quality (CO₂) · Office".into(), "Elevated · 1350 ppm".into()),
+                (
+                    "Air quality (CO₂) · Office".into(),
+                    "Elevated · 1350 ppm".into()
+                ),
                 ("Noise · Office".into(), "44 dB".into()),
             ]
         );
-        assert!(netatmo_weather_extra_metrics(std::slice::from_ref(&sensor), &["indoor-1".into()]).is_empty());
-        assert!(netatmo_weather_extra_metrics(&[NetatmoSensor { reachable: false, ..sensor.clone() }], &[]).is_empty());
-        assert!(netatmo_weather_extra_metrics(&[NetatmoSensor {
-            co2_ppm: Some(f64::NAN), noise_db: None, ..sensor.clone()
-        }], &[]).is_empty());
+        assert!(
+            netatmo_weather_extra_metrics(std::slice::from_ref(&sensor), &["indoor-1".into()])
+                .is_empty()
+        );
+        assert!(
+            netatmo_weather_extra_metrics(
+                &[NetatmoSensor {
+                    reachable: false,
+                    ..sensor.clone()
+                }],
+                &[]
+            )
+            .is_empty()
+        );
+        assert!(
+            netatmo_weather_extra_metrics(
+                &[NetatmoSensor {
+                    co2_ppm: Some(f64::NAN),
+                    noise_db: None,
+                    ..sensor.clone()
+                }],
+                &[]
+            )
+            .is_empty()
+        );
         let rain = NetatmoSensor {
-            id: "rain".into(), name: "Garden".into(), is_outdoor: false,
-            temperature_c: None, humidity_percent: None, co2_ppm: None,
-            pressure_hpa: None, noise_db: None, rain_mm: Some(1.25),
-            wind_kmh: None, reachable: true,
+            id: "rain".into(),
+            name: "Garden".into(),
+            is_outdoor: false,
+            temperature_c: None,
+            humidity_percent: None,
+            co2_ppm: None,
+            pressure_hpa: None,
+            noise_db: None,
+            rain_mm: Some(1.25),
+            wind_kmh: None,
+            reachable: true,
         };
         assert_eq!(
             netatmo_weather_extra_metrics(&[rain], &[]),
@@ -14506,17 +14827,47 @@ mod history_tests {
             reachable: true,
         };
         let selected = "NETATMO:outdoor-1";
-        assert_eq!(selected_weather_temperature(&[], std::slice::from_ref(&sensor), selected, 14.0), 8.5);
+        assert_eq!(
+            selected_weather_temperature(&[], std::slice::from_ref(&sensor), selected, 14.0),
+            8.5
+        );
         assert_eq!(selected_weather_temperature(&[], &[], selected, 14.0), 14.0);
-        assert_eq!(selected_weather_temperature(&[], &[NetatmoSensor {
-            reachable: false, ..sensor.clone()
-        }], selected, 14.0), 14.0);
-        assert_eq!(selected_weather_temperature(&[], &[NetatmoSensor {
-            temperature_c: None, ..sensor.clone()
-        }], selected, 14.0), 14.0);
-        assert_eq!(selected_weather_temperature(&[], &[NetatmoSensor {
-            is_outdoor: false, ..sensor
-        }], selected, 14.0), 14.0);
+        assert_eq!(
+            selected_weather_temperature(
+                &[],
+                &[NetatmoSensor {
+                    reachable: false,
+                    ..sensor.clone()
+                }],
+                selected,
+                14.0
+            ),
+            14.0
+        );
+        assert_eq!(
+            selected_weather_temperature(
+                &[],
+                &[NetatmoSensor {
+                    temperature_c: None,
+                    ..sensor.clone()
+                }],
+                selected,
+                14.0
+            ),
+            14.0
+        );
+        assert_eq!(
+            selected_weather_temperature(
+                &[],
+                &[NetatmoSensor {
+                    is_outdoor: false,
+                    ..sensor
+                }],
+                selected,
+                14.0
+            ),
+            14.0
+        );
     }
 
     #[test]
@@ -14535,12 +14886,26 @@ mod history_tests {
             reachable: true,
         };
         assert_eq!(
-            average_temperature_with_hue_c(&[], &[], &[], &[], std::slice::from_ref(&station), &[], false),
+            average_temperature_with_hue_c(
+                &[],
+                &[],
+                &[],
+                &[],
+                std::slice::from_ref(&station),
+                &[],
+                false
+            ),
             Some(20.0)
         );
         assert_eq!(
             average_temperature_with_hue_c(
-                &[], &[], &[], &[], std::slice::from_ref(&station), std::slice::from_ref(&station.id), false
+                &[],
+                &[],
+                &[],
+                &[],
+                std::slice::from_ref(&station),
+                std::slice::from_ref(&station.id),
+                false
             ),
             None
         );
@@ -14705,10 +15070,13 @@ mod history_tests {
             "hue".into(),
             VecDeque::from([(old, Some(20.0), None), (recent, None, Some(50.0))]),
         );
-        app.netatmo_history.entry("netatmo".into()).or_default().insert(
-            "co2".into(),
-            VecDeque::from([(old, 900.0), (recent, 800.0)]),
-        );
+        app.netatmo_history
+            .entry("netatmo".into())
+            .or_default()
+            .insert(
+                "co2".into(),
+                VecDeque::from([(old, 900.0), (recent, 800.0)]),
+            );
         prune_history_to_window(&mut app, Duration::from_secs(300), now);
         assert_eq!(app.history.len(), 1);
         assert_eq!(app.bandwidth_history.len(), 1);
@@ -15301,26 +15669,46 @@ mod copy_feedback_tests {
             wind_kmh: None,
             reachable: false,
         });
-        app.netatmo_history.entry("netatmo-42".into()).or_default()
-            .entry("co2".into()).or_default().push_back((now, 900.0));
+        app.netatmo_history
+            .entry("netatmo-42".into())
+            .or_default()
+            .entry("co2".into())
+            .or_default()
+            .push_back((now, 900.0));
 
         let hue = app.section_json("hue-sensor-graph-lux-hue-42").unwrap();
         assert_eq!(hue["data"]["current"], 200.0);
         assert_eq!(hue["data"]["samples"][0]["value"], 200.0);
-        let netatmo = app.section_json("netatmo-sensor-graph-co2-netatmo-42").unwrap();
+        let netatmo = app
+            .section_json("netatmo-sensor-graph-co2-netatmo-42")
+            .unwrap();
         assert!(netatmo["data"]["current"].is_null());
         assert_eq!(netatmo["data"]["history"][0]["value"], 900.0);
         let bandwidth = app.section_json("graph-bandwidth-pair").unwrap();
-        assert_eq!(bandwidth["data"]["history"][0]["download_bits_per_second"], 1200);
+        assert_eq!(
+            bandwidth["data"]["history"][0]["download_bits_per_second"],
+            1200
+        );
         let output = app.section_json("graph-overview-output-power").unwrap();
         assert_eq!(output["data"]["output_history"][0]["watts"], 88);
         for key in [
-            "summary", "weather", "total-power-overview", "current-power-history",
-            "daily-energy-history", "graph-overview-daily-input",
-            "graph-overview-daily-output", "graph-overview-daily-ratio",
-            "internet-bandwidth", "devices", "hue-sensor:hue-42", "netatmo:netatmo-42",
+            "summary",
+            "weather",
+            "total-power-overview",
+            "current-power-history",
+            "daily-energy-history",
+            "graph-overview-daily-input",
+            "graph-overview-daily-output",
+            "graph-overview-daily-ratio",
+            "internet-bandwidth",
+            "devices",
+            "hue-sensor:hue-42",
+            "netatmo:netatmo-42",
         ] {
-            assert!(app.section_json(key).is_some(), "missing JSON section {key}");
+            assert!(
+                app.section_json(key).is_some(),
+                "missing JSON section {key}"
+            );
         }
         assert!(app.section_json("UNKNOWN HEADING").is_none());
         assert!(app.section_json("hue-light:no-such-id").is_none());
@@ -15344,7 +15732,9 @@ mod copy_feedback_tests {
             reachable: true,
             on: Some(true),
         });
-        app.settings.hidden_hue_devices.push(hue_device_id("light", "hue-hidden"));
+        app.settings
+            .hidden_hue_devices
+            .push(hue_device_id("light", "hue-hidden"));
         app.netatmo_sensors.push(NetatmoSensor {
             id: "netatmo-hidden".into(),
             name: "Hidden station".into(),
@@ -15358,17 +15748,28 @@ mod copy_feedback_tests {
             wind_kmh: None,
             reachable: true,
         });
-        app.settings.hidden_netatmo_devices.push("netatmo-hidden".into());
+        app.settings
+            .hidden_netatmo_devices
+            .push("netatmo-hidden".into());
         let exported = app.section_json("devices").unwrap();
-        assert_eq!(exported["data"]["fritz_tasmota"].as_array().unwrap().len(), 1);
-        assert_eq!(exported["data"]["fritz_tasmota"][0]["name"], "Selected offline device");
+        assert_eq!(
+            exported["data"]["fritz_tasmota"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            exported["data"]["fritz_tasmota"][0]["name"],
+            "Selected offline device"
+        );
         assert!(exported["data"]["fritz_tasmota"][0]["power_w"].is_null());
         assert_eq!(exported["data"]["hue_lights"].as_array().unwrap().len(), 0);
         assert_eq!(exported["data"]["netatmo"].as_array().unwrap().len(), 0);
         app.settings.weather_netatmo_extra_metrics = true;
         assert_eq!(
             app.section_json("weather").unwrap()["data"]["netatmo_extras"]
-                .as_array().unwrap().len(), 0
+                .as_array()
+                .unwrap()
+                .len(),
+            0
         );
     }
 
