@@ -23,6 +23,9 @@ main{padding:54px 0 100px}article{max-width:860px;margin:auto}h1{font-size:clamp
 <h3 id="improved">Improved<a class="headerlink" href="#improved" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
+<p>Resolve strict Clippy errors blocking release checks in Netatmo graphs, sensor alerts and regression tests without weakening lint settings. Automatically validate full Debian, AppImage, Flatpak and portable-archive packaging on pushes to main using the same formatting and test steps as the release job.</p>
+</li>
+<li>
 <p>Fix the release-blocking weather image sizing test by explicitly using <code>usize</code> for metric counts, matching <code>weather_photo_height</code> and allowing <code>div_ceil</code> to compile during <code>cargo check --all-targets</code>.</p>
 </li>
 <li>
