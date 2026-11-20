@@ -3053,6 +3053,36 @@ fn netatmo_graph_current_value(
     }
 }
 
+/// Pick a recorded Netatmo metric for the device-list History shortcut.
+/// Prefer temperature when recorded; otherwise use the first available metric.
+/// The full metric list remains accessible from the expanded device details.
+fn netatmo_device_history_graph(
+    history: &crate::netatmo::NetatmoHistory,
+    sensor: &NetatmoSensor,
+    settings: &FritzSettings,
+) -> Option<(String, GraphSamples, String)> {
+    let metrics = history.get(&sensor.id)?;
+    crate::netatmo::METRICS.iter().find_map(|(metric, label, native_unit)| {
+        let samples = metrics.get(*metric).filter(|samples| !samples.is_empty())?;
+        let values: GraphSamples = samples.iter().map(|(time, value)| {
+            (
+                *time,
+                if *metric == "temperature" {
+                    temperature_in_unit(*value, &settings.temperature_unit)
+                } else {
+                    *value
+                },
+            )
+        }).collect();
+        let unit = if *metric == "temperature" {
+            temperature_unit_label(&settings.temperature_unit)
+        } else {
+            native_unit
+        };
+        Some((format!("{} · {label}", sensor.name), values, unit.to_string()))
+    })
+}
+
 /// Netatmo modules are read-only. Only recorded, finite measurements
 /// appear in their respective collapsible history graphs.
 fn netatmo_metric_graph(
@@ -9633,9 +9663,27 @@ impl cosmic::Application for AppModel {
                         .filter(|_| sensor.reachable)
                         .map(|temperature| format_temperature(temperature, &self.settings.temperature_unit))
                         .unwrap_or_else(|| "—".into());
-                    let humidity = sensor.humidity_percent
-                        .map(|value| format!("{value:.0} %"))
-                        .unwrap_or_else(|| "—".into());
+                    // Match the standard device-list History action. When no
+                    // samples exist yet, open details so the user can see the
+                    // available live values and the graph's empty state.
+                    let history_action = netatmo_device_history_graph(
+                        &self.netatmo_history, sensor, &self.settings,
+                    )
+                    .map(|(title, values, unit)| Message::ShowGraph(title, values, unit, None))
+                    .unwrap_or_else(|| Message::ToggleDeviceDetails(id.clone()));
+                    let history_button = widget::button::custom(
+                        widget::Row::new()
+                            .spacing(5)
+                            .align_y(cosmic::iced::Alignment::Center)
+                            .push(widget::icon::from_name("utilities-system-monitor-symbolic").size(16))
+                            .push(widget::text::caption(crate::i18n::tr(
+                                &self.settings.language, "History",
+                            ))),
+                    )
+                    .on_press(history_action)
+                    .width(cosmic::iced::Length::Fixed(108.0))
+                    .padding([8, 8])
+                    .class(cosmic::theme::Button::Text);
                     let heading = widget::Row::new()
                         .spacing(8)
                         .width(cosmic::iced::Length::Fill)
@@ -9665,9 +9713,7 @@ impl cosmic::Application for AppModel {
                         .push(widget::text::body(keep_value_unit_together(temperature))
                             .width(cosmic::iced::Length::Fixed(90.0))
                             .align_x(cosmic::iced::Alignment::End))
-                        .push(widget::text::caption(humidity)
-                            .width(cosmic::iced::Length::Fixed(108.0))
-                            .align_x(cosmic::iced::Alignment::End))
+                        .push(history_button)
                         .push(copy_section_button(
                             format!("netatmo:{}", sensor.id), self.copy_feedback.as_ref()))
                         .push(widget::Space::new()
@@ -14131,6 +14177,46 @@ mod history_tests {
         assert_eq!(co2_ventilation_label(1200.0), "Elevated");
         assert_eq!(co2_ventilation_label(1999.0), "Elevated");
         assert_eq!(co2_ventilation_label(2000.0), "Very high");
+    }
+
+    #[test]
+    fn netatmo_list_history_prefers_temperature_and_falls_back_to_co2() {
+        let sensor = NetatmoSensor {
+            id: "netatmo-test".into(),
+            name: "Living room".into(),
+            is_outdoor: false,
+            temperature_c: None,
+            humidity_percent: None,
+            co2_ppm: None,
+            pressure_hpa: None,
+            noise_db: None,
+            rain_mm: None,
+            wind_kmh: None,
+            reachable: false,
+        };
+        let settings = FritzSettings::default();
+        let mut history = crate::netatmo::NetatmoHistory::default();
+        assert!(netatmo_device_history_graph(&history, &sensor, &settings).is_none());
+        let now = Instant::now();
+        history.entry(sensor.id.clone()).or_default().insert(
+            "co2".into(), VecDeque::from([(now, 825.0)]),
+        );
+        let (title, values, unit) =
+            netatmo_device_history_graph(&history, &sensor, &settings).unwrap();
+        assert_eq!(title, "Living room · CO₂");
+        assert_eq!(unit, "ppm");
+        assert_eq!(values[0].1, 825.0);
+        history.get_mut(&sensor.id).unwrap().insert(
+            "temperature".into(), VecDeque::from([(now, 22.0)]),
+        );
+        let (title, values, unit) =
+            netatmo_device_history_graph(&history, &sensor, &settings).unwrap();
+        assert_eq!(title, "Living room · Temperature");
+        assert_eq!(unit, temperature_unit_label(&settings.temperature_unit));
+        assert_eq!(
+            values[0].1,
+            temperature_in_unit(22.0, &settings.temperature_unit)
+        );
     }
 
     #[test]
