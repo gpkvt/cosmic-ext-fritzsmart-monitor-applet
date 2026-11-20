@@ -190,6 +190,8 @@ pub struct FritzSettings {
     pub panel_internet_bandwidth: bool,
     pub panel_net_power: bool,
     pub graph_timespan_minutes: u32,
+    /// Maximum age of any locally retained historical measurement.
+    pub history_retention_minutes: u32,
     pub graph_style: String,
     pub temperature_unit: String,
     pub refresh_interval_seconds: u32,
@@ -259,6 +261,7 @@ impl Default for FritzSettings {
             panel_internet_bandwidth: false,
             panel_net_power: false,
             graph_timespan_minutes: 15,
+            history_retention_minutes: 43_200,
             graph_style: "line".into(),
             temperature_unit: "C".into(),
             refresh_interval_seconds: 60,
@@ -316,6 +319,10 @@ fn parse_panel_item_spacing(value: &str) -> u8 {
 
 fn parse_graph_timespan_minutes(value: &str) -> u32 {
     parse_clamped(value, 15, 5, 2_102_400)
+}
+
+fn parse_history_retention_minutes(value: &str) -> u32 {
+    parse_clamped(value, 43_200, 5, 2_102_400)
 }
 
 fn parse_temperature_unit(value: &str) -> String {
@@ -704,6 +711,7 @@ impl FritzSettings {
             panel_internet_bandwidth: get("PANEL_INTERNET_BANDWIDTH").eq_ignore_ascii_case("true"),
             panel_net_power: get("PANEL_NET_POWER").eq_ignore_ascii_case("true"),
             graph_timespan_minutes: parse_graph_timespan_minutes(&get("GRAPH_TIMESPAN_MINUTES")),
+            history_retention_minutes: parse_history_retention_minutes(&get("HISTORY_RETENTION_MINUTES")),
             graph_style: if get("GRAPH_STYLE") == "bar" {
                 "bar".into()
             } else {
@@ -1007,6 +1015,10 @@ impl FritzSettings {
                 "false"
             },
         );
+        contents.push_str(&format!(
+            "HISTORY_RETENTION_MINUTES={}\\n",
+            self.history_retention_minutes.clamp(5, 2_102_400)
+        ));
         contents.push_str(&format!("PROMETHEUS_ENABLED={}\n", if self.prometheus_enabled { "true" } else { "false" }));
         // Persist only parsed socket addresses to prevent newline/config injection.
         let bind_address = crate::prometheus::parse_bind_address(&self.prometheus_bind_address)
@@ -2732,6 +2744,17 @@ mod tests {
         assert_eq!(parse_graph_timespan_minutes("2000"), 2000);
         assert_eq!(parse_graph_timespan_minutes("2102400"), 2_102_400);
         assert_eq!(parse_graph_timespan_minutes("9999999"), 2_102_400);
+    }
+
+    #[test]
+    fn history_retention_defaults_to_30_days_and_is_bounded() {
+        assert_eq!(FritzSettings::default().history_retention_minutes, 43_200);
+        assert_eq!(parse_history_retention_minutes(""), 43_200);
+        assert_eq!(parse_history_retention_minutes("invalid"), 43_200);
+        assert_eq!(parse_history_retention_minutes("1"), 5);
+        assert_eq!(parse_history_retention_minutes("60"), 60);
+        assert_eq!(parse_history_retention_minutes("2102400"), 2_102_400);
+        assert_eq!(parse_history_retention_minutes("9999999"), 2_102_400);
     }
 
     #[test]
