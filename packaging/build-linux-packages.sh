@@ -23,7 +23,8 @@ require_command() {
     fi
 }
 
-for command in cargo curl dpkg-deb dpkg-shlibdeps desktop-file-validate     flatpak flatpak-builder git python3 sha256sum file; do
+for command in cargo curl dpkg-deb dpkg-shlibdeps desktop-file-validate \
+    flatpak flatpak-builder eu-strip eu-elfcompress git python3 sha256sum file; do
     require_command "$command"
 done
 
