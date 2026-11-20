@@ -127,6 +127,31 @@ When Prometheus runs in Docker or on another machine, `127.0.0.1` refers to that
 
 [Detailed first-time setup](https://gpkvt.github.io/cosmic-ext-fritzsmart-monitor-applet/guide.html#first-launch)
 
+## Headless mode (no COSMIC desktop required)
+
+Run the installed binary without a panel, Wayland session or graphical display. Headless mode polls the saved FRITZ!Box/Tasmota devices, connected Hue Bridge, Netatmo stations and optional OpenWeatherMap data independently, and serves their latest available measurements through the same Prometheus exporter. It skips weather photographs and does not launch COSMIC.
+
+Configure devices and credentials once in the applet settings (saved in `~/.config/fritz_solar.cfg`). Then, for a local Prometheus endpoint, run:
+
+```bash
+fritz-power-monitor --headless --listen 127.0.0.1:9817
+curl -fsS http://127.0.0.1:9817/metrics
+```
+
+Alternatively, `fritz-power-monitor --headless` uses the exporter setting and bind address saved in **Settings → Connection**; the exporter must already be enabled. The `--listen IP:PORT` option enables the exporter for that run without changing saved settings. With no options, the executable starts the normal COSMIC applet as before. Use `--help` to see all switches.
+
+For unattended startup on a systemd-based desktop, an **optional user service** is supplied with the Debian package, the portable archive and `make install`. If you installed the portable archive manually, copy `share/systemd/user/fritz-power-monitor-headless.service` to `~/.config/systemd/user/` and adjust `ExecStart` to the installed binary. Then:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now fritz-power-monitor-headless.service
+systemctl --user status fritz-power-monitor-headless.service
+```
+
+The service is **not enabled automatically**. Avoid running the panel exporter and the headless exporter on the same IP/port. To stop it, run `systemctl --user disable --now fritz-power-monitor-headless.service`. Headless monitoring requires a running user service session; `loginctl enable-linger "$USER"` is optional if you need it to continue after logout.
+
+**Security:** The exporter has no authentication or TLS. The default `127.0.0.1` binding is local only. Bind to a LAN interface only if access is restricted. Netatmo OAuth refresh tokens may be updated in the saved configuration during headless operation. The process needs normal user access to its settings and network; root is not required. Headless mode exports current readings, not the interactive panel UI or its graphs and notifications.
+
 ## Privacy and security
 
 **Local by default for power monitoring.** FRITZ!Box, Tasmota and Hue operate on the local network. Netatmo, OpenWeatherMap and Wikimedia Commons require external requests only when their respective integrations are enabled.

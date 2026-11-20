@@ -8,6 +8,7 @@ WORKSPACE="$(pwd)"
 BINARY="$WORKSPACE/target/release/fritz-power-monitor"
 DESKTOP="$WORKSPACE/data/com.gpkvt.FritzPowerMonitor.desktop"
 ICON="$WORKSPACE/data/com.gpkvt.FritzPowerMonitor.svg"
+HEADLESS_SERVICE="$WORKSPACE/packaging/fritz-power-monitor-headless.service"
 APP_ID="com.gpkvt.FritzPowerMonitor"
 FLATPAK_MANIFEST="$WORKSPACE/$APP_ID.yml"
 LINUXDEPLOY_VERSION="1-alpha-20251107-1"
@@ -31,6 +32,7 @@ test -s "$WORKSPACE/README.md"
 test -s "$WORKSPACE/LICENSE"
 test -s "$DESKTOP"
 test -s "$ICON"
+test -s "$HEADLESS_SERVICE"
 test -s "$FLATPAK_MANIFEST"
 sh -n "$WORKSPACE/packaging/deb-postinst"
 sh -n "$WORKSPACE/packaging/deb-prerm"
@@ -58,10 +60,12 @@ PORTABLE_FILE="$OUTPUT_DIR/$PORTABLE_NAME.tar.gz"
 install -Dm0755 "$BINARY" "$PORTABLE_ROOT/bin/fritz-power-monitor"
 install -Dm0644 "$DESKTOP" "$PORTABLE_ROOT/share/applications/$APP_ID.desktop"
 install -Dm0644 "$ICON" "$PORTABLE_ROOT/share/icons/hicolor/scalable/apps/$APP_ID.svg"
+install -Dm0644 "$HEADLESS_SERVICE" "$PORTABLE_ROOT/share/systemd/user/fritz-power-monitor-headless.service"
 tar -C "$TEMP_DIR" -czf "$PORTABLE_FILE" "$PORTABLE_NAME"
 tar -tzf "$PORTABLE_FILE" | grep -Fx "$PORTABLE_NAME/bin/fritz-power-monitor" >/dev/null
 tar -tzf "$PORTABLE_FILE" | grep -Fx "$PORTABLE_NAME/share/applications/$APP_ID.desktop" >/dev/null
 tar -tzf "$PORTABLE_FILE" | grep -Fx "$PORTABLE_NAME/share/icons/hicolor/scalable/apps/$APP_ID.svg" >/dev/null
+tar -tzf "$PORTABLE_FILE" | grep -Fx "$PORTABLE_NAME/share/systemd/user/fritz-power-monitor-headless.service" >/dev/null
 
 # Build a Debian package and derive runtime dependencies from ELF metadata.
 DEB_ROOT="$TEMP_DIR/deb-package"
@@ -71,6 +75,8 @@ sed -i 's|^Exec=.*|Exec=/usr/bin/fritz-power-monitor|' \
     "$DEB_ROOT/usr/share/applications/$APP_ID.desktop"
 install -Dm0644 "$ICON" \
     "$DEB_ROOT/usr/share/icons/hicolor/scalable/apps/$APP_ID.svg"
+install -Dm0644 "$HEADLESS_SERVICE" \
+    "$DEB_ROOT/usr/lib/systemd/user/fritz-power-monitor-headless.service"
 install -Dm0644 "$WORKSPACE/README.md" \
     "$DEB_ROOT/usr/share/doc/fritz-power-monitor/README.md"
 install -Dm0644 "$WORKSPACE/LICENSE" \
@@ -126,6 +132,7 @@ test -x "$TEMP_DIR/deb-control-check/prerm"
 dpkg-deb --contents "$DEB_FILE" | grep -F "/usr/bin/fritz-power-monitor" >/dev/null
 dpkg-deb --contents "$DEB_FILE" | grep -F "/usr/share/applications/$APP_ID.desktop" >/dev/null
 dpkg-deb --contents "$DEB_FILE" | grep -F "/usr/share/icons/hicolor/scalable/apps/$APP_ID.svg" >/dev/null
+dpkg-deb --contents "$DEB_FILE" | grep -F "/usr/lib/systemd/user/fritz-power-monitor-headless.service" >/dev/null
 
 # Bundle the executable and its shared-library dependencies into an AppImage.
 curl --fail --location --retry 3 \

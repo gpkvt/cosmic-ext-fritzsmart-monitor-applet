@@ -366,6 +366,23 @@ pub async fn fetch_weather_background_images(
 }
 
 pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherData, String> {
+    fetch_weather_with_images(api_key, location, true).await
+}
+
+/// Headless monitoring uses the same conditions and outdoor pollution readings
+/// but makes no Commons requests or image allocations.
+pub async fn fetch_weather_headless(
+    api_key: String,
+    location: String,
+) -> Result<WeatherData, String> {
+    fetch_weather_with_images(api_key, location, false).await
+}
+
+async fn fetch_weather_with_images(
+    api_key: String,
+    location: String,
+    include_images: bool,
+) -> Result<WeatherData, String> {
     if api_key.trim().is_empty() {
         return Err("OpenWeatherMap API key is empty".into());
     }
@@ -428,21 +445,25 @@ pub async fn fetch_weather(api_key: String, location: String) -> Result<WeatherD
     // Fetch actual outdoor pollutants independently from the conditions;
     // Netatmo's outdoor AQI in its app comes from a third-party provider and
     // is not a measurement exposed by the Weather Station read_station API.
-    // Run this alongside the Commons fetch to avoid delaying the weather UI.
+    // In the graphical applet, fetch pollution and Commons images in
+    // parallel. Headless mode fetches only weather/pollution values.
     let coordinates = payload["coord"]["lat"]
         .as_f64()
         .zip(payload["coord"]["lon"].as_f64());
-    let (air_pollution, (mut background_images, image_attributions)) = futures::join!(
-        async {
-            let (latitude, longitude) = coordinates?;
-            fetch_air_pollution(&client, &api_key, latitude, longitude).await
-        },
-        fetch_commons_background(&client, icon_code)
-    );
+    let fetch_pollution = async {
+        let (latitude, longitude) = coordinates?;
+        fetch_air_pollution(&client, &api_key, latitude, longitude).await
+    };
+    let (air_pollution, (mut background_images, image_attributions)) = if include_images {
+        futures::join!(fetch_pollution, fetch_commons_background(&client, icon_code))
+    } else {
+        (fetch_pollution.await, (Vec::new(), Vec::new()))
+    };
     let image_attribution = image_attributions.first().cloned();
     // At night, never substitute an unrelated image when Commons cannot
     // provide a credible match. Use a locally generated star field instead.
-    if icon_code.ends_with('n')
+    if include_images
+        && icon_code.ends_with('n')
         && background_images.is_empty()
         && let Some(stars) = generate_starry_night_background()
     {

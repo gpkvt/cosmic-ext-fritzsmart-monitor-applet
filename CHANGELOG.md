@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- Add an opt-in `--headless` monitoring mode with no COSMIC/Wayland UI: independently refresh FRITZ!Box, Tasmota, Hue, Netatmo and weather readings and publish cached Prometheus metrics. `--listen IP:PORT` enables a temporary bind override; regular applet startup remains unchanged. Keep current Netatmo OAuth tokens saved, avoid stale readings and weather image traffic.
+- Provide an optional systemd user service for Debian, portable archives and user-local source installs. The service is not enabled automatically; document local-only default, CLI operation and security limits.
+
 ### Improved
 
 - Add a **Remove inactive devices** button in Settings → Devices. It is shown only for saved FRITZ!Box/Tasmota devices confirmed unreachable by a successful refresh, and removes those entries, selections and related preferences in one operation without touching active devices, Hue/Netatmo modules or historical graphs. Devices may be rediscovered later.

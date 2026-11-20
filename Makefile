@@ -6,6 +6,7 @@ BINDIR ?= $(PREFIX)/bin
 DATADIR ?= $(PREFIX)/share
 DESKTOP_FILE := $(DATADIR)/applications/$(APP_ID).desktop
 ICON_FILE := $(DATADIR)/icons/hicolor/scalable/apps/$(APP_ID).svg
+HEADLESS_UNIT := $(HOME)/.config/systemd/user/fritz-power-monitor-headless.service
 
 UPDATE ?= 1
 
@@ -30,6 +31,9 @@ install:
 	install -D -m0644 "$(DESKTOP_FILE).tmp" "$(DESKTOP_FILE)"
 	rm -f "$(DESKTOP_FILE).tmp"
 	install -Dm0644 data/$(APP_ID).svg "$(ICON_FILE)"
+	install -d "$(dir $(HEADLESS_UNIT))"
+	sed 's|^ExecStart=.*|ExecStart=$(abspath $(BINDIR)/$(APP_NAME)) --headless --listen 127.0.0.1:9817|' packaging/fritz-power-monitor-headless.service > "$(HEADLESS_UNIT)"
+	@if command -v systemctl >/dev/null; then systemctl --user daemon-reload >/dev/null 2>&1 || true; fi
 	$(MAKE) reload
 
 reload:
@@ -41,7 +45,9 @@ reload:
 	fi
 
 uninstall:
-	rm -f "$(BINDIR)/$(APP_NAME)" "$(DESKTOP_FILE)" "$(ICON_FILE)"
+	@if command -v systemctl >/dev/null; then systemctl --user disable --now fritz-power-monitor-headless.service >/dev/null 2>&1 || true; fi
+	rm -f "$(BINDIR)/$(APP_NAME)" "$(DESKTOP_FILE)" "$(ICON_FILE)" "$(HEADLESS_UNIT)"
+	@if command -v systemctl >/dev/null; then systemctl --user daemon-reload >/dev/null 2>&1 || true; fi
 
 repo-help:
 	@bash scripts/repo.sh help
