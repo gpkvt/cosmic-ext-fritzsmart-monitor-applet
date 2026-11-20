@@ -68,6 +68,58 @@ pub fn language(setting: &str) -> &'static str {
 /// Translate an English source string; unknown strings fall back to English.
 pub fn tr(setting: &str, key: &'static str) -> &'static str {
     let lang = language(setting);
+    // Keep both retention controls and their deletion semantics localized.
+    if key == "MAXIMUM HISTORY RETENTION" {
+        return match lang {
+            "de" => "MAXIMALE AUFBEWAHRUNGSDAUER",
+            "es" => "RETENCIÓN MÁXIMA DEL HISTORIAL",
+            "nl" => "MAXIMALE BEWAARTERMIJN",
+            "fr" => "DURÉE MAXIMALE DE CONSERVATION",
+            "it" => "CONSERVAZIONE MASSIMA DELLA CRONOLOGIA",
+            "sv" => "MAXIMAL LAGRINGSTID",
+            "pt" => "RETENÇÃO MÁXIMA DO HISTÓRICO",
+            "pl" => "MAKSYMALNY OKRES PRZECHOWYWANIA",
+            "da" => "MAKSIMAL OPBEVARINGSTID",
+            "no" => "MAKSIMAL LAGRINGSTID",
+            "ja" => "履歴の最大保存期間",
+            "ko" => "기록 최대 보존 기간",
+            _ => key,
+        };
+    }
+    if key == "Graph range only changes what is shown; it never deletes saved samples." {
+        return match lang {
+            "de" => "Der Graphenzeitraum ändert nur die Anzeige und löscht keine gespeicherten Werte.",
+            "es" => "El intervalo del gráfico solo cambia la vista; no elimina datos guardados.",
+            "nl" => "Het grafiekbereik verandert alleen de weergave en verwijdert geen opgeslagen metingen.",
+            "fr" => "La plage du graphique ne change que l'affichage et ne supprime aucune mesure enregistrée.",
+            "it" => "L'intervallo del grafico modifica solo la vista e non elimina i dati salvati.",
+            "sv" => "Grafens tidsintervall ändrar bara visningen och raderar inga sparade värden.",
+            "pt" => "O intervalo do gráfico altera apenas a vista, sem apagar dados guardados.",
+            "pl" => "Zakres wykresu zmienia tylko widok i nie usuwa zapisanych próbek.",
+            "da" => "Grafens tidsrum ændrer kun visningen og sletter ikke gemte målinger.",
+            "no" => "Grafens tidsområde endrer bare visningen og sletter ikke lagrede målinger.",
+            "ja" => "グラフの表示期間を変更しても、保存した測定値は削除されません。",
+            "ko" => "그래프 범위는 표시만 변경하며 저장된 측정값을 삭제하지 않습니다.",
+            _ => key,
+        };
+    }
+    if key == "Reducing this limit permanently deletes older samples from every history source." {
+        return match lang {
+            "de" => "Ein kürzerer Zeitraum löscht ältere Werte aus allen Verlaufsdaten dauerhaft.",
+            "es" => "Reducir este límite elimina permanentemente los datos antiguos de todos los historiales.",
+            "nl" => "Een kortere bewaartermijn verwijdert oudere gegevens uit alle geschiedenissen definitief.",
+            "fr" => "Réduire cette limite supprime définitivement les anciennes mesures de tous les historiques.",
+            "it" => "Ridurre questo limite elimina definitivamente i dati meno recenti da tutte le cronologie.",
+            "sv" => "Om gränsen sänks tas äldre värden permanent bort från all historik.",
+            "pt" => "Reduzir este limite elimina permanentemente os dados antigos de todos os históricos.",
+            "pl" => "Zmniejszenie limitu trwale usuwa starsze próbki ze wszystkich historii.",
+            "da" => "En kortere grænse sletter ældre målinger permanent fra al historik.",
+            "no" => "Å redusere grensen sletter eldre målinger permanent fra all historikk.",
+            "ja" => "この上限を短くすると、すべての履歴の古い測定値が完全に削除されます。",
+            "ko" => "보존 기간을 줄이면 모든 기록의 오래된 측정값이 영구적으로 삭제됩니다.",
+            _ => key,
+        };
+    }
     // Device-inventory cleanup is offered in every supported UI language.
     if key == "Remove inactive devices" {
         return match lang {
