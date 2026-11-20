@@ -4,6 +4,8 @@
 
 ### Improved
 
+- Correct the Netatmo stale-reading regression fixture: timestamp 1 with clock 1050 is only 1049 seconds old (within the 30-minute freshness window). Verify a genuinely expired sample and a separately disconnected recent sample.
+
 - Ensure Linux packaging selects the actual generated application AppImage rather than accidentally copying the downloaded linuxdeploy AppImage plugin into release artifacts.
 
 - Resolve strict Clippy errors blocking release checks in Netatmo graphs, sensor alerts and regression tests without weakening lint settings. Automatically validate full Debian, AppImage, Flatpak and portable-archive packaging on pushes to main using the same formatting and test steps as the release job.
