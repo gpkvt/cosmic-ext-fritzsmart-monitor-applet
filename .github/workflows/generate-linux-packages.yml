@@ -1,6 +1,17 @@
 name: Build Linux packages
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'build.rs'
+      - 'packaging/**'
+      - 'com.gpkvt.FritzPowerMonitor.yml'
+      - '.github/workflows/generate-linux-packages.yml'
+      - '.github/workflows/release.yml'
   workflow_dispatch:
 
 permissions:
@@ -39,6 +50,9 @@ jobs:
         run: |
           echo "version=$(python3 packaging/version.py current)" >> "$GITHUB_OUTPUT"
 
+      - name: Format Rust sources (matching Release workflow)
+        run: cargo fmt --all
+
       - name: Format, compile, lint and test
         run: |
           cargo fmt --all -- --check
@@ -73,4 +87,4 @@ jobs:
           name: fritz-power-monitor-linux-packages
           path: dist/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7

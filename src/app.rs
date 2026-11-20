@@ -2991,10 +2991,8 @@ fn collapsible_graph_with_current_value(
         .align_y(cosmic::iced::Alignment::Center)
         .push(widget::text::caption(title))
         .push(widget::Space::new().width(cosmic::iced::Length::Fill));
-    if collapsed {
-        if let Some(value) = current_value {
-            heading_content = heading_content.push(widget::text::body(value));
-        }
+    if collapsed && let Some(value) = current_value {
+        heading_content = heading_content.push(widget::text::body(value));
     }
     let heading = widget::button::custom(
         heading_content.push(
@@ -3140,13 +3138,12 @@ fn netatmo_device_history_graph(
 fn netatmo_metric_graph(
     history: &crate::netatmo::NetatmoHistory,
     sensor: &NetatmoSensor,
-    metric: &'static str,
-    label: &'static str,
-    native_unit: &'static str,
+    metric_info: (&'static str, &'static str, &'static str),
     settings: &FritzSettings,
     collapsed_sections: &HashSet<String>,
     copy_feedback: Option<&CopyFeedback>,
 ) -> cosmic::Element<'static, Message> {
+    let (metric, label, native_unit) = metric_info;
     let section_id = format!("netatmo-sensor-graph-{metric}-{}", sensor.id);
     let collapsed = collapsed_sections.contains(&section_id);
     let unit = if metric == "temperature" {
@@ -9839,9 +9836,7 @@ impl cosmic::Application for AppModel {
                                 details = details.push(netatmo_metric_graph(
                                     &self.netatmo_history,
                                     sensor,
-                                    metric,
-                                    label,
-                                    unit,
+                                    (metric, label, unit),
                                     &self.settings,
                                     &self.collapsed_menu_sections,
                                     self.copy_feedback.as_ref(),
@@ -12203,10 +12198,8 @@ impl cosmic::Application for AppModel {
                                             if should_notify_temperature_alert(
                                                 self.netatmo_co2_alert_state.get(&sensor.id).copied(),
                                                 above,
-                                            ) {
-                                                if let Some(ppm) = sensor.co2_ppm {
-                                                    notify_netatmo_co2_alert(&sensor.name, ppm, threshold);
-                                                }
+                                            ) && let Some(ppm) = sensor.co2_ppm {
+                                                notify_netatmo_co2_alert(&sensor.name, ppm, threshold);
                                             }
                                             self.netatmo_co2_alert_state.insert(sensor.id.clone(), above);
                                         }
@@ -12710,19 +12703,19 @@ impl cosmic::Application for AppModel {
                     if let Some(samples) = self.expanded_graph_full_secondary.as_mut() {
                         samples.retain(|(at, _)| now.saturating_duration_since(*at) <= window);
                     }
-                    if let Some((title, _, unit, _)) = self.expanded_graph.as_ref() {
-                        if let Some(full) = self.expanded_graph_full_values.as_ref() {
-                            let visible = graph_values_for_timespan(
-                                full,
-                                self.expanded_graph_view_timespan_minutes,
-                            );
-                            let axis = graph_axis_start_for_samples(
-                                &visible,
-                                self.expanded_graph_view_timespan_minutes,
-                            );
-                            self.expanded_graph =
-                                Some((title.clone(), visible, unit.clone(), Some(axis)));
-                        }
+                    if let Some((title, _, unit, _)) = self.expanded_graph.as_ref()
+                        && let Some(full) = self.expanded_graph_full_values.as_ref()
+                    {
+                        let visible = graph_values_for_timespan(
+                            full,
+                            self.expanded_graph_view_timespan_minutes,
+                        );
+                        let axis = graph_axis_start_for_samples(
+                            &visible,
+                            self.expanded_graph_view_timespan_minutes,
+                        );
+                        self.expanded_graph =
+                            Some((title.clone(), visible, unit.clone(), Some(axis)));
                     }
                     if let (Some(series), Some((_, labels))) = (
                         self.expanded_graph_full_secondary.as_ref(),
@@ -13710,9 +13703,11 @@ mod history_tests {
     fn forgetting_saved_device_clears_related_configuration_by_canonical_id() {
         let stale = FritzDevice { ain: "TASMOTA:AA:BB".into(), name: "Old plug".into() };
         let active = FritzDevice { ain: "12:34-56".into(), name: "Active plug".into() };
-        let mut app = AppModel::default();
-        app.devices = vec![stale.clone(), active.clone()];
-        app.selected_ains = vec!["tasmota:aabb".into(), active.ain.clone()];
+        let mut app = AppModel {
+            devices: vec![stale.clone(), active.clone()],
+            selected_ains: vec!["tasmota:aabb".into(), active.ain.clone()],
+            ..AppModel::default()
+        };
         app.settings.device_order = vec![stale.ain.clone(), active.ain.clone()];
         app.settings.input_ains.insert("TASMOTAAABB".into());
         app.settings.temperature_alerts.insert(
@@ -14381,8 +14376,10 @@ mod history_tests {
             wind_kmh: Some(12.5),
             reachable: true,
         };
-        let mut settings = FritzSettings::default();
-        settings.temperature_unit = "F".into();
+        let settings = FritzSettings {
+            temperature_unit: "F".into(),
+            ..FritzSettings::default()
+        };
         assert_eq!(netatmo_graph_current_value(&sensor, "temperature", &settings), "68 °F");
         assert_eq!(netatmo_graph_current_value(&sensor, "humidity", &settings), "51 %");
         assert_eq!(netatmo_graph_current_value(&sensor, "co2", &settings), "1250 ppm");
@@ -14470,13 +14467,13 @@ mod history_tests {
             reachable: true,
         };
         assert_eq!(
-            netatmo_weather_extra_metrics(&[sensor.clone()], &[]),
+            netatmo_weather_extra_metrics(std::slice::from_ref(&sensor), &[]),
             vec![
                 ("Air quality (CO₂) · Office".into(), "Elevated · 1350 ppm".into()),
                 ("Noise · Office".into(), "44 dB".into()),
             ]
         );
-        assert!(netatmo_weather_extra_metrics(&[sensor.clone()], &["indoor-1".into()]).is_empty());
+        assert!(netatmo_weather_extra_metrics(std::slice::from_ref(&sensor), &["indoor-1".into()]).is_empty());
         assert!(netatmo_weather_extra_metrics(&[NetatmoSensor { reachable: false, ..sensor.clone() }], &[]).is_empty());
         assert!(netatmo_weather_extra_metrics(&[NetatmoSensor {
             co2_ppm: Some(f64::NAN), noise_db: None, ..sensor.clone()
@@ -14509,7 +14506,7 @@ mod history_tests {
             reachable: true,
         };
         let selected = "NETATMO:outdoor-1";
-        assert_eq!(selected_weather_temperature(&[], &[sensor.clone()], selected, 14.0), 8.5);
+        assert_eq!(selected_weather_temperature(&[], std::slice::from_ref(&sensor), selected, 14.0), 8.5);
         assert_eq!(selected_weather_temperature(&[], &[], selected, 14.0), 14.0);
         assert_eq!(selected_weather_temperature(&[], &[NetatmoSensor {
             reachable: false, ..sensor.clone()
@@ -14538,12 +14535,12 @@ mod history_tests {
             reachable: true,
         };
         assert_eq!(
-            average_temperature_with_hue_c(&[], &[], &[], &[], &[station.clone()], &[], false),
+            average_temperature_with_hue_c(&[], &[], &[], &[], std::slice::from_ref(&station), &[], false),
             Some(20.0)
         );
         assert_eq!(
             average_temperature_with_hue_c(
-                &[], &[], &[], &[], &[station.clone()], &[station.id.clone()], false
+                &[], &[], &[], &[], std::slice::from_ref(&station), std::slice::from_ref(&station.id), false
             ),
             None
         );
@@ -14695,10 +14692,11 @@ mod history_tests {
         let now = Instant::now();
         let old = now - Duration::from_secs(7200);
         let recent = now - Duration::from_secs(120);
-        let mut app = AppModel::default();
-        app.history = VecDeque::from([(old, 1), (recent, 2)]);
-        app.bandwidth_history =
-            VecDeque::from([(old, 1, 1), (recent, 2, 2)]);
+        let mut app = AppModel {
+            history: VecDeque::from([(old, 1), (recent, 2)]),
+            bandwidth_history: VecDeque::from([(old, 1, 1), (recent, 2, 2)]),
+            ..AppModel::default()
+        };
         app.device_history.insert(
             "device".into(),
             VecDeque::from([(old, 1, 20.0), (recent, 2, 21.0)]),
