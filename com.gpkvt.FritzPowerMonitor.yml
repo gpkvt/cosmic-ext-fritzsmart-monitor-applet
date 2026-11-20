@@ -2,6 +2,10 @@ app-id: com.gpkvt.FritzPowerMonitor
 runtime: org.freedesktop.Platform
 runtime-version: "26.08"
 sdk: org.freedesktop.Sdk
+# The Ubuntu 24.04 host appstreamcli fails with E:file-read-error during
+# compose even though the installed XML, desktop entry and icon are valid.
+# Preserve the AppStream metadata in the Flatpak and validate it separately.
+appstream-compose: false
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
 command: fritz-power-monitor

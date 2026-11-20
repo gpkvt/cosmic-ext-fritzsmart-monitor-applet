@@ -35,6 +35,28 @@ test -s "$DESKTOP"
 test -s "$ICON"
 test -s "$HEADLESS_SERVICE"
 test -s "$FLATPAK_MANIFEST"
+# Keep AppStream metadata in every Flatpak even when the host-side
+# appstreamcli compose stage is disabled for Ubuntu 24.04 compatibility.
+# Validate XML and the Desktop entry against the application ID up front.
+python3 - "$WORKSPACE/data/$APP_ID.metainfo.xml" "$DESKTOP" "$APP_ID" <<'PY'
+import configparser
+import sys
+import xml.etree.ElementTree as ET
+
+metadata, desktop_file, app_id = sys.argv[1:]
+root = ET.parse(metadata).getroot()
+assert root.tag == "component"
+assert root.findtext("id") == app_id
+assert root.find("metadata_license") is not None
+assert root.find("project_license") is not None
+assert root.find("launchable[@type='desktop-id']").text == app_id + ".desktop"
+desktop = configparser.ConfigParser(interpolation=None)
+desktop.read(desktop_file, encoding="utf-8")
+entry = desktop["Desktop Entry"]
+assert entry["Icon"] == app_id
+assert entry["Exec"] == "fritz-power-monitor"
+print("AppStream XML, desktop launcher and application ID are consistent")
+PY
 sh -n "$WORKSPACE/packaging/deb-postinst"
 sh -n "$WORKSPACE/packaging/deb-prerm"
 mkdir -p "$OUTPUT_DIR"
