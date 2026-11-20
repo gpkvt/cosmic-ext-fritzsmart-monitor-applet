@@ -94,6 +94,26 @@ fn prompt_secret(label: &str, current: &str) -> Result<String, String> {
     })
 }
 
+fn prompt_required(label: &str, current: &str) -> Result<String, String> {
+    loop {
+        let answer = prompt_value(label, current)?;
+        if !answer.trim().is_empty() {
+            return Ok(answer);
+        }
+        println!("{label} is required.");
+    }
+}
+
+fn prompt_required_secret(label: &str, current: &str) -> Result<String, String> {
+    loop {
+        let answer = prompt_secret(label, current)?;
+        if !answer.is_empty() {
+            return Ok(answer);
+        }
+        println!("{label} is required.");
+    }
+}
+
 fn parse_confirmation(answer: &str, default: bool) -> Option<bool> {
     match answer.trim().to_ascii_lowercase().as_str() {
         "" => Some(default),
@@ -269,15 +289,15 @@ pub fn run() -> Result<(), String> {
         } else {
             &settings.url
         };
-        settings.url = prompt_value("FRITZ!Box URL", default_url)?;
-        if !settings.url.starts_with("http://") && !settings.url.starts_with("https://") {
-            return Err("FRITZ!Box URL must start with http:// or https://".into());
-        }
-        settings.username = prompt_value("FRITZ!Box username", &settings.username)?;
-        settings.password = prompt_secret("FRITZ!Box password", &settings.password)?;
-        if settings.username.is_empty() || settings.password.is_empty() {
-            return Err("FRITZ!Box username and password are required for this connection".into());
-        }
+        settings.url = loop {
+            let url = prompt_required("FRITZ!Box URL", default_url)?;
+            if url.starts_with("http://") || url.starts_with("https://") {
+                break url;
+            }
+            println!("FRITZ!Box URL must start with http:// or https://.");
+        };
+        settings.username = prompt_required("FRITZ!Box username", &settings.username)?;
+        settings.password = prompt_required_secret("FRITZ!Box password", &settings.password)?;
     }
 
     if confirm(
@@ -285,26 +305,22 @@ pub fn run() -> Result<(), String> {
         !settings.tasmota_username.is_empty(),
     )? {
         settings.tasmota_username =
-            prompt_value("Tasmota shared username", &settings.tasmota_username)?;
+            prompt_required("Tasmota shared username", &settings.tasmota_username)?;
         settings.tasmota_password =
-            prompt_secret("Tasmota shared password", &settings.tasmota_password)?;
-        if settings.tasmota_username.is_empty() || settings.tasmota_password.is_empty() {
-            return Err("Tasmota requires a username and password".into());
-        }
+            prompt_required_secret("Tasmota shared password", &settings.tasmota_password)?;
     }
     discover_and_select(&mut settings)?;
 
     if confirm("Configure Hue Bridge?", !settings.hue_bridge_ip.is_empty())? {
-        settings.hue_bridge_ip =
-            prompt_value("Hue Bridge local IP", &settings.hue_bridge_ip)?;
-        if !valid_local_hue_ip(&settings.hue_bridge_ip) {
-            return Err("Hue Bridge must be a private or link-local IP address".into());
-        }
+        settings.hue_bridge_ip = loop {
+            let ip = prompt_required("Hue Bridge local IP", &settings.hue_bridge_ip)?;
+            if valid_local_hue_ip(&ip) {
+                break ip;
+            }
+            println!("Enter a private or link-local Hue Bridge IP address.");
+        };
         settings.hue_application_key =
-            prompt_secret("Hue application key", &settings.hue_application_key)?;
-        if settings.hue_application_key.is_empty() {
-            return Err("A Hue Bridge application key is required".into());
-        }
+            prompt_required_secret("Hue application key", &settings.hue_application_key)?;
     }
 
     if confirm(
@@ -312,17 +328,11 @@ pub fn run() -> Result<(), String> {
         !settings.netatmo_client_id.is_empty(),
     )? {
         settings.netatmo_client_id =
-            prompt_value("Netatmo client ID", &settings.netatmo_client_id)?;
+            prompt_required("Netatmo client ID", &settings.netatmo_client_id)?;
         settings.netatmo_client_secret =
-            prompt_secret("Netatmo client secret", &settings.netatmo_client_secret)?;
+            prompt_required_secret("Netatmo client secret", &settings.netatmo_client_secret)?;
         settings.netatmo_refresh_token =
-            prompt_secret("Netatmo OAuth refresh token", &settings.netatmo_refresh_token)?;
-        if settings.netatmo_client_id.is_empty()
-            || settings.netatmo_client_secret.is_empty()
-            || settings.netatmo_refresh_token.is_empty()
-        {
-            return Err("Netatmo requires client ID, client secret and refresh token".into());
-        }
+            prompt_required_secret("Netatmo OAuth refresh token", &settings.netatmo_refresh_token)?;
     }
 
     settings.weather_enabled = confirm(
@@ -331,12 +341,9 @@ pub fn run() -> Result<(), String> {
     )?;
     if settings.weather_enabled {
         settings.openweathermap_api_key =
-            prompt_secret("OpenWeatherMap API key", &settings.openweathermap_api_key)?;
+            prompt_required_secret("OpenWeatherMap API key", &settings.openweathermap_api_key)?;
         settings.weather_location =
-            prompt_value("Weather city or latitude,longitude", &settings.weather_location)?;
-        if settings.openweathermap_api_key.is_empty() || settings.weather_location.is_empty() {
-            return Err("Weather requires an API key and a location".into());
-        }
+            prompt_required("Weather city or latitude,longitude", &settings.weather_location)?;
     }
     settings.refresh_interval_seconds = prompt_refresh(settings.refresh_interval_seconds)?;
 
@@ -361,6 +368,14 @@ pub fn run() -> Result<(), String> {
         }
     }
     settings.prometheus_enabled = true;
+    if settings.ains.is_empty()
+        && settings.ain.is_empty()
+        && settings.hue_bridge_ip.is_empty()
+        && settings.netatmo_client_id.is_empty()
+        && !settings.weather_enabled
+    {
+        println!("No data source is configured. The /metrics endpoint will report only unavailable sources.");
+    }
     println!("\nReview:");
     println!("  Saved FRITZ!/Tasmota device selection: {}", settings.ains.len());
     println!("  Hue Bridge: {}", if settings.hue_bridge_ip.is_empty() { "not configured" } else { "configured" });
