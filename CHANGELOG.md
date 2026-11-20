@@ -4,6 +4,8 @@
 
 ### Improved
 
+- Fix the release-blocking weather image sizing test by explicitly using `usize` for metric counts, matching `weather_photo_height` and allowing `div_ceil` to compile during `cargo check --all-targets`.
+
 - Verify that TODAY and Y'DAY energy totals (including the seven-day and per-device views) use the local midnight-to-midnight calendar boundaries rather than rolling 24-hour windows. Keep the reference clock consistent across midnight and add deterministic tests for intervals entirely yesterday and intervals crossing local midnight.
 
 

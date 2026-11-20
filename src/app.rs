@@ -14415,7 +14415,7 @@ mod history_tests {
         assert_eq!(weather_photo_height(13), 327.0);
         assert_eq!(weather_photo_height(21), 459.0);
         // Preserve exactly three quarters of the old computed height.
-        for metrics in 0..=40 {
+        for metrics in 0_usize..=40 {
             let extra_rows = metrics.div_ceil(4).saturating_sub(2) as f32;
             let old_height = 260.0 + 88.0 * extra_rows;
             assert_eq!(weather_photo_height(metrics), old_height * 0.75);
