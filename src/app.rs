@@ -4424,18 +4424,22 @@ impl AppModel {
             );
             json_power_samples(&samples, now)
         };
-        let power_totals = || serde_json::json!({
-            "input_w": self.readings.iter().any(|reading| {
-                reading.has_power_meter &&
-                    self.settings.input_ains.iter().any(|id| {
-                        crate::fritz::canonical_device_key(id)
-                            == crate::fritz::canonical_device_key(&reading.ain)
-                    })
-            }).then_some(input_display_power_w(
-                input_power_w(&self.readings, &self.settings.input_ains))),
-            "output_w": self.readings.iter().any(|reading| reading.has_power_meter)
-                .then_some(output_power_w(&self.readings, &self.settings.input_ains)),
-        });
+        let power_totals = || {
+            let is_input = |ain: &str| self.settings.input_ains.iter().any(|id| {
+                crate::fritz::canonical_device_key(id)
+                    == crate::fritz::canonical_device_key(ain)
+            });
+            let input_available = self.readings.iter()
+                .any(|reading| reading.has_power_meter && is_input(&reading.ain));
+            let output_available = self.readings.iter()
+                .any(|reading| reading.has_power_meter && !is_input(&reading.ain));
+            serde_json::json!({
+                "input_w": input_available.then_some(input_display_power_w(
+                    input_power_w(&self.readings, &self.settings.input_ains))),
+                "output_w": output_available.then_some(output_power_w(
+                    &self.readings, &self.settings.input_ains)),
+            })
+        };
         let router = || self.fritzbox_system_info.as_ref().map(|info| serde_json::json!({
             "manufacturer": &info.manufacturer,
             "model": &info.model,
@@ -14956,6 +14960,27 @@ mod copy_feedback_tests {
         }
         assert!(app.section_json("UNKNOWN HEADING").is_none());
         assert!(app.section_json("hue-light:no-such-id").is_none());
+    }
+
+    #[test]
+    fn copy_sections_never_invent_zero_output_from_only_input_meters() {
+        let mut app = AppModel::default();
+        app.settings.input_ains.insert("123456".into());
+        app.readings.push(FritzReading {
+            ain: "12:34-56".into(),
+            name: "Solar input".into(),
+            power_w: 500,
+            has_power_meter: true,
+            temperature_c: f64::NAN,
+            power_state: None,
+            power_controllable: false,
+            power_toggle_allowed: false,
+        });
+        let section = app.section_json("total-power-overview").unwrap();
+        assert!(section["data"]["totals"]["output_w"].is_null());
+        assert_eq!(section["data"]["totals"]["input_w"], 500);
+        let detail = app.section_json("device:123456").unwrap();
+        assert!(detail["data"]["temperature_c"].is_null());
     }
 
     #[test]
