@@ -23,6 +23,9 @@ main{padding:54px 0 100px}article{max-width:860px;margin:auto}h1{font-size:clamp
 <h3 id="improved">Improved<a class="headerlink" href="#improved" title="Permanent link">&para;</a></h3>
 <ul>
 <li>
+<p>Fix the release-blocking weather image sizing test by explicitly using <code>usize</code> for metric counts, matching <code>weather_photo_height</code> and allowing <code>div_ceil</code> to compile during <code>cargo check --all-targets</code>.</p>
+</li>
+<li>
 <p>Verify that TODAY and Y'DAY energy totals (including the seven-day and per-device views) use the local midnight-to-midnight calendar boundaries rather than rolling 24-hour windows. Keep the reference clock consistent across midnight and add deterministic tests for intervals entirely yesterday and intervals crossing local midnight.</p>
 </li>
 <li>
