@@ -4993,7 +4993,7 @@ impl cosmic::Application for AppModel {
         if setup_assistant && settings.url.trim().is_empty() {
             settings.url = "http://fritz.box".into();
         }
-        let history_window = graph_history_window(settings.graph_timespan_minutes);
+        let history_window = graph_history_window(settings.history_retention_minutes);
         let history_storage_window = graph_history_storage_window(settings.history_retention_minutes);
         let (mut history, device_history) = crate::history::load(history_storage_window);
         let hue_sensor_history = crate::history::load_hue_sensors(history_storage_window);
@@ -6474,7 +6474,32 @@ impl cosmic::Application for AppModel {
                     )
                     .push(quick_slider_anchor_labels(["5m", "1h", "1d", "30d", "4y"]))
                     .push(widget::text::caption(
-                        "5 minutes to 4 years. Saved samples and the selected retention period survive applet restarts. Sampling adapts to retention, capped at about 50,000 samples per series.",
+                        "Visible graph range: 5 minutes to 4 years. This does not delete saved readings.",
+                    ))
+                    .push(widget::divider::horizontal::default())
+                    .push(widget::text::caption(format!(
+                        "MAXIMUM HISTORY RETENTION: {}",
+                        format_graph_timespan(self.settings.history_retention_minutes)
+                    )))
+                    .push(
+                        widget::slider(
+                            0.0..=4.0,
+                            quick_slider_position(
+                                self.settings.history_retention_minutes as f32,
+                                [5.0, 60.0, 1440.0, 43200.0, 2102400.0],
+                            ),
+                            |position| Message::HistoryRetentionChanged(
+                                quick_slider_value(
+                                    position,
+                                    [5.0, 60.0, 1440.0, 43200.0, 2102400.0],
+                                ).round() as u32
+                            ),
+                        )
+                        .step(0.01_f32),
+                    )
+                    .push(quick_slider_anchor_labels(["5m", "1h", "1d", "30d", "4y"]))
+                    .push(widget::text::caption(
+                        "Maximum age of stored FRITZ!Box, Tasmota, Hue, Netatmo and bandwidth readings. Reducing this value permanently deletes older saved samples.",
                     ))
                     .push(widget::divider::horizontal::default())
             }
@@ -11657,16 +11682,8 @@ impl cosmic::Application for AppModel {
                 if self.settings.graph_timespan_minutes != self.quick_graph_timespan {
                     self.settings.graph_timespan_minutes =
                         self.quick_graph_timespan.clamp(5, 2_102_400);
-                    let storage_window =
-                        graph_history_storage_window(self.settings.history_retention_minutes);
-                    (self.history, self.device_history) = crate::history::load(storage_window);
-                    self.hue_sensor_history = crate::history::load_hue_sensors(storage_window);
-                self.netatmo_history = crate::netatmo::load_history(storage_window);
-                    let window = graph_history_window(self.settings.history_retention_minutes);
-                    let now = Instant::now();
-                    self.history
-                        .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
-                    self.history_storage_diagnostics = crate::history::diagnostics(storage_window);
+                    // Changing the viewed range must never erase or reload samples.
+                    // The separate retention control owns history pruning.
                     if let Some(index) = self.history_graph_index
                         && let Some((key, name)) = self.history_graph_devices.get(index).cloned()
                     {
@@ -12607,19 +12624,56 @@ impl cosmic::Application for AppModel {
                 self.settings.panel_net_power = value;
                 self.persist_settings();
             }
+            Message::HistoryRetentionChanged(value) => {
+                let minutes = value.clamp(5, 2_102_400);
+                if self.settings.history_retention_minutes != minutes {
+                    self.settings.history_retention_minutes = minutes;
+                    let window = graph_history_storage_window(minutes);
+                    let now = Instant::now();
+                    self.history
+                        .retain(|(at, _)| now.saturating_duration_since(*at) <= window);
+                    self.bandwidth_history.retain(|(at, _, _)| {
+                        now.saturating_duration_since(*at) <= window
+                    });
+                    self.device_history.retain(|_, samples| {
+                        samples.retain(|(at, _, _)| {
+                            now.saturating_duration_since(*at) <= window
+                        });
+                        !samples.is_empty()
+                    });
+                    self.hue_sensor_history.retain(|_, samples| {
+                        samples.retain(|(at, _, _)| {
+                            now.saturating_duration_since(*at) <= window
+                        });
+                        !samples.is_empty()
+                    });
+                    self.netatmo_history.retain(|_, metrics| {
+                        metrics.retain(|_, samples| {
+                            samples.retain(|(at, _)| {
+                                now.saturating_duration_since(*at) <= window
+                            });
+                            !samples.is_empty()
+                        });
+                        !metrics.is_empty()
+                    });
+                    if let Err(error) = crate::history::save(&self.history, &self.device_history) {
+                        eprintln!("Could not save pruned graph history: {error}");
+                    }
+                    if let Err(error) = crate::history::save_hue_sensors(&self.hue_sensor_history) {
+                        eprintln!("Could not save pruned Hue history: {error}");
+                    }
+                    if let Err(error) = crate::netatmo::save_history(&self.netatmo_history) {
+                        eprintln!("Could not save pruned Netatmo history: {error}");
+                    }
+                    self.history_storage_diagnostics = crate::history::diagnostics(window);
+                    self.persist_settings();
+                }
+            }
             Message::GraphTimespanChanged(value) => {
                 self.settings.graph_timespan_minutes = value.clamp(5, 2_102_400);
                 self.quick_graph_timespan = self.settings.graph_timespan_minutes;
-                let storage_window =
-                    graph_history_storage_window(self.settings.history_retention_minutes);
-                (self.history, self.device_history) = crate::history::load(storage_window);
-                self.hue_sensor_history = crate::history::load_hue_sensors(storage_window);
-                self.netatmo_history = crate::netatmo::load_history(storage_window);
-                let window = graph_history_window(self.settings.history_retention_minutes);
-                let now = Instant::now();
-                self.history
-                    .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
-                self.history_storage_diagnostics = crate::history::diagnostics(storage_window);
+                // Only change the displayed graph range. Stored history is kept
+                // until the independent maximum retention age is reached.
                 if let Some(index) = self.history_graph_index
                     && let Some((key, name)) = self.history_graph_devices.get(index).cloned()
                 {
