@@ -14857,6 +14857,108 @@ mod copy_feedback_tests {
     use super::*;
 
     #[test]
+    fn copy_sections_export_structured_json_instead_of_heading_text() {
+        let mut app = AppModel::default();
+        app.settings.password = "router-password-do-not-copy".into();
+        app.settings.netatmo_client_secret = "oauth-client-secret-do-not-copy".into();
+        app.settings.openweathermap_api_key = "weather-api-key-do-not-copy".into();
+        app.settings.hue_application_key = "hue-token-do-not-copy".into();
+        app.devices.push(FritzDevice {
+            ain: "12:34-56".into(),
+            name: "Kitchen meter".into(),
+        });
+        app.selected_ains.push("12:34-56".into());
+        app.readings.push(FritzReading {
+            ain: "123456".into(),
+            name: "Kitchen meter".into(),
+            power_w: 42,
+            has_power_meter: true,
+            temperature_c: 22.5,
+            power_state: Some(true),
+            power_controllable: true,
+            power_toggle_allowed: true,
+        });
+        app.device_history.insert(
+            "123456".into(),
+            VecDeque::from([(Instant::now(), 42, 22.5)]),
+        );
+        let device = app.section_json("device:123456").unwrap();
+        assert_eq!(device["data"]["power_w"], 42);
+        assert_eq!(device["data"]["temperature_c"], 22.5);
+        assert_eq!(device["data"]["history"][0]["watts"], 42);
+        assert_eq!(device["data"]["reachable"], true);
+        assert_eq!(device["format"], "fritz-power-monitor.section.v1");
+        let all = app.section_json("devices").unwrap();
+        assert_eq!(all["data"]["fritz_tasmota"][0]["power_w"], 42);
+        let json = serde_json::to_string_pretty(&all).unwrap();
+        assert!(serde_json::from_str::<serde_json::Value>(&json).is_ok());
+        for secret in [
+            "router-password-do-not-copy",
+            "oauth-client-secret-do-not-copy",
+            "weather-api-key-do-not-copy",
+            "hue-token-do-not-copy",
+        ] {
+            assert!(!json.contains(secret), "export leaked a credential");
+        }
+    }
+
+    #[test]
+    fn graph_copy_uses_unique_section_ids_and_includes_recorded_samples() {
+        let mut app = AppModel::default();
+        let now = Instant::now();
+        app.history.push_back((now, 88));
+        app.bandwidth_history.push_back((now, 1200, 800));
+        app.hue_sensors.push(HueSensor {
+            id: "hue-42".into(),
+            name: "Hall motion sensor".into(),
+            temperature_c: Some(20.2),
+            illuminance_lux: Some(200.0),
+            motion: Some(false),
+            reachable: true,
+        });
+        app.hue_sensor_history.insert(
+            "hue-42".into(),
+            VecDeque::from([(now, Some(20.2), Some(200.0))]),
+        );
+        app.netatmo_sensors.push(NetatmoSensor {
+            id: "netatmo-42".into(),
+            name: "Bedroom".into(),
+            is_outdoor: false,
+            temperature_c: Some(19.0),
+            humidity_percent: Some(42.0),
+            co2_ppm: Some(900.0),
+            pressure_hpa: None,
+            noise_db: None,
+            rain_mm: None,
+            wind_kmh: None,
+            reachable: false,
+        });
+        app.netatmo_history.entry("netatmo-42".into()).or_default()
+            .entry("co2".into()).or_default().push_back((now, 900.0));
+
+        let hue = app.section_json("hue-sensor-graph-lux-hue-42").unwrap();
+        assert_eq!(hue["data"]["current"], 200.0);
+        assert_eq!(hue["data"]["samples"][0]["value"], 200.0);
+        let netatmo = app.section_json("netatmo-sensor-graph-co2-netatmo-42").unwrap();
+        assert!(netatmo["data"]["current"].is_null());
+        assert_eq!(netatmo["data"]["history"][0]["value"], 900.0);
+        let bandwidth = app.section_json("graph-bandwidth-pair").unwrap();
+        assert_eq!(bandwidth["data"]["history"][0]["download_bits_per_second"], 1200);
+        let output = app.section_json("graph-overview-output-power").unwrap();
+        assert_eq!(output["data"]["output_history"][0]["watts"], 88);
+        for key in [
+            "summary", "weather", "total-power-overview", "current-power-history",
+            "daily-energy-history", "graph-overview-daily-input",
+            "graph-overview-daily-output", "graph-overview-daily-ratio",
+            "internet-bandwidth", "devices", "hue-sensor:hue-42", "netatmo:netatmo-42",
+        ] {
+            assert!(app.section_json(key).is_some(), "missing JSON section {key}");
+        }
+        assert!(app.section_json("UNKNOWN HEADING").is_none());
+        assert!(app.section_json("hue-light:no-such-id").is_none());
+    }
+
+    #[test]
     fn copy_icon_pulses_and_returns_to_idle_without_affecting_other_buttons() {
         let start = Instant::now();
         let feedback = ("Title".to_string(), start);
