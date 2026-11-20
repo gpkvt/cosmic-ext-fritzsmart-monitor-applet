@@ -336,8 +336,30 @@ pub fn run() -> Result<(), String> {
             }
             println!("Enter a private or link-local Hue Bridge IP address.");
         };
-        settings.hue_application_key =
-            prompt_required_secret("Hue application key", &settings.hue_application_key)?;
+        if confirm(
+            "Pair this Hue Bridge using its physical link button?",
+            settings.hue_application_key.is_empty(),
+        )? {
+            println!("Press the Hue Bridge link button now (30-second pairing window).");
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|error| format!("Cannot start Hue pairing: {error}"))?;
+            match runtime.block_on(crate::hue::pair(settings.hue_bridge_ip.clone())) {
+                Ok(key) => {
+                    settings.hue_application_key = key;
+                    println!("Hue Bridge paired successfully.");
+                }
+                Err(error) => {
+                    println!("Hue pairing failed: {error}");
+                    println!("Enter an existing application key to continue.");
+                }
+            }
+        }
+        if settings.hue_application_key.is_empty() {
+            settings.hue_application_key =
+                prompt_required_secret("Hue application key", &settings.hue_application_key)?;
+        }
     }
 
     if confirm(
