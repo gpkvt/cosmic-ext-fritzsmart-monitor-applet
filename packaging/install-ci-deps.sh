@@ -10,7 +10,7 @@ sudo apt-get install -y --no-install-recommends \
     libexpat1-dev libfontconfig-dev libfreetype-dev \
     libxkbcommon-dev libwayland-dev libudev-dev libssl-dev \
     libdbus-1-dev libx11-dev libxrandr-dev libxi-dev \
-    dpkg-dev desktop-file-utils \
+    dpkg-dev desktop-file-utils elfutils \
     flatpak flatpak-builder \
     python3 python3-venv python3-pip \
     ca-certificates curl file git tar xz-utils
