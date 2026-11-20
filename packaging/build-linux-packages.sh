@@ -24,7 +24,7 @@ require_command() {
 }
 
 for command in cargo curl dpkg-deb dpkg-shlibdeps desktop-file-validate \
-    flatpak flatpak-builder eu-strip eu-elfcompress git python3 sha256sum file; do
+    flatpak flatpak-builder eu-strip eu-elfcompress rsvg-convert git python3 sha256sum file; do
     require_command "$command"
 done
 
@@ -208,6 +208,26 @@ mkdir -p "$FLATPAK_SOURCE"
 )
 cp "$WORKSPACE/Cargo.toml" "$WORKSPACE/Cargo.lock" "$WORKSPACE/build.rs" "$FLATPAK_SOURCE/"
 cp -r "$WORKSPACE/src" "$WORKSPACE/data" "$FLATPAK_SOURCE/"
+# The SVG is kept for Debian/AppImage, but flatpak export rejects it on
+# Ubuntu's minimal runners ("Format not recognized"). Export a raster icon
+# instead; Flatpak supports a properly named 128x128 PNG without SVG loaders.
+FLATPAK_PNG="$FLATPAK_SOURCE/data/$APP_ID.png"
+rsvg-convert --width=128 --height=128 --format=png "$ICON" > "$FLATPAK_PNG"
+python3 - "$FLATPAK_PNG" <<'PY'
+from pathlib import Path
+import struct
+import sys
+
+icon = Path(sys.argv[1]).read_bytes()
+if (
+    len(icon) < 33
+    or icon[:8] != bytes((137, 80, 78, 71, 13, 10, 26, 10))
+    or icon[12:16] != b"IHDR"
+    or struct.unpack(">II", icon[16:24]) != (128, 128)
+):
+    raise SystemExit("Generated Flatpak PNG icon is missing or invalid")
+print("Flatpak application icon: 128x128 PNG verified")
+PY
 # flatpak-cargo-generator stores cargo/config as an inline source in the
 # generated manifest; it is materialized by flatpak-builder, not in this
 # staging directory. Validate the generated source manifest here instead.
