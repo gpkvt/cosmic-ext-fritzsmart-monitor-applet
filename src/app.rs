@@ -243,6 +243,7 @@ pub enum Message {
     PanelExcludeSolarTemperatureChanged(bool),
     PanelNetPowerChanged(bool),
     GraphTimespanChanged(u32),
+    HistoryRetentionChanged(u32),
     GraphStyleChanged(String),
     TemperatureUnitChanged(String),
     ShowGraph(String, GraphSamples, String, Option<String>),
@@ -794,10 +795,10 @@ fn max_device_history_minutes(samples: &VecDeque<(Instant, i64, f64)>, now: Inst
         .unwrap_or(5)
 }
 
-// Keep up to 30 days on disk so changing a device graph's range can load
-// older samples instead of being limited to the previously selected range.
+// Retention is independent of the visible graph range and applies to all
+// persisted histories, not just device graphs.
 fn graph_history_storage_window(minutes: u32) -> Duration {
-    graph_history_window(minutes).max(Duration::from_secs(30 * 24 * 60 * 60))
+    graph_history_window(minutes)
 }
 
 fn rebuild_device_history_graph(
@@ -4993,7 +4994,7 @@ impl cosmic::Application for AppModel {
             settings.url = "http://fritz.box".into();
         }
         let history_window = graph_history_window(settings.graph_timespan_minutes);
-        let history_storage_window = graph_history_storage_window(settings.graph_timespan_minutes);
+        let history_storage_window = graph_history_storage_window(settings.history_retention_minutes);
         let (mut history, device_history) = crate::history::load(history_storage_window);
         let hue_sensor_history = crate::history::load_hue_sensors(history_storage_window);
         let netatmo_history = crate::netatmo::load_history(history_storage_window);
@@ -11047,7 +11048,7 @@ impl cosmic::Application for AppModel {
                         notify_missing_devices(&newly_missing, &self.settings.language);
                         notify_recovered_devices(&recovered, &self.settings.language);
                         let history_window =
-                            graph_history_window(self.settings.graph_timespan_minutes);
+                            graph_history_window(self.settings.history_retention_minutes);
                         if let Some(bandwidth) = result.internet_bandwidth.as_ref() {
                             record_bandwidth_sample(
                                 &mut self.bandwidth_history,
@@ -11084,9 +11085,9 @@ impl cosmic::Application for AppModel {
                             let total_power = output_power_w(&readings, &self.settings.input_ains);
                             let now = Instant::now();
                             let history_window =
-                                graph_history_window(self.settings.graph_timespan_minutes);
+                                graph_history_window(self.settings.history_retention_minutes);
                             let device_history_window =
-                                graph_history_storage_window(self.settings.graph_timespan_minutes);
+                                graph_history_storage_window(self.settings.history_retention_minutes);
                             record_power_sample(
                                 &mut self.history,
                                 total_power,
@@ -11212,7 +11213,7 @@ impl cosmic::Application for AppModel {
                                 );
                             }
                             self.history_storage_diagnostics = crate::history::diagnostics(
-                                graph_history_storage_window(self.settings.graph_timespan_minutes),
+                                graph_history_storage_window(self.settings.history_retention_minutes),
                             );
                             self.error = None;
                             self.updated =
@@ -11657,11 +11658,11 @@ impl cosmic::Application for AppModel {
                     self.settings.graph_timespan_minutes =
                         self.quick_graph_timespan.clamp(5, 2_102_400);
                     let storage_window =
-                        graph_history_storage_window(self.settings.graph_timespan_minutes);
+                        graph_history_storage_window(self.settings.history_retention_minutes);
                     (self.history, self.device_history) = crate::history::load(storage_window);
                     self.hue_sensor_history = crate::history::load_hue_sensors(storage_window);
                 self.netatmo_history = crate::netatmo::load_history(storage_window);
-                    let window = graph_history_window(self.settings.graph_timespan_minutes);
+                    let window = graph_history_window(self.settings.history_retention_minutes);
                     let now = Instant::now();
                     self.history
                         .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
@@ -12116,7 +12117,7 @@ impl cosmic::Application for AppModel {
                         }
                         match snapshot.stations {
                             Ok(sensors) => {
-                                let window = graph_history_storage_window(self.settings.graph_timespan_minutes);
+                                let window = graph_history_storage_window(self.settings.history_retention_minutes);
                                 let now = Instant::now();
                                 for sensor in &sensors {
                                     crate::netatmo::record_history(&mut self.netatmo_history, sensor, now, window);
@@ -12447,7 +12448,7 @@ impl cosmic::Application for AppModel {
                     Ok(snapshot) => {
                         let now = Instant::now();
                         let window =
-                            graph_history_storage_window(self.settings.graph_timespan_minutes);
+                            graph_history_storage_window(self.settings.history_retention_minutes);
                         for sensor in &snapshot.sensors {
                             record_hue_sensor_sample(
                                 &mut self.hue_sensor_history,
@@ -12610,11 +12611,11 @@ impl cosmic::Application for AppModel {
                 self.settings.graph_timespan_minutes = value.clamp(5, 2_102_400);
                 self.quick_graph_timespan = self.settings.graph_timespan_minutes;
                 let storage_window =
-                    graph_history_storage_window(self.settings.graph_timespan_minutes);
+                    graph_history_storage_window(self.settings.history_retention_minutes);
                 (self.history, self.device_history) = crate::history::load(storage_window);
                 self.hue_sensor_history = crate::history::load_hue_sensors(storage_window);
                 self.netatmo_history = crate::netatmo::load_history(storage_window);
-                let window = graph_history_window(self.settings.graph_timespan_minutes);
+                let window = graph_history_window(self.settings.history_retention_minutes);
                 let now = Instant::now();
                 self.history
                     .retain(|(timestamp, _)| now.duration_since(*timestamp) <= window);
@@ -14560,7 +14561,7 @@ mod history_tests {
         assert_eq!(graph_history_window(15), Duration::from_secs(900));
         assert_eq!(
             graph_history_storage_window(15),
-            Duration::from_secs(30 * 24 * 60 * 60)
+            Duration::from_secs(15 * 60)
         );
         assert_eq!(
             graph_history_storage_window(43_200),
