@@ -4,6 +4,8 @@
 
 ### Improved
 
+- Fix Flatpak release export on Ubuntu runners by generating and validating a 128×128 PNG application icon from the existing SVG. Keep SVG artwork for the Debian and AppImage formats while exporting a PNG Flatpak icon supported without host SVG loaders.
+
 - Rebuild the Linux release workflow with separate immutable-source preparation, strict validation/four-format packaging and atomic publication jobs. Use identical versioned sources across builds and tags, verify every asset and checksum before publishing, and keep valid Flatpak metainfo without invoking the broken Ubuntu host AppStream compose step.
 
 - Fix Linux release and package workflows failing during Flatpak bundling because `eu-strip` was missing on Ubuntu 24.04 runners. Install `elfutils` explicitly and check both `eu-strip` and `eu-elfcompress` before the expensive package build.
