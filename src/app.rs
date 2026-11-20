@@ -4261,6 +4261,338 @@ impl AppModel {
     /// Single source of truth for removing saved FRITZ!/Tasmota device
     /// references. Called once per device for both individual and bulk removal;
     /// callers persist after their entire operation is complete.
+    fn json_device_data(&self, canonical: &str, now: Instant) -> Option<serde_json::Value> {
+        let id_matches = |id: &str| crate::fritz::canonical_device_key(id) == canonical;
+        let known = self.devices.iter().find(|device| id_matches(&device.ain));
+        let live = self.readings.iter().find(|reading| id_matches(&reading.ain));
+        if known.is_none() && live.is_none() {
+            return None;
+        }
+        let history = self.device_history.iter()
+            .find(|(id, _)| id_matches(id))
+            .map(|(_, history)| json_device_samples(history, now))
+            .unwrap_or_default();
+        Some(serde_json::json!({
+            "id": live.map(|reading| reading.ain.as_str())
+                .or_else(|| known.map(|device| device.ain.as_str())),
+            "name": live.map(|reading| reading.name.as_str())
+                .or_else(|| known.map(|device| device.name.as_str())),
+            "reachable": live.is_some(),
+            "selected": self.selected_ains.iter().any(|id| id_matches(id)),
+            "is_power_input": self.settings.input_ains.iter().any(|id| id_matches(id)),
+            "power_w": live.and_then(|reading|
+                reading.has_power_meter.then_some(reading.power_w)),
+            "temperature_c": live.and_then(|reading|
+                reading.temperature_c.is_finite().then_some(reading.temperature_c)),
+            "power_state": live.and_then(|reading| reading.power_state),
+            "power_controllable": live.is_some_and(|reading| reading.power_controllable),
+            "power_toggle_allowed": live.is_some_and(|reading| reading.power_toggle_allowed),
+            "history": history,
+        }))
+    }
+
+    fn json_hue_light(&self, id: &str) -> Option<serde_json::Value> {
+        let light = self.hue_lights.iter().find(|light| light.id == id)?;
+        Some(serde_json::json!({
+            "id": &light.id,
+            "name": &light.name,
+            "reachable": light.reachable,
+            "on": light.reachable.then_some(light.on).flatten(),
+        }))
+    }
+
+    fn json_hue_sensor(&self, id: &str, now: Instant) -> Option<serde_json::Value> {
+        let sensor = self.hue_sensors.iter().find(|sensor| sensor.id == id)?;
+        let history: Vec<serde_json::Value> = self.hue_sensor_history.get(id)
+            .into_iter().flat_map(|samples| samples.iter())
+            .map(|(at, temperature, lux)| serde_json::json!({
+                "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+                "temperature_c": temperature.filter(|value| value.is_finite()),
+                "illuminance_lux": lux.filter(|value| value.is_finite() && *value >= 0.0),
+            }))
+            .collect();
+        Some(serde_json::json!({
+            "id": &sensor.id,
+            "name": &sensor.name,
+            "reachable": sensor.reachable,
+            "temperature_c": sensor.reachable.then_some(sensor.temperature_c)
+                .flatten().filter(|value| value.is_finite()),
+            "illuminance_lux": sensor.reachable.then_some(sensor.illuminance_lux)
+                .flatten().filter(|value| value.is_finite() && *value >= 0.0),
+            "motion": sensor.reachable.then_some(sensor.motion).flatten(),
+            "history": history,
+        }))
+    }
+
+    fn json_netatmo_metric(
+        &self,
+        sensor: &NetatmoSensor,
+        metric: &str,
+        now: Instant,
+    ) -> Option<serde_json::Value> {
+        let (_, label, unit) = crate::netatmo::METRICS.iter()
+            .find(|(key, _, _)| *key == metric)?;
+        let samples: Vec<serde_json::Value> = self.netatmo_history.get(&sensor.id)
+            .and_then(|by_metric| by_metric.get(metric))
+            .into_iter().flat_map(|samples| samples.iter())
+            .filter(|(_, value)| value.is_finite())
+            .map(|(at, value)| serde_json::json!({
+                "age_seconds": now.saturating_duration_since(*at).as_secs_f64(),
+                "value": value,
+            })).collect();
+        Some(serde_json::json!({
+            "metric": metric,
+            "label": label,
+            "unit": unit,
+            "current": crate::netatmo::metric_value(sensor, metric),
+            "history": samples,
+        }))
+    }
+
+    fn json_netatmo_sensor(&self, id: &str, now: Instant) -> Option<serde_json::Value> {
+        let sensor = self.netatmo_sensors.iter().find(|sensor| sensor.id == id)?;
+        let metrics: Vec<_> = crate::netatmo::METRICS.iter()
+            .filter_map(|(metric, _, _)| self.json_netatmo_metric(sensor, metric, now))
+            .collect();
+        Some(serde_json::json!({
+            "id": &sensor.id,
+            "name": &sensor.name,
+            "reachable": sensor.reachable,
+            "is_outdoor": sensor.is_outdoor,
+            "metrics": metrics,
+        }))
+    }
+
+    /// Build a fresh, section-scoped snapshot even for collapsed sections.
+    /// The stable section key distinguishes duplicate names and translations.
+    fn section_json(&self, key: &str) -> Option<serde_json::Value> {
+        let now = Instant::now();
+        let power_history = || json_power_samples(&self.history, now);
+        let input_history = || {
+            let samples = rebuild_input_power_history(
+                &self.device_history, &self.settings.input_ains,
+            );
+            json_power_samples(&samples, now)
+        };
+        let power_totals = || serde_json::json!({
+            "input_w": self.readings.iter().any(|reading| {
+                reading.has_power_meter &&
+                    self.settings.input_ains.iter().any(|id| {
+                        crate::fritz::canonical_device_key(id)
+                            == crate::fritz::canonical_device_key(&reading.ain)
+                    })
+            }).then_some(input_display_power_w(
+                input_power_w(&self.readings, &self.settings.input_ains))),
+            "output_w": self.readings.iter().any(|reading| reading.has_power_meter)
+                .then_some(output_power_w(&self.readings, &self.settings.input_ains)),
+        });
+        let router = || self.fritzbox_system_info.as_ref().map(|info| serde_json::json!({
+            "manufacturer": &info.manufacturer,
+            "model": &info.model,
+            "product_class": &info.product_class,
+            "hardware_version": &info.hardware_version,
+            "software_version": &info.software_version,
+            "uptime_seconds": info.uptime_seconds,
+            "wan": info.wan.as_ref().map(|wan| serde_json::json!({
+                "access_type": &wan.access_type,
+                "physical_link_status": &wan.physical_link_status,
+                "download_bits_per_second": wan.download_bits_per_second,
+                "upload_bits_per_second": wan.upload_bits_per_second,
+            })),
+        }));
+        let bandwidth = || self.internet_bandwidth.as_ref().map(|bandwidth| serde_json::json!({
+            "download_bits_per_second": bandwidth.download_bits_per_second,
+            "upload_bits_per_second": bandwidth.upload_bits_per_second,
+        }));
+        let data = match key {
+            "summary" => serde_json::json!({
+                "totals": power_totals(),
+                "readings": self.readings.iter().filter_map(|reading| {
+                    self.json_device_data(&crate::fritz::canonical_device_key(&reading.ain), now)
+                }).collect::<Vec<_>>(),
+                "router": router(),
+                "last_updated": &self.updated,
+            }),
+            "total-power-overview" => serde_json::json!({
+                "totals": power_totals(),
+                "output_history": power_history(),
+                "input_history": input_history(),
+                "daily_energy": json_daily_energy_rows(&self.device_history, &self.settings),
+                "power_unit": "W",
+                "energy_unit": "Wh",
+            }),
+            "current-power-history" => serde_json::json!({
+                "totals": power_totals(),
+                "output_history": power_history(),
+                "input_history": input_history(),
+                "unit": "W",
+            }),
+            "graph-overview-output-power" => serde_json::json!({
+                "unit": "W", "output_history": power_history(),
+            }),
+            "graph-overview-input-power" => serde_json::json!({
+                "unit": "W", "input_history": input_history(),
+            }),
+            "daily-energy-history" => serde_json::json!({
+                "daily_energy": json_daily_energy_rows(&self.device_history, &self.settings),
+                "energy_unit": "Wh",
+            }),
+            "graph-overview-daily-input" | "graph-overview-daily-output"
+                | "graph-overview-daily-ratio" => {
+                let field = match key {
+                    "graph-overview-daily-input" => "input_wh",
+                    "graph-overview-daily-output" => "output_wh",
+                    _ => "input_output_percent",
+                };
+                let rows = json_daily_energy_rows(&self.device_history, &self.settings);
+                serde_json::json!({
+                    "metric": field,
+                    "unit": if field == "input_output_percent" { "%" } else { "Wh" },
+                    "days": rows.iter().map(|day| serde_json::json!({
+                        "date": &day["date"],
+                        "value": &day[field],
+                    })).collect::<Vec<_>>(),
+                })
+            }
+            "internet-bandwidth" | "graph-bandwidth-pair" => serde_json::json!({
+                "current": bandwidth(),
+                "history": json_bandwidth_samples(&self.bandwidth_history, now),
+                "unit": "bits/s",
+            }),
+            "devices" => {
+                let mut fritz_ids: Vec<String> = self.devices.iter()
+                    .map(|device| crate::fritz::canonical_device_key(&device.ain))
+                    .collect();
+                for reading in &self.readings {
+                    let id = crate::fritz::canonical_device_key(&reading.ain);
+                    if !fritz_ids.contains(&id) {
+                        fritz_ids.push(id);
+                    }
+                }
+                serde_json::json!({
+                    "fritz_tasmota": fritz_ids.iter()
+                        .filter_map(|id| self.json_device_data(id, now))
+                        .collect::<Vec<_>>(),
+                    "hue_lights": self.hue_lights.iter()
+                        .filter_map(|light| self.json_hue_light(&light.id))
+                        .collect::<Vec<_>>(),
+                    "hue_sensors": self.hue_sensors.iter()
+                        .filter_map(|sensor| self.json_hue_sensor(&sensor.id, now))
+                        .collect::<Vec<_>>(),
+                    "netatmo": self.netatmo_sensors.iter()
+                        .filter_map(|sensor| self.json_netatmo_sensor(&sensor.id, now))
+                        .collect::<Vec<_>>(),
+                })
+            }
+            "weather" => serde_json::json!({
+                "current": self.weather.as_ref().map(|weather| serde_json::json!({
+                    "source": "OpenWeatherMap",
+                    "location": &weather.location_name,
+                    "description": &weather.description,
+                    "temperature_c": weather.temperature_c,
+                    "feels_like_c": weather.feels_like_c,
+                    "humidity_percent": weather.humidity_percent,
+                    "pressure_hpa": weather.pressure_hpa,
+                    "wind_speed_mps": weather.wind_speed_mps,
+                    "wind_direction_degrees": weather.wind_direction_degrees,
+                    "cloudiness_percent": weather.cloudiness_percent,
+                    "visibility_m": weather.visibility_m,
+                    "sunrise_unix": weather.sunrise_unix,
+                    "sunset_unix": weather.sunset_unix,
+                    "outdoor_air_pollution": weather.air_pollution.as_ref().map(|air| {
+                        serde_json::json!({
+                            "source": "OpenWeatherMap Air Pollution",
+                            "aqi_1_to_5": air.aqi,
+                            "pm2_5_ug_m3": air.pm2_5,
+                            "pm10_ug_m3": air.pm10,
+                            "no2_ug_m3": air.no2,
+                            "o3_ug_m3": air.o3,
+                        })
+                    }),
+                    "image_attributions": weather.image_attributions.iter().map(|credit|
+                        serde_json::json!({
+                            "title": &credit.title,
+                            "artist": &credit.artist,
+                            "license": &credit.license,
+                            "license_url": &credit.license_url,
+                            "page_url": &credit.page_url,
+                        })
+                    ).collect::<Vec<_>>(),
+                })),
+                "forecast": self.weather_forecast.as_ref().map(|forecast|
+                    forecast.days.iter().map(|day| serde_json::json!({
+                        "date": &day.date,
+                        "weather_code": day.weather_code,
+                        "description": &day.description,
+                        "min_temperature_c": day.min_temperature_c,
+                        "max_temperature_c": day.max_temperature_c,
+                        "precipitation_probability_percent": day.precipitation_probability_percent,
+                        "wind_speed_kmh": day.wind_speed_kmh,
+                    })).collect::<Vec<_>>()),
+                "netatmo_extras_enabled": self.settings.weather_netatmo_extra_metrics,
+                "netatmo_extras": self.settings.weather_netatmo_extra_metrics.then(|| {
+                    self.netatmo_sensors.iter().filter_map(|sensor|
+                        self.json_netatmo_sensor(&sensor.id, now)
+                    ).collect::<Vec<_>>()
+                }),
+                "error": &self.weather_error,
+            }),
+            _ => {
+                if let Some(id) = key.strip_prefix("device:") {
+                    self.json_device_data(id, now)?
+                } else if let Some(id) = key.strip_prefix("hue-light:") {
+                    self.json_hue_light(id)?
+                } else if let Some(id) = key.strip_prefix("hue-sensor:") {
+                    self.json_hue_sensor(id, now)?
+                } else if let Some(id) = key.strip_prefix("netatmo:") {
+                    self.json_netatmo_sensor(id, now)?
+                } else if let Some(id) = key.strip_prefix("hue-sensor-graph-temperature-") {
+                    let sensor = self.json_hue_sensor(id, now)?;
+                    serde_json::json!({
+                        "metric": "temperature_c",
+                        "unit": "°C",
+                        "current": &sensor["temperature_c"],
+                        "samples": sensor["history"].as_array().into_iter().flatten()
+                            .map(|sample| serde_json::json!({
+                                "age_seconds": &sample["age_seconds"],
+                                "value": &sample["temperature_c"],
+                            })).collect::<Vec<_>>(),
+                    })
+                } else if let Some(id) = key.strip_prefix("hue-sensor-graph-lux-") {
+                    let sensor = self.json_hue_sensor(id, now)?;
+                    serde_json::json!({
+                        "metric": "illuminance_lux",
+                        "unit": "lx",
+                        "current": &sensor["illuminance_lux"],
+                        "samples": sensor["history"].as_array().into_iter().flatten()
+                            .map(|sample| serde_json::json!({
+                                "age_seconds": &sample["age_seconds"],
+                                "value": &sample["illuminance_lux"],
+                            })).collect::<Vec<_>>(),
+                    })
+                } else {
+                    let metric_match = crate::netatmo::METRICS.iter()
+                        .find_map(|(metric, _, _)| key.strip_prefix(
+                            &format!("netatmo-sensor-graph-{metric}-")
+                        ).map(|id| (*metric, id)));
+                    if let Some((metric, id)) = metric_match {
+                        let sensor = self.netatmo_sensors.iter().find(|s| s.id == id)?;
+                        self.json_netatmo_metric(sensor, metric, now)?
+                    } else {
+                        return None;
+                    }
+                }
+            }
+        };
+        Some(serde_json::json!({
+            "format": "fritz-power-monitor.section.v1",
+            "section": key,
+            "exported_at_utc": chrono::Utc::now().to_rfc3339(),
+            "graph_timespan_minutes": self.settings.graph_timespan_minutes,
+            "data": data,
+        }))
+    }
+
     fn forget_saved_device(&mut self, ain: &str) {
         let canonical = crate::fritz::canonical_device_key(ain);
         let same_device = |id: &str| crate::fritz::canonical_device_key(id) == canonical;
@@ -10790,9 +11122,24 @@ impl cosmic::Application for AppModel {
                 self.copy_feedback = Some((url.clone(), Instant::now()));
                 return cosmic::iced::clipboard::write(url);
             }
-            Message::CopyMenuTitle(title) => {
-                self.copy_feedback = Some((title.clone(), Instant::now()));
-                return cosmic::iced::clipboard::write(title);
+            Message::CopySectionJson(section_key) => {
+                if let Some(snapshot) = self.section_json(&section_key) {
+                    match serde_json::to_string_pretty(&snapshot) {
+                        Ok(json) => {
+                            self.copy_feedback = Some((section_key, Instant::now()));
+                            return cosmic::iced::clipboard::write(json);
+                        }
+                        Err(error) => record_diagnostic_event(
+                            &mut self.diagnostic_events,
+                            format!("Could not encode section JSON: {error}"),
+                        ),
+                    }
+                } else {
+                    record_diagnostic_event(
+                        &mut self.diagnostic_events,
+                        "No exportable data available for this section.",
+                    );
+                }
             }
             Message::ClearDiagnosticEvents => {
                 self.diagnostic_events.clear();
